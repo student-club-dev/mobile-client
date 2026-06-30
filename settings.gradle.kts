@@ -1,3 +1,7 @@
+rootProject.name = "StudentClubs"
+
+enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
+
 pluginManagement {
     repositories {
         google {
@@ -11,6 +15,7 @@ pluginManagement {
         gradlePluginPortal()
     }
 }
+
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
@@ -19,7 +24,20 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "Student Clubs"
-include(":app")
-include(":data")
-include(":domain")
+// App entry points
+include(":androidApp")
+
+// Core modules
+include(":dev:core:common")
+include(":dev:core:designsystem")
+include(":dev:core:network")
+include(":dev:core:database")
+include(":dev:core:domain")
+include(":dev:core:data")
+include(":dev:core:di")
+
+// Feature modules
+include(":dev:feature:auth")
+
+// iOS framework + Compose App() aggregator
+include(":dev:shared")
