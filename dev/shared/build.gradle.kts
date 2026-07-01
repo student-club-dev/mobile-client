@@ -14,6 +14,8 @@ kotlin {
             baseName = "Shared"
             isStatic = true
             export(projects.dev.core.di)
+            // Swift tomonidagi social auth bridge (IosSocialAuthBridge/Delegate) ko'rinsin
+            export(projects.dev.feature.auth)
         }
     }
 
@@ -21,7 +23,7 @@ kotlin {
         commonMain.dependencies {
             api(projects.dev.core.di)
             implementation(projects.dev.core.designsystem)
-            implementation(projects.dev.feature.auth)
+            api(projects.dev.feature.auth)
 
             implementation(compose.runtime)
             implementation(compose.foundation)

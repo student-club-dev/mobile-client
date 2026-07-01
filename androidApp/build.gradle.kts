@@ -3,6 +3,7 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.compose.multiplatform)
     alias(libs.plugins.compose.compiler)
+    alias(libs.plugins.google.services)
 }
 
 android {
@@ -42,6 +43,10 @@ dependencies {
     implementation(projects.dev.shared)
     implementation(projects.dev.core.di)
     implementation(projects.dev.core.designsystem)
+
+    // Firebase (Google + Phone auth) — google-services.json orqali sozlanadi
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.auth)
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)

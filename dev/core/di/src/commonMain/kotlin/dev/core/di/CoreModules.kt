@@ -10,6 +10,7 @@ import dev.core.database.sql.StudentClubsDatabase
 import dev.core.domain.repository.AuthRepository
 import dev.core.domain.repository.ClubRepository
 import dev.core.domain.usecase.LoginUseCase
+import dev.core.domain.usecase.SyncExternalUserUseCase
 import dev.core.network.NetworkConfig
 import dev.core.network.createHttpClient
 import io.ktor.client.HttpClient
@@ -39,6 +40,7 @@ val repositoryModule = module {
 
 val domainModule = module {
     factory { LoginUseCase(get()) }
+    factory { SyncExternalUserUseCase(get()) }
 }
 
 /** DriverFactory platformaga bog'liq (Android: Context kerak). */

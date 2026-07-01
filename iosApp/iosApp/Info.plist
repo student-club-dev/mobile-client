@@ -31,5 +31,20 @@
     <array>
         <string>UIInterfaceOrientationPortrait</string>
     </array>
+    <!--
+      Google Sign-In uchun REVERSED_CLIENT_ID ni (GoogleService-Info.plist dan)
+      shu yerga qo'ying. Firebase Phone auth uchun ham xuddi shu URL scheme kerak.
+    -->
+    <key>CFBundleURLTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleTypeRole</key>
+            <string>Editor</string>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <string>com.googleusercontent.apps.000000000000-placeholderplaceholderplaceholder</string>
+            </array>
+        </dict>
+    </array>
 </dict>
 </plist>
