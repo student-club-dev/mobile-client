@@ -21,6 +21,15 @@ interface IosSocialAuthDelegate {
     /** onResult(user, errorMessage) — user null bo'lsa xato yoki bekor qilingan. */
     fun signInWithGoogle(onResult: (IosAuthUser?, String?) -> Unit)
 
+    /** Apple (ASAuthorization + Firebase OAuthProvider) orqali kirish. */
+    fun signInWithApple(onResult: (IosAuthUser?, String?) -> Unit)
+
+    /**
+     * Telegram — [url] ni ASWebAuthenticationSession'da ochadi, [callbackScheme] bilan
+     * qaytgan custom token orqali Firebase'ga kiradi.
+     */
+    fun signInWithTelegram(url: String, callbackScheme: String, onResult: (IosAuthUser?, String?) -> Unit)
+
     /** onResult(sent, autoUser, errorMessage) — iOS'da odatda faqat sent=true. */
     fun sendOtp(phoneNumber: String, onResult: (Boolean, IosAuthUser?, String?) -> Unit)
 
@@ -51,6 +60,26 @@ private class IosSocialAuthController : SocialAuthController {
         return suspendCancellableCoroutine { cont ->
             d.signInWithGoogle { user, error ->
                 if (!cont.isActive) return@signInWithGoogle
+                cont.resume(user.toResult(error))
+            }
+        }
+    }
+
+    override suspend fun signInWithApple(): SocialAuthResult {
+        val d = delegate ?: return notWired()
+        return suspendCancellableCoroutine { cont ->
+            d.signInWithApple { user, error ->
+                if (!cont.isActive) return@signInWithApple
+                cont.resume(user.toResult(error))
+            }
+        }
+    }
+
+    override suspend fun signInWithTelegram(): SocialAuthResult {
+        val d = delegate ?: return notWired()
+        return suspendCancellableCoroutine { cont ->
+            d.signInWithTelegram(TelegramConfig.authUrl, TelegramConfig.REDIRECT_SCHEME) { user, error ->
+                if (!cont.isActive) return@signInWithTelegram
                 cont.resume(user.toResult(error))
             }
         }
@@ -97,7 +126,12 @@ private class IosSocialAuthController : SocialAuthController {
 
 private fun IosAuthUser.toExternal(): ExternalAuthUser = ExternalAuthUser(
     uid = uid,
-    provider = if (provider == "google") AuthProvider.GOOGLE else AuthProvider.PHONE,
+    provider = when (provider) {
+        "google" -> AuthProvider.GOOGLE
+        "apple" -> AuthProvider.APPLE
+        "telegram" -> AuthProvider.TELEGRAM
+        else -> AuthProvider.PHONE
+    },
     fullName = fullName,
     email = email,
     phoneNumber = phoneNumber,

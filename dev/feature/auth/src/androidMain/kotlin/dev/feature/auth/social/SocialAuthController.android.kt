@@ -16,6 +16,7 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.auth.GoogleAuthProvider
+import com.google.firebase.auth.OAuthProvider
 import com.google.firebase.auth.PhoneAuthCredential
 import com.google.firebase.auth.PhoneAuthOptions
 import com.google.firebase.auth.PhoneAuthProvider
@@ -71,6 +72,41 @@ private class AndroidSocialAuthController(
             SocialAuthResult.Error(e.message ?: "Google Sign-In amalga oshmadi")
         } catch (e: Exception) {
             SocialAuthResult.Error(e.message ?: "Google Sign-In amalga oshmadi")
+        }
+    }
+
+    override suspend fun signInWithApple(): SocialAuthResult {
+        val activity = context.findActivity()
+            ?: return SocialAuthResult.Error("Activity topilmadi — Apple kirish uchun kerak")
+        return try {
+            val provider = OAuthProvider.newBuilder("apple.com").apply {
+                scopes = listOf("email", "name")
+            }.build()
+            // Ekran aylanishidan keyin qolgan natija bo'lsa — o'shani olamiz
+            val pending = auth.pendingAuthResult
+            val result = (pending ?: auth.startActivityForSignInWithProvider(activity, provider)).await()
+            val user = result.user
+                ?: return SocialAuthResult.Error("Firebase foydalanuvchisi topilmadi")
+            SocialAuthResult.Success(user.toExternal(AuthProvider.APPLE))
+        } catch (e: Exception) {
+            val msg = e.message.orEmpty()
+            if (msg.contains("cancel", ignoreCase = true) || msg.contains("closed", ignoreCase = true)) {
+                SocialAuthResult.Cancelled
+            } else {
+                SocialAuthResult.Error(msg.ifBlank { "Apple bilan kirish amalga oshmadi" })
+            }
+        }
+    }
+
+    override suspend fun signInWithTelegram(): SocialAuthResult {
+        return try {
+            val token = TelegramAuthLauncher.launch(context, TelegramConfig.authUrl)
+                ?: return SocialAuthResult.Cancelled
+            val user = auth.signInWithCustomToken(token).await().user
+                ?: return SocialAuthResult.Error("Firebase foydalanuvchisi topilmadi")
+            SocialAuthResult.Success(user.toExternal(AuthProvider.TELEGRAM))
+        } catch (e: Exception) {
+            SocialAuthResult.Error(e.message ?: "Telegram bilan kirish amalga oshmadi")
         }
     }
 

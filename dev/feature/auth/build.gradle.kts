@@ -3,6 +3,7 @@ plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.compose.multiplatform)
     alias(libs.plugins.compose.compiler)
+    alias(libs.plugins.kotlin.serialization)
 }
 
 kotlin {
@@ -26,10 +27,16 @@ kotlin {
 
             implementation(libs.androidx.lifecycle.viewmodel)
             implementation(libs.androidx.lifecycle.runtimeCompose)
+            implementation(libs.androidx.navigation.compose)
             implementation(libs.koin.core)
             implementation(libs.koin.compose)
             implementation(libs.koin.compose.viewmodel)
             implementation(libs.kotlinx.coroutines.core)
+
+            // GitLive Firebase — email/parol, parolni tiklash, Firestore profil (backendsiz)
+            implementation(libs.gitlive.firebase.auth)
+            implementation(libs.gitlive.firebase.firestore)
+            implementation(libs.gitlive.firebase.functions)
         }
 
         androidMain.dependencies {
@@ -43,6 +50,8 @@ kotlin {
             // Task<T>.await() uchun
             implementation(libs.kotlinx.coroutines.playServices)
             implementation(libs.androidx.activity.compose)
+            // Telegram login — Custom Tabs (web oqim)
+            implementation(libs.androidx.browser)
         }
     }
 }

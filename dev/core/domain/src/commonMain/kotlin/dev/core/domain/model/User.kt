@@ -12,7 +12,7 @@ data class User(
 enum class UserRole { STUDENT, ADMIN }
 
 /** Foydalanuvchi ro'yxatdan o'tgan usul. */
-enum class AuthProvider { EMAIL, GOOGLE, PHONE }
+enum class AuthProvider { EMAIL, GOOGLE, APPLE, PHONE, TELEGRAM }
 
 /**
  * Firebase (Google yoki Telefon OTP) orqali autentifikatsiyadan o'tgan

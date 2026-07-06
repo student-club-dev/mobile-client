@@ -4,12 +4,21 @@ import FirebaseAuth
 import FirebaseCore
 import GoogleSignIn
 import UIKit
+import AuthenticationServices
+import CryptoKit
 
-/// Kotlin `IosSocialAuthDelegate` ni Firebase + GoogleSignIn orqali amalga oshiradi.
+/// Kotlin `IosSocialAuthDelegate` ni Firebase + GoogleSignIn + Apple orqali amalga oshiradi.
 /// `iOSApp.init()` da `IosSocialAuthBridge.shared.delegate = SocialAuthBridge()` deb ulanadi.
 final class SocialAuthBridge: NSObject, IosSocialAuthDelegate {
 
     private var phoneVerificationId: String?
+
+    // Apple oqimi uchun holat
+    private var appleCompletion: ((IosAuthUser?, String?) -> Void)?
+    private var currentNonce: String?
+
+    // Telegram web-auth sessiyasiga kuchli havola
+    private var webAuthSession: ASWebAuthenticationSession?
 
     // MARK: - Google
 
@@ -57,9 +66,64 @@ final class SocialAuthBridge: NSObject, IosSocialAuthDelegate {
         }
     }
 
+    // MARK: - Apple
+
+    func signInWithApple(onResult: @escaping (IosAuthUser?, String?) -> Void) {
+        let nonce = Self.randomNonceString()
+        currentNonce = nonce
+        appleCompletion = onResult
+
+        let request = ASAuthorizationAppleIDProvider().createRequest()
+        request.requestedScopes = [.fullName, .email]
+        request.nonce = Self.sha256(nonce)
+
+        let controller = ASAuthorizationController(authorizationRequests: [request])
+        controller.delegate = self
+        controller.presentationContextProvider = self
+        controller.performRequests()
+    }
+
+    // MARK: - Telegram
+
+    func signInWithTelegram(url: String, callbackScheme: String, onResult: @escaping (IosAuthUser?, String?) -> Void) {
+        guard let authURL = URL(string: url) else {
+            onResult(nil, "Telegram URL noto‘g‘ri")
+            return
+        }
+        let session = ASWebAuthenticationSession(url: authURL, callbackURLScheme: callbackScheme) { callbackURL, error in
+            if let error = error {
+                if (error as NSError).code == ASWebAuthenticationSessionError.canceledLogin.rawValue {
+                    onResult(nil, nil) // Cancelled
+                } else {
+                    onResult(nil, error.localizedDescription)
+                }
+                return
+            }
+            guard
+                let callbackURL = callbackURL,
+                let token = URLComponents(url: callbackURL, resolvingAgainstBaseURL: false)?
+                    .queryItems?.first(where: { $0.name == "token" })?.value
+            else {
+                onResult(nil, "Telegram token olinmadi")
+                return
+            }
+            Auth.auth().signIn(withCustomToken: token) { authResult, err in
+                if let err = err {
+                    onResult(nil, err.localizedDescription)
+                    return
+                }
+                onResult(Self.map(authResult?.user, provider: "telegram"), nil)
+            }
+        }
+        session.presentationContextProvider = self
+        session.prefersEphemeralWebBrowserSession = false
+        webAuthSession = session
+        session.start()
+    }
+
     // MARK: - Phone (OTP)
 
-    func sendOtp(phoneNumber: String, onResult: @escaping (Bool, IosAuthUser?, String?) -> Void) {
+    func sendOtp(phoneNumber: String, onResult: @escaping (KotlinBoolean, IosAuthUser?, String?) -> Void) {
         PhoneAuthProvider.provider().verifyPhoneNumber(phoneNumber, uiDelegate: nil) { [weak self] verificationID, error in
             if let error = error {
                 onResult(false, nil, error.localizedDescription)
@@ -106,5 +170,98 @@ final class SocialAuthBridge: NSObject, IosSocialAuthDelegate {
     private static func rootViewController() -> UIViewController? {
         let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene
         return scene?.windows.first(where: { $0.isKeyWindow })?.rootViewController
+    }
+
+    /// Firebase talab qiladigan tasodifiy nonce.
+    private static func randomNonceString(length: Int = 32) -> String {
+        let charset: [Character] = Array("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-._")
+        var result = ""
+        var remaining = length
+        while remaining > 0 {
+            var random: UInt8 = 0
+            let status = SecRandomCopyBytes(kSecRandomDefault, 1, &random)
+            if status == errSecSuccess {
+                if random < UInt8(charset.count) {
+                    result.append(charset[Int(random)])
+                    remaining -= 1
+                }
+            }
+        }
+        return result
+    }
+
+    private static func sha256(_ input: String) -> String {
+        let hashed = SHA256.hash(data: Data(input.utf8))
+        return hashed.map { String(format: "%02x", $0) }.joined()
+    }
+}
+
+// MARK: - Apple delegate
+
+extension SocialAuthBridge: ASAuthorizationControllerDelegate, ASAuthorizationControllerPresentationContextProviding, ASWebAuthenticationPresentationContextProviding {
+
+    func presentationAnchor(for controller: ASAuthorizationController) -> ASPresentationAnchor {
+        let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene
+        return scene?.windows.first(where: { $0.isKeyWindow }) ?? ASPresentationAnchor()
+    }
+
+    func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
+        let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene
+        return scene?.windows.first(where: { $0.isKeyWindow }) ?? ASPresentationAnchor()
+    }
+
+    func authorizationController(controller: ASAuthorizationController, didCompleteWithAuthorization authorization: ASAuthorization) {
+        let completion = appleCompletion
+        appleCompletion = nil
+
+        guard
+            let appleIDCredential = authorization.credential as? ASAuthorizationAppleIDCredential,
+            let nonce = currentNonce,
+            let tokenData = appleIDCredential.identityToken,
+            let idToken = String(data: tokenData, encoding: .utf8)
+        else {
+            completion?(nil, "Apple token olinmadi")
+            return
+        }
+
+        let credential = OAuthProvider.appleCredential(
+            withIDToken: idToken,
+            rawNonce: nonce,
+            fullName: appleIDCredential.fullName
+        )
+        Auth.auth().signIn(with: credential) { authResult, error in
+            if let error = error {
+                completion?(nil, error.localizedDescription)
+                return
+            }
+            // Apple faqat birinchi marta ism beradi — uni Firebase profilига yozamiz
+            if let fullName = appleIDCredential.fullName,
+               let user = authResult?.user,
+               (user.displayName?.isEmpty ?? true) {
+                let name = [fullName.givenName, fullName.familyName]
+                    .compactMap { $0 }
+                    .joined(separator: " ")
+                if !name.isEmpty {
+                    let changeRequest = user.createProfileChangeRequest()
+                    changeRequest.displayName = name
+                    changeRequest.commitChanges { _ in
+                        completion?(Self.map(user, provider: "apple"), nil)
+                    }
+                    return
+                }
+            }
+            completion?(Self.map(authResult?.user, provider: "apple"), nil)
+        }
+    }
+
+    func authorizationController(controller: ASAuthorizationController, didCompleteWithError error: Error) {
+        let completion = appleCompletion
+        appleCompletion = nil
+        let nsError = error as NSError
+        if nsError.code == ASAuthorizationError.canceled.rawValue {
+            completion?(nil, nil) // Cancelled
+        } else {
+            completion?(nil, error.localizedDescription)
+        }
     }
 }

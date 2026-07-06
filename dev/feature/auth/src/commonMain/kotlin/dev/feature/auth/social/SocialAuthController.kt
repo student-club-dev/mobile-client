@@ -16,6 +16,15 @@ interface SocialAuthController {
     /** Google hisob tanlash oynasini ochadi va Firebase'ga kirtadi. */
     suspend fun signInWithGoogle(): SocialAuthResult
 
+    /** Apple "Sign in with Apple" oqimini ochadi va Firebase'ga kiritadi. */
+    suspend fun signInWithApple(): SocialAuthResult
+
+    /**
+     * Telegram Login oqimini ochadi (web) — Cloud Function custom token qaytaradi,
+     * shu token bilan Firebase'ga kiriladi.
+     */
+    suspend fun signInWithTelegram(): SocialAuthResult
+
     /**
      * [phoneNumber] (E.164, masalan "+998901234567") ga SMS kod yuboradi.
      * Android'da avtomatik tasdiqlanishi mumkin ([OtpSendResult.AutoVerified]).
