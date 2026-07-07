@@ -1,0 +1,48 @@
+CREATE TABLE ConversationEntity (
+    id TEXT NOT NULL PRIMARY KEY,
+    peerName TEXT NOT NULL,
+    peerInitial TEXT NOT NULL,
+    type TEXT NOT NULL,
+    online INTEGER NOT NULL,
+    lastMessage TEXT NOT NULL,
+    lastTime TEXT NOT NULL,
+    unreadCount INTEGER NOT NULL
+);
+
+CREATE TABLE MessageEntity (
+    id TEXT NOT NULL PRIMARY KEY,
+    conversationId TEXT NOT NULL,
+    body TEXT NOT NULL,
+    outgoing INTEGER NOT NULL,
+    time TEXT NOT NULL,
+    createdAt INTEGER NOT NULL
+);
+
+selectConversations:
+SELECT * FROM ConversationEntity ORDER BY unreadCount DESC;
+
+selectMessages:
+SELECT * FROM MessageEntity WHERE conversationId = ? ORDER BY createdAt ASC;
+
+countConversations:
+SELECT count(*) FROM ConversationEntity;
+
+upsertConversation:
+INSERT OR REPLACE INTO ConversationEntity(id, peerName, peerInitial, type, online, lastMessage, lastTime, unreadCount)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+
+insertMessage:
+INSERT OR REPLACE INTO MessageEntity(id, conversationId, body, outgoing, time, createdAt)
+VALUES (?, ?, ?, ?, ?, ?);
+
+touchConversation:
+UPDATE ConversationEntity SET lastMessage = ?, lastTime = ?, unreadCount = ? WHERE id = ?;
+
+markRead:
+UPDATE ConversationEntity SET unreadCount = 0 WHERE id = ?;
+
+clearConversations:
+DELETE FROM ConversationEntity;
+
+clearMessages:
+DELETE FROM MessageEntity;

@@ -126,6 +126,68 @@ object AuthIcons {
         "M10 11h4",
         "M10 15h4",
     )
+    val Home = strokeIcon(
+        "Home",
+        "M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z",
+        "M9 21v-8h6v8",
+    )
+    val Bell = strokeIcon(
+        "Bell",
+        "M10.268 21a2 2 0 0 0 3.464 0",
+        "M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326z",
+    )
+    val Tag = strokeIcon(
+        "Tag",
+        "M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z",
+        "M7.5 7.5h.01",
+    )
+    val Users = strokeIcon(
+        "Users",
+        "M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2",
+        "M9 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8z",
+        "M22 21v-2a4 4 0 0 0-3-3.87",
+        "M16 3.13a4 4 0 0 1 0 7.75",
+    )
+    val Plus = strokeIcon("Plus", "M5 12h14", "M12 5v14")
+    val ChevronRight = strokeIcon("ChevronRight", "m9 18 6-6-6-6")
+    val Bookmark = strokeIcon(
+        "Bookmark",
+        "m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z",
+    )
+    val Filter = strokeIcon("Filter", "M22 3H2l8 9.46V19l4 2v-8.54z")
+    val Send = strokeIcon("Send", "M22 2 11 13", "M22 2 15 22l-4-9-9-4z")
+    val Settings = strokeIcon(
+        "Settings",
+        "M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z",
+        "M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z",
+    )
+    val LogOut = strokeIcon("LogOut", "M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4", "m16 17 5-5-5-5", "M21 12H9")
+    val FileText = strokeIcon(
+        "FileText",
+        "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z",
+        "M14 2v6h6",
+        "M9 13h6",
+        "M9 17h6",
+    )
+    val Pencil = strokeIcon(
+        "Pencil",
+        "M12 20h9",
+        "M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4z",
+    )
+    val Star = strokeIcon("Star", "M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14l-5-4.87 6.91-1.01z")
+    val ImageIcon = strokeIcon(
+        "Image",
+        "M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z",
+        "M8.5 10a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z",
+        "m21 15-5-5L5 21",
+    )
+    val UserPlus = strokeIcon(
+        "UserPlus",
+        "M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2",
+        "M9 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8z",
+        "M19 8v6",
+        "M22 11h-6",
+    )
 
     /** Apple logo — bitta to'ldirilgan yo'l; `Icon(tint=...)` bilan bo'yaladi. */
     val Apple: ImageVector = ImageVector.Builder(

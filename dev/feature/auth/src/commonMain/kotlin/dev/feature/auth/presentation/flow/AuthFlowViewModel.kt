@@ -7,7 +7,9 @@ import dev.core.domain.model.ExternalAuthUser
 import dev.core.domain.model.User
 import dev.core.domain.model.UserProfile
 import dev.core.domain.usecase.ConfirmEmailSignupUseCase
+import dev.core.domain.usecase.HasProfileUseCase
 import dev.core.domain.usecase.LoginUseCase
+import dev.core.domain.usecase.ObserveCurrentUserUseCase
 import dev.core.domain.usecase.RegisterUseCase
 import dev.core.domain.usecase.RequestEmailSignupUseCase
 import dev.core.domain.usecase.SaveProfileUseCase
@@ -21,9 +23,12 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -61,6 +66,8 @@ class AuthFlowViewModel(
     private val confirmEmailSignupUseCase: ConfirmEmailSignupUseCase,
     private val saveProfileUseCase: SaveProfileUseCase,
     private val syncExternalUserUseCase: SyncExternalUserUseCase,
+    private val hasProfileUseCase: HasProfileUseCase,
+    observeCurrentUserUseCase: ObserveCurrentUserUseCase,
     /** true → email kodi (Cloud Function) ishlatiladi; false → native (deploy'siz). */
     private val useEmailCode: Boolean = false,
 ) : ViewModel() {
@@ -70,6 +77,14 @@ class AuthFlowViewModel(
 
     private val _events = Channel<AuthEvent>(Channel.BUFFERED)
     val events: Flow<AuthEvent> = _events.receiveAsFlow()
+
+    /**
+     * Ilova ochilishida avtomatik kirish holati (local keshdan):
+     * `null` — hali tekshirilmoqda (splash), `true` — kirgan (HOME), `false` — kirmagan (onboarding).
+     */
+    val loggedIn: StateFlow<Boolean?> = observeCurrentUserUseCase()
+        .map { it != null }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     /** OTP orqali tasdiqlangan foydalanuvchi — ro'yxatni yakunlashda ishlatiladi. */
     private var verifiedExternal: ExternalAuthUser? = null
@@ -132,10 +147,7 @@ class AuthFlowViewModel(
                     startResendTimer()
                     _events.send(AuthEvent.OtpSent)
                 }
-                is OtpSendResult.AutoVerified -> {
-                    verifiedExternal = result.user
-                    syncAndFinish(result.user)
-                }
+                is OtpSendResult.AutoVerified -> onPhoneVerified(result.user)
                 is OtpSendResult.Error -> _state.update { it.copy(isLoading = false, error = result.message) }
             }
         }
@@ -151,11 +163,7 @@ class AuthFlowViewModel(
         _state.update { it.copy(isLoading = true, error = null) }
         viewModelScope.launch {
             when (val result = controller.confirmOtp(s.otp)) {
-                is SocialAuthResult.Success -> {
-                    verifiedExternal = result.user
-                    _state.update { it.copy(isLoading = false) }
-                    _events.send(AuthEvent.OtpVerified)
-                }
+                is SocialAuthResult.Success -> onPhoneVerified(result.user)
                 SocialAuthResult.Cancelled -> _state.update { it.copy(isLoading = false) }
                 is SocialAuthResult.Error -> _state.update { it.copy(isLoading = false, error = result.message) }
             }
@@ -393,6 +401,21 @@ class AuthFlowViewModel(
     fun clearError() = _state.update { it.copy(error = null, info = null) }
 
     // ------------------------------------------------------------------
+    /**
+     * Telefon OTP tasdiqlangач (qo'lda yoki avto): Firebase sessiyasi tayyor.
+     * Profil bor bo'lsa — mavjud foydalanuvchi → HOME.
+     * Profil yo'q bo'lsa — yangi foydalanuvchi → SignUp (rol/ism to'ldirish).
+     */
+    private suspend fun onPhoneVerified(external: ExternalAuthUser) {
+        verifiedExternal = external
+        if (hasProfileUseCase()) {
+            syncAndFinish(external) // mavjud foydalanuvchi → HOME
+        } else {
+            _state.update { it.copy(isLoading = false) }
+            _events.send(AuthEvent.OtpVerified) // yangi foydalanuvchi → SignUp
+        }
+    }
+
     private suspend fun syncAndFinish(external: ExternalAuthUser) {
         when (val synced = syncExternalUserUseCase(external)) {
             is Resource.Success -> finishAuthenticated(synced.data)

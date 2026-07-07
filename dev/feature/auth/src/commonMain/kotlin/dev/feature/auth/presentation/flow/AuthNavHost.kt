@@ -73,6 +73,14 @@ private object Route {
  */
 @Composable
 fun AuthNavHost(vm: AuthFlowViewModel = koinViewModel()) {
+    // Local keshdagi sessiyani tekshiramiz: kirgan bo'lsa to'g'ridan-to'g'ri HOME.
+    val loggedIn by vm.loggedIn.collectAsStateWithLifecycle()
+    if (loggedIn == null) {
+        BootSplash() // kesh o'qilmagунча qisqa splash
+        return
+    }
+    val startDestination = if (loggedIn == true) Route.HOME else Route.ONBOARDING
+
     val nav = rememberNavController()
     val state by vm.state.collectAsStateWithLifecycle()
     val socialAuth = rememberSocialAuthController()
@@ -83,9 +91,15 @@ fun AuthNavHost(vm: AuthFlowViewModel = koinViewModel()) {
         vm.events.collect { event ->
             when (event) {
                 AuthEvent.OtpSent -> nav.navigate(Route.OTP)
-                AuthEvent.OtpVerified -> nav.navigate(Route.SIGNUP)
+                // Kod ishlatildi — orqaga qaytib bekor bo'lgan OTP ekraniga tushmasin.
+                AuthEvent.OtpVerified -> nav.navigate(Route.SIGNUP) {
+                    popUpTo(Route.OTP) { inclusive = true }
+                }
                 AuthEvent.EmailVerificationSent -> nav.navigate(Route.VERIFY_EMAIL)
-                AuthEvent.Registered -> nav.navigate(Route.SUCCESS)
+                // Hisob yaratildi — orqaga qaytib ro'yxat formasini qayta yubormasin.
+                AuthEvent.Registered -> nav.navigate(Route.SUCCESS) {
+                    popUpTo(Route.WELCOME)
+                }
                 AuthEvent.ProfileSaved,
                 is AuthEvent.Authenticated -> nav.navigate(Route.HOME) {
                     popUpTo(Route.ONBOARDING) { inclusive = true }
@@ -95,7 +109,7 @@ fun AuthNavHost(vm: AuthFlowViewModel = koinViewModel()) {
         }
     }
 
-    NavHost(navController = nav, startDestination = Route.ONBOARDING) {
+    NavHost(navController = nav, startDestination = startDestination) {
         composable(Route.ONBOARDING) {
             OnboardingScreen(
                 onNext = { nav.navigate(Route.WELCOME) },
@@ -207,31 +221,26 @@ fun AuthNavHost(vm: AuthFlowViewModel = koinViewModel()) {
                 onSelectDone = { nav.popBackStack() },
             )
         }
-        composable(Route.HOME) { HomeStub() }
-    }
-}
-
-/** Uy sahifasi hali qurilmagan — oqim shu yerda tugaydi. */
-@Composable
-private fun HomeStub() {
-    val palette = authPalette
-    AuthScreenScaffold {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                LogoTile(size = 72, radius = 22, iconSize = 38)
-                Text("Xush kelibsiz! 🎉", style = TextStyle(fontFamily = AuthFontFamily, fontSize = 22.sp, fontWeight = FontWeight.Black, color = palette.ink))
-                Text(
-                    "Autentifikatsiya oqimi tugadi.\nBosh sahifa keyingi bosqichda quriladi.",
-                    style = TextStyle(fontFamily = AuthFontFamily, fontSize = 13.sp, color = palette.inkMuted, textAlign = TextAlign.Center, lineHeight = 19.sp),
-                )
-                Box(
-                    Modifier.size(width = 46.dp, height = 46.dp)
-                        .background(palette.successBg, RoundedCornerShape(999.dp)),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(AuthIcons.Check, null, tint = palette.successDeep, modifier = Modifier.size(24.dp))
-                }
-            }
+        composable(Route.HOME) {
+            dev.feature.auth.presentation.main.MainShell(
+                onLoggedOut = {
+                    nav.navigate(Route.WELCOME) {
+                        popUpTo(Route.HOME) { inclusive = true }
+                        launchSingleTop = true
+                    }
+                },
+            )
         }
     }
 }
+
+/** Kesh o'qilguncha ko'rsatiladigan qisqa boshlang'ich ekran (session restore). */
+@Composable
+private fun BootSplash() {
+    AuthScreenScaffold {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            LogoTile(size = 72, radius = 22, iconSize = 38)
+        }
+    }
+}
+

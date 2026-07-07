@@ -1,12 +1,19 @@
 package dev.feature.auth.data
 
+import app.cash.sqldelight.coroutines.asFlow
+import app.cash.sqldelight.coroutines.mapToOneOrNull
 import dev.core.common.Resource
+import dev.core.database.sql.StudentClubsDatabase
+import dev.core.database.sql.UserEntity
 import dev.core.domain.model.ExternalAuthUser
 import dev.core.domain.model.User
 import dev.core.domain.model.UserProfile
 import dev.core.domain.model.UserRole
 import dev.core.domain.repository.AuthRepository
 import dev.gitlive.firebase.Firebase
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import dev.gitlive.firebase.auth.FirebaseAuthInvalidCredentialsException
 import dev.gitlive.firebase.auth.FirebaseAuthInvalidUserException
 import dev.gitlive.firebase.auth.FirebaseAuthUserCollisionException
@@ -28,24 +35,33 @@ import dev.gitlive.firebase.functions.functions
  * singleton ustida ishlaydi — shu sabab native controller kiritgan sessiya bu yerda
  * ham ko'rinadi.
  */
-class FirebaseAuthRepository : AuthRepository {
+class FirebaseAuthRepository(
+    /** Local sessiya keshi (SQLDelight) — offline ishlash va avtomatik kirish uchun. */
+    private val database: StudentClubsDatabase,
+) : AuthRepository {
 
     private val auth get() = Firebase.auth
     private val db get() = Firebase.firestore
     private val fns get() = Firebase.functions
+    private val userQueries get() = database.userQueries
 
     override suspend fun login(email: String, password: String): Resource<User> = try {
-        val user = auth.signInWithEmailAndPassword(email, password).user
+        val fbUser = auth.signInWithEmailAndPassword(email, password).user
             ?: return Resource.Error("Foydalanuvchi topilmadi")
-        Resource.Success(user.toDomainUser(loadProfile(user.uid)))
+        val profile = loadProfile(fbUser.uid)
+        val user = fbUser.toDomainUser(profile)
+        cacheUser(fbUser.uid, user, profile)
+        Resource.Success(user)
     } catch (e: Exception) {
         Resource.Error(mapError(e), e)
     }
 
     override suspend fun register(email: String, password: String): Resource<User> = try {
-        val user = auth.createUserWithEmailAndPassword(email, password).user
+        val fbUser = auth.createUserWithEmailAndPassword(email, password).user
             ?: return Resource.Error("Hisob yaratilmadi")
-        Resource.Success(user.toDomainUser(null))
+        val user = fbUser.toDomainUser(null)
+        cacheUser(fbUser.uid, user, null)
+        Resource.Success(user)
     } catch (e: Exception) {
         Resource.Error(mapError(e), e)
     }
@@ -76,30 +92,116 @@ class FirebaseAuthRepository : AuthRepository {
     }
 
     override suspend fun syncExternalUser(external: ExternalAuthUser): Resource<User> {
-        val user = auth.currentUser
+        val fbUser = auth.currentUser
             ?: return Resource.Error("Firebase sessiyasi topilmadi")
-        return Resource.Success(user.toDomainUser(loadProfile(user.uid)))
+        val profile = loadProfile(fbUser.uid)
+        val user = fbUser.toDomainUser(profile)
+        cacheUser(fbUser.uid, user, profile)
+        return Resource.Success(user)
     }
 
     override suspend fun saveProfile(profile: UserProfile): Resource<Unit> {
-        val uid = auth.currentUser?.uid ?: return Resource.Error("Sessiya topilmadi — avval kiring")
+        val fbUser = auth.currentUser ?: return Resource.Error("Sessiya topilmadi — avval kiring")
         return try {
-            db.collection("users").document(uid)
+            db.collection("users").document(fbUser.uid)
                 .set(ProfileDto.serializer(), ProfileDto.from(profile), merge = true)
+            // Local keshni yangilaymiz — offline'da ham profil ko'rinadi
+            cacheUser(fbUser.uid, fbUser.toDomainUser(profile), profile)
             Resource.Success(Unit)
         } catch (e: Exception) {
             Resource.Error(mapError(e), e)
         }
     }
 
+    override suspend fun hasProfile(): Boolean {
+        val uid = auth.currentUser?.uid ?: return false
+        return try {
+            db.collection("users").document(uid).get().exists
+        } catch (e: Exception) {
+            false
+        }
+    }
+
     override suspend fun logout() {
         auth.signOut()
+        userQueries.clear() // local sessiya keshini tozalaymiz
     }
 
     override suspend fun currentUser(): User? {
-        val user = auth.currentUser ?: return null
-        return user.toDomainUser(loadProfile(user.uid))
+        val fbUser = auth.currentUser
+        if (fbUser == null) {
+            userQueries.clear() // sessiya yo'q — eskirgan keshni tozalaymiz
+            return null
+        }
+        // Offline-first: kesh bo'lsa darrov qaytaramiz (tarmoqsiz ishlaydi)
+        cachedUser()?.let { return it }
+        // Kesh bo'sh — Firebase/Firestore'dan tiklab keshlaymiz
+        val profile = loadProfile(fbUser.uid)
+        val user = fbUser.toDomainUser(profile)
+        cacheUser(fbUser.uid, user, profile)
+        return user
     }
+
+    override fun observeCurrentUser(): Flow<User?> =
+        userQueries.selectCurrent()
+            .asFlow()
+            .mapToOneOrNull(Dispatchers.Default)
+            .map { it?.toDomainUser() }
+
+    override fun observeProfile(): Flow<UserProfile?> =
+        userQueries.selectCurrent()
+            .asFlow()
+            .mapToOneOrNull(Dispatchers.Default)
+            .map { it?.toProfile() }
+
+    // ------------------------------------------------------------------
+    // Local kesh (SQLDelight)
+    // ------------------------------------------------------------------
+    private fun cachedUser(): User? =
+        userQueries.selectCurrent().executeAsOneOrNull()?.toDomainUser()
+
+    /** Bitta joriy-foydalanuvchi qatorini yozadi (avval eskisini o'chirib). */
+    private fun cacheUser(uid: String, user: User, profile: UserProfile?) {
+        userQueries.transaction {
+            userQueries.clear()
+            userQueries.upsert(
+                uid = uid,
+                userId = user.id,
+                fullName = user.fullName,
+                email = user.email,
+                role = user.role.name,
+                phoneNumber = user.phoneNumber,
+                photoUrl = user.photoUrl,
+                firstName = profile?.firstName,
+                lastName = profile?.lastName,
+                universityId = profile?.universityId,
+                universityEmail = profile?.universityEmail,
+                birthYear = profile?.birthYear?.toLong(),
+                courseYear = profile?.courseYear,
+                profileRole = profile?.role,
+            )
+        }
+    }
+
+    private fun UserEntity.toDomainUser(): User = User(
+        id = userId,
+        fullName = fullName,
+        email = email,
+        role = runCatching { UserRole.valueOf(role) }.getOrDefault(UserRole.STUDENT),
+        phoneNumber = phoneNumber,
+        photoUrl = photoUrl,
+    )
+
+    private fun UserEntity.toProfile(): UserProfile = UserProfile(
+        firstName = firstName,
+        lastName = lastName,
+        phoneNumber = phoneNumber,
+        role = profileRole,
+        universityId = universityId,
+        universityEmail = universityEmail,
+        birthYear = birthYear?.toInt(),
+        courseYear = courseYear,
+    )
 
     // ------------------------------------------------------------------
     private suspend fun loadProfile(uid: String): UserProfile? = try {

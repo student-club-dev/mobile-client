@@ -19,6 +19,11 @@ kotlin {
             api(projects.dev.core.domain)
             implementation(projects.dev.core.designsystem)
             implementation(projects.dev.core.common)
+            implementation(projects.dev.core.database)
+
+            // Local sessiya keshi (offline + avtomatik kirish)
+            implementation(libs.sqldelight.runtime)
+            implementation(libs.sqldelight.coroutines)
 
             implementation(compose.runtime)
             implementation(compose.foundation)
