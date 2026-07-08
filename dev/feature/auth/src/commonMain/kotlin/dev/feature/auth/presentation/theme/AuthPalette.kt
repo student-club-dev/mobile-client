@@ -6,6 +6,7 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import dev.core.designsystem.theme.LocalDarkTheme
 import dev.core.designsystem.theme.BgBottomDark
 import dev.core.designsystem.theme.BgBottomLight
 import dev.core.designsystem.theme.BgMidDark
@@ -112,8 +113,11 @@ private val DarkAuthPalette = AuthPalette(
     onPrimary = Color.White,
 )
 
-/** Joriy rejimga mos auth palitrasi. */
+/** Joriy rejimga mos auth palitrasi (foydalanuvchi mavzu tanloviga ergashadi, aks holda tizim). */
 val authPalette: AuthPalette
     @Composable
     @ReadOnlyComposable
-    get() = if (isSystemInDarkTheme()) DarkAuthPalette else LightAuthPalette
+    get() {
+        val dark = LocalDarkTheme.current ?: isSystemInDarkTheme()
+        return if (dark) DarkAuthPalette else LightAuthPalette
+    }
