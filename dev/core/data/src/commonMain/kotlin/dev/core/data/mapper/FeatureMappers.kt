@@ -122,6 +122,7 @@ fun ConversationEntity.toDomain(): Conversation = Conversation(
     lastMessage = lastMessage,
     lastTime = lastTime,
     unreadCount = unreadCount.toInt(),
+    archived = archived != 0L,
 )
 
 fun MessageEntity.toDomain(): Message = Message(

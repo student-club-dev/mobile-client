@@ -14,6 +14,7 @@ import io.ktor.client.call.body
 import io.ktor.client.request.get
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withContext
 
 class ClubRepositoryImpl(
     private val client: HttpClient,
@@ -39,5 +40,9 @@ class ClubRepositoryImpl(
         Resource.Success(dtos.map { it.toDomain() })
     } catch (e: Exception) {
         Resource.Error(e.message ?: "Klublarni yuklab bo'lmadi", e)
+    }
+
+    override suspend fun setJoined(id: Long, joined: Boolean) = withContext(dispatchers.io) {
+        database.clubQueries.setJoined(if (joined) 1L else 0L, id)
     }
 }

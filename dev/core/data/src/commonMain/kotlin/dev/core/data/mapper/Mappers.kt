@@ -18,4 +18,5 @@ fun ClubEntity.toDomain(): Club = Club(
     description = description,
     membersCount = membersCount.toInt(),
     imageUrl = imageUrl,
+    joined = joined != 0L,
 )

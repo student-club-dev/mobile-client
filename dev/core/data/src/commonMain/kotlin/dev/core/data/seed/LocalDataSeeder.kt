@@ -25,6 +25,8 @@ class LocalDataSeeder(
         seedStudents()
         seedAds()
         seedChat()
+        seedNotifications()
+        seedClubs()
     }
 
     private fun seedUniversities() {
@@ -120,6 +122,31 @@ class LocalDataSeeder(
             q.insertMessage("c-dilnoza-2", "c-dilnoza", "Ha, bor! Hozir yuboraman 👍", true.toDb(), "14:21", 2000)
             q.insertMessage("c-dilnoza-3", "c-dilnoza", "Ertaga kutubxonada uchrashamizmi?", false.toDb(), "14:22", 3000)
             q.insertMessage("c-dilnoza-4", "c-dilnoza", "Albatta, soat 10 da 👌", true.toDb(), "14:22", 4000)
+        }
+    }
+
+    private fun seedNotifications() {
+        val q = db.notificationQueries
+        if (q.count().executeAsOne() > 0) return
+        q.transaction {
+            q.insert("nt-1", "Yangi ish taklifi", "Uzum Market — Frontend Intern lavozimiga mos keldingiz.", "JOB", "10 daqiqa oldin", 1, 0)
+            q.insert("nt-2", "Chegirma tugayapti", "Chorsu Cafe'dagi 25% chegirma bugun tugaydi.", "DISCOUNT", "2 soat oldin", 2, 0)
+            q.insert("nt-3", "Yangi xabar", "Dilnoza Rahimova sizga xabar yozdi.", "CHAT", "3 soat oldin", 3, 0)
+            q.insert("nt-4", "E'loningiz ko'rildi", "\"MacBook Air M1\" e'loningizni 12 kishi ko'rdi.", "AD", "kecha", 4, 1)
+            q.insert("nt-5", "Xush kelibsiz! 🎉", "StudentClubs'ga xush kelibsiz. Profilingizni to'ldiring.", "SYSTEM", "2 kun oldin", 5, 1)
+        }
+    }
+
+    private fun seedClubs() {
+        val q = db.clubQueries
+        if (q.selectAll().executeAsList().isNotEmpty()) return
+        q.transaction {
+            q.upsert(1, "IT Klub", "Dasturlash, hackathonlar va IT loyihalar jamoasi.", 342, null)
+            q.upsert(2, "Debat Klubi", "Mantiqiy fikrlash va notiqlik san'ati.", 128, null)
+            q.upsert(3, "Sport Klubi", "Futbol, basketbol va umumjismoniy mashg'ulotlar.", 256, null)
+            q.upsert(4, "Volontyorlar", "Ijtimoiy loyihalar va xayriya tadbirlari.", 189, null)
+            q.upsert(5, "Dizayn Studiyasi", "UI/UX, grafika va ijodiy ustaxonalar.", 97, null)
+            q.upsert(6, "Til Klubi", "Ingliz, koreys va arab tillari amaliyoti.", 214, null)
         }
     }
 
