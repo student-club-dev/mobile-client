@@ -50,10 +50,12 @@ private val adTypes = listOf(
 )
 
 @Composable
-fun PostAdScreen(onClose: () -> Unit, vm: PostAdViewModel = koinViewModel()) {
+fun PostAdScreen(onClose: () -> Unit, editAdId: String? = null, vm: PostAdViewModel = koinViewModel()) {
     val palette = authPalette
     val state by vm.state.collectAsStateWithLifecycle()
 
+    // Tahrirlash rejimi — mavjud e'lonni forma'ga yuklaymiz.
+    LaunchedEffect(editAdId) { if (editAdId != null) vm.loadForEdit(editAdId) }
     LaunchedEffect(state.posted) { if (state.posted) onClose() }
 
     if (state.type == null) {

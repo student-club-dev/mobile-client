@@ -51,6 +51,12 @@ class DiscountsViewModel(
         DiscountsUiState(categories, selected, filtered, q, savedIds)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), DiscountsUiState())
 
+    init {
+        // Offline-first: ekran ochilганда fonда backend'dan sinxronlashga urinamiz.
+        // UI DB'ni kuzatadi — xato/tarmoqsiz bo'lsa cache ko'rinaveradi (refresh no-op yoki Error).
+        viewModelScope.launch { discountRepository.refresh() }
+    }
+
     fun open(category: DiscountCategory) {
         query.value = ""
         selectedId.value = category.id

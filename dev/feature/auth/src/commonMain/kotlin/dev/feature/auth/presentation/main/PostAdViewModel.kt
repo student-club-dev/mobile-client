@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -36,6 +37,23 @@ class PostAdViewModel(
     private val _state = MutableStateFlow(PostAdUiState())
     val state: StateFlow<PostAdUiState> = _state.asStateFlow()
 
+    // Tahrirlash rejimi — mavjud e'lonning id/vaqti (submit shu id bilan upsert qiladi).
+    private var editingId: String? = null
+    private var editingCreatedAgo: String? = null
+
+    /** Mavjud e'lonni forma'ga yuklaydi (tahrirlash). */
+    fun loadForEdit(adId: String) {
+        if (editingId == adId) return
+        viewModelScope.launch {
+            val ad = adRepository.observeAds().first().firstOrNull { it.id == adId } ?: return@launch
+            editingId = ad.id
+            editingCreatedAgo = ad.createdAgo
+            _state.update {
+                it.copy(type = ad.type, title = ad.title, category = ad.category, price = ad.price, description = ad.description)
+            }
+        }
+    }
+
     fun selectType(type: AdType) = _state.update { it.copy(type = type) }
     fun backToTypes() = _state.update { it.copy(type = null) }
     fun onTitle(v: String) = _state.update { it.copy(title = v) }
@@ -47,7 +65,9 @@ class PostAdViewModel(
         val s = _state.value
         if (!s.canSubmit || s.type == null) return
         val ownerId = (user.value?.id ?: 0L).toString()
-        val id = "ad-$ownerId-${s.title.hashCode()}"
+        // Tahrirlashda mavjud id/vaqt saqlanadi; yangi e'londa id title'dan generatsiya bo'ladi.
+        val id = editingId ?: "ad-$ownerId-${s.title.hashCode()}"
+        val createdAgo = editingCreatedAgo ?: "hozir"
         viewModelScope.launch {
             adRepository.post(
                 Ad(
@@ -59,7 +79,7 @@ class PostAdViewModel(
                     description = s.description,
                     images = emptyList(),
                     ownerId = ownerId,
-                    createdAgo = "hozir",
+                    createdAgo = createdAgo,
                 ),
             )
             _state.update { it.copy(posted = true) }

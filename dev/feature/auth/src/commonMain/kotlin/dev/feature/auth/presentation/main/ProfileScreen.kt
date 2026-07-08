@@ -20,8 +20,10 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -38,6 +40,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.core.domain.model.Ad
 import dev.feature.auth.presentation.components.AuthFontFamily
 import dev.feature.auth.presentation.components.AuthIcons
 import dev.feature.auth.presentation.theme.AuthPalette
@@ -47,13 +50,20 @@ import org.koin.compose.viewmodel.koinViewModel
 private enum class ProfileSection(val title: String) { MY_ADS("Mening e'lonlarim"), SAVED("Saqlangan chegirmalar"), APPLICATIONS("Ish arizalarim") }
 
 @Composable
-fun ProfileScreen(onBack: () -> Unit, onLoggedOut: () -> Unit, vm: ProfileViewModel = koinViewModel()) {
+fun ProfileScreen(
+    onBack: () -> Unit,
+    onLoggedOut: () -> Unit,
+    onEditProfile: () -> Unit = {},
+    onOpenSettings: () -> Unit = {},
+    onEditAd: (String) -> Unit = {},
+    vm: ProfileViewModel = koinViewModel(),
+) {
     val palette = authPalette
     val state by vm.state.collectAsStateWithLifecycle()
     var section by remember { mutableStateOf<ProfileSection?>(null) }
 
     if (section != null) {
-        SectionList(section!!, state, palette, onBack = { section = null })
+        SectionList(section!!, state, palette, onBack = { section = null }, onDeleteAd = vm::deleteAd, onEditAd = onEditAd)
         return
     }
 
@@ -91,7 +101,10 @@ fun ProfileScreen(onBack: () -> Unit, onLoggedOut: () -> Unit, vm: ProfileViewMo
                     val sub = listOfNotNull(state.universityMonogram, state.courseLabel).joinToString(" · ").ifBlank { state.contact }
                     Text(sub, style = TextStyle(fontFamily = AuthFontFamily, fontSize = 11.5f.sp, color = palette.inkFaint))
                     Spacer(Modifier.height(4.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        Modifier.clip(RoundedCornerShape(8.dp)).clickable(onClick = onEditProfile),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
                         Text("Profilni tahrirlash", style = TextStyle(fontFamily = AuthFontFamily, fontSize = 11.5f.sp, fontWeight = FontWeight.Bold, color = palette.primary))
                         Icon(AuthIcons.ChevronRight, null, tint = palette.primary, modifier = Modifier.size(14.dp))
                     }
@@ -105,7 +118,7 @@ fun ProfileScreen(onBack: () -> Unit, onLoggedOut: () -> Unit, vm: ProfileViewMo
                 MenuRow(AuthIcons.FileText, ProfileSection.MY_ADS.title, "${state.myAds.size}", palette) { section = ProfileSection.MY_ADS }
                 MenuRow(AuthIcons.Bookmark, ProfileSection.SAVED.title, "${state.savedDiscounts.size}", palette) { section = ProfileSection.SAVED }
                 MenuRow(AuthIcons.Briefcase, ProfileSection.APPLICATIONS.title, "${state.applications.size}", palette) { section = ProfileSection.APPLICATIONS }
-                MenuRow(AuthIcons.Settings, "Sozlamalar", null, palette) {}
+                MenuRow(AuthIcons.Settings, "Sozlamalar", null, palette, onClick = onOpenSettings)
             }
 
             Spacer(Modifier.height(16.dp))
@@ -144,7 +157,16 @@ private fun MenuRow(icon: ImageVector, title: String, trailing: String?, palette
 }
 
 @Composable
-private fun SectionList(section: ProfileSection, state: ProfileUiState, palette: AuthPalette, onBack: () -> Unit) {
+private fun SectionList(
+    section: ProfileSection,
+    state: ProfileUiState,
+    palette: AuthPalette,
+    onBack: () -> Unit,
+    onDeleteAd: (String) -> Unit,
+    onEditAd: (String) -> Unit,
+) {
+    var adToDelete by remember { mutableStateOf<Ad?>(null) }
+
     Column(Modifier.fillMaxSize()) {
         Row(
             Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(top = 54.dp),
@@ -163,10 +185,62 @@ private fun SectionList(section: ProfileSection, state: ProfileUiState, palette:
             verticalArrangement = Arrangement.spacedBy(9.dp),
         ) {
             when (section) {
-                ProfileSection.MY_ADS -> items(state.myAds, key = { it.id }) { SimpleRow(it.title, "${it.category} · ${it.price}", it.createdAgo, palette) }
+                ProfileSection.MY_ADS -> items(state.myAds, key = { it.id }) { ad ->
+                    DeletableAdRow(ad.title, "${ad.category} · ${ad.price}", ad.createdAgo, palette, onEdit = { onEditAd(ad.id) }, onDelete = { adToDelete = ad })
+                }
                 ProfileSection.SAVED -> items(state.savedDiscounts, key = { it.id }) { SimpleRow("${it.merchant} — ${it.title}", "−${it.discountPercent}%", it.expiry ?: "", palette) }
                 ProfileSection.APPLICATIONS -> items(state.applications, key = { it.id }) { SimpleRow(it.jobTitle, it.company, statusLabel(it.status.name), palette) }
             }
+        }
+    }
+
+    val target = adToDelete
+    if (target != null) {
+        AlertDialog(
+            onDismissRequest = { adToDelete = null },
+            title = { Text("E'lonni o'chirish", style = TextStyle(fontFamily = AuthFontFamily, fontWeight = FontWeight.Black)) },
+            text = { Text("\"${target.title}\" e'lonini o'chirmoqchimisiz? Bu amalni ortga qaytarib bo'lmaydi.", style = TextStyle(fontFamily = AuthFontFamily)) },
+            confirmButton = {
+                TextButton(onClick = { onDeleteAd(target.id); adToDelete = null }) {
+                    Text("O'chirish", style = TextStyle(fontFamily = AuthFontFamily, fontWeight = FontWeight.ExtraBold, color = Color(0xFFDC2626)))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { adToDelete = null }) {
+                    Text("Bekor", style = TextStyle(fontFamily = AuthFontFamily, fontWeight = FontWeight.Bold, color = palette.inkMuted))
+                }
+            },
+        )
+    }
+}
+
+@Composable
+private fun DeletableAdRow(title: String, subtitle: String, trailing: String, palette: AuthPalette, onEdit: () -> Unit, onDelete: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(palette.glass).border(1.dp, palette.border, RoundedCornerShape(14.dp)).padding(14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(title, style = TextStyle(fontFamily = AuthFontFamily, fontSize = 13.5f.sp, fontWeight = FontWeight.ExtraBold, color = palette.ink))
+            Text(subtitle, style = TextStyle(fontFamily = AuthFontFamily, fontSize = 11.5f.sp, color = palette.inkFaint))
+            if (trailing.isNotBlank()) {
+                Text(trailing, style = TextStyle(fontFamily = AuthFontFamily, fontSize = 10.5f.sp, fontWeight = FontWeight.Bold, color = palette.primary))
+            }
+        }
+        // Tahrirlash
+        Box(
+            Modifier.size(34.dp).clip(RoundedCornerShape(10.dp)).background(palette.primary.copy(alpha = 0.10f)).clickable(onClick = onEdit),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(AuthIcons.Pencil, "Tahrirlash", tint = palette.primary, modifier = Modifier.size(15.dp))
+        }
+        // O'chirish
+        Box(
+            Modifier.size(34.dp).clip(RoundedCornerShape(10.dp)).background(Color(0xFFDC2626).copy(alpha = 0.10f)).clickable(onClick = onDelete),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(AuthIcons.Close, "O'chirish", tint = Color(0xFFDC2626), modifier = Modifier.size(16.dp))
         }
     }
 }

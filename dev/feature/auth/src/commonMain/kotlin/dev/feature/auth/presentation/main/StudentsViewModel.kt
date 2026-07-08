@@ -25,6 +25,10 @@ class StudentsViewModel(
     private val studentRepository: StudentRepository,
 ) : ViewModel() {
 
+    init {
+        viewModelScope.launch { studentRepository.refresh() }
+    }
+
     private val sort = MutableStateFlow(StudentSort.MY_UNIVERSITY)
 
     val state: StateFlow<StudentsUiState> = combine(

@@ -28,10 +28,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import dev.feature.auth.presentation.components.AuthFontFamily
 import dev.feature.auth.presentation.components.AuthIcons
 import dev.feature.auth.presentation.theme.AuthPalette
@@ -47,6 +49,10 @@ private enum class MainTab(val route: String, val label: String, val icon: Image
 private const val POST_AD = "post_ad"
 private const val PROFILE = "profile"
 private const val CHAT = "chat"
+private const val NOTIFICATIONS = "notifications"
+private const val EDIT_PROFILE = "edit_profile"
+private const val SETTINGS = "settings"
+private const val CLUBS = "clubs"
 
 private val tabRoutes = MainTab.entries.map { it.route }.toSet()
 
@@ -58,29 +64,63 @@ fun MainShell(onLoggedOut: () -> Unit) {
     val backStack by nav.currentBackStackEntryAsState()
     val current = backStack?.destination?.route ?: MainTab.HOME.route
 
+    // Pastki tab'ga o'tish (BottomBar va Home "Barchasi" havolalari uchun umumiy).
+    val selectTab: (String) -> Unit = { route ->
+        nav.navigate(route) {
+            popUpTo(MainTab.HOME.route) { saveState = true }
+            launchSingleTop = true
+            restoreState = true
+        }
+    }
+
     Box(Modifier.fillMaxSize().background(palette.bgBrush)) {
         NavHost(navController = nav, startDestination = MainTab.HOME.route, modifier = Modifier.fillMaxSize()) {
             composable(MainTab.HOME.route) {
-                HomeScreen(onOpenProfile = { nav.navigate(PROFILE) }, onOpenChat = { nav.navigate(CHAT) })
+                HomeScreen(
+                    onOpenProfile = { nav.navigate(PROFILE) },
+                    onOpenChat = { nav.navigate(CHAT) },
+                    onOpenNotifications = { nav.navigate(NOTIFICATIONS) },
+                    onOpenClubs = { nav.navigate(CLUBS) },
+                    onOpenDiscounts = { selectTab(MainTab.DISCOUNTS.route) },
+                    onOpenJobs = { selectTab(MainTab.JOBS.route) },
+                    onOpenStudents = { selectTab(MainTab.STUDENTS.route) },
+                )
             }
             composable(MainTab.DISCOUNTS.route) { DiscountsScreen() }
             composable(MainTab.JOBS.route) { JobsScreen() }
             composable(MainTab.STUDENTS.route) { StudentsScreen() }
-            composable(POST_AD) { PostAdScreen(onClose = { nav.popBackStack() }) }
-            composable(PROFILE) { ProfileScreen(onBack = { nav.popBackStack() }, onLoggedOut = onLoggedOut) }
+            composable(
+                route = "$POST_AD?adId={adId}",
+                arguments = listOf(navArgument("adId") { type = NavType.StringType; nullable = true; defaultValue = null }),
+            ) { entry ->
+                PostAdScreen(onClose = { nav.popBackStack() }, editAdId = entry.arguments?.getString("adId"))
+            }
+            composable(PROFILE) {
+                ProfileScreen(
+                    onBack = { nav.popBackStack() },
+                    onLoggedOut = onLoggedOut,
+                    onEditProfile = { nav.navigate(EDIT_PROFILE) },
+                    onOpenSettings = { nav.navigate(SETTINGS) },
+                    onEditAd = { adId -> nav.navigate("$POST_AD?adId=$adId") },
+                )
+            }
             composable(CHAT) { ChatScreen(onBack = { nav.popBackStack() }) }
+            composable(NOTIFICATIONS) { NotificationsScreen(onBack = { nav.popBackStack() }) }
+            composable(CLUBS) { ClubsScreen(onBack = { nav.popBackStack() }) }
+            composable(EDIT_PROFILE) { EditProfileScreen(onBack = { nav.popBackStack() }) }
+            composable(SETTINGS) {
+                SettingsScreen(
+                    onBack = { nav.popBackStack() },
+                    onEditProfile = { nav.navigate(EDIT_PROFILE) },
+                    onLoggedOut = onLoggedOut,
+                )
+            }
         }
 
         if (current in tabRoutes) {
             BottomBar(
                 current = current,
-                onSelect = { route ->
-                    nav.navigate(route) {
-                        popUpTo(MainTab.HOME.route) { saveState = true }
-                        launchSingleTop = true
-                        restoreState = true
-                    }
-                },
+                onSelect = selectTab,
                 onFab = { nav.navigate(POST_AD) { launchSingleTop = true } },
                 palette = palette,
                 modifier = Modifier.align(Alignment.BottomCenter),
@@ -149,20 +189,5 @@ private fun NavBarItem(
     ) {
         Icon(tab.icon, tab.label, tint = tint, modifier = Modifier.size(21.dp))
         Text(tab.label, style = TextStyle(fontFamily = AuthFontFamily, fontSize = 9.sp, fontWeight = if (active) FontWeight.ExtraBold else FontWeight.Bold, color = tint))
-    }
-}
-
-/** Hali qurilmagan bo'limlar uchun vaqtincha ekran. */
-@Composable
-private fun PlaceholderTab(title: String, icon: ImageVector, palette: AuthPalette) {
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Box(
-                Modifier.size(64.dp).clip(RoundedCornerShape(20.dp)).background(palette.primary.copy(alpha = 0.12f)),
-                contentAlignment = Alignment.Center,
-            ) { Icon(icon, null, tint = palette.primary, modifier = Modifier.size(30.dp)) }
-            Text(title, style = TextStyle(fontFamily = AuthFontFamily, fontSize = 18.sp, fontWeight = FontWeight.Black, color = palette.ink))
-            Text("Tez orada tayyor bo'ladi", style = TextStyle(fontFamily = AuthFontFamily, fontSize = 13.sp, color = palette.inkMuted))
-        }
     }
 }

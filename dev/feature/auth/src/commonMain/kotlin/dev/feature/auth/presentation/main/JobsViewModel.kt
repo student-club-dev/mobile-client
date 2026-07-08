@@ -22,6 +22,11 @@ class JobsViewModel(
     private val jobRepository: JobRepository,
 ) : ViewModel() {
 
+    init {
+        // Offline-first: backend'dan sinxronlashga urinamiz (no-op yoki Error → cache saqlanadi).
+        viewModelScope.launch { jobRepository.refresh() }
+    }
+
     private val filter = MutableStateFlow(JobFilter.ALL)
 
     val state: StateFlow<JobsUiState> = combine(jobRepository.observeJobs(), filter) { jobs, f ->

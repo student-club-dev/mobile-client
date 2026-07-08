@@ -2,9 +2,12 @@ package dev.feature.auth.presentation.main
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import dev.core.common.Resource
 import dev.core.domain.model.Ad
 import dev.core.domain.model.DiscountOffer
 import dev.core.domain.model.JobApplication
+import dev.core.domain.model.University
+import dev.core.domain.model.UserProfile
 import dev.core.domain.repository.AdRepository
 import dev.core.domain.repository.DiscountRepository
 import dev.core.domain.repository.JobRepository
@@ -12,6 +15,7 @@ import dev.core.domain.repository.UniversityRepository
 import dev.core.domain.usecase.LogoutUseCase
 import dev.core.domain.usecase.ObserveCurrentUserUseCase
 import dev.core.domain.usecase.ObserveProfileUseCase
+import dev.core.domain.usecase.SaveProfileUseCase
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -27,17 +31,27 @@ data class ProfileUiState(
     val myAds: List<Ad> = emptyList(),
     val savedDiscounts: List<DiscountOffer> = emptyList(),
     val applications: List<JobApplication> = emptyList(),
+    /** Tahrirlash ekrani uchun xom profil ma'lumoti (local keshdan). */
+    val profile: UserProfile? = null,
+    /** Universitet tanlash uchun ro'yxat. */
+    val universities: List<University> = emptyList(),
 )
 
 class ProfileViewModel(
     observeCurrentUserUseCase: ObserveCurrentUserUseCase,
     observeProfileUseCase: ObserveProfileUseCase,
     universityRepository: UniversityRepository,
-    adRepository: AdRepository,
+    private val adRepository: AdRepository,
     discountRepository: DiscountRepository,
     jobRepository: JobRepository,
     private val logoutUseCase: LogoutUseCase,
+    private val saveProfileUseCase: SaveProfileUseCase,
 ) : ViewModel() {
+
+    init {
+        // Offline-first: e'lonlarni backend'dan sinxronlashga urinamiz.
+        viewModelScope.launch { adRepository.refresh() }
+    }
 
     private val header = combine(
         observeCurrentUserUseCase(),
@@ -51,6 +65,8 @@ class ProfileViewModel(
             course = profile?.courseYear?.let(::courseLabelProfile),
             contact = user?.phoneNumber ?: user?.email.orEmpty(),
             ownerId = (user?.id ?: 0L).toString(),
+            profile = profile,
+            universities = universities,
         )
     }
 
@@ -69,8 +85,15 @@ class ProfileViewModel(
             myAds = l.ads.filter { it.ownerId == h.ownerId },
             savedDiscounts = l.saved,
             applications = l.applications,
+            profile = h.profile,
+            universities = h.universities,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), ProfileUiState())
+
+    /** E'lonni o'chirish ("Mening e'lonlarim"). */
+    fun deleteAd(adId: String) {
+        viewModelScope.launch { adRepository.delete(adId) }
+    }
 
     fun logout(onDone: () -> Unit) {
         viewModelScope.launch {
@@ -79,7 +102,29 @@ class ProfileViewModel(
         }
     }
 
-    private data class Header(val name: String, val monogram: String?, val course: String?, val contact: String, val ownerId: String)
+    /**
+     * Profilni saqlaydi (Firestore + local kesh). [onResult] `null` — muvaffaqiyat,
+     * aks holda xato matni. Local kesh yangilangach `state` avtomatik yangilanadi.
+     */
+    fun saveProfile(updated: UserProfile, onResult: (String?) -> Unit) {
+        viewModelScope.launch {
+            when (val res = saveProfileUseCase(updated)) {
+                is Resource.Success -> onResult(null)
+                is Resource.Error -> onResult(res.message)
+                else -> onResult(null)
+            }
+        }
+    }
+
+    private data class Header(
+        val name: String,
+        val monogram: String?,
+        val course: String?,
+        val contact: String,
+        val ownerId: String,
+        val profile: UserProfile?,
+        val universities: List<University>,
+    )
     private data class Lists(val ads: List<Ad>, val saved: List<DiscountOffer>, val applications: List<JobApplication>)
 }
 

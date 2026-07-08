@@ -33,6 +33,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.core.domain.model.Club
 import dev.core.domain.model.DiscountCategory
 import dev.core.domain.model.DiscountOffer
 import dev.core.domain.model.DiscountTag
@@ -49,19 +50,26 @@ import org.koin.compose.viewmodel.koinViewModel
 fun HomeScreen(
     onOpenProfile: () -> Unit = {},
     onOpenChat: () -> Unit = {},
+    onOpenNotifications: () -> Unit = {},
+    onOpenClubs: () -> Unit = {},
+    onOpenDiscounts: () -> Unit = {},
+    onOpenJobs: () -> Unit = {},
+    onOpenStudents: () -> Unit = {},
     vm: HomeViewModel = koinViewModel(),
 ) {
     val palette = authPalette
     val state by vm.state.collectAsStateWithLifecycle()
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-        HomeHeader(state, palette, onOpenProfile, onOpenChat)
+        HomeHeader(state, palette, onOpenProfile, onOpenChat, onOpenNotifications)
         Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(top = 18.dp)) {
-            DiscountsSection(state.categories, state.featured, palette)
+            DiscountsSection(state.categories, state.featured, palette, onOpenDiscounts)
             Spacer(Modifier.height(24.dp))
-            JobsSection(state.jobs, palette) { vm.toggleBookmark(it) }
+            ClubsSection(state.clubs, palette, onOpenClubs)
             Spacer(Modifier.height(24.dp))
-            StudentsSection(state.students, palette) { vm.toggleFriend(it) }
+            JobsSection(state.jobs, palette, onOpenJobs) { vm.toggleBookmark(it) }
+            Spacer(Modifier.height(24.dp))
+            StudentsSection(state.students, palette, onOpenStudents) { vm.toggleFriend(it) }
             Spacer(Modifier.height(110.dp)) // pastki navigatsiya uchun joy
         }
     }
@@ -71,7 +79,7 @@ fun HomeScreen(
 // Header
 // ---------------------------------------------------------------------------
 @Composable
-private fun HomeHeader(state: HomeUiState, palette: AuthPalette, onOpenProfile: () -> Unit, onOpenChat: () -> Unit) {
+private fun HomeHeader(state: HomeUiState, palette: AuthPalette, onOpenProfile: () -> Unit, onOpenChat: () -> Unit, onOpenNotifications: () -> Unit) {
     val gradient = Brush.linearGradient(listOf(Color(0xFF6C47FF), Color(0xFF7C4DFF), Color(0xFF5B34D6)))
     Box(
         Modifier.fillMaxWidth()
@@ -112,11 +120,13 @@ private fun HomeHeader(state: HomeUiState, palette: AuthPalette, onOpenProfile: 
                     contentAlignment = Alignment.Center,
                 ) { Icon(AuthIcons.MessageSquare, "Xabarlar", tint = Color.White, modifier = Modifier.size(18.dp)) }
                 Box(
-                    Modifier.size(40.dp).clip(RoundedCornerShape(13.dp)).background(Color.White.copy(alpha = 0.18f)),
+                    Modifier.size(40.dp).clip(RoundedCornerShape(13.dp)).background(Color.White.copy(alpha = 0.18f)).clickable(onClick = onOpenNotifications),
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(AuthIcons.Bell, "Bildirishnomalar", tint = Color.White, modifier = Modifier.size(18.dp))
-                    Box(Modifier.align(Alignment.TopEnd).padding(10.dp).size(7.dp).clip(RoundedCornerShape(999.dp)).background(Color(0xFFFF5A5A)))
+                    if (state.hasUnreadNotifications) {
+                        Box(Modifier.align(Alignment.TopEnd).padding(10.dp).size(7.dp).clip(RoundedCornerShape(999.dp)).background(Color(0xFFFF5A5A)))
+                    }
                 }
             }
         }
@@ -127,7 +137,7 @@ private fun HomeHeader(state: HomeUiState, palette: AuthPalette, onOpenProfile: 
 // Umumiy bo'lim sarlavhasi
 // ---------------------------------------------------------------------------
 @Composable
-private fun SectionHeader(title: String, action: String? = null, subtitle: String? = null, palette: AuthPalette) {
+private fun SectionHeader(title: String, action: String? = null, subtitle: String? = null, palette: AuthPalette, onAction: (() -> Unit)? = null) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
             Text(title, style = TextStyle(fontFamily = AuthFontFamily, fontSize = 17.sp, fontWeight = FontWeight.Black, color = palette.ink))
@@ -136,9 +146,51 @@ private fun SectionHeader(title: String, action: String? = null, subtitle: Strin
             }
         }
         if (action != null) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                Modifier.then(if (onAction != null) Modifier.clip(RoundedCornerShape(8.dp)).clickable(onClick = onAction).padding(horizontal = 4.dp, vertical = 2.dp) else Modifier),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 Text(action, style = TextStyle(fontFamily = AuthFontFamily, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = palette.primary))
                 Icon(AuthIcons.ChevronRight, null, tint = palette.primary, modifier = Modifier.size(15.dp))
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Klublar
+// ---------------------------------------------------------------------------
+private val homeClubAccents = listOf(
+    Color(0xFF6C47FF), Color(0xFF2563EB), Color(0xFF059669),
+    Color(0xFFD97706), Color(0xFFBE185D), Color(0xFF0EA5E9),
+)
+private val homeClubEmojis = listOf("💻", "🗣️", "⚽", "🤝", "🎨", "🌍", "🎬", "📚")
+
+@Composable
+private fun ClubsSection(clubs: List<Club>, palette: AuthPalette, onOpenClubs: () -> Unit) {
+    if (clubs.isEmpty()) return
+    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable(onClick = onOpenClubs), verticalAlignment = Alignment.CenterVertically) {
+        Text("Klublar", style = TextStyle(fontFamily = AuthFontFamily, fontSize = 17.sp, fontWeight = FontWeight.Black, color = palette.ink), modifier = Modifier.weight(1f))
+        Text("Barchasi", style = TextStyle(fontFamily = AuthFontFamily, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = palette.primary))
+        Icon(AuthIcons.ChevronRight, null, tint = palette.primary, modifier = Modifier.size(15.dp))
+    }
+    Spacer(Modifier.height(12.dp))
+    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        clubs.take(6).forEach { club ->
+            val idx = ((club.id - 1).toInt()).mod(homeClubAccents.size)
+            val accent = homeClubAccents[idx]
+            val emoji = homeClubEmojis[((club.id - 1).toInt()).mod(homeClubEmojis.size)]
+            Column(
+                Modifier.width(120.dp).clip(RoundedCornerShape(16.dp)).background(palette.glass).border(1.dp, palette.border, RoundedCornerShape(16.dp)).clickable(onClick = onOpenClubs).padding(12.dp),
+                horizontalAlignment = Alignment.Start,
+            ) {
+                Box(Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(accent.copy(alpha = 0.14f)), contentAlignment = Alignment.Center) {
+                    Text(emoji, style = TextStyle(fontSize = 19.sp))
+                }
+                Spacer(Modifier.height(9.dp))
+                Text(club.name, style = TextStyle(fontFamily = AuthFontFamily, fontSize = 12.5f.sp, fontWeight = FontWeight.Black, color = palette.ink), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Spacer(Modifier.height(3.dp))
+                Text("${club.membersCount} a'zo", style = TextStyle(fontFamily = AuthFontFamily, fontSize = 10.5f.sp, fontWeight = FontWeight.Bold, color = if (club.joined) accent else palette.inkFaint))
             }
         }
     }
@@ -148,23 +200,23 @@ private fun SectionHeader(title: String, action: String? = null, subtitle: Strin
 // Chegirmalar
 // ---------------------------------------------------------------------------
 @Composable
-private fun DiscountsSection(categories: List<DiscountCategory>, featured: DiscountOffer?, palette: AuthPalette) {
-    SectionHeader("Chegirmalar", action = "Barchasi", palette = palette)
+private fun DiscountsSection(categories: List<DiscountCategory>, featured: DiscountOffer?, palette: AuthPalette, onSeeAll: () -> Unit) {
+    SectionHeader("Chegirmalar", action = "Barchasi", palette = palette, onAction = onSeeAll)
     Spacer(Modifier.height(12.dp))
     Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-        categories.take(4).forEach { CategoryChip(it, palette) }
-        MoreChip(palette)
+        categories.take(4).forEach { CategoryChip(it, palette, onSeeAll) }
+        MoreChip(palette, onSeeAll)
     }
     if (featured != null) {
         Spacer(Modifier.height(14.dp))
-        FeaturedOfferCard(featured, palette)
+        FeaturedOfferCard(featured, palette, onSeeAll)
     }
 }
 
 @Composable
-private fun CategoryChip(category: DiscountCategory, palette: AuthPalette) {
+private fun CategoryChip(category: DiscountCategory, palette: AuthPalette, onClick: () -> Unit) {
     Row(
-        Modifier.clip(RoundedCornerShape(999.dp)).background(palette.glass).border(1.dp, palette.border, RoundedCornerShape(999.dp)).padding(horizontal = 12.dp, vertical = 8.dp),
+        Modifier.clip(RoundedCornerShape(999.dp)).background(palette.glass).border(1.dp, palette.border, RoundedCornerShape(999.dp)).clickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
@@ -174,9 +226,9 @@ private fun CategoryChip(category: DiscountCategory, palette: AuthPalette) {
 }
 
 @Composable
-private fun MoreChip(palette: AuthPalette) {
+private fun MoreChip(palette: AuthPalette, onClick: () -> Unit) {
     Box(
-        Modifier.clip(RoundedCornerShape(999.dp)).background(palette.primary.copy(alpha = 0.10f)).padding(horizontal = 14.dp, vertical = 8.dp),
+        Modifier.clip(RoundedCornerShape(999.dp)).background(palette.primary.copy(alpha = 0.10f)).clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 8.dp),
         contentAlignment = Alignment.Center,
     ) {
         Text("Yana", style = TextStyle(fontFamily = AuthFontFamily, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = palette.primary))
@@ -184,10 +236,10 @@ private fun MoreChip(palette: AuthPalette) {
 }
 
 @Composable
-private fun FeaturedOfferCard(offer: DiscountOffer, palette: AuthPalette) {
+private fun FeaturedOfferCard(offer: DiscountOffer, palette: AuthPalette, onClick: () -> Unit) {
     val accent = Color(offer.bannerAccent)
     Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(palette.glassStrong).border(1.dp, palette.border, RoundedCornerShape(18.dp)).padding(12.dp),
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(palette.glassStrong).border(1.dp, palette.border, RoundedCornerShape(18.dp)).clickable(onClick = onClick).padding(12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -219,8 +271,8 @@ private fun FeaturedOfferCard(offer: DiscountOffer, palette: AuthPalette) {
 // Ishlar
 // ---------------------------------------------------------------------------
 @Composable
-private fun JobsSection(jobs: List<Job>, palette: AuthPalette, onBookmark: (Job) -> Unit) {
-    SectionHeader("Ishlar", action = "Barchasi", subtitle = "Sizning bo'limlaringiz bo'yicha", palette = palette)
+private fun JobsSection(jobs: List<Job>, palette: AuthPalette, onSeeAll: () -> Unit, onBookmark: (Job) -> Unit) {
+    SectionHeader("Ishlar", action = "Barchasi", subtitle = "Sizning bo'limlaringiz bo'yicha", palette = palette, onAction = onSeeAll)
     Spacer(Modifier.height(12.dp))
     Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
         jobs.take(3).forEach { JobRow(it, palette, onBookmark) }
@@ -263,8 +315,8 @@ private fun JobRow(job: Job, palette: AuthPalette, onBookmark: (Job) -> Unit) {
 // Studentlar
 // ---------------------------------------------------------------------------
 @Composable
-private fun StudentsSection(students: List<Student>, palette: AuthPalette, onFriend: (Student) -> Unit) {
-    SectionHeader("Studentlar", action = "Ko'proq", subtitle = "Universitet bo'yicha do'st toping", palette = palette)
+private fun StudentsSection(students: List<Student>, palette: AuthPalette, onSeeAll: () -> Unit, onFriend: (Student) -> Unit) {
+    SectionHeader("Studentlar", action = "Ko'proq", subtitle = "Universitet bo'yicha do'st toping", palette = palette, onAction = onSeeAll)
     Spacer(Modifier.height(12.dp))
     Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(11.dp)) {
         students.take(6).forEach { StudentConnectCard(it, palette, onFriend) }

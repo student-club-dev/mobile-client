@@ -22,7 +22,14 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -149,6 +156,9 @@ private fun CategoryOffers(
 @Composable
 private fun OfferCard(offer: DiscountOffer, saved: Boolean, palette: AuthPalette, onToggleSaved: (DiscountOffer, Boolean) -> Unit) {
     val accent = Color(offer.bannerAccent)
+    val clipboard = LocalClipboardManager.current
+    var copied by remember(offer.id) { mutableStateOf(false) }
+    LaunchedEffect(copied) { if (copied) { delay(1500); copied = false } }
     Column(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(palette.glass).border(1.dp, palette.border, RoundedCornerShape(18.dp)),
     ) {
@@ -172,7 +182,20 @@ private fun OfferCard(offer: DiscountOffer, saved: Boolean, palette: AuthPalette
                 val promo = offer.promoCode
                 if (promo != null) {
                     Spacer(Modifier.size(6.dp))
-                    Text(promo, style = TextStyle(fontFamily = AuthFontFamily, fontSize = 10.5f.sp, fontWeight = FontWeight.ExtraBold, color = palette.inkMuted))
+                    Row(
+                        Modifier.clip(RoundedCornerShape(8.dp))
+                            .background(palette.primary.copy(alpha = 0.08f))
+                            .clickable { clipboard.setText(AnnotatedString(promo)); copied = true }
+                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        Text(
+                            if (copied) "Nusxalandi ✓" else promo,
+                            style = TextStyle(fontFamily = AuthFontFamily, fontSize = 10.5f.sp, fontWeight = FontWeight.ExtraBold, color = palette.primary),
+                        )
+                        if (!copied) Icon(AuthIcons.FileText, "Nusxalash", tint = palette.primary, modifier = Modifier.size(11.dp))
+                    }
                 }
                 Spacer(Modifier.weight(1f))
                 Icon(
