@@ -6,7 +6,8 @@ CREATE TABLE ConversationEntity (
     online INTEGER NOT NULL,
     lastMessage TEXT NOT NULL,
     lastTime TEXT NOT NULL,
-    unreadCount INTEGER NOT NULL
+    unreadCount INTEGER NOT NULL,
+    archived INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE MessageEntity (
@@ -19,7 +20,13 @@ CREATE TABLE MessageEntity (
 );
 
 selectConversations:
-SELECT * FROM ConversationEntity ORDER BY unreadCount DESC;
+SELECT * FROM ConversationEntity WHERE archived = 0 ORDER BY unreadCount DESC;
+
+selectArchivedConversations:
+SELECT * FROM ConversationEntity WHERE archived = 1 ORDER BY unreadCount DESC;
+
+setArchived:
+UPDATE ConversationEntity SET archived = ? WHERE id = ?;
 
 selectMessages:
 SELECT * FROM MessageEntity WHERE conversationId = ? ORDER BY createdAt ASC;
@@ -40,6 +47,15 @@ UPDATE ConversationEntity SET lastMessage = ?, lastTime = ?, unreadCount = ? WHE
 
 markRead:
 UPDATE ConversationEntity SET unreadCount = 0 WHERE id = ?;
+
+deleteMessage:
+DELETE FROM MessageEntity WHERE id = ?;
+
+clearConversationMessages:
+DELETE FROM MessageEntity WHERE conversationId = ?;
+
+deleteConversation:
+DELETE FROM ConversationEntity WHERE id = ?;
 
 clearConversations:
 DELETE FROM ConversationEntity;
