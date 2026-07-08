@@ -1,14 +1,21 @@
 package dev.feature.auth.di
 
+import dev.core.common.AuthTokenProvider
 import dev.core.domain.repository.AuthRepository
+import dev.core.domain.repository.ChatRealtimeSource
 import dev.feature.auth.data.FirebaseAuthRepository
+import dev.feature.auth.data.FirebaseTokenProvider
+import dev.feature.auth.data.FirestoreChatRealtimeSource
 import dev.feature.auth.presentation.flow.AuthFlowViewModel
 import dev.feature.auth.presentation.main.ChatViewModel
+import dev.feature.auth.presentation.main.ClubsViewModel
 import dev.feature.auth.presentation.main.DiscountsViewModel
 import dev.feature.auth.presentation.main.HomeViewModel
 import dev.feature.auth.presentation.main.JobsViewModel
+import dev.feature.auth.presentation.main.NotificationsViewModel
 import dev.feature.auth.presentation.main.PostAdViewModel
 import dev.feature.auth.presentation.main.ProfileViewModel
+import dev.feature.auth.presentation.main.SettingsViewModel
 import dev.feature.auth.presentation.main.StudentsViewModel
 import org.koin.core.module.dsl.viewModel
 import org.koin.core.module.dsl.viewModelOf
@@ -22,10 +29,22 @@ import org.koin.dsl.module
  */
 private const val USE_EMAIL_CODE = false
 
+/**
+ * Chat real-time (Firestore) yoqilganmi (B7). Firebase sozlangач `true` qiling.
+ * `false` — chat local DB'dan ishlaydi (demo/seed suhbatlar).
+ */
+private const val CHAT_REALTIME_ENABLED = false
+
 val authFeatureModule = module {
     // Backendsiz Firebase (GitLive) — email/parol, ro'yxat, reset, Firestore profil.
     // StudentClubsDatabase (SQLDelight) local sessiya keshi uchun uzatiladi.
     single<AuthRepository> { FirebaseAuthRepository(get()) }
+
+    // Ktor uchun Firebase ID token beruvchi (network qatlami shuni ishlatadi).
+    single<AuthTokenProvider> { FirebaseTokenProvider() }
+
+    // Chat real-time manbasi (Firestore) — ChatRepository shuni ishlatadi (B7).
+    single<ChatRealtimeSource> { FirestoreChatRealtimeSource(CHAT_REALTIME_ENABLED) }
 
     viewModel {
         AuthFlowViewModel(
@@ -48,4 +67,7 @@ val authFeatureModule = module {
     viewModelOf(::PostAdViewModel)
     viewModelOf(::ProfileViewModel)
     viewModelOf(::ChatViewModel)
+    viewModelOf(::SettingsViewModel)
+    viewModelOf(::NotificationsViewModel)
+    viewModelOf(::ClubsViewModel)
 }

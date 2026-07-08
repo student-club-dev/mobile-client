@@ -1,12 +1,27 @@
 package dev.core.di
 
 import dev.core.common.AppDispatchers
+import dev.core.common.AuthTokenProvider
 import dev.core.common.DefaultAppDispatchers
 import dev.core.data.repository.AdRepositoryImpl
 import dev.core.data.repository.ChatRepositoryImpl
 import dev.core.data.repository.ClubRepositoryImpl
 import dev.core.data.repository.DiscountRepositoryImpl
+import dev.core.data.remote.AdRemoteDataSource
+import dev.core.data.remote.ChatRemoteDataSource
+import dev.core.data.remote.DiscountRemoteDataSource
+import dev.core.data.remote.JobRemoteDataSource
+import dev.core.data.remote.KtorAdRemoteDataSource
+import dev.core.data.remote.KtorChatRemoteDataSource
+import dev.core.data.remote.KtorDiscountRemoteDataSource
+import dev.core.data.remote.KtorJobRemoteDataSource
+import dev.core.data.remote.KtorStudentRemoteDataSource
+import dev.core.data.remote.KtorUniversityRemoteDataSource
+import dev.core.data.remote.StudentRemoteDataSource
+import dev.core.data.remote.UniversityRemoteDataSource
 import dev.core.data.repository.JobRepositoryImpl
+import dev.core.data.repository.NotificationRepositoryImpl
+import dev.core.data.repository.SettingsRepositoryImpl
 import dev.core.data.repository.StudentRepositoryImpl
 import dev.core.data.repository.UniversityRepositoryImpl
 import dev.core.data.seed.LocalDataSeeder
@@ -18,6 +33,8 @@ import dev.core.domain.repository.ChatRepository
 import dev.core.domain.repository.ClubRepository
 import dev.core.domain.repository.DiscountRepository
 import dev.core.domain.repository.JobRepository
+import dev.core.domain.repository.NotificationRepository
+import dev.core.domain.repository.SettingsRepository
 import dev.core.domain.repository.StudentRepository
 import dev.core.domain.repository.UniversityRepository
 import dev.core.domain.usecase.ConfirmEmailSignupUseCase
@@ -37,12 +54,30 @@ import io.ktor.client.HttpClient
 import org.koin.core.module.Module
 import org.koin.dsl.module
 
-/** Bazaviy URL — haqiqiy backend kelganda shu yerda almashtiriladi. */
-const val DEFAULT_BASE_URL = "https://api.studentclubs.dev"
+/**
+ * Backend manzillari — haqiqiy API kelganda faqat shu yerni almashtiring.
+ * `USE_PROD_API = true` qilib prod'ga o'tasiz (yoki build-flag'ga ulaysiz).
+ */
+const val DEV_BASE_URL = "https://api.studentclubs.dev"
+const val PROD_BASE_URL = "https://api.studentclubs.dev"
+private const val USE_PROD_API = false
+
+/** Joriy bazaviy URL (bitta manba). */
+const val DEFAULT_BASE_URL = DEV_BASE_URL
+
+/**
+ * Offline-first sinxronlash yoqilganmi (B4). Hozir backend yo'q — `false` (seed data ishlaydi).
+ * Real API tayyor bo'lganda `true` qiling — repository'lar `refresh()` da API'dan tortadi.
+ */
+const val REMOTE_SYNC_ENABLED = false
 
 val networkModule = module {
-    single { NetworkConfig(baseUrl = DEFAULT_BASE_URL) }
-    single<HttpClient> { createHttpClient(get()) }
+    single { NetworkConfig(baseUrl = if (USE_PROD_API) PROD_BASE_URL else DEV_BASE_URL) }
+    // Firebase ID tokenni har so'rovga qo'shadi; haqiqiy AuthTokenProvider auth feature'da bog'lanadi.
+    single<HttpClient> {
+        val tokenProvider = get<AuthTokenProvider>()
+        createHttpClient(get()) { tokenProvider.currentToken() }
+    }
 }
 
 val databaseModule = module {
@@ -58,12 +93,24 @@ val repositoryModule = module {
     single<ClubRepository> { ClubRepositoryImpl(get(), get(), get()) }
 
     // Barcha domenlar — local DB (SQLDelight) ustidagi repository'lar.
-    single<UniversityRepository> { UniversityRepositoryImpl(get(), get()) }
-    single<DiscountRepository> { DiscountRepositoryImpl(get(), get()) }
-    single<JobRepository> { JobRepositoryImpl(get(), get()) }
-    single<StudentRepository> { StudentRepositoryImpl(get(), get()) }
-    single<AdRepository> { AdRepositoryImpl(get(), get()) }
-    single<ChatRepository> { ChatRepositoryImpl(get(), get()) }
+    // --- B4 offline-first: masofaviy manbalar (Ktor) ---
+    single<DiscountRemoteDataSource> { KtorDiscountRemoteDataSource(get()) }
+    single<JobRemoteDataSource> { KtorJobRemoteDataSource(get()) }
+    single<StudentRemoteDataSource> { KtorStudentRemoteDataSource(get()) }
+    single<AdRemoteDataSource> { KtorAdRemoteDataSource(get()) }
+    single<UniversityRemoteDataSource> { KtorUniversityRemoteDataSource(get()) }
+    single<ChatRemoteDataSource> { KtorChatRemoteDataSource(get()) }
+
+    // --- Repository'lar (offline-first: DB + refresh) ---
+    single<UniversityRepository> { UniversityRepositoryImpl(get(), get(), get(), REMOTE_SYNC_ENABLED) }
+    single<DiscountRepository> { DiscountRepositoryImpl(get(), get(), get(), REMOTE_SYNC_ENABLED) }
+    single<JobRepository> { JobRepositoryImpl(get(), get(), get(), REMOTE_SYNC_ENABLED) }
+    single<StudentRepository> { StudentRepositoryImpl(get(), get(), get(), REMOTE_SYNC_ENABLED) }
+    single<AdRepository> { AdRepositoryImpl(get(), get(), get(), REMOTE_SYNC_ENABLED) }
+    // ChatRealtimeSource (Firestore) auth feature'da bog'lanadi (B7).
+    single<ChatRepository> { ChatRepositoryImpl(get(), get(), get(), REMOTE_SYNC_ENABLED, get()) }
+    single<SettingsRepository> { SettingsRepositoryImpl(get(), get()) }
+    single<NotificationRepository> { NotificationRepositoryImpl(get(), get()) }
 
     // Dizayndagi namuna ma'lumot bilan bazani to'ldiruvchi (bo'sh bo'lsa).
     single { LocalDataSeeder(get(), get()) }
