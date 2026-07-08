@@ -26,6 +26,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
@@ -67,7 +68,7 @@ class AuthFlowViewModel(
     private val saveProfileUseCase: SaveProfileUseCase,
     private val syncExternalUserUseCase: SyncExternalUserUseCase,
     private val hasProfileUseCase: HasProfileUseCase,
-    observeCurrentUserUseCase: ObserveCurrentUserUseCase,
+    private val observeCurrentUserUseCase: ObserveCurrentUserUseCase,
     /** true → email kodi (Cloud Function) ishlatiladi; false → native (deploy'siz). */
     private val useEmailCode: Boolean = false,
 ) : ViewModel() {
@@ -375,9 +376,20 @@ class AuthFlowViewModel(
         }
     }
 
-    /** Hali qo'llab-quvvatlanmaydigan usullar (biometrika) uchun xabar. */
-    fun notSupported(method: String) =
-        _state.update { it.copy(error = "$method hali qo‘llab-quvvatlanmaydi.") }
+    /**
+     * Biometrik tasdiqdan (Face ID / barmoq izi) so'ng chaqiriladi — local keshda sessiya bo'lsa
+     * to'g'ridan-to'g'ri HOME'ga, aks holda xato xabari (avval oddiy kirish kerak).
+     */
+    fun onBiometricAuthenticated() {
+        viewModelScope.launch {
+            val user = observeCurrentUserUseCase().first()
+            if (user != null) finishAuthenticated(user)
+            else _state.update { it.copy(error = "Saqlangan hisob topilmadi. Avval email/parol bilan kiring.") }
+        }
+    }
+
+    /** Biometrik oqim xatosi (mavjud emas / tanilmadi) uchun xabar. */
+    fun biometricError(message: String) = _state.update { it.copy(error = message) }
 
     /** Parolni tiklash havolasini yuboradi (Firebase). */
     fun requestPasswordReset() {

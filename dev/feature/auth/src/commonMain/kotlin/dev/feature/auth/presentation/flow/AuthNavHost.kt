@@ -15,7 +15,11 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.launch
+import dev.feature.auth.biometric.BiometricOutcome
+import dev.feature.auth.biometric.rememberBiometricAuthenticator
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -142,13 +146,28 @@ fun AuthNavHost(vm: AuthFlowViewModel = koinViewModel()) {
             )
         }
         composable(Route.EMAIL) {
+            val biometric = rememberBiometricAuthenticator()
+            val bioScope = rememberCoroutineScope()
             EmailLoginScreen(
                 state = state, vm = vm,
                 onBack = { nav.popBackStack() },
                 onSwitchPhone = { nav.navigate(Route.PHONE) },
                 onLogin = { vm.login() },
                 onForgot = { nav.navigate(Route.FORGOT) },
-                onBiometric = { vm.notSupported("Face ID") },
+                onBiometric = {
+                    if (!biometric.canAuthenticate()) {
+                        vm.biometricError("Qurilmada biometrika sozlanmagan (Face ID / barmoq izi).")
+                    } else {
+                        bioScope.launch {
+                            when (biometric.authenticate("Kirish", "Face ID bilan tasdiqlang", "Bekor qilish")) {
+                                BiometricOutcome.SUCCESS -> vm.onBiometricAuthenticated()
+                                BiometricOutcome.FAILED -> vm.biometricError("Biometrika tanilmadi. Qayta urinib ko'ring.")
+                                BiometricOutcome.UNAVAILABLE -> vm.biometricError("Biometrika mavjud emas.")
+                                BiometricOutcome.CANCELLED -> Unit
+                            }
+                        }
+                    }
+                },
                 onSignUp = { nav.navigate(Route.REGISTER_CHOICE) },
             )
         }
