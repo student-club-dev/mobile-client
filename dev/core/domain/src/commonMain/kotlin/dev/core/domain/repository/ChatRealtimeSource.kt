@@ -13,7 +13,12 @@ import kotlinx.coroutines.flow.Flow
 interface ChatRealtimeSource {
     val enabled: Boolean
     fun conversations(): Flow<List<Conversation>>
+    fun archivedConversations(): Flow<List<Conversation>>
     fun messages(conversationId: String): Flow<List<Message>>
     suspend fun send(conversationId: String, text: String, time: String, createdAt: Long)
     suspend fun markRead(conversationId: String)
+    suspend fun deleteMessage(conversationId: String, messageId: String)
+    suspend fun clearMessages(conversationId: String)
+    suspend fun deleteConversation(conversationId: String)
+    suspend fun setArchived(conversationId: String, archived: Boolean)
 }

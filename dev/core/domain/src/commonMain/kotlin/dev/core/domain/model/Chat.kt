@@ -13,6 +13,7 @@ data class Conversation(
     val lastMessage: String,
     val lastTime: String,        // "14:22", "Kecha"
     val unreadCount: Int = 0,
+    val archived: Boolean = false,
 )
 
 /** Suhbat ichidagi bitta xabar. */

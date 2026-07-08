@@ -7,4 +7,5 @@ data class Club(
     val description: String,
     val membersCount: Int,
     val imageUrl: String? = null,
+    val joined: Boolean = false,
 )
