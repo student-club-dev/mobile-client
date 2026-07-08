@@ -37,6 +37,7 @@ kotlin {
             implementation(libs.koin.compose)
             implementation(libs.koin.compose.viewmodel)
             implementation(libs.kotlinx.coroutines.core)
+            implementation(libs.kotlinx.datetime)
 
             // GitLive Firebase — email/parol, parolni tiklash, Firestore profil (backendsiz)
             implementation(libs.gitlive.firebase.auth)
@@ -57,6 +58,9 @@ kotlin {
             implementation(libs.androidx.activity.compose)
             // Telegram login — Custom Tabs (web oqim)
             implementation(libs.androidx.browser)
+            // Biometrik login (F1) — Face ID / barmoq izi
+            implementation(libs.androidx.biometric)
+            implementation(libs.androidx.fragment)
         }
     }
 }

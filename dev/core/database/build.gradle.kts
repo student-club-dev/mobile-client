@@ -25,6 +25,14 @@ kotlin {
         iosMain.dependencies {
             implementation(libs.sqldelight.native.driver)
         }
+        // Host (JVM) testlari — sxema/migratsiya/CRUD ni real SQLite'da tekshirish.
+        val androidUnitTest by getting {
+            dependencies {
+                implementation(libs.sqldelight.sqlite.driver)
+                implementation(kotlin("test"))
+                implementation(libs.kotlinx.coroutines.core)
+            }
+        }
     }
 }
 

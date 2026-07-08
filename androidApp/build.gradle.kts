@@ -50,6 +50,8 @@ dependencies {
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
+    // MainActivity FragmentActivity bo'lishi uchun (biometrik BiometricPrompt talab qiladi)
+    implementation(libs.androidx.fragment)
     implementation(libs.koin.core)
     implementation(libs.koin.android)
     implementation(libs.koin.compose)
