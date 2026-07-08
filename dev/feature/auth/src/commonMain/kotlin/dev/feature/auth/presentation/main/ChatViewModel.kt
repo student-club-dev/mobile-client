@@ -14,10 +14,14 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.datetime.Clock
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 
 /** Chat (1x ro'yxat + 1y suhbat) holati. */
 data class ChatUiState(
     val conversations: List<Conversation> = emptyList(),
+    val archivedConversations: List<Conversation> = emptyList(),
     val selected: Conversation? = null,
     val messages: List<Message> = emptyList(),
     val draft: String = "",
@@ -28,6 +32,10 @@ class ChatViewModel(
     private val chatRepository: ChatRepository,
 ) : ViewModel() {
 
+    init {
+        viewModelScope.launch { chatRepository.refresh() }
+    }
+
     private val selectedId = MutableStateFlow<String?>(null)
     private val draft = MutableStateFlow("")
 
@@ -37,13 +45,15 @@ class ChatViewModel(
 
     val state: StateFlow<ChatUiState> = combine(
         chatRepository.observeConversations(),
+        chatRepository.observeArchivedConversations(),
         selectedId,
         messagesFlow,
         draft,
-    ) { conversations, id, messages, d ->
+    ) { conversations, archived, id, messages, d ->
         ChatUiState(
             conversations = conversations,
-            selected = conversations.firstOrNull { it.id == id },
+            archivedConversations = archived,
+            selected = (conversations + archived).firstOrNull { it.id == id },
             messages = messages,
             draft = d,
         )
@@ -58,6 +68,29 @@ class ChatViewModel(
         selectedId.value = null
     }
 
+    /** Suhbatdagi xabarni o'chirish. */
+    fun deleteMessage(messageId: String) {
+        val id = selectedId.value ?: return
+        viewModelScope.launch { chatRepository.deleteMessage(id, messageId) }
+    }
+
+    /** Suhbatni tozalash — barcha xabarlarni o'chirish. */
+    fun clearMessages() {
+        val id = selectedId.value ?: return
+        viewModelScope.launch { chatRepository.clearMessages(id) }
+    }
+
+    /** Suhbatni butunlay o'chirish (ro'yxatdan). */
+    fun deleteConversation(conversationId: String) {
+        if (selectedId.value == conversationId) selectedId.value = null
+        viewModelScope.launch { chatRepository.deleteConversation(conversationId) }
+    }
+
+    /** Suhbatni arxivlash / arxivdan chiqarish. */
+    fun setArchived(conversationId: String, archived: Boolean) {
+        viewModelScope.launch { chatRepository.setArchived(conversationId, archived) }
+    }
+
     fun onDraft(v: String) {
         draft.value = v
     }
@@ -66,8 +99,12 @@ class ChatViewModel(
         val id = selectedId.value ?: return
         val text = draft.value.trim()
         if (text.isEmpty()) return
-        val nextAt = (state.value.messages.maxOfOrNull { it.createdAt } ?: 0L) + 1000
+        // Haqiqiy vaqt — qurilmalararo to'g'ri tartib (Firestore real-time) va to'g'ri HH:mm yorlig'i.
+        val now = Clock.System.now()
+        val createdAt = now.toEpochMilliseconds()
+        val local = now.toLocalDateTime(TimeZone.currentSystemDefault())
+        val time = "${local.hour.toString().padStart(2, '0')}:${local.minute.toString().padStart(2, '0')}"
         draft.value = ""
-        viewModelScope.launch { chatRepository.send(id, text, time = "hozir", createdAt = nextAt) }
+        viewModelScope.launch { chatRepository.send(id, text, time = time, createdAt = createdAt) }
     }
 }

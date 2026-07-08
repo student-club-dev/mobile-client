@@ -6,6 +6,7 @@ import dev.core.domain.model.Message
 import dev.core.domain.repository.ChatRealtimeSource
 import dev.gitlive.firebase.Firebase
 import dev.gitlive.firebase.auth.auth
+import dev.gitlive.firebase.firestore.Direction
 import dev.gitlive.firebase.firestore.firestore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
@@ -27,14 +28,19 @@ class FirestoreChatRealtimeSource(
     private val db get() = Firebase.firestore
     private val currentUid: String? get() = Firebase.auth.currentUser?.uid
 
-    override fun conversations(): Flow<List<Conversation>> {
+    override fun conversations(): Flow<List<Conversation>> = conversationsFlow(archived = false)
+
+    override fun archivedConversations(): Flow<List<Conversation>> = conversationsFlow(archived = true)
+
+    private fun conversationsFlow(archived: Boolean): Flow<List<Conversation>> {
         if (!enabled) return flowOf(emptyList())
         val uid = currentUid
         return db.collection(CONVERSATIONS).snapshots.map { snap ->
             snap.documents
                 .mapNotNull { runCatching { it.data(FsConversation.serializer()) }.getOrNull() }
-                // A'zolik ma'lumoti bo'lsa — faqat foydalanuvchi suhbatlari.
+                // A'zolik ma'lumoti bo'lsa — faqat foydalanuvchi suhbatlari; arxiv holati bo'yicha filtr.
                 .filter { it.members.isEmpty() || uid == null || it.members.contains(uid) }
+                .filter { it.archived == archived }
                 .sortedByDescending { it.unreadCount }
                 .map { it.toDomain() }
         }
@@ -43,12 +49,15 @@ class FirestoreChatRealtimeSource(
     override fun messages(conversationId: String): Flow<List<Message>> {
         if (!enabled) return flowOf(emptyList())
         val uid = currentUid
-        return db.collection(CONVERSATIONS).document(conversationId).collection(MESSAGES).snapshots.map { snap ->
-            snap.documents
-                .mapNotNull { runCatching { it.data(FsMessage.serializer()) }.getOrNull() }
-                .sortedBy { it.createdAt }
-                .map { it.toDomain(uid) }
-        }
+        // Butun tarix, server tomonida vaqt bo'yicha tartiblangan; .snapshots — jonli oqim
+        // (yangi xabar kelganda avtomatik yangilanadi, eski tarix ham to'liq keladi).
+        return db.collection(CONVERSATIONS).document(conversationId).collection(MESSAGES)
+            .orderBy("createdAt", Direction.ASCENDING)
+            .snapshots.map { snap ->
+                snap.documents
+                    .mapNotNull { runCatching { it.data(FsMessage.serializer()) }.getOrNull() }
+                    .map { it.toDomain(uid, conversationId) }
+            }
     }
 
     override suspend fun send(conversationId: String, text: String, time: String, createdAt: Long) {
@@ -66,6 +75,33 @@ class FirestoreChatRealtimeSource(
         if (!enabled) return
         db.collection(CONVERSATIONS).document(conversationId)
             .set(FsConversationUnread.serializer(), FsConversationUnread(unreadCount = 0), merge = true)
+    }
+
+    override suspend fun deleteMessage(conversationId: String, messageId: String) {
+        if (!enabled) return
+        // Xabar hujjatini o'chiramiz — .snapshots orqali barcha qurilmalarda darhol yo'qoladi.
+        db.collection(CONVERSATIONS).document(conversationId).collection(MESSAGES).document(messageId).delete()
+    }
+
+    override suspend fun clearMessages(conversationId: String) {
+        if (!enabled) return
+        // Suhbatdagi barcha xabar hujjatlarini o'qib, birma-bir o'chiramiz.
+        val snapshot = db.collection(CONVERSATIONS).document(conversationId).collection(MESSAGES).get()
+        snapshot.documents.forEach { it.reference.delete() }
+    }
+
+    override suspend fun deleteConversation(conversationId: String) {
+        if (!enabled) return
+        // Avval xabarlar subkolleksiyasini, so'ng suhbat hujjatining o'zini o'chiramiz.
+        val snapshot = db.collection(CONVERSATIONS).document(conversationId).collection(MESSAGES).get()
+        snapshot.documents.forEach { it.reference.delete() }
+        db.collection(CONVERSATIONS).document(conversationId).delete()
+    }
+
+    override suspend fun setArchived(conversationId: String, archived: Boolean) {
+        if (!enabled) return
+        db.collection(CONVERSATIONS).document(conversationId)
+            .set(FsConversationArchived.serializer(), FsConversationArchived(archived = archived), merge = true)
     }
 
     private companion object {
@@ -86,6 +122,7 @@ private data class FsConversation(
     val lastTime: String = "",
     val unreadCount: Int = 0,
     val members: List<String> = emptyList(),
+    val archived: Boolean = false,
 )
 
 @Serializable
@@ -104,6 +141,9 @@ private data class FsConversationPreview(val lastMessage: String, val lastTime: 
 @Serializable
 private data class FsConversationUnread(val unreadCount: Int)
 
+@Serializable
+private data class FsConversationArchived(val archived: Boolean)
+
 private fun FsConversation.toDomain(): Conversation = Conversation(
     id = id,
     peerName = peerName,
@@ -113,11 +153,12 @@ private fun FsConversation.toDomain(): Conversation = Conversation(
     lastMessage = lastMessage,
     lastTime = lastTime,
     unreadCount = unreadCount,
+    archived = archived,
 )
 
-private fun FsMessage.toDomain(currentUid: String?): Message = Message(
+private fun FsMessage.toDomain(currentUid: String?, conversationId: String): Message = Message(
     id = id,
-    conversationId = "",
+    conversationId = conversationId,
     text = text,
     outgoing = senderId.isNotBlank() && senderId == currentUid,
     time = time,
