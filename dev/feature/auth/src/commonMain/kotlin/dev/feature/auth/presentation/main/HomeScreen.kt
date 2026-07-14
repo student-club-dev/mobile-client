@@ -40,10 +40,10 @@ import dev.core.domain.model.DiscountTag
 import dev.core.domain.model.FriendStatus
 import dev.core.domain.model.Job
 import dev.core.domain.model.Student
-import dev.feature.auth.presentation.components.AuthFontFamily
-import dev.feature.auth.presentation.components.AuthIcons
-import dev.feature.auth.presentation.theme.AuthPalette
-import dev.feature.auth.presentation.theme.authPalette
+import dev.core.designsystem.components.AppFontFamily
+import dev.core.designsystem.components.AppIcons
+import dev.core.designsystem.theme.AppPalette
+import dev.core.designsystem.theme.appPalette
 import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
@@ -57,7 +57,7 @@ fun HomeScreen(
     onOpenStudents: () -> Unit = {},
     vm: HomeViewModel = koinViewModel(),
 ) {
-    val palette = authPalette
+    val palette = appPalette
     val state by vm.state.collectAsStateWithLifecycle()
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
@@ -79,7 +79,7 @@ fun HomeScreen(
 // Header
 // ---------------------------------------------------------------------------
 @Composable
-private fun HomeHeader(state: HomeUiState, palette: AuthPalette, onOpenProfile: () -> Unit, onOpenChat: () -> Unit, onOpenNotifications: () -> Unit) {
+private fun HomeHeader(state: HomeUiState, palette: AppPalette, onOpenProfile: () -> Unit, onOpenChat: () -> Unit, onOpenNotifications: () -> Unit) {
     val gradient = Brush.linearGradient(listOf(Color(0xFF6C47FF), Color(0xFF7C4DFF), Color(0xFF5B34D6)))
     Box(
         Modifier.fillMaxWidth()
@@ -93,14 +93,14 @@ private fun HomeHeader(state: HomeUiState, palette: AuthPalette, onOpenProfile: 
             ) {
                 Text(
                     state.userName.take(1).uppercase(),
-                    style = TextStyle(fontFamily = AuthFontFamily, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = Color.White),
+                    style = TextStyle(fontFamily = AppFontFamily, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = Color.White),
                 )
             }
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
-                Text("Assalomu alaykum 👋", style = TextStyle(fontFamily = AuthFontFamily, fontSize = 12.5f.sp, color = Color.White.copy(alpha = 0.85f)))
+                Text("Assalomu alaykum 👋", style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.5f.sp, color = Color.White.copy(alpha = 0.85f)))
                 Spacer(Modifier.height(2.dp))
-                Text(state.userName, style = TextStyle(fontFamily = AuthFontFamily, fontSize = 18.sp, fontWeight = FontWeight.Black, color = Color.White), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(state.userName, style = TextStyle(fontFamily = AppFontFamily, fontSize = 18.sp, fontWeight = FontWeight.Black, color = Color.White), maxLines = 1, overflow = TextOverflow.Ellipsis)
                 val badge = listOfNotNull(state.universityMonogram, state.courseLabel).joinToString(" · ")
                 if (badge.isNotBlank()) {
                     Spacer(Modifier.height(6.dp))
@@ -108,9 +108,9 @@ private fun HomeHeader(state: HomeUiState, palette: AuthPalette, onOpenProfile: 
                         Modifier.clip(RoundedCornerShape(999.dp)).background(Color.White.copy(alpha = 0.18f)).padding(horizontal = 9.dp, vertical = 3.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Icon(AuthIcons.GraduationCap, null, tint = Color.White, modifier = Modifier.size(12.dp))
+                        Icon(AppIcons.GraduationCap, null, tint = Color.White, modifier = Modifier.size(12.dp))
                         Spacer(Modifier.width(5.dp))
-                        Text(badge, style = TextStyle(fontFamily = AuthFontFamily, fontSize = 10.5f.sp, fontWeight = FontWeight.Bold, color = Color.White))
+                        Text(badge, style = TextStyle(fontFamily = AppFontFamily, fontSize = 10.5f.sp, fontWeight = FontWeight.Bold, color = Color.White))
                     }
                 }
             }
@@ -118,12 +118,12 @@ private fun HomeHeader(state: HomeUiState, palette: AuthPalette, onOpenProfile: 
                 Box(
                     Modifier.size(40.dp).clip(RoundedCornerShape(13.dp)).background(Color.White.copy(alpha = 0.18f)).clickable(onClick = onOpenChat),
                     contentAlignment = Alignment.Center,
-                ) { Icon(AuthIcons.MessageSquare, "Xabarlar", tint = Color.White, modifier = Modifier.size(18.dp)) }
+                ) { Icon(AppIcons.MessageSquare, "Xabarlar", tint = Color.White, modifier = Modifier.size(18.dp)) }
                 Box(
                     Modifier.size(40.dp).clip(RoundedCornerShape(13.dp)).background(Color.White.copy(alpha = 0.18f)).clickable(onClick = onOpenNotifications),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Icon(AuthIcons.Bell, "Bildirishnomalar", tint = Color.White, modifier = Modifier.size(18.dp))
+                    Icon(AppIcons.Bell, "Bildirishnomalar", tint = Color.White, modifier = Modifier.size(18.dp))
                     if (state.hasUnreadNotifications) {
                         Box(Modifier.align(Alignment.TopEnd).padding(10.dp).size(7.dp).clip(RoundedCornerShape(999.dp)).background(Color(0xFFFF5A5A)))
                     }
@@ -137,12 +137,12 @@ private fun HomeHeader(state: HomeUiState, palette: AuthPalette, onOpenProfile: 
 // Umumiy bo'lim sarlavhasi
 // ---------------------------------------------------------------------------
 @Composable
-private fun SectionHeader(title: String, action: String? = null, subtitle: String? = null, palette: AuthPalette, onAction: (() -> Unit)? = null) {
+private fun SectionHeader(title: String, action: String? = null, subtitle: String? = null, palette: AppPalette, onAction: (() -> Unit)? = null) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
-            Text(title, style = TextStyle(fontFamily = AuthFontFamily, fontSize = 17.sp, fontWeight = FontWeight.Black, color = palette.ink))
+            Text(title, style = TextStyle(fontFamily = AppFontFamily, fontSize = 17.sp, fontWeight = FontWeight.Black, color = palette.ink))
             if (subtitle != null) {
-                Text(subtitle, style = TextStyle(fontFamily = AuthFontFamily, fontSize = 11.5f.sp, color = palette.inkFaint))
+                Text(subtitle, style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.5f.sp, color = palette.inkFaint))
             }
         }
         if (action != null) {
@@ -150,8 +150,8 @@ private fun SectionHeader(title: String, action: String? = null, subtitle: Strin
                 Modifier.then(if (onAction != null) Modifier.clip(RoundedCornerShape(8.dp)).clickable(onClick = onAction).padding(horizontal = 4.dp, vertical = 2.dp) else Modifier),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(action, style = TextStyle(fontFamily = AuthFontFamily, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = palette.primary))
-                Icon(AuthIcons.ChevronRight, null, tint = palette.primary, modifier = Modifier.size(15.dp))
+                Text(action, style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = palette.primary))
+                Icon(AppIcons.ChevronRight, null, tint = palette.primary, modifier = Modifier.size(15.dp))
             }
         }
     }
@@ -167,12 +167,12 @@ private val homeClubAccents = listOf(
 private val homeClubEmojis = listOf("💻", "🗣️", "⚽", "🤝", "🎨", "🌍", "🎬", "📚")
 
 @Composable
-private fun ClubsSection(clubs: List<Club>, palette: AuthPalette, onOpenClubs: () -> Unit) {
+private fun ClubsSection(clubs: List<Club>, palette: AppPalette, onOpenClubs: () -> Unit) {
     if (clubs.isEmpty()) return
     Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable(onClick = onOpenClubs), verticalAlignment = Alignment.CenterVertically) {
-        Text("Klublar", style = TextStyle(fontFamily = AuthFontFamily, fontSize = 17.sp, fontWeight = FontWeight.Black, color = palette.ink), modifier = Modifier.weight(1f))
-        Text("Barchasi", style = TextStyle(fontFamily = AuthFontFamily, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = palette.primary))
-        Icon(AuthIcons.ChevronRight, null, tint = palette.primary, modifier = Modifier.size(15.dp))
+        Text("Klublar", style = TextStyle(fontFamily = AppFontFamily, fontSize = 17.sp, fontWeight = FontWeight.Black, color = palette.ink), modifier = Modifier.weight(1f))
+        Text("Barchasi", style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = palette.primary))
+        Icon(AppIcons.ChevronRight, null, tint = palette.primary, modifier = Modifier.size(15.dp))
     }
     Spacer(Modifier.height(12.dp))
     Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -188,9 +188,9 @@ private fun ClubsSection(clubs: List<Club>, palette: AuthPalette, onOpenClubs: (
                     Text(emoji, style = TextStyle(fontSize = 19.sp))
                 }
                 Spacer(Modifier.height(9.dp))
-                Text(club.name, style = TextStyle(fontFamily = AuthFontFamily, fontSize = 12.5f.sp, fontWeight = FontWeight.Black, color = palette.ink), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(club.name, style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.5f.sp, fontWeight = FontWeight.Black, color = palette.ink), maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Spacer(Modifier.height(3.dp))
-                Text("${club.membersCount} a'zo", style = TextStyle(fontFamily = AuthFontFamily, fontSize = 10.5f.sp, fontWeight = FontWeight.Bold, color = if (club.joined) accent else palette.inkFaint))
+                Text("${club.membersCount} a'zo", style = TextStyle(fontFamily = AppFontFamily, fontSize = 10.5f.sp, fontWeight = FontWeight.Bold, color = if (club.joined) accent else palette.inkFaint))
             }
         }
     }
@@ -200,7 +200,7 @@ private fun ClubsSection(clubs: List<Club>, palette: AuthPalette, onOpenClubs: (
 // Chegirmalar
 // ---------------------------------------------------------------------------
 @Composable
-private fun DiscountsSection(categories: List<DiscountCategory>, featured: DiscountOffer?, palette: AuthPalette, onSeeAll: () -> Unit) {
+private fun DiscountsSection(categories: List<DiscountCategory>, featured: DiscountOffer?, palette: AppPalette, onSeeAll: () -> Unit) {
     SectionHeader("Chegirmalar", action = "Barchasi", palette = palette, onAction = onSeeAll)
     Spacer(Modifier.height(12.dp))
     Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
@@ -214,29 +214,29 @@ private fun DiscountsSection(categories: List<DiscountCategory>, featured: Disco
 }
 
 @Composable
-private fun CategoryChip(category: DiscountCategory, palette: AuthPalette, onClick: () -> Unit) {
+private fun CategoryChip(category: DiscountCategory, palette: AppPalette, onClick: () -> Unit) {
     Row(
         Modifier.clip(RoundedCornerShape(999.dp)).background(palette.glass).border(1.dp, palette.border, RoundedCornerShape(999.dp)).clickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Text(category.emoji, style = TextStyle(fontSize = 14.sp))
-        Text(category.name, style = TextStyle(fontFamily = AuthFontFamily, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = palette.ink))
+        Text(category.name, style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = palette.ink))
     }
 }
 
 @Composable
-private fun MoreChip(palette: AuthPalette, onClick: () -> Unit) {
+private fun MoreChip(palette: AppPalette, onClick: () -> Unit) {
     Box(
         Modifier.clip(RoundedCornerShape(999.dp)).background(palette.primary.copy(alpha = 0.10f)).clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 8.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Text("Yana", style = TextStyle(fontFamily = AuthFontFamily, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = palette.primary))
+        Text("Yana", style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = palette.primary))
     }
 }
 
 @Composable
-private fun FeaturedOfferCard(offer: DiscountOffer, palette: AuthPalette, onClick: () -> Unit) {
+private fun FeaturedOfferCard(offer: DiscountOffer, palette: AppPalette, onClick: () -> Unit) {
     val accent = Color(offer.bannerAccent)
     Row(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(palette.glassStrong).border(1.dp, palette.border, RoundedCornerShape(18.dp)).clickable(onClick = onClick).padding(12.dp),
@@ -250,19 +250,19 @@ private fun FeaturedOfferCard(offer: DiscountOffer, palette: AuthPalette, onClic
         Column(Modifier.weight(1f)) {
             Text(
                 "${offer.merchant} — ${offer.discountPercent}% chegirma",
-                style = TextStyle(fontFamily = AuthFontFamily, fontSize = 13.5f.sp, fontWeight = FontWeight.ExtraBold, color = palette.ink),
+                style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.5f.sp, fontWeight = FontWeight.ExtraBold, color = palette.ink),
                 maxLines = 1, overflow = TextOverflow.Ellipsis,
             )
             Spacer(Modifier.height(3.dp))
             val tagText = if (offer.tag == DiscountTag.STUDENT_ID) "Talaba ID bilan" else "Promokod"
             val meta = listOfNotNull(tagText, offer.expiry).joinToString(" · ")
-            Text(meta, style = TextStyle(fontFamily = AuthFontFamily, fontSize = 11.sp, color = palette.inkFaint))
+            Text(meta, style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.sp, color = palette.inkFaint))
         }
         Box(
             Modifier.clip(RoundedCornerShape(10.dp)).background(accent).padding(horizontal = 10.dp, vertical = 6.dp),
             contentAlignment = Alignment.Center,
         ) {
-            Text("−${offer.discountPercent}%", style = TextStyle(fontFamily = AuthFontFamily, fontSize = 13.sp, fontWeight = FontWeight.Black, color = Color.White))
+            Text("−${offer.discountPercent}%", style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.sp, fontWeight = FontWeight.Black, color = Color.White))
         }
     }
 }
@@ -271,7 +271,7 @@ private fun FeaturedOfferCard(offer: DiscountOffer, palette: AuthPalette, onClic
 // Ishlar
 // ---------------------------------------------------------------------------
 @Composable
-private fun JobsSection(jobs: List<Job>, palette: AuthPalette, onSeeAll: () -> Unit, onBookmark: (Job) -> Unit) {
+private fun JobsSection(jobs: List<Job>, palette: AppPalette, onSeeAll: () -> Unit, onBookmark: (Job) -> Unit) {
     SectionHeader("Ishlar", action = "Barchasi", subtitle = "Sizning bo'limlaringiz bo'yicha", palette = palette, onAction = onSeeAll)
     Spacer(Modifier.height(12.dp))
     Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
@@ -280,7 +280,7 @@ private fun JobsSection(jobs: List<Job>, palette: AuthPalette, onSeeAll: () -> U
 }
 
 @Composable
-private fun JobRow(job: Job, palette: AuthPalette, onBookmark: (Job) -> Unit) {
+private fun JobRow(job: Job, palette: AppPalette, onBookmark: (Job) -> Unit) {
     Row(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(palette.glass).border(1.dp, palette.border, RoundedCornerShape(16.dp)).padding(12.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -290,21 +290,21 @@ private fun JobRow(job: Job, palette: AuthPalette, onBookmark: (Job) -> Unit) {
             Modifier.size(42.dp).clip(RoundedCornerShape(12.dp)).background(palette.primary.copy(alpha = 0.12f)),
             contentAlignment = Alignment.Center,
         ) {
-            Text(job.companyMonogram, style = TextStyle(fontFamily = AuthFontFamily, fontSize = 16.sp, fontWeight = FontWeight.ExtraBold, color = palette.primary))
+            Text(job.companyMonogram, style = TextStyle(fontFamily = AppFontFamily, fontSize = 16.sp, fontWeight = FontWeight.ExtraBold, color = palette.primary))
         }
         Column(Modifier.weight(1f)) {
-            Text(job.title, style = TextStyle(fontFamily = AuthFontFamily, fontSize = 13.5f.sp, fontWeight = FontWeight.ExtraBold, color = palette.ink), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(job.title, style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.5f.sp, fontWeight = FontWeight.ExtraBold, color = palette.ink), maxLines = 1, overflow = TextOverflow.Ellipsis)
             Spacer(Modifier.height(2.dp))
             Text(
                 "${job.company} · ${job.location} · ${job.category}",
-                style = TextStyle(fontFamily = AuthFontFamily, fontSize = 11.sp, color = palette.inkFaint),
+                style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.sp, color = palette.inkFaint),
                 maxLines = 1, overflow = TextOverflow.Ellipsis,
             )
             Spacer(Modifier.height(4.dp))
-            Text(job.salary, style = TextStyle(fontFamily = AuthFontFamily, fontSize = 12.5f.sp, fontWeight = FontWeight.Bold, color = palette.successDeep))
+            Text(job.salary, style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.5f.sp, fontWeight = FontWeight.Bold, color = palette.successDeep))
         }
         Icon(
-            AuthIcons.Bookmark, "Saqlash",
+            AppIcons.Bookmark, "Saqlash",
             tint = if (job.bookmarked) palette.primary else palette.inkFaint,
             modifier = Modifier.size(20.dp).clickable { onBookmark(job) },
         )
@@ -315,7 +315,7 @@ private fun JobRow(job: Job, palette: AuthPalette, onBookmark: (Job) -> Unit) {
 // Studentlar
 // ---------------------------------------------------------------------------
 @Composable
-private fun StudentsSection(students: List<Student>, palette: AuthPalette, onSeeAll: () -> Unit, onFriend: (Student) -> Unit) {
+private fun StudentsSection(students: List<Student>, palette: AppPalette, onSeeAll: () -> Unit, onFriend: (Student) -> Unit) {
     SectionHeader("Studentlar", action = "Ko'proq", subtitle = "Universitet bo'yicha do'st toping", palette = palette, onAction = onSeeAll)
     Spacer(Modifier.height(12.dp))
     Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(11.dp)) {
@@ -324,7 +324,7 @@ private fun StudentsSection(students: List<Student>, palette: AuthPalette, onSee
 }
 
 @Composable
-private fun StudentConnectCard(student: Student, palette: AuthPalette, onFriend: (Student) -> Unit) {
+private fun StudentConnectCard(student: Student, palette: AppPalette, onFriend: (Student) -> Unit) {
     Column(
         Modifier.width(128.dp).clip(RoundedCornerShape(16.dp)).background(palette.glass).border(1.dp, palette.border, RoundedCornerShape(16.dp)).padding(12.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -334,16 +334,16 @@ private fun StudentConnectCard(student: Student, palette: AuthPalette, onFriend:
             Modifier.size(48.dp).clip(RoundedCornerShape(999.dp)).background(palette.primary.copy(alpha = 0.14f)),
             contentAlignment = Alignment.Center,
         ) {
-            Text(student.initial, style = TextStyle(fontFamily = AuthFontFamily, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = palette.primary))
+            Text(student.initial, style = TextStyle(fontFamily = AppFontFamily, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = palette.primary))
         }
-        Text(student.firstName, style = TextStyle(fontFamily = AuthFontFamily, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = palette.ink), maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Text(student.universityMonogram, style = TextStyle(fontFamily = AuthFontFamily, fontSize = 10.5f.sp, color = palette.inkFaint))
+        Text(student.firstName, style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = palette.ink), maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(student.universityMonogram, style = TextStyle(fontFamily = AppFontFamily, fontSize = 10.5f.sp, color = palette.inkFaint))
         FriendButton(student, palette, onFriend)
     }
 }
 
 @Composable
-private fun FriendButton(student: Student, palette: AuthPalette, onFriend: (Student) -> Unit) {
+private fun FriendButton(student: Student, palette: AppPalette, onFriend: (Student) -> Unit) {
     val pending = student.friendStatus == FriendStatus.PENDING
     val friends = student.friendStatus == FriendStatus.FRIENDS
     val label = when {
@@ -357,6 +357,6 @@ private fun FriendButton(student: Student, palette: AuthPalette, onFriend: (Stud
         Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(bg).clickable { onFriend(student) }.padding(vertical = 7.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Text(label, style = TextStyle(fontFamily = AuthFontFamily, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, color = fg), maxLines = 1)
+        Text(label, style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, color = fg), maxLines = 1)
     }
 }

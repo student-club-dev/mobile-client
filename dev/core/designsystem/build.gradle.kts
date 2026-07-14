@@ -23,6 +23,11 @@ kotlin {
             api(compose.components.resources)
             implementation(compose.materialIconsExtended)
         }
+
+        androidMain.dependencies {
+            // Galereyadan rasm tanlash (`media/ImagePicker`) — ActivityResultContracts.PickVisualMedia.
+            implementation(libs.androidx.activity.compose)
+        }
     }
 }
 

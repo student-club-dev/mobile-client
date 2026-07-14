@@ -7,7 +7,6 @@ import dev.core.database.sql.StudentClubsDatabase
 import dev.core.database.sql.UserEntity
 import dev.core.domain.model.ExternalAuthUser
 import dev.core.domain.model.User
-import dev.core.domain.model.UserProfile
 import dev.core.domain.model.UserRole
 import dev.core.domain.repository.AuthRepository
 import dev.gitlive.firebase.Firebase
@@ -20,18 +19,18 @@ import dev.gitlive.firebase.auth.FirebaseAuthUserCollisionException
 import dev.gitlive.firebase.auth.FirebaseAuthWeakPasswordException
 import dev.gitlive.firebase.auth.FirebaseUser
 import dev.gitlive.firebase.auth.auth
-import dev.gitlive.firebase.firestore.firestore
 import dev.gitlive.firebase.functions.functions
 
 /**
  * [AuthRepository] ning GitLive Firebase (backendsiz) implementatsiyasi.
  *
  * - Email/parol, ro'yxat, parolni tiklash → **Firebase Auth** (commonMain).
- * - Profil (rol, universitet, kurs...) → **Cloud Firestore** `users/{uid}`.
+ * - Profil (rol, universitet, kurs...) bu yerda EMAS → `:dev:feature:profile` moduli
+ *   (`ProfileRepository`) unga egalik qiladi.
  * - Google/Telefon → platformaga bog'liq `SocialAuthController` Firebase'ga kiritadi,
  *   bu yerdagi [syncExternalUser] esa o'sha sessiyani o'qib domen [User] qaytaradi.
  *
- * GitLive `Firebase.auth`/`Firebase.firestore` platformadagi bir xil Firebase
+ * GitLive `Firebase.auth` platformadagi bir xil Firebase
  * singleton ustida ishlaydi — shu sabab native controller kiritgan sessiya bu yerda
  * ham ko'rinadi.
  */
@@ -41,16 +40,15 @@ class FirebaseAuthRepository(
 ) : AuthRepository {
 
     private val auth get() = Firebase.auth
-    private val db get() = Firebase.firestore
     private val fns get() = Firebase.functions
     private val userQueries get() = database.userQueries
+    private val profileQueries get() = database.profileQueries
 
     override suspend fun login(email: String, password: String): Resource<User> = try {
         val fbUser = auth.signInWithEmailAndPassword(email, password).user
             ?: return Resource.Error("Foydalanuvchi topilmadi")
-        val profile = loadProfile(fbUser.uid)
-        val user = fbUser.toDomainUser(profile)
-        cacheUser(fbUser.uid, user, profile)
+        val user = fbUser.toDomainUser()
+        cacheUser(fbUser.uid, user)
         Resource.Success(user)
     } catch (e: Exception) {
         Resource.Error(mapError(e), e)
@@ -59,8 +57,8 @@ class FirebaseAuthRepository(
     override suspend fun register(email: String, password: String): Resource<User> = try {
         val fbUser = auth.createUserWithEmailAndPassword(email, password).user
             ?: return Resource.Error("Hisob yaratilmadi")
-        val user = fbUser.toDomainUser(null)
-        cacheUser(fbUser.uid, user, null)
+        val user = fbUser.toDomainUser()
+        cacheUser(fbUser.uid, user)
         Resource.Success(user)
     } catch (e: Exception) {
         Resource.Error(mapError(e), e)
@@ -94,51 +92,31 @@ class FirebaseAuthRepository(
     override suspend fun syncExternalUser(external: ExternalAuthUser): Resource<User> {
         val fbUser = auth.currentUser
             ?: return Resource.Error("Firebase sessiyasi topilmadi")
-        val profile = loadProfile(fbUser.uid)
-        val user = fbUser.toDomainUser(profile)
-        cacheUser(fbUser.uid, user, profile)
+        val user = fbUser.toDomainUser()
+        cacheUser(fbUser.uid, user)
         return Resource.Success(user)
-    }
-
-    override suspend fun saveProfile(profile: UserProfile): Resource<Unit> {
-        val fbUser = auth.currentUser ?: return Resource.Error("Sessiya topilmadi — avval kiring")
-        return try {
-            db.collection("users").document(fbUser.uid)
-                .set(ProfileDto.serializer(), ProfileDto.from(profile), merge = true)
-            // Local keshni yangilaymiz — offline'da ham profil ko'rinadi
-            cacheUser(fbUser.uid, fbUser.toDomainUser(profile), profile)
-            Resource.Success(Unit)
-        } catch (e: Exception) {
-            Resource.Error(mapError(e), e)
-        }
-    }
-
-    override suspend fun hasProfile(): Boolean {
-        val uid = auth.currentUser?.uid ?: return false
-        return try {
-            db.collection("users").document(uid).get().exists
-        } catch (e: Exception) {
-            false
-        }
     }
 
     override suspend fun logout() {
         auth.signOut()
-        userQueries.clear() // local sessiya keshini tozalaymiz
+        // Sessiya tugadi — local kesh (sessiya + profil) to'liq tozalanadi.
+        userQueries.clear()
+        profileQueries.clear()
     }
 
     override suspend fun currentUser(): User? {
         val fbUser = auth.currentUser
         if (fbUser == null) {
-            userQueries.clear() // sessiya yo'q — eskirgan keshni tozalaymiz
+            // Sessiya yo'q — eskirgan keshni tozalaymiz.
+            userQueries.clear()
+            profileQueries.clear()
             return null
         }
         // Offline-first: kesh bo'lsa darrov qaytaramiz (tarmoqsiz ishlaydi)
         cachedUser()?.let { return it }
-        // Kesh bo'sh — Firebase/Firestore'dan tiklab keshlaymiz
-        val profile = loadProfile(fbUser.uid)
-        val user = fbUser.toDomainUser(profile)
-        cacheUser(fbUser.uid, user, profile)
+        // Kesh bo'sh — Firebase sessiyasidan tiklab keshlaymiz
+        val user = fbUser.toDomainUser()
+        cacheUser(fbUser.uid, user)
         return user
     }
 
@@ -148,12 +126,6 @@ class FirebaseAuthRepository(
             .mapToOneOrNull(Dispatchers.Default)
             .map { it?.toDomainUser() }
 
-    override fun observeProfile(): Flow<UserProfile?> =
-        userQueries.selectCurrent()
-            .asFlow()
-            .mapToOneOrNull(Dispatchers.Default)
-            .map { it?.toProfile() }
-
     // ------------------------------------------------------------------
     // Local kesh (SQLDelight)
     // ------------------------------------------------------------------
@@ -161,7 +133,7 @@ class FirebaseAuthRepository(
         userQueries.selectCurrent().executeAsOneOrNull()?.toDomainUser()
 
     /** Bitta joriy-foydalanuvchi qatorini yozadi (avval eskisini o'chirib). */
-    private fun cacheUser(uid: String, user: User, profile: UserProfile?) {
+    private fun cacheUser(uid: String, user: User) {
         userQueries.transaction {
             userQueries.clear()
             userQueries.upsert(
@@ -172,13 +144,6 @@ class FirebaseAuthRepository(
                 role = user.role.name,
                 phoneNumber = user.phoneNumber,
                 photoUrl = user.photoUrl,
-                firstName = profile?.firstName,
-                lastName = profile?.lastName,
-                universityId = profile?.universityId,
-                universityEmail = profile?.universityEmail,
-                birthYear = profile?.birthYear?.toLong(),
-                courseYear = profile?.courseYear,
-                profileRole = profile?.role,
             )
         }
     }
@@ -192,33 +157,11 @@ class FirebaseAuthRepository(
         photoUrl = photoUrl,
     )
 
-    private fun UserEntity.toProfile(): UserProfile = UserProfile(
-        firstName = firstName,
-        lastName = lastName,
-        phoneNumber = phoneNumber,
-        role = profileRole,
-        universityId = universityId,
-        universityEmail = universityEmail,
-        birthYear = birthYear?.toInt(),
-        courseYear = courseYear,
-    )
-
-    // ------------------------------------------------------------------
-    private suspend fun loadProfile(uid: String): UserProfile? = try {
-        val snapshot = db.collection("users").document(uid).get()
-        if (snapshot.exists) snapshot.data(ProfileDto.serializer()).toDomain() else null
-    } catch (e: Exception) {
-        null
-    }
-
-    private fun FirebaseUser.toDomainUser(profile: UserProfile?): User {
-        val profileName = listOfNotNull(profile?.firstName, profile?.lastName)
-            .joinToString(" ")
-            .ifBlank { null }
+    private fun FirebaseUser.toDomainUser(): User {
         return User(
             id = uid.hashCode().toLong() and 0xffffffffL,
-            fullName = profileName
-                ?: displayName
+            // Ism profildan EMAS — sessiyadan. Profil nomi ProfileRepository'dan keladi.
+            fullName = displayName
                 ?: email?.substringBefore('@')
                 ?: phoneNumber
                 ?: "Foydalanuvchi",

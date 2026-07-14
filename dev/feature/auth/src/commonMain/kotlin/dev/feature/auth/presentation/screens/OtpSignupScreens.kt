@@ -34,23 +34,23 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import dev.feature.auth.presentation.components.AuthFontFamily
-import dev.feature.auth.presentation.components.AuthIcons
-import dev.feature.auth.presentation.components.AuthScreenScaffold
-import dev.feature.auth.presentation.components.BackButton
-import dev.feature.auth.presentation.components.ErrorText
-import dev.feature.auth.presentation.components.FieldLabel
-import dev.feature.auth.presentation.components.GlassTextField
-import dev.feature.auth.presentation.components.HintText
-import dev.feature.auth.presentation.components.PhoneVisualTransformation
-import dev.feature.auth.presentation.components.PrimaryButton
-import dev.feature.auth.presentation.components.ScreenSubtitle
-import dev.feature.auth.presentation.components.ScreenTitle
+import dev.core.designsystem.components.AppFontFamily
+import dev.core.designsystem.components.AppIcons
+import dev.core.designsystem.components.AppScreenScaffold
+import dev.core.designsystem.components.BackButton
+import dev.core.designsystem.components.ErrorText
+import dev.core.designsystem.components.FieldLabel
+import dev.core.designsystem.components.GlassTextField
+import dev.core.designsystem.components.HintText
+import dev.core.designsystem.components.PhoneVisualTransformation
+import dev.core.designsystem.components.PrimaryButton
+import dev.core.designsystem.components.ScreenSubtitle
+import dev.core.designsystem.components.ScreenTitle
 import dev.feature.auth.presentation.flow.AuthFlowState
 import dev.feature.auth.presentation.flow.AuthFlowViewModel
 import dev.feature.auth.presentation.flow.Role
-import dev.feature.auth.presentation.theme.AuthPalette
-import dev.feature.auth.presentation.theme.authPalette
+import dev.core.designsystem.theme.AppPalette
+import dev.core.designsystem.theme.appPalette
 
 // ===========================================================================
 // 1g — OTP
@@ -64,9 +64,9 @@ fun OtpScreen(
     onVerify: () -> Unit,
     onResend: () -> Unit,
     onTelegram: () -> Unit,
-    palette: AuthPalette = authPalette,
+    palette: AppPalette = appPalette,
 ) {
-    AuthScreenScaffold(scroll = false) {
+    AppScreenScaffold(scroll = false) {
         BackButton(onBack)
         Spacer(Modifier.height(24.dp))
         Box(
@@ -74,7 +74,7 @@ fun OtpScreen(
                 .background(Brush.linearGradient(listOf(palette.primary.copy(alpha = 0.14f), palette.primary.copy(alpha = 0.14f))), RoundedCornerShape(18.dp)),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(AuthIcons.MessageSquare, null, tint = palette.primary, modifier = Modifier.size(30.dp))
+            Icon(AppIcons.MessageSquare, null, tint = palette.primary, modifier = Modifier.size(30.dp))
         }
         Spacer(Modifier.height(16.dp))
         ScreenTitle("Tasdiqlash kodi")
@@ -82,13 +82,13 @@ fun OtpScreen(
         Text(
             buildAnnotatedString {
                 withStyle(androidx.compose.ui.text.SpanStyle(color = palette.ink, fontWeight = FontWeight.Bold)) {
-                    append("+998 ${dev.feature.auth.presentation.components.formatUzPhone(state.phone.ifEmpty { "901234567" })} ")
+                    append("+998 ${dev.core.designsystem.components.formatUzPhone(state.phone.ifEmpty { "901234567" })} ")
                 }
                 withStyle(androidx.compose.ui.text.SpanStyle(color = palette.inkMuted)) {
                     append("raqamiga yuborilgan 6 xonali kodni kiriting.")
                 }
             },
-            style = TextStyle(fontFamily = AuthFontFamily, fontSize = 13.sp, lineHeight = 19.sp),
+            style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.sp, lineHeight = 19.sp),
         )
         Spacer(Modifier.height(22.dp))
 
@@ -96,35 +96,35 @@ fun OtpScreen(
 
         Spacer(Modifier.height(22.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
-            Icon(AuthIcons.Clock, null, tint = palette.inkFaint, modifier = Modifier.size(15.dp))
+            Icon(AppIcons.Clock, null, tint = palette.inkFaint, modifier = Modifier.size(15.dp))
             Spacer(Modifier.width(6.dp))
             if (state.resendSeconds > 0) {
                 Text(
                     "Kodni qayta yuborish · ",
-                    style = TextStyle(fontFamily = AuthFontFamily, fontSize = 12.5f.sp, color = palette.inkFaint),
+                    style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.5f.sp, color = palette.inkFaint),
                 )
                 Text(
                     formatTimer(state.resendSeconds),
-                    style = TextStyle(fontFamily = AuthFontFamily, fontSize = 12.5f.sp, fontWeight = FontWeight.Bold, color = palette.primary),
+                    style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.5f.sp, fontWeight = FontWeight.Bold, color = palette.primary),
                 )
             } else {
                 Text(
                     "Kodni qayta yuborish",
-                    style = TextStyle(fontFamily = AuthFontFamily, fontSize = 12.5f.sp, fontWeight = FontWeight.Bold, color = palette.primary),
+                    style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.5f.sp, fontWeight = FontWeight.Bold, color = palette.primary),
                     modifier = Modifier.clickableNoRipple(onResend),
                 )
             }
         }
 
         Spacer(Modifier.height(22.dp))
-        PrimaryButton("Tasdiqlash", onVerify, enabled = state.otpValid && !state.isLoading, trailingIcon = AuthIcons.Check)
+        PrimaryButton("Tasdiqlash", onVerify, enabled = state.otpValid && !state.isLoading, trailingIcon = AppIcons.Check)
 
         ErrorText(state.error)
 
         Spacer(Modifier.weight(1f))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-            Text("Kod SMS orqali kelmadimi? ", style = TextStyle(fontFamily = AuthFontFamily, fontSize = 11.5f.sp, color = palette.inkFaint))
-            Text("Telegram orqali oling", style = TextStyle(fontFamily = AuthFontFamily, fontSize = 11.5f.sp, fontWeight = FontWeight.Bold, color = palette.primary), modifier = Modifier.clickableNoRipple(onTelegram))
+            Text("Kod SMS orqali kelmadimi? ", style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.5f.sp, color = palette.inkFaint))
+            Text("Telegram orqali oling", style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.5f.sp, fontWeight = FontWeight.Bold, color = palette.primary), modifier = Modifier.clickableNoRipple(onTelegram))
         }
     }
 }
@@ -136,7 +136,7 @@ private fun formatTimer(seconds: Int): String {
 }
 
 @Composable
-private fun OtpInput(value: String, onValueChange: (String) -> Unit, palette: AuthPalette) {
+private fun OtpInput(value: String, onValueChange: (String) -> Unit, palette: AppPalette) {
     BasicTextField(
         value = value,
         onValueChange = { onValueChange(it) },
@@ -157,7 +157,7 @@ private fun OtpInput(value: String, onValueChange: (String) -> Unit, palette: Au
 }
 
 @Composable
-private fun OtpCell(ch: Char?, focused: Boolean, palette: AuthPalette, modifier: Modifier) {
+private fun OtpCell(ch: Char?, focused: Boolean, palette: AppPalette, modifier: Modifier) {
     val shape = RoundedCornerShape(13.dp)
     val bg = when {
         ch != null -> palette.fieldBg
@@ -178,7 +178,7 @@ private fun OtpCell(ch: Char?, focused: Boolean, palette: AuthPalette, modifier:
         contentAlignment = Alignment.Center,
     ) {
         when {
-            ch != null -> Text(ch.toString(), style = TextStyle(fontFamily = AuthFontFamily, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, color = palette.ink))
+            ch != null -> Text(ch.toString(), style = TextStyle(fontFamily = AppFontFamily, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, color = palette.ink))
             focused -> Box(Modifier.width(2.dp).height(24.dp).background(palette.primary))
         }
     }
@@ -194,9 +194,9 @@ fun SignUpScreen(
     vm: AuthFlowViewModel,
     onBack: () -> Unit,
     onCreate: () -> Unit,
-    palette: AuthPalette = authPalette,
+    palette: AppPalette = appPalette,
 ) {
-    AuthScreenScaffold(scroll = false, horizontalPadding = 20, topPadding = 54) {
+    AppScreenScaffold(scroll = false, horizontalPadding = 20, topPadding = 54) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(11.dp)) {
             BackButton(onBack)
             ScreenTitle("Hisob yaratish", size = 21)
@@ -206,10 +206,10 @@ fun SignUpScreen(
         FieldLabel("Kim sifatida?")
         Spacer(Modifier.height(8.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-            RoleChip("Talaba", AuthIcons.GraduationCap, state.role == Role.STUDENT, { vm.onRoleChange(Role.STUDENT) }, Modifier.weight(1f), palette)
-            RoleChip("Biznes", AuthIcons.Store, state.role == Role.BUSINESS, { vm.onRoleChange(Role.BUSINESS) }, Modifier.weight(1f), palette)
-            RoleChip("Ish beruvchi", AuthIcons.Briefcase, state.role == Role.EMPLOYER, { vm.onRoleChange(Role.EMPLOYER) }, Modifier.weight(1f), palette)
-            RoleChip("Univer", AuthIcons.Building, state.role == Role.UNIVERSITY, { vm.onRoleChange(Role.UNIVERSITY) }, Modifier.weight(1f), palette)
+            RoleChip("Talaba", AppIcons.GraduationCap, state.role == Role.STUDENT, { vm.onRoleChange(Role.STUDENT) }, Modifier.weight(1f), palette)
+            RoleChip("Biznes", AppIcons.Store, state.role == Role.BUSINESS, { vm.onRoleChange(Role.BUSINESS) }, Modifier.weight(1f), palette)
+            RoleChip("Ish beruvchi", AppIcons.Briefcase, state.role == Role.EMPLOYER, { vm.onRoleChange(Role.EMPLOYER) }, Modifier.weight(1f), palette)
+            RoleChip("Univer", AppIcons.Building, state.role == Role.UNIVERSITY, { vm.onRoleChange(Role.UNIVERSITY) }, Modifier.weight(1f), palette)
         }
 
         Spacer(Modifier.height(14.dp))
@@ -232,11 +232,11 @@ fun SignUpScreen(
             value = state.password,
             onValueChange = vm::onPasswordChange,
             placeholder = "••••••",
-            leading = AuthIcons.Lock,
+            leading = AppIcons.Lock,
             height = 46,
             trailing = {
                 Icon(
-                    if (state.passwordVisible) AuthIcons.EyeOff else AuthIcons.Eye,
+                    if (state.passwordVisible) AppIcons.EyeOff else AppIcons.Eye,
                     null, tint = palette.inkFaint,
                     modifier = Modifier.size(16.dp).clickableNoRipple { vm.togglePasswordVisible() },
                 )
@@ -256,14 +256,14 @@ fun SignUpScreen(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(9.dp),
         ) {
-            Icon(AuthIcons.ShieldCheck, null, tint = palette.successDeep, modifier = Modifier.size(16.dp))
+            Icon(AppIcons.ShieldCheck, null, tint = palette.successDeep, modifier = Modifier.size(16.dp))
             Box(Modifier.weight(1f)) {
                 if (state.universityEmail.isEmpty()) {
-                    Text("aziz@tuit.uz", style = TextStyle(fontFamily = AuthFontFamily, fontSize = 12.5f.sp, color = palette.inkFaint))
+                    Text("aziz@tuit.uz", style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.5f.sp, color = palette.inkFaint))
                 }
                 BasicTextField(
                     state.universityEmail, vm::onUniversityEmailChange, singleLine = true,
-                    textStyle = TextStyle(fontFamily = AuthFontFamily, fontSize = 12.5f.sp, fontWeight = FontWeight.SemiBold, color = palette.ink),
+                    textStyle = TextStyle(fontFamily = AppFontFamily, fontSize = 12.5f.sp, fontWeight = FontWeight.SemiBold, color = palette.ink),
                     cursorBrush = SolidColor(palette.primary),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
                     modifier = Modifier.fillMaxWidth(),
@@ -271,7 +271,7 @@ fun SignUpScreen(
             }
             if (verified) {
                 Box(Modifier.clip(RoundedCornerShape(6.dp)).background(palette.successDeep.copy(alpha = 0.14f)).padding(horizontal = 7.dp, vertical = 3.dp)) {
-                    Text("TASDIQLANGAN", style = TextStyle(fontFamily = AuthFontFamily, fontSize = 10.sp, fontWeight = FontWeight.ExtraBold, color = palette.successDeep))
+                    Text("TASDIQLANGAN", style = TextStyle(fontFamily = AppFontFamily, fontSize = 10.sp, fontWeight = FontWeight.ExtraBold, color = palette.successDeep))
                 }
             }
         }
@@ -288,7 +288,7 @@ fun SignUpScreen(
                     withStyle(androidx.compose.ui.text.SpanStyle(color = palette.primary, fontWeight = FontWeight.Bold)) { append("Maxfiylik siyosati") }
                     withStyle(androidx.compose.ui.text.SpanStyle(color = palette.label)) { append("ga roziman.") }
                 },
-                style = TextStyle(fontFamily = AuthFontFamily, fontSize = 11.5f.sp, lineHeight = 16.sp),
+                style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.5f.sp, lineHeight = 16.sp),
             )
         }
 
@@ -301,7 +301,7 @@ fun SignUpScreen(
 }
 
 @Composable
-private fun RoleChip(label: String, icon: ImageVector, active: Boolean, onClick: () -> Unit, modifier: Modifier, palette: AuthPalette) {
+private fun RoleChip(label: String, icon: ImageVector, active: Boolean, onClick: () -> Unit, modifier: Modifier, palette: AppPalette) {
     val shape = RoundedCornerShape(13.dp)
     Column(
         modifier
@@ -314,7 +314,7 @@ private fun RoleChip(label: String, icon: ImageVector, active: Boolean, onClick:
         verticalArrangement = Arrangement.spacedBy(5.dp),
     ) {
         Icon(icon, null, tint = if (active) Color.White else palette.inkFaint, modifier = Modifier.size(18.dp))
-        Text(label, style = TextStyle(fontFamily = AuthFontFamily, fontSize = 10.5f.sp, fontWeight = if (active) FontWeight.ExtraBold else FontWeight.Bold, color = if (active) Color.White else palette.inkMuted), maxLines = 1)
+        Text(label, style = TextStyle(fontFamily = AppFontFamily, fontSize = 10.5f.sp, fontWeight = if (active) FontWeight.ExtraBold else FontWeight.Bold, color = if (active) Color.White else palette.inkMuted), maxLines = 1)
     }
 }
 
@@ -329,9 +329,9 @@ fun ForgotPasswordScreen(
     onBack: () -> Unit,
     onSend: () -> Unit,
     onBackToLogin: () -> Unit,
-    palette: AuthPalette = authPalette,
+    palette: AppPalette = appPalette,
 ) {
-    AuthScreenScaffold(scroll = false) {
+    AppScreenScaffold(scroll = false) {
         BackButton(onBack)
         Spacer(Modifier.height(40.dp))
         Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -344,7 +344,7 @@ fun ForgotPasswordScreen(
                     Modifier.size(64.dp).background(palette.primaryBrush, RoundedCornerShape(20.dp)),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Icon(AuthIcons.Lock, null, tint = Color.White, modifier = Modifier.size(32.dp))
+                    Icon(AppIcons.Lock, null, tint = Color.White, modifier = Modifier.size(32.dp))
                 }
             }
             Spacer(Modifier.height(22.dp))
@@ -352,7 +352,7 @@ fun ForgotPasswordScreen(
             Spacer(Modifier.height(8.dp))
             Text(
                 "Email manzilingizni kiriting — parolni tiklash havolasini yuboramiz.",
-                style = TextStyle(fontFamily = AuthFontFamily, fontSize = 13.sp, color = palette.inkMuted, textAlign = androidx.compose.ui.text.style.TextAlign.Center, lineHeight = 19.sp),
+                style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.sp, color = palette.inkMuted, textAlign = androidx.compose.ui.text.style.TextAlign.Center, lineHeight = 19.sp),
                 modifier = Modifier.padding(horizontal = 6.dp),
             )
         }
@@ -364,7 +364,7 @@ fun ForgotPasswordScreen(
             value = state.email,
             onValueChange = vm::onEmailChange,
             placeholder = "aziz.karimov@edu.uz",
-            leading = AuthIcons.Mail,
+            leading = AppIcons.Mail,
             focused = true,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
         )
@@ -373,18 +373,18 @@ fun ForgotPasswordScreen(
 
         state.info?.let {
             Spacer(Modifier.height(12.dp))
-            Text(it, style = TextStyle(fontFamily = AuthFontFamily, fontSize = 12.5f.sp, fontWeight = FontWeight.SemiBold, color = palette.successDeep, lineHeight = 17.sp))
+            Text(it, style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.5f.sp, fontWeight = FontWeight.SemiBold, color = palette.successDeep, lineHeight = 17.sp))
         }
         state.error?.let {
             Spacer(Modifier.height(12.dp))
-            Text(it, style = TextStyle(fontFamily = AuthFontFamily, fontSize = 12.5f.sp, color = Color(0xFFDC2626), lineHeight = 17.sp))
+            Text(it, style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.5f.sp, color = Color(0xFFDC2626), lineHeight = 17.sp))
         }
 
         Spacer(Modifier.weight(1f))
         Row(Modifier.fillMaxWidth().clickableNoRipple(onBackToLogin), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
-            Icon(AuthIcons.ArrowLeft, null, tint = palette.primary, modifier = Modifier.size(16.dp))
+            Icon(AppIcons.ArrowLeft, null, tint = palette.primary, modifier = Modifier.size(16.dp))
             Spacer(Modifier.width(7.dp))
-            Text("Kirishga qaytish", style = TextStyle(fontFamily = AuthFontFamily, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = palette.primary))
+            Text("Kirishga qaytish", style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = palette.primary))
         }
     }
 }

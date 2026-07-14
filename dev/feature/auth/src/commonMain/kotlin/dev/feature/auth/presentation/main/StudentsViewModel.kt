@@ -6,7 +6,7 @@ import dev.core.domain.model.FriendStatus
 import dev.core.domain.model.Student
 import dev.core.domain.model.StudentSort
 import dev.core.domain.repository.StudentRepository
-import dev.core.domain.usecase.ObserveProfileUseCase
+import dev.feature.profile.domain.usecase.ObserveProfileUseCase
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow

@@ -42,22 +42,22 @@ import dev.core.designsystem.theme.ModuleFood
 import dev.core.designsystem.theme.ModuleStudy
 import dev.core.designsystem.theme.Success
 import dev.core.designsystem.theme.SuccessDeep
-import dev.feature.auth.presentation.components.AuthFontFamily
-import dev.feature.auth.presentation.components.AuthIcons
-import dev.feature.auth.presentation.components.AuthScreenScaffold
-import dev.feature.auth.presentation.components.BackButton
-import dev.feature.auth.presentation.components.ErrorText
-import dev.feature.auth.presentation.components.FieldLabel
-import dev.feature.auth.presentation.components.GlassTextField
-import dev.feature.auth.presentation.components.PrimaryButton
-import dev.feature.auth.presentation.components.ScreenTitle
+import dev.core.designsystem.components.AppFontFamily
+import dev.core.designsystem.components.AppIcons
+import dev.core.designsystem.components.AppScreenScaffold
+import dev.core.designsystem.components.BackButton
+import dev.core.designsystem.components.ErrorText
+import dev.core.designsystem.components.FieldLabel
+import dev.core.designsystem.components.GlassTextField
+import dev.core.designsystem.components.PrimaryButton
+import dev.core.designsystem.components.ScreenTitle
 import dev.feature.auth.presentation.flow.AuthFlowState
 import dev.feature.auth.presentation.flow.AuthFlowViewModel
 import dev.feature.auth.presentation.flow.CourseYear
 import dev.feature.auth.presentation.flow.Role
 import dev.feature.auth.presentation.flow.University
-import dev.feature.auth.presentation.theme.AuthPalette
-import dev.feature.auth.presentation.theme.authPalette
+import dev.core.designsystem.theme.AppPalette
+import dev.core.designsystem.theme.appPalette
 
 // ===========================================================================
 // 1j — SUCCESS / ROLE PICKER
@@ -70,29 +70,29 @@ fun SuccessScreen(
     state: AuthFlowState,
     vm: AuthFlowViewModel,
     onContinue: () -> Unit,
-    palette: AuthPalette = authPalette,
+    palette: AppPalette = appPalette,
 ) {
     val cards = listOf(
-        RoleCardInfo(Role.STUDENT, "Talaba", "8 modul, buyurtma, chat", AuthIcons.GraduationCap, palette.primary),
-        RoleCardInfo(Role.BUSINESS, "Biznes", "Menyu, buyurtma qabul", AuthIcons.Store, ModuleFood),
-        RoleCardInfo(Role.EMPLOYER, "Ish beruvchi", "E‘lon, arizalar", AuthIcons.Briefcase, dev.core.designsystem.theme.ModuleEmployer),
-        RoleCardInfo(Role.UNIVERSITY, "Universitet", "Jadval, e‘lonlar", AuthIcons.Building, ModuleStudy),
+        RoleCardInfo(Role.STUDENT, "Talaba", "8 modul, buyurtma, chat", AppIcons.GraduationCap, palette.primary),
+        RoleCardInfo(Role.BUSINESS, "Biznes", "Menyu, buyurtma qabul", AppIcons.Store, ModuleFood),
+        RoleCardInfo(Role.EMPLOYER, "Ish beruvchi", "E‘lon, arizalar", AppIcons.Briefcase, dev.core.designsystem.theme.ModuleEmployer),
+        RoleCardInfo(Role.UNIVERSITY, "Universitet", "Jadval, e‘lonlar", AppIcons.Building, ModuleStudy),
     )
-    AuthScreenScaffold(scroll = true, topPadding = 64) {
+    AppScreenScaffold(scroll = true, topPadding = 64) {
         Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
             Box(
                 Modifier.size(88.dp)
                     .background(Brush.linearGradient(listOf(Success, SuccessDeep)), RoundedCornerShape(999.dp)),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(AuthIcons.Check, null, tint = Color.White, modifier = Modifier.size(46.dp))
+                Icon(AppIcons.Check, null, tint = Color.White, modifier = Modifier.size(46.dp))
             }
             Spacer(Modifier.height(20.dp))
             ScreenTitle("Tabriklaymiz! 🎉")
             Spacer(Modifier.height(6.dp))
             Text(
                 "Hisobingiz tayyor. Boshlash uchun rolingizni tasdiqlang.",
-                style = TextStyle(fontFamily = AuthFontFamily, fontSize = 13.sp, color = palette.inkMuted, textAlign = TextAlign.Center, lineHeight = 19.sp),
+                style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.sp, color = palette.inkMuted, textAlign = TextAlign.Center, lineHeight = 19.sp),
                 modifier = Modifier.padding(horizontal = 8.dp),
             )
         }
@@ -109,12 +109,12 @@ fun SuccessScreen(
         }
 
         Spacer(Modifier.height(22.dp))
-        PrimaryButton("Davom etish", onContinue, trailingIcon = AuthIcons.ArrowRight)
+        PrimaryButton("Davom etish", onContinue, trailingIcon = AppIcons.ArrowRight)
     }
 }
 
 @Composable
-private fun RoleCard(info: RoleCardInfo, selected: Boolean, onClick: () -> Unit, modifier: Modifier, palette: AuthPalette) {
+private fun RoleCard(info: RoleCardInfo, selected: Boolean, onClick: () -> Unit, modifier: Modifier, palette: AppPalette) {
     val shape = RoundedCornerShape(16.dp)
     Column(
         modifier
@@ -128,8 +128,8 @@ private fun RoleCard(info: RoleCardInfo, selected: Boolean, onClick: () -> Unit,
         Box(Modifier.size(38.dp).background(info.accent.copy(alpha = 0.12f), RoundedCornerShape(11.dp)), contentAlignment = Alignment.Center) {
             Icon(info.icon, null, tint = info.accent, modifier = Modifier.size(20.dp))
         }
-        Text(info.title, style = TextStyle(fontFamily = AuthFontFamily, fontSize = 14.sp, fontWeight = FontWeight.ExtraBold, color = palette.ink))
-        Text(info.desc, style = TextStyle(fontFamily = AuthFontFamily, fontSize = 11.sp, color = palette.inkFaint, lineHeight = 15.sp))
+        Text(info.title, style = TextStyle(fontFamily = AppFontFamily, fontSize = 14.sp, fontWeight = FontWeight.ExtraBold, color = palette.ink))
+        Text(info.desc, style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.sp, color = palette.inkFaint, lineHeight = 15.sp))
     }
 }
 
@@ -144,14 +144,14 @@ fun ProfileScreen(
     onBack: () -> Unit,
     onPickUniversity: () -> Unit,
     onStart: () -> Unit,
-    palette: AuthPalette = authPalette,
+    palette: AppPalette = appPalette,
 ) {
-    AuthScreenScaffold(scroll = false, horizontalPadding = 20, topPadding = 54) {
+    AppScreenScaffold(scroll = false, horizontalPadding = 20, topPadding = 54) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(11.dp)) {
             BackButton(onBack)
             Column {
                 ScreenTitle("Profilingiz haqida", size = 20)
-                Text("Deyarli tayyor — 2-qadam / 2", style = TextStyle(fontFamily = AuthFontFamily, fontSize = 11.5f.sp, fontWeight = FontWeight.SemiBold, color = palette.inkFaint))
+                Text("Deyarli tayyor — 2-qadam / 2", style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.5f.sp, fontWeight = FontWeight.SemiBold, color = palette.inkFaint))
             }
         }
         Spacer(Modifier.height(14.dp))
@@ -193,12 +193,12 @@ fun ProfileScreen(
 
         Spacer(Modifier.weight(1f))
         Spacer(Modifier.height(16.dp))
-        PrimaryButton("Boshlash", onStart, enabled = !state.isLoading, trailingIcon = AuthIcons.ArrowRight)
+        PrimaryButton("Boshlash", onStart, enabled = !state.isLoading, trailingIcon = AppIcons.ArrowRight)
     }
 }
 
 @Composable
-private fun UniversitySelectorRow(university: University?, onClick: () -> Unit, palette: AuthPalette) {
+private fun UniversitySelectorRow(university: University?, onClick: () -> Unit, palette: AppPalette) {
     val shape = RoundedCornerShape(13.dp)
     Row(
         Modifier.fillMaxWidth().height(52.dp).clip(shape)
@@ -210,26 +210,26 @@ private fun UniversitySelectorRow(university: University?, onClick: () -> Unit, 
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Box(Modifier.size(32.dp).background(palette.primary.copy(alpha = 0.12f), RoundedCornerShape(9.dp)), contentAlignment = Alignment.Center) {
-            Icon(AuthIcons.GraduationCap, null, tint = palette.primary, modifier = Modifier.size(17.dp))
+            Icon(AppIcons.GraduationCap, null, tint = palette.primary, modifier = Modifier.size(17.dp))
         }
         Column(Modifier.weight(1f)) {
             Text(
                 university?.name ?: "Universitetni tanlang",
-                style = TextStyle(fontFamily = AuthFontFamily, fontSize = 13.5f.sp, fontWeight = FontWeight.Bold, color = palette.ink),
+                style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.5f.sp, fontWeight = FontWeight.Bold, color = palette.ink),
                 maxLines = 1, overflow = TextOverflow.Ellipsis,
             )
             Text(
                 university?.let { "${it.city} · Universitet" } ?: "Ro‘yxatdan tanlang",
-                style = TextStyle(fontFamily = AuthFontFamily, fontSize = 10.5f.sp, color = palette.inkFaint),
+                style = TextStyle(fontFamily = AppFontFamily, fontSize = 10.5f.sp, color = palette.inkFaint),
                 maxLines = 1, overflow = TextOverflow.Ellipsis,
             )
         }
-        Icon(AuthIcons.ChevronDown, null, tint = palette.primary, modifier = Modifier.size(18.dp))
+        Icon(AppIcons.ChevronDown, null, tint = palette.primary, modifier = Modifier.size(18.dp))
     }
 }
 
 @Composable
-private fun BirthYearRow(year: Int, onSelect: (Int) -> Unit, palette: AuthPalette) {
+private fun BirthYearRow(year: Int, onSelect: (Int) -> Unit, palette: AppPalette) {
     var expanded by remember { mutableStateOf(false) }
     val shape = RoundedCornerShape(13.dp)
     Box {
@@ -242,20 +242,20 @@ private fun BirthYearRow(year: Int, onSelect: (Int) -> Unit, palette: AuthPalett
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Icon(AuthIcons.Calendar, null, tint = palette.inkFaint, modifier = Modifier.size(16.dp))
-            Text("$year", style = TextStyle(fontFamily = AuthFontFamily, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = palette.ink), modifier = Modifier.weight(1f))
-            Icon(AuthIcons.ChevronDown, null, tint = palette.inkFaint, modifier = Modifier.size(18.dp))
+            Icon(AppIcons.Calendar, null, tint = palette.inkFaint, modifier = Modifier.size(16.dp))
+            Text("$year", style = TextStyle(fontFamily = AppFontFamily, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = palette.ink), modifier = Modifier.weight(1f))
+            Icon(AppIcons.ChevronDown, null, tint = palette.inkFaint, modifier = Modifier.size(18.dp))
         }
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }, modifier = Modifier.heightIn(max = 280.dp)) {
             (2010 downTo 1980).forEach { y ->
-                DropdownMenuItem(text = { Text("$y", style = TextStyle(fontFamily = AuthFontFamily, fontWeight = if (y == year) FontWeight.Bold else FontWeight.Normal)) }, onClick = { onSelect(y); expanded = false })
+                DropdownMenuItem(text = { Text("$y", style = TextStyle(fontFamily = AppFontFamily, fontWeight = if (y == year) FontWeight.Bold else FontWeight.Normal)) }, onClick = { onSelect(y); expanded = false })
             }
         }
     }
 }
 
 @Composable
-private fun CourseOption(course: CourseYear, active: Boolean, onClick: () -> Unit, modifier: Modifier, palette: AuthPalette) {
+private fun CourseOption(course: CourseYear, active: Boolean, onClick: () -> Unit, modifier: Modifier, palette: AppPalette) {
     val shape = RoundedCornerShape(12.dp)
     Box(
         modifier
@@ -268,7 +268,7 @@ private fun CourseOption(course: CourseYear, active: Boolean, onClick: () -> Uni
     ) {
         Text(
             course.label,
-            style = TextStyle(fontFamily = AuthFontFamily, fontSize = if (course == CourseYear.MASTER) 13.sp else 14.sp, fontWeight = FontWeight.ExtraBold, color = if (active) Color.White else palette.inkMuted),
+            style = TextStyle(fontFamily = AppFontFamily, fontSize = if (course == CourseYear.MASTER) 13.sp else 14.sp, fontWeight = FontWeight.ExtraBold, color = if (active) Color.White else palette.inkMuted),
         )
     }
 }
@@ -283,12 +283,12 @@ fun UniversityPickerScreen(
     vm: AuthFlowViewModel,
     onClose: () -> Unit,
     onSelectDone: () -> Unit,
-    palette: AuthPalette = authPalette,
+    palette: AppPalette = appPalette,
 ) {
     val results = state.filteredUniversities
-    AuthScreenScaffold(horizontalPadding = 18, topPadding = 54) {
+    AppScreenScaffold(horizontalPadding = 18, topPadding = 54) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(11.dp)) {
-            BackButton(onClose, icon = AuthIcons.Close)
+            BackButton(onClose, icon = AppIcons.Close)
             ScreenTitle("Universitetni tanlang", size = 18)
         }
         Spacer(Modifier.height(14.dp))
@@ -296,14 +296,14 @@ fun UniversityPickerScreen(
             value = state.universityQuery,
             onValueChange = vm::onUniversityQueryChange,
             placeholder = "Toshkent",
-            leading = AuthIcons.Search,
+            leading = AppIcons.Search,
             focused = true,
             height = 46,
         )
         Spacer(Modifier.height(16.dp))
         Text(
             "${results.size} TA NATIJA",
-            style = TextStyle(fontFamily = AuthFontFamily, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp, color = palette.inkFaint),
+            style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp, color = palette.inkFaint),
         )
         Spacer(Modifier.height(8.dp))
 
@@ -319,7 +319,7 @@ fun UniversityPickerScreen(
 }
 
 @Composable
-private fun UniversityRow(uni: University, selected: Boolean, onClick: () -> Unit, palette: AuthPalette) {
+private fun UniversityRow(uni: University, selected: Boolean, onClick: () -> Unit, palette: AppPalette) {
     val shape = RoundedCornerShape(14.dp)
     val accent = Color(uni.accent)
     Row(
@@ -335,15 +335,15 @@ private fun UniversityRow(uni: University, selected: Boolean, onClick: () -> Uni
             Modifier.size(36.dp).background(if (selected) palette.primary else accent.copy(alpha = 0.12f), RoundedCornerShape(10.dp)),
             contentAlignment = Alignment.Center,
         ) {
-            Text(uni.monogram, style = TextStyle(fontFamily = AuthFontFamily, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, color = if (selected) Color.White else accent))
+            Text(uni.monogram, style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, color = if (selected) Color.White else accent))
         }
         Column(Modifier.weight(1f)) {
-            Text(uni.name, style = TextStyle(fontFamily = AuthFontFamily, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = palette.ink), maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(uni.city, style = TextStyle(fontFamily = AuthFontFamily, fontSize = 10.5f.sp, color = palette.inkFaint))
+            Text(uni.name, style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = palette.ink), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(uni.city, style = TextStyle(fontFamily = AppFontFamily, fontSize = 10.5f.sp, color = palette.inkFaint))
         }
         if (selected) {
             Box(Modifier.size(20.dp).background(palette.primary, RoundedCornerShape(999.dp)), contentAlignment = Alignment.Center) {
-                Icon(AuthIcons.Check, null, tint = Color.White, modifier = Modifier.size(12.dp))
+                Icon(AppIcons.Check, null, tint = Color.White, modifier = Modifier.size(12.dp))
             }
         }
     }

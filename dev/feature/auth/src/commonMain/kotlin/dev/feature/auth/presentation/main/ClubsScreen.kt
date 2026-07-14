@@ -32,10 +32,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.core.domain.model.Club
-import dev.feature.auth.presentation.components.AuthFontFamily
-import dev.feature.auth.presentation.components.AuthIcons
-import dev.feature.auth.presentation.theme.AuthPalette
-import dev.feature.auth.presentation.theme.authPalette
+import dev.core.designsystem.components.AppFontFamily
+import dev.core.designsystem.components.AppIcons
+import dev.core.designsystem.theme.AppPalette
+import dev.core.designsystem.theme.appPalette
 import org.koin.compose.viewmodel.koinViewModel
 
 private val clubAccents = listOf(
@@ -47,7 +47,7 @@ private val clubEmojis = listOf("💻", "🗣️", "⚽", "🤝", "🎨", "🌍"
 /** Klublar ekrani (C4). Local DB'dan real ro'yxat; "Qo'shilish/Chiqish" ishlaydi. */
 @Composable
 fun ClubsScreen(onBack: () -> Unit, vm: ClubsViewModel = koinViewModel()) {
-    val palette = authPalette
+    val palette = appPalette
     val state by vm.state.collectAsStateWithLifecycle()
 
     Column(Modifier.fillMaxSize()) {
@@ -60,11 +60,11 @@ fun ClubsScreen(onBack: () -> Unit, vm: ClubsViewModel = koinViewModel()) {
                 Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(palette.glass)
                     .border(1.dp, palette.border, RoundedCornerShape(12.dp)).clickable(onClick = onBack),
                 contentAlignment = Alignment.Center,
-            ) { Icon(AuthIcons.ArrowLeft, "Orqaga", tint = palette.ink, modifier = Modifier.size(18.dp)) }
+            ) { Icon(AppIcons.ArrowLeft, "Orqaga", tint = palette.ink, modifier = Modifier.size(18.dp)) }
             Column(Modifier.weight(1f)) {
-                Text("Klublar", style = TextStyle(fontFamily = AuthFontFamily, fontSize = 22.sp, fontWeight = FontWeight.Black, color = palette.ink))
+                Text("Klublar", style = TextStyle(fontFamily = AppFontFamily, fontSize = 22.sp, fontWeight = FontWeight.Black, color = palette.ink))
                 if (state.joinedCount > 0) {
-                    Text("${state.joinedCount} ta klubga a'zosiz", style = TextStyle(fontFamily = AuthFontFamily, fontSize = 11.5f.sp, color = palette.inkFaint))
+                    Text("${state.joinedCount} ta klubga a'zosiz", style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.5f.sp, color = palette.inkFaint))
                 }
             }
         }
@@ -83,7 +83,7 @@ fun ClubsScreen(onBack: () -> Unit, vm: ClubsViewModel = koinViewModel()) {
 }
 
 @Composable
-private fun ClubCard(club: Club, palette: AuthPalette, onToggle: () -> Unit) {
+private fun ClubCard(club: Club, palette: AppPalette, onToggle: () -> Unit) {
     val idx = ((club.id - 1).toInt()).mod(clubAccents.size)
     val accent = clubAccents[idx]
     val emoji = clubEmojis[((club.id - 1).toInt()).mod(clubEmojis.size)]
@@ -96,13 +96,13 @@ private fun ClubCard(club: Club, palette: AuthPalette, onToggle: () -> Unit) {
             Text(emoji, style = TextStyle(fontSize = 22.sp))
         }
         Column(Modifier.weight(1f)) {
-            Text(club.name, style = TextStyle(fontFamily = AuthFontFamily, fontSize = 14.5f.sp, fontWeight = FontWeight.Black, color = palette.ink))
+            Text(club.name, style = TextStyle(fontFamily = AppFontFamily, fontSize = 14.5f.sp, fontWeight = FontWeight.Black, color = palette.ink))
             Spacer(Modifier.height(2.dp))
-            Text(club.description, style = TextStyle(fontFamily = AuthFontFamily, fontSize = 11.5f.sp, color = palette.inkMuted), maxLines = 2)
+            Text(club.description, style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.5f.sp, color = palette.inkMuted), maxLines = 2)
             Spacer(Modifier.height(5.dp))
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                Icon(AuthIcons.Users, null, tint = palette.inkFaint, modifier = Modifier.size(13.dp))
-                Text("${club.membersCount} a'zo", style = TextStyle(fontFamily = AuthFontFamily, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = palette.inkFaint))
+                Icon(AppIcons.Users, null, tint = palette.inkFaint, modifier = Modifier.size(13.dp))
+                Text("${club.membersCount} a'zo", style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = palette.inkFaint))
             }
         }
         JoinButton(joined = club.joined, accent = accent, palette = palette, onClick = onToggle)
@@ -110,7 +110,7 @@ private fun ClubCard(club: Club, palette: AuthPalette, onToggle: () -> Unit) {
 }
 
 @Composable
-private fun JoinButton(joined: Boolean, accent: Color, palette: AuthPalette, onClick: () -> Unit) {
+private fun JoinButton(joined: Boolean, accent: Color, palette: AppPalette, onClick: () -> Unit) {
     Box(
         Modifier.height(36.dp).width(if (joined) 78.dp else 90.dp)
             .clip(RoundedCornerShape(11.dp))
@@ -121,7 +121,7 @@ private fun JoinButton(joined: Boolean, accent: Color, palette: AuthPalette, onC
     ) {
         Text(
             if (joined) "A'zosiz" else "Qo'shilish",
-            style = TextStyle(fontFamily = AuthFontFamily, fontSize = 12.sp, fontWeight = FontWeight.ExtraBold, color = if (joined) palette.inkMuted else Color.White),
+            style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.sp, fontWeight = FontWeight.ExtraBold, color = if (joined) palette.inkMuted else Color.White),
         )
     }
 }

@@ -1,5 +1,7 @@
 -- Joriy (kirgan) foydalanuvchi sessiyasining local keshi.
 -- Bitta qatordan iborat: offline ishlash va avtomatik kirish uchun.
+-- Profil maydonlari (universitet, kurs, rol...) bu yerda EMAS — ular `ProfileEntity`
+-- jadvalida, unga `:dev:feature:profile` moduli egalik qiladi (migratsiya v6).
 CREATE TABLE UserEntity (
     uid TEXT NOT NULL PRIMARY KEY,
     userId INTEGER NOT NULL,
@@ -7,15 +9,7 @@ CREATE TABLE UserEntity (
     email TEXT NOT NULL,
     role TEXT NOT NULL,
     phoneNumber TEXT,
-    photoUrl TEXT,
-    -- Profil maydonlari (Firestore users/{uid})
-    firstName TEXT,
-    lastName TEXT,
-    universityId TEXT,
-    universityEmail TEXT,
-    birthYear INTEGER,
-    courseYear TEXT,
-    profileRole TEXT
+    photoUrl TEXT
 );
 
 selectCurrent:
@@ -23,9 +17,8 @@ SELECT * FROM UserEntity LIMIT 1;
 
 upsert:
 INSERT OR REPLACE INTO UserEntity(
-    uid, userId, fullName, email, role, phoneNumber, photoUrl,
-    firstName, lastName, universityId, universityEmail, birthYear, courseYear, profileRole
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+    uid, userId, fullName, email, role, phoneNumber, photoUrl
+) VALUES (?, ?, ?, ?, ?, ?, ?);
 
 clear:
 DELETE FROM UserEntity;

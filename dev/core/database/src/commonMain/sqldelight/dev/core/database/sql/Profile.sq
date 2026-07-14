@@ -1,0 +1,27 @@
+-- Joriy (kirgan) foydalanuvchi profilining local keshi.
+-- Egasi: `:dev:feature:profile` moduli (UserEntity — sessiya, bu esa profil).
+-- Bitta qatordan iborat: offline ishlash uchun.
+CREATE TABLE ProfileEntity (
+    uid TEXT NOT NULL PRIMARY KEY,
+    firstName TEXT,
+    lastName TEXT,
+    phoneNumber TEXT,
+    role TEXT,
+    universityId TEXT,
+    universityEmail TEXT,
+    birthYear INTEGER,
+    courseYear TEXT,
+    -- Profil rasmining URL manzili (POST /v1/profile/me/avatar qaytaradi)
+    avatarUrl TEXT
+);
+
+selectCurrent:
+SELECT * FROM ProfileEntity LIMIT 1;
+
+upsert:
+INSERT OR REPLACE INTO ProfileEntity(
+    uid, firstName, lastName, phoneNumber, role, universityId, universityEmail, birthYear, courseYear, avatarUrl
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+clear:
+DELETE FROM ProfileEntity;

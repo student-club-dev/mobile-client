@@ -3,9 +3,14 @@ package dev.core.domain.repository
 import dev.core.common.Resource
 import dev.core.domain.model.ExternalAuthUser
 import dev.core.domain.model.User
-import dev.core.domain.model.UserProfile
 import kotlinx.coroutines.flow.Flow
 
+/**
+ * Sessiya (autentifikatsiya) repository'si.
+ *
+ * Profil ma'lumoti (universitet, kurs, rol...) bu yerda EMAS — unga
+ * `dev.feature.profile.domain.repository.ProfileRepository` egalik qiladi.
+ */
 interface AuthRepository {
     /** Email + parol bilan kirish (Firebase Auth). */
     suspend fun login(email: String, password: String): Resource<User>
@@ -28,16 +33,7 @@ interface AuthRepository {
      */
     suspend fun syncExternalUser(external: ExternalAuthUser): Resource<User>
 
-    /** Joriy foydalanuvchining profilini Firestore'ga saqlaydi (`users/{uid}`). */
-    suspend fun saveProfile(profile: UserProfile): Resource<Unit>
-
-    /**
-     * Joriy Firebase sessiyasi uchun Firestore'da profil hujjati (`users/{uid}`)
-     * mavjudmi — telefon OTP'dan keyin login (profil bor) va register (profil yo'q)
-     * oqimlarini ajratish uchun ishlatiladi.
-     */
-    suspend fun hasProfile(): Boolean
-
+    /** Chiqish — Firebase sessiyasi va local sessiya/profil keshi tozalanadi. */
     suspend fun logout()
 
     /** Joriy foydalanuvchi (local keshdan, offline-first; sessiya bo'lmasa null). */
@@ -49,7 +45,4 @@ interface AuthRepository {
      * Ilova ochilishida avtomatik kirish (session restore) uchun ishlatiladi.
      */
     fun observeCurrentUser(): Flow<User?>
-
-    /** Local keshdagi joriy foydalanuvchi profili (universitet, kurs, rol...). */
-    fun observeProfile(): Flow<UserProfile?>
 }

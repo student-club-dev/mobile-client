@@ -31,27 +31,27 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.core.domain.model.AdType
-import dev.feature.auth.presentation.components.AuthFontFamily
-import dev.feature.auth.presentation.components.AuthIcons
-import dev.feature.auth.presentation.components.GlassTextField
-import dev.feature.auth.presentation.components.PrimaryButton
-import dev.feature.auth.presentation.theme.AuthPalette
-import dev.feature.auth.presentation.theme.authPalette
+import dev.core.designsystem.components.AppFontFamily
+import dev.core.designsystem.components.AppIcons
+import dev.core.designsystem.components.GlassTextField
+import dev.core.designsystem.components.PrimaryButton
+import dev.core.designsystem.theme.AppPalette
+import dev.core.designsystem.theme.appPalette
 import org.koin.compose.viewmodel.koinViewModel
 
 private data class AdTypeInfo(val type: AdType, val title: String, val subtitle: String, val icon: ImageVector)
 
 private val adTypes = listOf(
-    AdTypeInfo(AdType.JOB, "Ish e'loni", "Xodim yoki part-time izlash", AuthIcons.Briefcase),
-    AdTypeInfo(AdType.RENTAL, "Ijara / Turar joy", "Kvartira, hostel, room-mate", AuthIcons.Home),
-    AdTypeInfo(AdType.SALE, "Sotuv (bozor)", "Kitob, texnika, buyum sotish", AuthIcons.Store),
-    AdTypeInfo(AdType.SERVICE, "Xizmat / Repetitor", "Dars berish, dizayn, tarjima", AuthIcons.GraduationCap),
-    AdTypeInfo(AdType.OTHER, "Boshqa e'lon", "Tadbir, jamoa, yo'qoldi-topildi", AuthIcons.MessageSquare),
+    AdTypeInfo(AdType.JOB, "Ish e'loni", "Xodim yoki part-time izlash", AppIcons.Briefcase),
+    AdTypeInfo(AdType.RENTAL, "Ijara / Turar joy", "Kvartira, hostel, room-mate", AppIcons.Home),
+    AdTypeInfo(AdType.SALE, "Sotuv (bozor)", "Kitob, texnika, buyum sotish", AppIcons.Store),
+    AdTypeInfo(AdType.SERVICE, "Xizmat / Repetitor", "Dars berish, dizayn, tarjima", AppIcons.GraduationCap),
+    AdTypeInfo(AdType.OTHER, "Boshqa e'lon", "Tadbir, jamoa, yo'qoldi-topildi", AppIcons.MessageSquare),
 )
 
 @Composable
 fun PostAdScreen(onClose: () -> Unit, editAdId: String? = null, vm: PostAdViewModel = koinViewModel()) {
-    val palette = authPalette
+    val palette = appPalette
     val state by vm.state.collectAsStateWithLifecycle()
 
     // Tahrirlash rejimi — mavjud e'lonni forma'ga yuklaymiz.
@@ -67,14 +67,14 @@ fun PostAdScreen(onClose: () -> Unit, editAdId: String? = null, vm: PostAdViewMo
 
 // 1s — tur tanlash
 @Composable
-private fun AdTypePicker(palette: AuthPalette, onClose: () -> Unit, onPick: (AdType) -> Unit) {
+private fun AdTypePicker(palette: AppPalette, onClose: () -> Unit, onPick: (AdType) -> Unit) {
     Column(Modifier.fillMaxSize().padding(horizontal = 16.dp).padding(top = 54.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(11.dp)) {
-            IconBtn(AuthIcons.Close, palette, onClose)
-            Text("Elon berish", style = TextStyle(fontFamily = AuthFontFamily, fontSize = 20.sp, fontWeight = FontWeight.Black, color = palette.ink))
+            IconBtn(AppIcons.Close, palette, onClose)
+            Text("Elon berish", style = TextStyle(fontFamily = AppFontFamily, fontSize = 20.sp, fontWeight = FontWeight.Black, color = palette.ink))
         }
         Spacer(Modifier.height(6.dp))
-        Text("Qanday e'lon joylamoqchisiz?", style = TextStyle(fontFamily = AuthFontFamily, fontSize = 12.5f.sp, color = palette.inkMuted))
+        Text("Qanday e'lon joylamoqchisiz?", style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.5f.sp, color = palette.inkMuted))
         Spacer(Modifier.height(16.dp))
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             adTypes.forEach { info ->
@@ -88,10 +88,10 @@ private fun AdTypePicker(palette: AuthPalette, onClose: () -> Unit, onPick: (AdT
                         Icon(info.icon, null, tint = palette.primary, modifier = Modifier.size(20.dp))
                     }
                     Column(Modifier.weight(1f)) {
-                        Text(info.title, style = TextStyle(fontFamily = AuthFontFamily, fontSize = 14.sp, fontWeight = FontWeight.ExtraBold, color = palette.ink))
-                        Text(info.subtitle, style = TextStyle(fontFamily = AuthFontFamily, fontSize = 11.5f.sp, color = palette.inkFaint))
+                        Text(info.title, style = TextStyle(fontFamily = AppFontFamily, fontSize = 14.sp, fontWeight = FontWeight.ExtraBold, color = palette.ink))
+                        Text(info.subtitle, style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.5f.sp, color = palette.inkFaint))
                     }
-                    Icon(AuthIcons.ChevronRight, null, tint = palette.inkFaint, modifier = Modifier.size(18.dp))
+                    Icon(AppIcons.ChevronRight, null, tint = palette.inkFaint, modifier = Modifier.size(18.dp))
                 }
             }
         }
@@ -100,13 +100,13 @@ private fun AdTypePicker(palette: AuthPalette, onClose: () -> Unit, onPick: (AdT
 
 // 1v — forma
 @Composable
-private fun AdForm(state: PostAdUiState, palette: AuthPalette, onBack: () -> Unit, vm: PostAdViewModel) {
+private fun AdForm(state: PostAdUiState, palette: AppPalette, onBack: () -> Unit, vm: PostAdViewModel) {
     val info = adTypes.first { it.type == state.type }
     Column(Modifier.fillMaxSize()) {
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).padding(top = 54.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(11.dp)) {
-                IconBtn(AuthIcons.ArrowLeft, palette, onBack)
-                Text(info.title, style = TextStyle(fontFamily = AuthFontFamily, fontSize = 19.sp, fontWeight = FontWeight.Black, color = palette.ink))
+                IconBtn(AppIcons.ArrowLeft, palette, onBack)
+                Text(info.title, style = TextStyle(fontFamily = AppFontFamily, fontSize = 19.sp, fontWeight = FontWeight.Black, color = palette.ink))
             }
             Spacer(Modifier.height(16.dp))
 
@@ -116,8 +116,8 @@ private fun AdForm(state: PostAdUiState, palette: AuthPalette, onBack: () -> Uni
                 contentAlignment = Alignment.Center,
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Icon(AuthIcons.ImageIcon, null, tint = palette.inkFaint, modifier = Modifier.size(26.dp))
-                    Text("Rasm qo'shish", style = TextStyle(fontFamily = AuthFontFamily, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = palette.inkFaint))
+                    Icon(AppIcons.ImageIcon, null, tint = palette.inkFaint, modifier = Modifier.size(26.dp))
+                    Text("Rasm qo'shish", style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = palette.inkFaint))
                 }
             }
             Spacer(Modifier.height(14.dp))
@@ -148,13 +148,13 @@ private fun AdForm(state: PostAdUiState, palette: AuthPalette, onBack: () -> Uni
 }
 
 @Composable
-private fun FieldTitle(text: String, palette: AuthPalette) {
-    Text(text, style = TextStyle(fontFamily = AuthFontFamily, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = palette.label))
+private fun FieldTitle(text: String, palette: AppPalette) {
+    Text(text, style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = palette.label))
     Spacer(Modifier.height(7.dp))
 }
 
 @Composable
-private fun IconBtn(icon: ImageVector, palette: AuthPalette, onClick: () -> Unit) {
+private fun IconBtn(icon: ImageVector, palette: AppPalette, onClick: () -> Unit) {
     Box(
         Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(palette.glass).border(1.dp, palette.border, RoundedCornerShape(12.dp)).clickable(onClick = onClick),
         contentAlignment = Alignment.Center,

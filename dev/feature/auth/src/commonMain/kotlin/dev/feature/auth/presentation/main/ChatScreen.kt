@@ -47,16 +47,16 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.core.domain.model.Conversation
 import dev.core.domain.model.Message
-import dev.feature.auth.presentation.components.AuthFontFamily
-import dev.feature.auth.presentation.components.AuthIcons
-import dev.feature.auth.presentation.components.GlassTextField
-import dev.feature.auth.presentation.theme.AuthPalette
-import dev.feature.auth.presentation.theme.authPalette
+import dev.core.designsystem.components.AppFontFamily
+import dev.core.designsystem.components.AppIcons
+import dev.core.designsystem.components.GlassTextField
+import dev.core.designsystem.theme.AppPalette
+import dev.core.designsystem.theme.appPalette
 import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
 fun ChatScreen(onBack: () -> Unit, vm: ChatViewModel = koinViewModel()) {
-    val palette = authPalette
+    val palette = appPalette
     val state by vm.state.collectAsStateWithLifecycle()
 
     if (state.selected == null) {
@@ -80,7 +80,7 @@ fun ChatScreen(onBack: () -> Unit, vm: ChatViewModel = koinViewModel()) {
 private fun ConversationList(
     conversations: List<Conversation>,
     archivedConversations: List<Conversation>,
-    palette: AuthPalette,
+    palette: AppPalette,
     onBack: () -> Unit,
     onOpen: (Conversation) -> Unit,
     onDelete: (Conversation) -> Unit,
@@ -98,23 +98,23 @@ private fun ConversationList(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(11.dp),
         ) {
-            IconBox(AuthIcons.ArrowLeft, palette) { if (showArchived) showArchived = false else onBack() }
-            Text(if (showArchived) "Arxiv" else "Xabarlar", style = TextStyle(fontFamily = AuthFontFamily, fontSize = 22.sp, fontWeight = FontWeight.Black, color = palette.ink), modifier = Modifier.weight(1f))
+            IconBox(AppIcons.ArrowLeft, palette) { if (showArchived) showArchived = false else onBack() }
+            Text(if (showArchived) "Arxiv" else "Xabarlar", style = TextStyle(fontFamily = AppFontFamily, fontSize = 22.sp, fontWeight = FontWeight.Black, color = palette.ink), modifier = Modifier.weight(1f))
             if (!showArchived && archivedConversations.isNotEmpty()) {
                 Row(
                     Modifier.clip(RoundedCornerShape(10.dp)).background(palette.glass).border(1.dp, palette.border, RoundedCornerShape(10.dp)).clickable { showArchived = true }.padding(horizontal = 10.dp, vertical = 7.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(5.dp),
                 ) {
-                    Icon(AuthIcons.Bookmark, "Arxiv", tint = palette.primary, modifier = Modifier.size(13.dp))
-                    Text("Arxiv (${archivedConversations.size})", style = TextStyle(fontFamily = AuthFontFamily, fontSize = 11.5f.sp, fontWeight = FontWeight.Bold, color = palette.primary))
+                    Icon(AppIcons.Bookmark, "Arxiv", tint = palette.primary, modifier = Modifier.size(13.dp))
+                    Text("Arxiv (${archivedConversations.size})", style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.5f.sp, fontWeight = FontWeight.Bold, color = palette.primary))
                 }
             }
         }
         Spacer(Modifier.height(14.dp))
         if (list.isEmpty()) {
             Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
-                Text(if (showArchived) "Arxiv bo'sh" else "Suhbatlar yo'q", style = TextStyle(fontFamily = AuthFontFamily, fontSize = 14.sp, color = palette.inkMuted))
+                Text(if (showArchived) "Arxiv bo'sh" else "Suhbatlar yo'q", style = TextStyle(fontFamily = AppFontFamily, fontSize = 14.sp, color = palette.inkMuted))
             }
         } else {
             LazyColumn(
@@ -134,18 +134,18 @@ private fun ConversationList(
     if (action != null) {
         AlertDialog(
             onDismissRequest = { conversationForAction = null },
-            title = { Text(action.peerName, style = TextStyle(fontFamily = AuthFontFamily, fontWeight = FontWeight.Black)) },
+            title = { Text(action.peerName, style = TextStyle(fontFamily = AppFontFamily, fontWeight = FontWeight.Black)) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     ActionRow(
-                        if (action.archived) AuthIcons.ArrowRight else AuthIcons.Bookmark,
+                        if (action.archived) AppIcons.ArrowRight else AppIcons.Bookmark,
                         if (action.archived) "Arxivdan chiqarish" else "Arxivlash",
                         palette,
                     ) {
                         if (action.archived) onUnarchive(action) else onArchive(action)
                         conversationForAction = null
                     }
-                    ActionRow(AuthIcons.Close, "O'chirish", palette, danger = true) {
+                    ActionRow(AppIcons.Close, "O'chirish", palette, danger = true) {
                         conversationToDelete = action
                         conversationForAction = null
                     }
@@ -154,7 +154,7 @@ private fun ConversationList(
             confirmButton = {},
             dismissButton = {
                 TextButton(onClick = { conversationForAction = null }) {
-                    Text("Bekor", style = TextStyle(fontFamily = AuthFontFamily, fontWeight = FontWeight.Bold, color = palette.inkMuted))
+                    Text("Bekor", style = TextStyle(fontFamily = AppFontFamily, fontWeight = FontWeight.Bold, color = palette.inkMuted))
                 }
             },
         )
@@ -164,16 +164,16 @@ private fun ConversationList(
     if (target != null) {
         AlertDialog(
             onDismissRequest = { conversationToDelete = null },
-            title = { Text("Suhbatni o'chirish", style = TextStyle(fontFamily = AuthFontFamily, fontWeight = FontWeight.Black)) },
-            text = { Text("\"${target.peerName}\" bilan suhbat va barcha xabarlar o'chiriladi. Davom etasizmi?", style = TextStyle(fontFamily = AuthFontFamily)) },
+            title = { Text("Suhbatni o'chirish", style = TextStyle(fontFamily = AppFontFamily, fontWeight = FontWeight.Black)) },
+            text = { Text("\"${target.peerName}\" bilan suhbat va barcha xabarlar o'chiriladi. Davom etasizmi?", style = TextStyle(fontFamily = AppFontFamily)) },
             confirmButton = {
                 TextButton(onClick = { onDelete(target); conversationToDelete = null }) {
-                    Text("O'chirish", style = TextStyle(fontFamily = AuthFontFamily, fontWeight = FontWeight.ExtraBold, color = Color(0xFFDC2626)))
+                    Text("O'chirish", style = TextStyle(fontFamily = AppFontFamily, fontWeight = FontWeight.ExtraBold, color = Color(0xFFDC2626)))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { conversationToDelete = null }) {
-                    Text("Bekor", style = TextStyle(fontFamily = AuthFontFamily, fontWeight = FontWeight.Bold, color = palette.inkMuted))
+                    Text("Bekor", style = TextStyle(fontFamily = AppFontFamily, fontWeight = FontWeight.Bold, color = palette.inkMuted))
                 }
             },
         )
@@ -181,7 +181,7 @@ private fun ConversationList(
 }
 
 @Composable
-private fun ActionRow(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, palette: AuthPalette, danger: Boolean = false, onClick: () -> Unit) {
+private fun ActionRow(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, palette: AppPalette, danger: Boolean = false, onClick: () -> Unit) {
     val tint = if (danger) Color(0xFFDC2626) else palette.primary
     Row(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable(onClick = onClick).padding(vertical = 10.dp, horizontal = 4.dp),
@@ -189,13 +189,13 @@ private fun ActionRow(icon: androidx.compose.ui.graphics.vector.ImageVector, lab
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Icon(icon, null, tint = tint, modifier = Modifier.size(18.dp))
-        Text(label, style = TextStyle(fontFamily = AuthFontFamily, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = if (danger) tint else palette.ink))
+        Text(label, style = TextStyle(fontFamily = AppFontFamily, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = if (danger) tint else palette.ink))
     }
 }
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun ConversationRow(c: Conversation, palette: AuthPalette, onClick: () -> Unit, onLongPress: () -> Unit) {
+private fun ConversationRow(c: Conversation, palette: AppPalette, onClick: () -> Unit, onLongPress: () -> Unit) {
     Row(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(palette.glass).border(1.dp, palette.border, RoundedCornerShape(16.dp)).combinedClickable(onClick = onClick, onLongClick = onLongPress).padding(12.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -203,7 +203,7 @@ private fun ConversationRow(c: Conversation, palette: AuthPalette, onClick: () -
     ) {
         Box {
             Box(Modifier.size(46.dp).clip(RoundedCornerShape(999.dp)).background(palette.primary.copy(alpha = 0.14f)), contentAlignment = Alignment.Center) {
-                Text(c.peerInitial, style = TextStyle(fontFamily = AuthFontFamily, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = palette.primary))
+                Text(c.peerInitial, style = TextStyle(fontFamily = AppFontFamily, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = palette.primary))
             }
             if (c.online) {
                 Box(Modifier.align(Alignment.BottomEnd).size(12.dp).clip(RoundedCornerShape(999.dp)).background(Color.White).padding(2.dp)) {
@@ -212,15 +212,15 @@ private fun ConversationRow(c: Conversation, palette: AuthPalette, onClick: () -
             }
         }
         Column(Modifier.weight(1f)) {
-            Text(c.peerName, style = TextStyle(fontFamily = AuthFontFamily, fontSize = 13.5f.sp, fontWeight = FontWeight.ExtraBold, color = palette.ink), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(c.peerName, style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.5f.sp, fontWeight = FontWeight.ExtraBold, color = palette.ink), maxLines = 1, overflow = TextOverflow.Ellipsis)
             Spacer(Modifier.height(2.dp))
-            Text(c.lastMessage, style = TextStyle(fontFamily = AuthFontFamily, fontSize = 11.5f.sp, color = palette.inkFaint), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(c.lastMessage, style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.5f.sp, color = palette.inkFaint), maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(c.lastTime, style = TextStyle(fontFamily = AuthFontFamily, fontSize = 10.5f.sp, color = palette.inkFaint))
+            Text(c.lastTime, style = TextStyle(fontFamily = AppFontFamily, fontSize = 10.5f.sp, color = palette.inkFaint))
             if (c.unreadCount > 0) {
                 Box(Modifier.size(18.dp).clip(RoundedCornerShape(999.dp)).background(palette.primary), contentAlignment = Alignment.Center) {
-                    Text("${c.unreadCount}", style = TextStyle(fontFamily = AuthFontFamily, fontSize = 10.sp, fontWeight = FontWeight.Black, color = Color.White))
+                    Text("${c.unreadCount}", style = TextStyle(fontFamily = AppFontFamily, fontSize = 10.sp, fontWeight = FontWeight.Black, color = Color.White))
                 }
             }
         }
@@ -233,7 +233,7 @@ private fun ChatThread(
     conversation: Conversation,
     messages: List<Message>,
     draft: String,
-    palette: AuthPalette,
+    palette: AppPalette,
     onBack: () -> Unit,
     onDraft: (String) -> Unit,
     onSend: () -> Unit,
@@ -260,10 +260,10 @@ private fun ChatThread(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(11.dp),
             ) {
-                IconBox(AuthIcons.ArrowLeft, palette, onBack)
+                IconBox(AppIcons.ArrowLeft, palette, onBack)
                 Box(contentAlignment = Alignment.Center) {
                     Box(Modifier.size(42.dp).clip(RoundedCornerShape(999.dp)).background(palette.primary.copy(alpha = 0.14f)), contentAlignment = Alignment.Center) {
-                        Text(conversation.peerInitial, style = TextStyle(fontFamily = AuthFontFamily, fontSize = 16.sp, fontWeight = FontWeight.ExtraBold, color = palette.primary))
+                        Text(conversation.peerInitial, style = TextStyle(fontFamily = AppFontFamily, fontSize = 16.sp, fontWeight = FontWeight.ExtraBold, color = palette.primary))
                     }
                     if (conversation.online) {
                         Box(Modifier.align(Alignment.BottomEnd).size(12.dp).clip(RoundedCornerShape(999.dp)).background(palette.glass).padding(2.dp)) {
@@ -272,14 +272,14 @@ private fun ChatThread(
                     }
                 }
                 Column(Modifier.weight(1f)) {
-                    Text(conversation.peerName, style = TextStyle(fontFamily = AuthFontFamily, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, color = palette.ink), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(if (conversation.online) "online" else "oflayn", style = TextStyle(fontFamily = AuthFontFamily, fontSize = 11.5f.sp, color = if (conversation.online) palette.successDeep else palette.inkFaint))
+                    Text(conversation.peerName, style = TextStyle(fontFamily = AppFontFamily, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, color = palette.ink), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(if (conversation.online) "online" else "oflayn", style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.5f.sp, color = if (conversation.online) palette.successDeep else palette.inkFaint))
                 }
                 if (messages.isNotEmpty()) {
                     Box(
                         Modifier.size(38.dp).clip(RoundedCornerShape(11.dp)).background(Color(0xFFDC2626).copy(alpha = 0.10f)).clickable { showClearConfirm = true },
                         contentAlignment = Alignment.Center,
-                    ) { Icon(AuthIcons.Close, "Tozalash", tint = Color(0xFFDC2626), modifier = Modifier.size(16.dp)) }
+                    ) { Icon(AppIcons.Close, "Tozalash", tint = Color(0xFFDC2626), modifier = Modifier.size(16.dp)) }
                 }
             }
             Box(Modifier.fillMaxWidth().height(1.dp).background(palette.border))
@@ -307,7 +307,7 @@ private fun ChatThread(
                 Box(
                     Modifier.size(48.dp).clip(RoundedCornerShape(999.dp)).background(palette.primaryBrush).clickable(onClick = onSend),
                     contentAlignment = Alignment.Center,
-                ) { Icon(AuthIcons.Send, "Yuborish", tint = Color.White, modifier = Modifier.size(20.dp)) }
+                ) { Icon(AppIcons.Send, "Yuborish", tint = Color.White, modifier = Modifier.size(20.dp)) }
             }
         }
     }
@@ -316,16 +316,16 @@ private fun ChatThread(
     if (target != null) {
         AlertDialog(
             onDismissRequest = { messageToDelete = null },
-            title = { Text("Xabarni o'chirish", style = TextStyle(fontFamily = AuthFontFamily, fontWeight = FontWeight.Black)) },
-            text = { Text("Bu xabarni o'chirmoqchimisiz?", style = TextStyle(fontFamily = AuthFontFamily)) },
+            title = { Text("Xabarni o'chirish", style = TextStyle(fontFamily = AppFontFamily, fontWeight = FontWeight.Black)) },
+            text = { Text("Bu xabarni o'chirmoqchimisiz?", style = TextStyle(fontFamily = AppFontFamily)) },
             confirmButton = {
                 TextButton(onClick = { onDeleteMessage(target.id); messageToDelete = null }) {
-                    Text("O'chirish", style = TextStyle(fontFamily = AuthFontFamily, fontWeight = FontWeight.ExtraBold, color = Color(0xFFDC2626)))
+                    Text("O'chirish", style = TextStyle(fontFamily = AppFontFamily, fontWeight = FontWeight.ExtraBold, color = Color(0xFFDC2626)))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { messageToDelete = null }) {
-                    Text("Bekor", style = TextStyle(fontFamily = AuthFontFamily, fontWeight = FontWeight.Bold, color = palette.inkMuted))
+                    Text("Bekor", style = TextStyle(fontFamily = AppFontFamily, fontWeight = FontWeight.Bold, color = palette.inkMuted))
                 }
             },
         )
@@ -334,16 +334,16 @@ private fun ChatThread(
     if (showClearConfirm) {
         AlertDialog(
             onDismissRequest = { showClearConfirm = false },
-            title = { Text("Suhbatni tozalash", style = TextStyle(fontFamily = AuthFontFamily, fontWeight = FontWeight.Black)) },
-            text = { Text("Bu suhbatdagi barcha xabarlar o'chiriladi. Davom etasizmi?", style = TextStyle(fontFamily = AuthFontFamily)) },
+            title = { Text("Suhbatni tozalash", style = TextStyle(fontFamily = AppFontFamily, fontWeight = FontWeight.Black)) },
+            text = { Text("Bu suhbatdagi barcha xabarlar o'chiriladi. Davom etasizmi?", style = TextStyle(fontFamily = AppFontFamily)) },
             confirmButton = {
                 TextButton(onClick = { onClearMessages(); showClearConfirm = false }) {
-                    Text("Tozalash", style = TextStyle(fontFamily = AuthFontFamily, fontWeight = FontWeight.ExtraBold, color = Color(0xFFDC2626)))
+                    Text("Tozalash", style = TextStyle(fontFamily = AppFontFamily, fontWeight = FontWeight.ExtraBold, color = Color(0xFFDC2626)))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showClearConfirm = false }) {
-                    Text("Bekor", style = TextStyle(fontFamily = AuthFontFamily, fontWeight = FontWeight.Bold, color = palette.inkMuted))
+                    Text("Bekor", style = TextStyle(fontFamily = AppFontFamily, fontWeight = FontWeight.Bold, color = palette.inkMuted))
                 }
             },
         )
@@ -352,7 +352,7 @@ private fun ChatThread(
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun MessageBubble(message: Message, palette: AuthPalette, onLongPress: () -> Unit) {
+private fun MessageBubble(message: Message, palette: AppPalette, onLongPress: () -> Unit) {
     val align = if (message.outgoing) Alignment.CenterEnd else Alignment.CenterStart
     Box(Modifier.fillMaxWidth(), contentAlignment = align) {
         val shape = if (message.outgoing) {
@@ -367,10 +367,10 @@ private fun MessageBubble(message: Message, palette: AuthPalette, onLongPress: (
                 .combinedClickable(onClick = {}, onLongClick = onLongPress)
                 .padding(horizontal = 13.dp, vertical = 9.dp),
         ) {
-            Text(message.text, style = TextStyle(fontFamily = AuthFontFamily, fontSize = 13.sp, color = if (message.outgoing) Color.White else palette.ink))
+            Text(message.text, style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.sp, color = if (message.outgoing) Color.White else palette.ink))
             Text(
                 message.time,
-                style = TextStyle(fontFamily = AuthFontFamily, fontSize = 9.sp, color = if (message.outgoing) Color.White.copy(alpha = 0.7f) else palette.inkFaint),
+                style = TextStyle(fontFamily = AppFontFamily, fontSize = 9.sp, color = if (message.outgoing) Color.White.copy(alpha = 0.7f) else palette.inkFaint),
                 modifier = Modifier.align(Alignment.End),
             )
         }
@@ -378,7 +378,7 @@ private fun MessageBubble(message: Message, palette: AuthPalette, onLongPress: (
 }
 
 @Composable
-private fun IconBox(icon: androidx.compose.ui.graphics.vector.ImageVector, palette: AuthPalette, onClick: () -> Unit) {
+private fun IconBox(icon: androidx.compose.ui.graphics.vector.ImageVector, palette: AppPalette, onClick: () -> Unit) {
     Box(
         Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(palette.glass).border(1.dp, palette.border, RoundedCornerShape(12.dp)).clickable(onClick = onClick),
         contentAlignment = Alignment.Center,

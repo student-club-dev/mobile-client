@@ -42,5 +42,11 @@ include(":dev:core:di")
 // Feature modules
 include(":dev:feature:auth")
 
+// Profil feature'i — qatlamlarga ajratilgan (domain / data / presentation).
+// Keyingi feature'lar (Jobs, Chat, Discounts...) aynan shu shakldan nusxa oladi.
+include(":dev:feature:profile:domain")
+include(":dev:feature:profile:data")
+include(":dev:feature:profile:presentation")
+
 // iOS framework + Compose App() aggregator
 include(":dev:shared")

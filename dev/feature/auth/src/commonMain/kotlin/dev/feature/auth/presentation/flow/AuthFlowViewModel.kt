@@ -5,14 +5,14 @@ import androidx.lifecycle.viewModelScope
 import dev.core.common.Resource
 import dev.core.domain.model.ExternalAuthUser
 import dev.core.domain.model.User
-import dev.core.domain.model.UserProfile
+import dev.feature.profile.domain.model.UserProfile
 import dev.core.domain.usecase.ConfirmEmailSignupUseCase
-import dev.core.domain.usecase.HasProfileUseCase
+import dev.feature.profile.domain.usecase.HasProfileUseCase
 import dev.core.domain.usecase.LoginUseCase
 import dev.core.domain.usecase.ObserveCurrentUserUseCase
 import dev.core.domain.usecase.RegisterUseCase
 import dev.core.domain.usecase.RequestEmailSignupUseCase
-import dev.core.domain.usecase.SaveProfileUseCase
+import dev.feature.profile.domain.usecase.SaveProfileUseCase
 import dev.core.domain.usecase.SendPasswordResetUseCase
 import dev.core.domain.usecase.SyncExternalUserUseCase
 import dev.feature.auth.social.OtpSendResult

@@ -21,6 +21,13 @@ kotlin {
             implementation(projects.dev.core.common)
             implementation(projects.dev.core.database)
 
+            // Ro'yxatdan o'tish oqimi profilni saqlaydi (SaveProfile/HasProfile),
+            // MainShell esa Profil ekranlarini ochadi.
+            // Eslatma: MainShell keyinchalik alohida `feature:main` moduliga ko'chirilsa,
+            // bu yerdagi presentation bog'liqligi yo'qoladi.
+            api(projects.dev.feature.profile.domain)
+            implementation(projects.dev.feature.profile.presentation)
+
             // Local sessiya keshi (offline + avtomatik kirish)
             implementation(libs.sqldelight.runtime)
             implementation(libs.sqldelight.coroutines)

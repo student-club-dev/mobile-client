@@ -36,10 +36,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.core.domain.model.ThemeMode
-import dev.feature.auth.presentation.components.AuthFontFamily
-import dev.feature.auth.presentation.components.AuthIcons
-import dev.feature.auth.presentation.theme.AuthPalette
-import dev.feature.auth.presentation.theme.authPalette
+import dev.core.designsystem.components.AppFontFamily
+import dev.core.designsystem.components.AppIcons
+import dev.core.designsystem.theme.AppPalette
+import dev.core.designsystem.theme.appPalette
+import dev.feature.profile.presentation.ProfileViewModel
 import org.koin.compose.viewmodel.koinViewModel
 
 /**
@@ -57,7 +58,7 @@ fun SettingsScreen(
     vm: ProfileViewModel = koinViewModel(),
     settingsVm: SettingsViewModel = koinViewModel(),
 ) {
-    val palette = authPalette
+    val palette = appPalette
     val state by vm.state.collectAsStateWithLifecycle()
     val settings by settingsVm.state.collectAsStateWithLifecycle()
 
@@ -74,14 +75,14 @@ fun SettingsScreen(
                 Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(palette.glass)
                     .border(1.dp, palette.border, RoundedCornerShape(12.dp)).clickable(onClick = onBack),
                 contentAlignment = Alignment.Center,
-            ) { Icon(AuthIcons.ArrowLeft, "Orqaga", tint = palette.ink, modifier = Modifier.size(18.dp)) }
-            Text("Sozlamalar", style = TextStyle(fontFamily = AuthFontFamily, fontSize = 20.sp, fontWeight = FontWeight.Black, color = palette.ink))
+            ) { Icon(AppIcons.ArrowLeft, "Orqaga", tint = palette.ink, modifier = Modifier.size(18.dp)) }
+            Text("Sozlamalar", style = TextStyle(fontFamily = AppFontFamily, fontSize = 20.sp, fontWeight = FontWeight.Black, color = palette.ink))
         }
         Spacer(Modifier.height(18.dp))
 
         Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
             SectionTitle("Hisob", palette)
-            SettingRow(AuthIcons.Pencil, "Profilni tahrirlash", state.name, palette, onClick = onEditProfile)
+            SettingRow(AppIcons.Pencil, "Profilni tahrirlash", state.name, palette, onClick = onEditProfile)
 
             Spacer(Modifier.height(6.dp))
             SectionTitle("Mavzu", palette)
@@ -89,16 +90,16 @@ fun SettingsScreen(
 
             Spacer(Modifier.height(6.dp))
             SectionTitle("Bildirishnomalar", palette)
-            ToggleRow(AuthIcons.Bell, "Push bildirishnomalar", settings.pushEnabled, palette) { settingsVm.setPush(it) }
-            ToggleRow(AuthIcons.Mail, "Email xabarnomalar", settings.emailEnabled, palette) { settingsVm.setEmail(it) }
+            ToggleRow(AppIcons.Bell, "Push bildirishnomalar", settings.pushEnabled, palette) { settingsVm.setPush(it) }
+            ToggleRow(AppIcons.Mail, "Email xabarnomalar", settings.emailEnabled, palette) { settingsVm.setEmail(it) }
 
             Spacer(Modifier.height(6.dp))
             SectionTitle("Umumiy", palette)
-            SettingRow(AuthIcons.ShieldCheck, "Ilova haqida", if (aboutExpanded) "Versiya 1.0.0" else null, palette) { aboutExpanded = !aboutExpanded }
+            SettingRow(AppIcons.ShieldCheck, "Ilova haqida", if (aboutExpanded) "Versiya 1.0.0" else null, palette) { aboutExpanded = !aboutExpanded }
             if (aboutExpanded) {
                 Text(
                     "StudentClubs — talabalar uchun super-app: chegirmalar, ishlar, e'lonlar va xabarlar.\nVersiya 1.0.0",
-                    style = TextStyle(fontFamily = AuthFontFamily, fontSize = 12.sp, color = palette.inkMuted),
+                    style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.sp, color = palette.inkMuted),
                     modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                 )
             }
@@ -109,8 +110,8 @@ fun SettingsScreen(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                Icon(AuthIcons.LogOut, null, tint = Color(0xFFDC2626), modifier = Modifier.size(18.dp))
-                Text("Chiqish", style = TextStyle(fontFamily = AuthFontFamily, fontSize = 13.5f.sp, fontWeight = FontWeight.ExtraBold, color = Color(0xFFDC2626)))
+                Icon(AppIcons.LogOut, null, tint = Color(0xFFDC2626), modifier = Modifier.size(18.dp))
+                Text("Chiqish", style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.5f.sp, fontWeight = FontWeight.ExtraBold, color = Color(0xFFDC2626)))
             }
             Spacer(Modifier.height(28.dp))
         }
@@ -118,7 +119,7 @@ fun SettingsScreen(
 }
 
 @Composable
-private fun ThemeSelector(current: ThemeMode, palette: AuthPalette, onSelect: (ThemeMode) -> Unit) {
+private fun ThemeSelector(current: ThemeMode, palette: AppPalette, onSelect: (ThemeMode) -> Unit) {
     val options = listOf(
         ThemeMode.SYSTEM to "Tizim",
         ThemeMode.LIGHT to "Yorug'",
@@ -136,19 +137,19 @@ private fun ThemeSelector(current: ThemeMode, palette: AuthPalette, onSelect: (T
                     .clickable { onSelect(mode) },
                 contentAlignment = Alignment.Center,
             ) {
-                Text(label, style = TextStyle(fontFamily = AuthFontFamily, fontSize = 12.5f.sp, fontWeight = FontWeight.Bold, color = if (active) palette.primary else palette.inkMuted))
+                Text(label, style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.5f.sp, fontWeight = FontWeight.Bold, color = if (active) palette.primary else palette.inkMuted))
             }
         }
     }
 }
 
 @Composable
-private fun SectionTitle(text: String, palette: AuthPalette) {
-    Text(text, style = TextStyle(fontFamily = AuthFontFamily, fontSize = 12.5f.sp, fontWeight = FontWeight.Bold, color = palette.inkFaint), modifier = Modifier.padding(start = 4.dp, top = 2.dp, bottom = 2.dp))
+private fun SectionTitle(text: String, palette: AppPalette) {
+    Text(text, style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.5f.sp, fontWeight = FontWeight.Bold, color = palette.inkFaint), modifier = Modifier.padding(start = 4.dp, top = 2.dp, bottom = 2.dp))
 }
 
 @Composable
-private fun SettingRow(icon: ImageVector, title: String, trailing: String?, palette: AuthPalette, onClick: () -> Unit) {
+private fun SettingRow(icon: ImageVector, title: String, trailing: String?, palette: AppPalette, onClick: () -> Unit) {
     Row(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(palette.glass).border(1.dp, palette.border, RoundedCornerShape(14.dp)).clickable(onClick = onClick).padding(14.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -157,17 +158,17 @@ private fun SettingRow(icon: ImageVector, title: String, trailing: String?, pale
         Box(Modifier.size(36.dp).clip(RoundedCornerShape(10.dp)).background(palette.primary.copy(alpha = 0.10f)), contentAlignment = Alignment.Center) {
             Icon(icon, null, tint = palette.primary, modifier = Modifier.size(17.dp))
         }
-        Text(title, style = TextStyle(fontFamily = AuthFontFamily, fontSize = 13.5f.sp, fontWeight = FontWeight.Bold, color = palette.ink), modifier = Modifier.weight(1f))
+        Text(title, style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.5f.sp, fontWeight = FontWeight.Bold, color = palette.ink), modifier = Modifier.weight(1f))
         if (trailing != null) {
-            Text(trailing, style = TextStyle(fontFamily = AuthFontFamily, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = palette.inkFaint))
+            Text(trailing, style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = palette.inkFaint))
             Spacer(Modifier.width(6.dp))
         }
-        Icon(AuthIcons.ChevronRight, null, tint = palette.inkFaint, modifier = Modifier.size(17.dp))
+        Icon(AppIcons.ChevronRight, null, tint = palette.inkFaint, modifier = Modifier.size(17.dp))
     }
 }
 
 @Composable
-private fun ToggleRow(icon: ImageVector, title: String, checked: Boolean, palette: AuthPalette, onToggle: (Boolean) -> Unit) {
+private fun ToggleRow(icon: ImageVector, title: String, checked: Boolean, palette: AppPalette, onToggle: (Boolean) -> Unit) {
     Row(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(palette.glass).border(1.dp, palette.border, RoundedCornerShape(14.dp)).clickable { onToggle(!checked) }.padding(14.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -176,13 +177,13 @@ private fun ToggleRow(icon: ImageVector, title: String, checked: Boolean, palett
         Box(Modifier.size(36.dp).clip(RoundedCornerShape(10.dp)).background(palette.primary.copy(alpha = 0.10f)), contentAlignment = Alignment.Center) {
             Icon(icon, null, tint = palette.primary, modifier = Modifier.size(17.dp))
         }
-        Text(title, style = TextStyle(fontFamily = AuthFontFamily, fontSize = 13.5f.sp, fontWeight = FontWeight.Bold, color = palette.ink), modifier = Modifier.weight(1f))
+        Text(title, style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.5f.sp, fontWeight = FontWeight.Bold, color = palette.ink), modifier = Modifier.weight(1f))
         SwitchTrack(checked, palette)
     }
 }
 
 @Composable
-private fun SwitchTrack(checked: Boolean, palette: AuthPalette) {
+private fun SwitchTrack(checked: Boolean, palette: AppPalette) {
     val knobOffset by animateDpAsState(if (checked) 20.dp else 2.dp)
     Box(
         Modifier.width(44.dp).height(26.dp).clip(RoundedCornerShape(999.dp))

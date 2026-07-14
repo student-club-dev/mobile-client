@@ -38,14 +38,11 @@ import dev.core.domain.repository.SettingsRepository
 import dev.core.domain.repository.StudentRepository
 import dev.core.domain.repository.UniversityRepository
 import dev.core.domain.usecase.ConfirmEmailSignupUseCase
-import dev.core.domain.usecase.HasProfileUseCase
 import dev.core.domain.usecase.LoginUseCase
 import dev.core.domain.usecase.LogoutUseCase
 import dev.core.domain.usecase.ObserveCurrentUserUseCase
-import dev.core.domain.usecase.ObserveProfileUseCase
 import dev.core.domain.usecase.RegisterUseCase
 import dev.core.domain.usecase.RequestEmailSignupUseCase
-import dev.core.domain.usecase.SaveProfileUseCase
 import dev.core.domain.usecase.SendPasswordResetUseCase
 import dev.core.domain.usecase.SyncExternalUserUseCase
 import dev.core.network.NetworkConfig
@@ -57,9 +54,14 @@ import org.koin.dsl.module
 /**
  * Backend manzillari — haqiqiy API kelganda faqat shu yerni almashtiring.
  * `USE_PROD_API = true` qilib prod'ga o'tasiz (yoki build-flag'ga ulaysiz).
+ *
+ * ⚠️ Oxiridagi `/v1/` (slash bilan) MUHIM:
+ * - Ktor `defaultRequest` nisbiy yo'llarni shunga nisbatan hal qiladi (`get("jobs")` → `/v1/jobs`),
+ * - OpenAPI'dan generatsiya qilingan klient ham shu bazaga yo'lni qo'shadi (`/profile/me` → `/v1/profile/me`).
+ * API versiyasi `openapi/student-clubs.json` dagi `servers` bilan mos bo'lishi kerak.
  */
-const val DEV_BASE_URL = "https://api.studentclubs.dev"
-const val PROD_BASE_URL = "https://api.studentclubs.dev"
+const val DEV_BASE_URL = "https://api.studentclubs.dev/v1/"
+const val PROD_BASE_URL = "https://api.studentclubs.dev/v1/"
 private const val USE_PROD_API = false
 
 /** Joriy bazaviy URL (bitta manba). */
@@ -122,11 +124,8 @@ val domainModule = module {
     factory { SendPasswordResetUseCase(get()) }
     factory { RequestEmailSignupUseCase(get()) }
     factory { ConfirmEmailSignupUseCase(get()) }
-    factory { SaveProfileUseCase(get()) }
     factory { SyncExternalUserUseCase(get()) }
-    factory { HasProfileUseCase(get()) }
     factory { ObserveCurrentUserUseCase(get()) }
-    factory { ObserveProfileUseCase(get()) }
     factory { LogoutUseCase(get()) }
 }
 

@@ -238,6 +238,73 @@ Bular almashtirilmaguncha social/phone auth **ishlamaydi** (placeholder):
 
 ---
 
+## H. Modullarga ajratish (feature = domain / data / presentation)
+
+Maqsad: butun post-login ilova `:dev:feature:auth` ichida yashash muammosini (yuqoridagi
+"Modul tuzilishi muammosi") hal qilish. **Profil** — birinchi ajratilgan feature, qolganlari
+uchun namuna.
+
+- [x] **H0 — Umumiy UI kit `core:designsystem` ga ko'chirildi.** ✅
+  `AuthPalette`→`AppPalette`, `AuthIcons`→`AppIcons`, `AuthComponents`→`AppComponents`,
+  `AuthUtils`→`AppUtils`, `AuthFontFamily`→`AppFontFamily`.
+  Endi **har qanday feature** UI kitni ishlatadi va `feature:auth` ga bog'lanmaydi —
+  keyingi feature'larni ajratish shu bilan ochildi.
+
+- [x] **H1 — `:dev:feature:profile:{domain,data,presentation}`.** ✅
+  - **domain** — `UserProfile` (+`displayName`/`isComplete`), `ProfileRepository`,
+    use-case'lar: `ObserveProfile`/`SaveProfile`/`HasProfile`/`RefreshProfile`.
+    Hech qanday framework'ga bog'lanmaydi (faqat `core:common` + coroutines).
+  - **data** — `ProfileRepositoryImpl` (offline-first: UI **faqat** local DB'ni kuzatadi),
+    `ProfileRemoteDataSource` interfeysi + **ikkita** implementatsiya:
+    `ApiProfileRemoteDataSource` (REST, generatsiya qilingan klient) va
+    `FirestoreProfileRemoteDataSource` (backendsiz rejim). Repository manbani bilmaydi.
+  - **presentation** — `ProfileViewModel`/`ProfileUiState`, `ProfileScreen`, `EditProfileScreen`,
+    `profileModule(useRemoteApi)` — barcha qatlamlarni bog'laydigan Koin moduli.
+  - `core:domain`'dan profil butunlay olib tashlandi (`AuthRepository` endi faqat sessiya).
+  - Android APK + iOS framework ✅.
+
+- [x] **H2 — DB: profil sessiyadan ajratildi (migratsiya v6).** ✅
+  Yangi `ProfileEntity` jadvali (`Profile.sq`) — egasi `feature:profile`.
+  `UserEntity` profil ustunlarisiz qayta qurildi (`5.sqm`, SQLite table-rebuild);
+  mavjud o'rnatishlardagi profil **ko'chiriladi**, bo'sh profil qatorlari yaratilmaydi
+  (aks holda `hasProfile()` noto'g'ri `true` qaytarardi).
+  Host testlari: **5/5 o'tdi** — v1→v6 zanjiri, profil ko'chishi, bo'sh profilni o'tkazib yuborish.
+
+- [x] **H3 — B1 (qisman): OpenAPI v1 spec + profil endpointlari ulandi.** ✅
+  `openapi/student-clubs.json` — endi **API'ning yagona manbasi**: `servers: .../v1`,
+  `bearerAuth` (Firebase ID token), `GET/PUT /profile/me` + `UserProfileDto`/`UpdateProfileRequestDto`
+  (+ `ProfileRoleDto`/`CourseYearDto` enum'lari).
+  `openApiGenerate` → `dev.core.network.generated.api.ProfileApi` → `ApiProfileRemoteDataSource`.
+  Bazaviy URL `.../v1/` ga o'tdi (`CoreModules`) — **ham** generatsiya qilingan klient,
+  **ham** qo'lda yozilgan Ktor nisbiy yo'llari (`get("jobs")`) shu bazadan ishlaydi.
+  ⚙️ Manba tanlovi `REMOTE_SYNC_ENABLED` bilan: `false` → Firestore, `true` → REST.
+
+- [x] **H4 — Profil rasmi (avatar).** ✅
+  - **Spec:** `POST /profile/me/avatar` (multipart `file`) → `AvatarUploadResponseDto{avatarUrl}`;
+    `UserProfileDto`/`UpdateProfileRequestDto` ga `avatarUrl` qo'shildi. Generatsiya qilingan
+    `ProfileApi.uploadMyAvatar(InputProvider)` → `ApiProfileRemoteDataSource`.
+  - **DB:** `ProfileEntity.avatarUrl` + migratsiya `6.sqm` (v7). Testlar 5/5 ✅.
+  - **Rasm tanlash** (`presentation/media/ImagePicker.kt`, expect/actual) — **ruxsat so'ramaydi**:
+    Android `ActivityResultContracts.PickVisualMedia`, iOS `PHPickerViewController`.
+  - **UI:** `EditProfileScreen` — bosiladigan avatar + kamera nishoni; tanlangan rasm **darrov**
+    ko'rinadi (local `ImageBitmap`), fon rejimida yuklanadi; "yuklanmoqda"/xato holati bor.
+    `ProfileScreen` — harf o'rniga rasm. URL'dan rasm — **Coil 3** (`App.kt` da ilovaning
+    Ktor klienti bilan sozlangan `ImageLoader`, shunda himoyalangan URL'larga token ham ketadi).
+  - **Chegara:** 5 MB (`UploadAvatarUseCase`), spec ham 413 qaytaradi.
+  - ⚠️ **Hozir yuklash ISHLAMAYDI:** `REMOTE_SYNC_ENABLED = false` → Firestore rejimi, u esa
+    fayl ombori emas va aniq xato beradi ("Rasm yuklash uchun backend kerak").
+    Backend `POST /v1/profile/me/avatar` ni chiqargach — `REMOTE_SYNC_ENABLED = true`, tamom.
+  - ℹ️ Generatsiya qilingan multipart chaqiruvi `Content-Disposition` ga **filename qo'ymaydi**
+    (generator shunday yozadi). Server fayl nomiga tayanmasin — turini kontent bo'yicha aniqlasin.
+
+> **Keyingi feature'ni ajratish retsepti:** H1 dagi 3 modul + `featureModule(...)` Koin
+> moduli + kerakli endpoint'larni `student-clubs.json` ga qo'shib `openApiGenerate`.
+> ⚠️ `MainShell` hamon `feature:auth` da va Profil ekranlarini chaqiradi — shuning uchun
+> `feature:auth` → `feature:profile:presentation` bog'liqligi bor. Keyinroq `MainShell`ni
+> alohida `feature:main` (yoki `dev:shared`) moduliga ko'chirsak, bu bog'liqlik yo'qoladi.
+
+---
+
 ## Ish tartibi (Claude uchun qoidalar)
 
 1. Foydalanuvchi bir band raqamini aytadi (masalan "A1") → **faqat shuni** bajaraman.

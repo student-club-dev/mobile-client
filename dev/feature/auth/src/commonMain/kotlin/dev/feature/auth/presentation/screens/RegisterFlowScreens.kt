@@ -32,21 +32,21 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import dev.feature.auth.presentation.components.AuthFontFamily
-import dev.feature.auth.presentation.components.AuthIcons
-import dev.feature.auth.presentation.components.AuthScreenScaffold
-import dev.feature.auth.presentation.components.BackButton
-import dev.feature.auth.presentation.components.ErrorText
-import dev.feature.auth.presentation.components.FooterLink
-import dev.feature.auth.presentation.components.LogoTile
-import dev.feature.auth.presentation.components.OutlineButton
-import dev.feature.auth.presentation.components.PrimaryButton
-import dev.feature.auth.presentation.components.ScreenSubtitle
-import dev.feature.auth.presentation.components.ScreenTitle
+import dev.core.designsystem.components.AppFontFamily
+import dev.core.designsystem.components.AppIcons
+import dev.core.designsystem.components.AppScreenScaffold
+import dev.core.designsystem.components.BackButton
+import dev.core.designsystem.components.ErrorText
+import dev.core.designsystem.components.FooterLink
+import dev.core.designsystem.components.LogoTile
+import dev.core.designsystem.components.OutlineButton
+import dev.core.designsystem.components.PrimaryButton
+import dev.core.designsystem.components.ScreenSubtitle
+import dev.core.designsystem.components.ScreenTitle
 import dev.feature.auth.presentation.flow.AuthFlowState
 import dev.feature.auth.presentation.flow.AuthFlowViewModel
-import dev.feature.auth.presentation.theme.AuthPalette
-import dev.feature.auth.presentation.theme.authPalette
+import dev.core.designsystem.theme.AppPalette
+import dev.core.designsystem.theme.appPalette
 
 // ===========================================================================
 // Ro'yxatdan o'tish — usul tanlash (Telefon / Email)
@@ -58,9 +58,9 @@ fun RegisterChoiceScreen(
     onPhone: () -> Unit,
     onEmail: () -> Unit,
     onSignIn: () -> Unit,
-    palette: AuthPalette = authPalette,
+    palette: AppPalette = appPalette,
 ) {
-    AuthScreenScaffold(scroll = false) {
+    AppScreenScaffold(scroll = false) {
         BackButton(onBack)
         Spacer(Modifier.height(24.dp))
         LogoTile(size = 56, radius = 17, iconSize = 30)
@@ -71,14 +71,14 @@ fun RegisterChoiceScreen(
 
         Spacer(Modifier.weight(1f))
 
-        PrimaryButton("Telefon raqami bilan", onPhone, trailingIcon = AuthIcons.Phone)
+        PrimaryButton("Telefon raqami bilan", onPhone, trailingIcon = AppIcons.Phone)
         Spacer(Modifier.height(12.dp))
-        OutlineButton("Email bilan davom etish", onEmail, leadingIcon = AuthIcons.Mail)
+        OutlineButton("Email bilan davom etish", onEmail, leadingIcon = AppIcons.Mail)
 
         Spacer(Modifier.height(14.dp))
         Text(
             "Telefon orqali SMS kod, email orqali 6 xonali kod yuboriladi.",
-            style = TextStyle(fontFamily = AuthFontFamily, fontSize = 11.5f.sp, color = palette.inkFaint, textAlign = TextAlign.Center, lineHeight = 16.sp),
+            style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.5f.sp, color = palette.inkFaint, textAlign = TextAlign.Center, lineHeight = 16.sp),
             modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
         )
 
@@ -98,9 +98,9 @@ fun EmailVerifyScreen(
     onBack: () -> Unit,
     onVerify: () -> Unit,
     onResend: () -> Unit,
-    palette: AuthPalette = authPalette,
+    palette: AppPalette = appPalette,
 ) {
-    AuthScreenScaffold(scroll = false) {
+    AppScreenScaffold(scroll = false) {
         BackButton(onBack)
         Spacer(Modifier.height(24.dp))
         Box(
@@ -108,7 +108,7 @@ fun EmailVerifyScreen(
                 .background(Brush.linearGradient(listOf(palette.primary.copy(alpha = 0.14f), palette.primary.copy(alpha = 0.14f))), RoundedCornerShape(18.dp)),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(AuthIcons.Mail, null, tint = palette.primary, modifier = Modifier.size(30.dp))
+            Icon(AppIcons.Mail, null, tint = palette.primary, modifier = Modifier.size(30.dp))
         }
         Spacer(Modifier.height(16.dp))
         ScreenTitle("Emailingizni tasdiqlang")
@@ -122,7 +122,7 @@ fun EmailVerifyScreen(
                     append(" manziliga yuborilgan 6 xonali kodni kiriting.")
                 }
             },
-            style = TextStyle(fontFamily = AuthFontFamily, fontSize = 13.sp, lineHeight = 19.sp),
+            style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.sp, lineHeight = 19.sp),
         )
 
         Spacer(Modifier.height(22.dp))
@@ -130,31 +130,31 @@ fun EmailVerifyScreen(
 
         Spacer(Modifier.height(20.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
-            Icon(AuthIcons.Clock, null, tint = palette.inkFaint, modifier = Modifier.size(15.dp))
+            Icon(AppIcons.Clock, null, tint = palette.inkFaint, modifier = Modifier.size(15.dp))
             Spacer(Modifier.width(6.dp))
             if (state.resendSeconds > 0) {
-                Text("Qayta yuborish · ", style = TextStyle(fontFamily = AuthFontFamily, fontSize = 12.5f.sp, color = palette.inkFaint))
-                Text(formatTimer(state.resendSeconds), style = TextStyle(fontFamily = AuthFontFamily, fontSize = 12.5f.sp, fontWeight = FontWeight.Bold, color = palette.primary))
+                Text("Qayta yuborish · ", style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.5f.sp, color = palette.inkFaint))
+                Text(formatTimer(state.resendSeconds), style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.5f.sp, fontWeight = FontWeight.Bold, color = palette.primary))
             } else {
                 Text(
                     "Kodni qayta yuborish",
-                    style = TextStyle(fontFamily = AuthFontFamily, fontSize = 12.5f.sp, fontWeight = FontWeight.Bold, color = palette.primary),
+                    style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.5f.sp, fontWeight = FontWeight.Bold, color = palette.primary),
                     modifier = Modifier.clickableNoRipple(onResend),
                 )
             }
         }
 
         Spacer(Modifier.height(22.dp))
-        PrimaryButton("Tasdiqlash", onVerify, enabled = state.emailCodeValid && !state.isLoading, trailingIcon = AuthIcons.Check)
+        PrimaryButton("Tasdiqlash", onVerify, enabled = state.emailCodeValid && !state.isLoading, trailingIcon = AppIcons.Check)
 
         state.info?.let {
             Spacer(Modifier.height(12.dp))
-            Text(it, style = TextStyle(fontFamily = AuthFontFamily, fontSize = 12.5f.sp, fontWeight = FontWeight.SemiBold, color = palette.successDeep, lineHeight = 17.sp))
+            Text(it, style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.5f.sp, fontWeight = FontWeight.SemiBold, color = palette.successDeep, lineHeight = 17.sp))
         }
         ErrorText(state.error)
 
         Spacer(Modifier.weight(1f))
-        Text("Spam papkasini ham tekshiring.", style = TextStyle(fontFamily = AuthFontFamily, fontSize = 11.5f.sp, color = palette.inkFaint))
+        Text("Spam papkasini ham tekshiring.", style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.5f.sp, color = palette.inkFaint))
     }
 }
 
@@ -165,7 +165,7 @@ private fun formatTimer(seconds: Int): String {
 }
 
 @Composable
-private fun CodeBoxes(value: String, onValueChange: (String) -> Unit, palette: AuthPalette) {
+private fun CodeBoxes(value: String, onValueChange: (String) -> Unit, palette: AppPalette) {
     BasicTextField(
         value = value,
         onValueChange = onValueChange,
@@ -184,7 +184,7 @@ private fun CodeBoxes(value: String, onValueChange: (String) -> Unit, palette: A
 }
 
 @Composable
-private fun CodeCell(ch: Char?, focused: Boolean, palette: AuthPalette, modifier: Modifier) {
+private fun CodeCell(ch: Char?, focused: Boolean, palette: AppPalette, modifier: Modifier) {
     val shape = RoundedCornerShape(13.dp)
     val bg = when {
         ch != null || focused -> palette.fieldBg
@@ -201,7 +201,7 @@ private fun CodeCell(ch: Char?, focused: Boolean, palette: AuthPalette, modifier
         contentAlignment = Alignment.Center,
     ) {
         when {
-            ch != null -> Text(ch.toString(), style = TextStyle(fontFamily = AuthFontFamily, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, color = palette.ink))
+            ch != null -> Text(ch.toString(), style = TextStyle(fontFamily = AppFontFamily, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, color = palette.ink))
             focused -> Box(Modifier.width(2.dp).height(24.dp).background(palette.primary))
         }
     }

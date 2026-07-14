@@ -32,11 +32,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import dev.feature.auth.presentation.components.AuthFontFamily
-import dev.feature.auth.presentation.components.AuthIcons
-import dev.feature.auth.presentation.components.AuthScreenScaffold
-import dev.feature.auth.presentation.components.AuthTab
-import dev.feature.auth.presentation.components.LogoTile
+import dev.core.designsystem.components.AppFontFamily
+import dev.core.designsystem.components.AppIcons
+import dev.core.designsystem.components.AppScreenScaffold
+import dev.core.designsystem.components.AuthTab
+import dev.core.designsystem.components.LogoTile
 import dev.feature.auth.presentation.screens.EmailLoginScreen
 import dev.feature.auth.presentation.screens.ForgotPasswordScreen
 import dev.feature.auth.presentation.screens.OnboardingScreen
@@ -50,7 +50,7 @@ import dev.feature.auth.presentation.screens.SignUpScreen
 import dev.feature.auth.presentation.screens.SuccessScreen
 import dev.feature.auth.presentation.screens.UniversityPickerScreen
 import dev.feature.auth.presentation.screens.WelcomeScreen
-import dev.feature.auth.presentation.theme.authPalette
+import dev.core.designsystem.theme.appPalette
 import dev.feature.auth.social.rememberSocialAuthController
 import org.koin.compose.viewmodel.koinViewModel
 
@@ -256,7 +256,7 @@ fun AuthNavHost(vm: AuthFlowViewModel = koinViewModel()) {
 /** Kesh o'qilguncha ko'rsatiladigan qisqa boshlang'ich ekran (session restore). */
 @Composable
 private fun BootSplash() {
-    AuthScreenScaffold {
+    AppScreenScaffold {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             LogoTile(size = 72, radius = 22, iconSize = 38)
         }

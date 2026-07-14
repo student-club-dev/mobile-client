@@ -14,7 +14,6 @@ import dev.feature.auth.presentation.main.HomeViewModel
 import dev.feature.auth.presentation.main.JobsViewModel
 import dev.feature.auth.presentation.main.NotificationsViewModel
 import dev.feature.auth.presentation.main.PostAdViewModel
-import dev.feature.auth.presentation.main.ProfileViewModel
 import dev.feature.auth.presentation.main.SettingsViewModel
 import dev.feature.auth.presentation.main.StudentsViewModel
 import org.koin.core.module.dsl.viewModel
@@ -65,7 +64,6 @@ val authFeatureModule = module {
     viewModelOf(::StudentsViewModel)
     viewModelOf(::DiscountsViewModel)
     viewModelOf(::PostAdViewModel)
-    viewModelOf(::ProfileViewModel)
     viewModelOf(::ChatViewModel)
     viewModelOf(::SettingsViewModel)
     viewModelOf(::NotificationsViewModel)

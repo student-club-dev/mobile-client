@@ -29,37 +29,37 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import dev.feature.auth.presentation.components.AuthFontFamily
-import dev.feature.auth.presentation.components.AuthIcons
-import dev.feature.auth.presentation.components.AuthScreenScaffold
-import dev.feature.auth.presentation.components.AuthTab
-import dev.feature.auth.presentation.components.BackButton
-import dev.feature.auth.presentation.components.ErrorText
-import dev.feature.auth.presentation.components.FieldLabel
-import dev.feature.auth.presentation.components.FooterLink
-import dev.feature.auth.presentation.components.GlassTextField
-import dev.feature.auth.presentation.components.HintText
-import dev.feature.auth.presentation.components.LogoTile
-import dev.feature.auth.presentation.components.OrDivider
-import dev.feature.auth.presentation.components.PhoneVisualTransformation
-import dev.feature.auth.presentation.components.PrimaryButton
-import dev.feature.auth.presentation.components.ScreenSubtitle
-import dev.feature.auth.presentation.components.ScreenTitle
-import dev.feature.auth.presentation.components.SegmentedTabs
-import dev.feature.auth.presentation.components.SocialRow
+import dev.core.designsystem.components.AppFontFamily
+import dev.core.designsystem.components.AppIcons
+import dev.core.designsystem.components.AppScreenScaffold
+import dev.core.designsystem.components.AuthTab
+import dev.core.designsystem.components.BackButton
+import dev.core.designsystem.components.ErrorText
+import dev.core.designsystem.components.FieldLabel
+import dev.core.designsystem.components.FooterLink
+import dev.core.designsystem.components.GlassTextField
+import dev.core.designsystem.components.HintText
+import dev.core.designsystem.components.LogoTile
+import dev.core.designsystem.components.OrDivider
+import dev.core.designsystem.components.PhoneVisualTransformation
+import dev.core.designsystem.components.PrimaryButton
+import dev.core.designsystem.components.ScreenSubtitle
+import dev.core.designsystem.components.ScreenTitle
+import dev.core.designsystem.components.SegmentedTabs
+import dev.core.designsystem.components.SocialRow
 import dev.feature.auth.presentation.flow.AuthFlowState
 import dev.feature.auth.presentation.flow.AuthFlowViewModel
-import dev.feature.auth.presentation.theme.AuthPalette
-import dev.feature.auth.presentation.theme.authPalette
+import dev.core.designsystem.theme.AppPalette
+import dev.core.designsystem.theme.appPalette
 
 /** Telefon maydonining "🇺🇿 +998 |" prefiksi. */
 @Composable
-internal fun PhonePrefix(palette: AuthPalette) {
+internal fun PhonePrefix(palette: AppPalette) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(
             "🇺🇿 +998",
             style = TextStyle(
-                fontFamily = AuthFontFamily,
+                fontFamily = AppFontFamily,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Bold,
                 color = palette.ink
@@ -78,16 +78,16 @@ internal fun PhonePrefix(palette: AuthPalette) {
 fun OnboardingScreen(
     onNext: () -> Unit,
     onSkip: () -> Unit,
-    palette: AuthPalette = authPalette,
+    palette: AppPalette = appPalette,
 ) {
-    AuthScreenScaffold(topPadding = 52) {
+    AppScreenScaffold(topPadding = 52) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
             Text(
                 "O‘tkazib yuborish",
                 modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickableNoRipple(onSkip)
                     .padding(4.dp),
                 style = TextStyle(
-                    fontFamily = AuthFontFamily,
+                    fontFamily = AppFontFamily,
                     fontSize = 12.5f.sp,
                     fontWeight = FontWeight.Bold,
                     color = palette.inkFaint
@@ -114,7 +114,7 @@ fun OnboardingScreen(
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
-                    AuthIcons.GraduationCap,
+                    AppIcons.GraduationCap,
                     null,
                     tint = androidx.compose.ui.graphics.Color.White,
                     modifier = Modifier.size(52.dp)
@@ -151,7 +151,7 @@ fun OnboardingScreen(
             Text(
                 "Hamma xizmat bitta ilovada",
                 style = TextStyle(
-                    fontFamily = AuthFontFamily,
+                    fontFamily = AppFontFamily,
                     fontSize = 24.sp,
                     fontWeight = FontWeight.Black,
                     letterSpacing = (-0.5).sp,
@@ -164,7 +164,7 @@ fun OnboardingScreen(
             Text(
                 "7-10 ta ilova o‘rniga bitta hisob. Ovqatdan darsgacha, ishdan turar joygacha.",
                 style = TextStyle(
-                    fontFamily = AuthFontFamily,
+                    fontFamily = AppFontFamily,
                     fontSize = 13.sp,
                     color = palette.inkMuted,
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center,
@@ -177,13 +177,13 @@ fun OnboardingScreen(
                 Dot(false, palette); Dot(true, palette); Dot(false, palette)
             }
             Spacer(Modifier.height(20.dp))
-            PrimaryButton("Keyingi", onNext, trailingIcon = AuthIcons.ArrowRight)
+            PrimaryButton("Keyingi", onNext, trailingIcon = AppIcons.ArrowRight)
         }
     }
 }
 
 @Composable
-private fun Dot(active: Boolean, palette: AuthPalette) {
+private fun Dot(active: Boolean, palette: AppPalette) {
     Box(
         Modifier.height(7.dp).width(if (active) 22.dp else 7.dp).background(
                 if (active) palette.primary else palette.primary.copy(alpha = 0.25f),
@@ -193,7 +193,7 @@ private fun Dot(active: Boolean, palette: AuthPalette) {
 }
 
 @Composable
-private fun FloatingChip(emoji: String, label: String?, modifier: Modifier, palette: AuthPalette) {
+private fun FloatingChip(emoji: String, label: String?, modifier: Modifier, palette: AppPalette) {
     Row(
         modifier.clip(RoundedCornerShape(15.dp)).background(palette.glassStrong)
             .border(1.dp, palette.border, RoundedCornerShape(15.dp))
@@ -205,7 +205,7 @@ private fun FloatingChip(emoji: String, label: String?, modifier: Modifier, pale
         if (label != null) {
             Text(
                 label, style = TextStyle(
-                    fontFamily = AuthFontFamily,
+                    fontFamily = AppFontFamily,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
                     color = palette.ink
@@ -230,9 +230,9 @@ fun WelcomeScreen(
     onGoogle: () -> Unit,
     onApple: () -> Unit,
     onTelegram: () -> Unit,
-    palette: AuthPalette = authPalette,
+    palette: AppPalette = appPalette,
 ) {
-    AuthScreenScaffold(scroll = true, topPadding = 60) {
+    AppScreenScaffold(scroll = true, topPadding = 60) {
         LogoTile()
         Spacer(Modifier.height(18.dp))
         ScreenTitle("Xush kelibsiz 👋", size = 25)
@@ -264,7 +264,7 @@ fun WelcomeScreen(
                 value = state.email,
                 onValueChange = vm::onEmailChange,
                 placeholder = "aziz.karimov@edu.uz",
-                leading = AuthIcons.Mail,
+                leading = AppIcons.Mail,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
             )
             Spacer(Modifier.height(8.dp))
@@ -272,13 +272,13 @@ fun WelcomeScreen(
         }
 
         Spacer(Modifier.height(16.dp))
-        PrimaryButton("Davom etish", onContinue, trailingIcon = AuthIcons.ArrowRight)
+        PrimaryButton("Davom etish", onContinue, trailingIcon = AppIcons.ArrowRight)
 
         state.error?.let {
             Spacer(Modifier.height(10.dp))
             Text(
                 it, style = TextStyle(
-                    fontFamily = AuthFontFamily,
+                    fontFamily = AppFontFamily,
                     fontSize = 12.sp,
                     color = androidx.compose.ui.graphics.Color(0xFFDC2626)
                 )
@@ -310,9 +310,9 @@ fun PhoneScreen(
     onGoogle: () -> Unit,
     onApple: () -> Unit,
     onTelegram: () -> Unit,
-    palette: AuthPalette = authPalette,
+    palette: AppPalette = appPalette,
 ) {
-    AuthScreenScaffold(scroll = false) {
+    AppScreenScaffold(scroll = false) {
         BackButton(onBack)
         Spacer(Modifier.height(20.dp))
         ScreenTitle("Telefon raqamingiz")
@@ -342,7 +342,7 @@ fun PhoneScreen(
             "Kod olish",
             onGetCode,
             enabled = state.phoneValid && !state.isLoading,
-            trailingIcon = AuthIcons.ArrowRight
+            trailingIcon = AppIcons.ArrowRight
         )
 
         ErrorText(state.error)
@@ -372,9 +372,9 @@ fun EmailLoginScreen(
     onForgot: () -> Unit,
     onBiometric: () -> Unit,
     onSignUp: () -> Unit,
-    palette: AuthPalette = authPalette,
+    palette: AppPalette = appPalette,
 ) {
-    AuthScreenScaffold(scroll = false) {
+    AppScreenScaffold(scroll = false) {
         BackButton(onBack)
         Spacer(Modifier.height(18.dp))
         ScreenTitle("Xush kelibsiz")
@@ -391,7 +391,7 @@ fun EmailLoginScreen(
             value = state.email,
             onValueChange = vm::onEmailChange,
             placeholder = "aziz.karimov@edu.uz",
-            leading = AuthIcons.Mail,
+            leading = AppIcons.Mail,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
         )
         Spacer(Modifier.height(13.dp))
@@ -401,10 +401,10 @@ fun EmailLoginScreen(
             value = state.password,
             onValueChange = vm::onPasswordChange,
             placeholder = "••••••••",
-            leading = AuthIcons.Lock,
+            leading = AppIcons.Lock,
             trailing = {
                 Icon(
-                    if (state.passwordVisible) AuthIcons.EyeOff else AuthIcons.Eye,
+                    if (state.passwordVisible) AppIcons.EyeOff else AppIcons.Eye,
                     null,
                     tint = palette.inkFaint,
                     modifier = Modifier.size(18.dp).clip(RoundedCornerShape(6.dp))
@@ -428,7 +428,7 @@ fun EmailLoginScreen(
                 CheckBoxSmall(state.rememberMe, palette)
                 Text(
                     "Meni eslab qol", style = TextStyle(
-                        fontFamily = AuthFontFamily,
+                        fontFamily = AppFontFamily,
                         fontSize = 12.5f.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = palette.label
@@ -438,7 +438,7 @@ fun EmailLoginScreen(
             Text(
                 "Parolni unutdingizmi?",
                 style = TextStyle(
-                    fontFamily = AuthFontFamily,
+                    fontFamily = AppFontFamily,
                     fontSize = 12.5f.sp,
                     fontWeight = FontWeight.Bold,
                     color = palette.primary
@@ -450,8 +450,8 @@ fun EmailLoginScreen(
         Spacer(Modifier.height(18.dp))
         PrimaryButton("Kirish", onLogin, enabled = !state.isLoading)
         Spacer(Modifier.height(11.dp))
-        dev.feature.auth.presentation.components.OutlineButton(
-            "Face ID bilan kirish", onBiometric, leadingIcon = AuthIcons.ScanFace
+        dev.core.designsystem.components.OutlineButton(
+            "Face ID bilan kirish", onBiometric, leadingIcon = AppIcons.ScanFace
         )
 
         ErrorText(state.error)
@@ -465,7 +465,7 @@ fun EmailLoginScreen(
 // ---- Umumiy kichik yordamchilar ----
 
 @Composable
-internal fun CheckBoxSmall(checked: Boolean, palette: AuthPalette, size: Int = 20) {
+internal fun CheckBoxSmall(checked: Boolean, palette: AppPalette, size: Int = 20) {
     Box(
         Modifier.size(size.dp).clip(RoundedCornerShape(6.dp))
             .background(if (checked) palette.primary else androidx.compose.ui.graphics.Color.Transparent)
@@ -473,7 +473,7 @@ internal fun CheckBoxSmall(checked: Boolean, palette: AuthPalette, size: Int = 2
         contentAlignment = Alignment.Center,
     ) {
         if (checked) Icon(
-            AuthIcons.Check,
+            AppIcons.Check,
             null,
             tint = androidx.compose.ui.graphics.Color.White,
             modifier = Modifier.size((size * 0.6f).dp)

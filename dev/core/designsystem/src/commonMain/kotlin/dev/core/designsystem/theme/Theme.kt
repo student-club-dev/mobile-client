@@ -11,7 +11,7 @@ import androidx.compose.ui.graphics.Color
 
 /**
  * Joriy dark rejim — foydalanuvchi tanlovi bilan boshqariladi (Sozlamalar → mavzu).
- * [AppTheme] o'rnatadi; palitralar (masalan auth `authPalette`) shu qiymatga ergashadi.
+ * [AppTheme] o'rnatadi; palitralar (masalan auth `appPalette`) shu qiymatga ergashadi.
  */
 val LocalDarkTheme = staticCompositionLocalOf<Boolean?> { null }
 

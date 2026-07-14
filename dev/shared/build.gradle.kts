@@ -33,6 +33,11 @@ kotlin {
             implementation(libs.androidx.navigation.compose)
             implementation(libs.koin.core)
             implementation(libs.koin.compose)
+
+            // Rasm yuklash (avatar) — ilova darajasidagi ImageLoader sozlamasi App.kt'da.
+            implementation(libs.coil.compose)
+            implementation(libs.coil.network.ktor)
+            implementation(libs.ktor.client.core)
         }
     }
 }

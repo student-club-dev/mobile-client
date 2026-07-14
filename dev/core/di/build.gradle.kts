@@ -15,6 +15,8 @@ kotlin {
         commonMain.dependencies {
             api(projects.dev.core.data)
             api(projects.dev.feature.auth)
+            // Profil feature'ining Koin moduli (`profileModule`) shu yerda ulanadi.
+            api(projects.dev.feature.profile.presentation)
             api(libs.koin.core)
             implementation(libs.ktor.client.core)
             implementation(libs.ktor.client.contentNegotiation)

@@ -35,10 +35,10 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.core.domain.model.AppNotification
 import dev.core.domain.model.NotificationType
-import dev.feature.auth.presentation.components.AuthFontFamily
-import dev.feature.auth.presentation.components.AuthIcons
-import dev.feature.auth.presentation.theme.AuthPalette
-import dev.feature.auth.presentation.theme.authPalette
+import dev.core.designsystem.components.AppFontFamily
+import dev.core.designsystem.components.AppIcons
+import dev.core.designsystem.theme.AppPalette
+import dev.core.designsystem.theme.appPalette
 import org.koin.compose.viewmodel.koinViewModel
 
 /**
@@ -47,7 +47,7 @@ import org.koin.compose.viewmodel.koinViewModel
  */
 @Composable
 fun NotificationsScreen(onBack: () -> Unit, vm: NotificationsViewModel = koinViewModel()) {
-    val palette = authPalette
+    val palette = appPalette
     val state by vm.state.collectAsStateWithLifecycle()
 
     Column(Modifier.fillMaxSize()) {
@@ -61,12 +61,12 @@ fun NotificationsScreen(onBack: () -> Unit, vm: NotificationsViewModel = koinVie
                 Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(palette.glass)
                     .border(1.dp, palette.border, RoundedCornerShape(12.dp)).clickable(onClick = onBack),
                 contentAlignment = Alignment.Center,
-            ) { Icon(AuthIcons.ArrowLeft, "Orqaga", tint = palette.ink, modifier = Modifier.size(18.dp)) }
-            Text("Bildirishnomalar", style = TextStyle(fontFamily = AuthFontFamily, fontSize = 20.sp, fontWeight = FontWeight.Black, color = palette.ink), modifier = Modifier.weight(1f))
+            ) { Icon(AppIcons.ArrowLeft, "Orqaga", tint = palette.ink, modifier = Modifier.size(18.dp)) }
+            Text("Bildirishnomalar", style = TextStyle(fontFamily = AppFontFamily, fontSize = 20.sp, fontWeight = FontWeight.Black, color = palette.ink), modifier = Modifier.weight(1f))
             if (state.unreadCount > 0) {
                 Text(
                     "Hammasini o'qildi",
-                    style = TextStyle(fontFamily = AuthFontFamily, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = palette.primary),
+                    style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = palette.primary),
                     modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable { vm.markAllRead() }.padding(horizontal = 6.dp, vertical = 4.dp),
                 )
             }
@@ -90,7 +90,7 @@ fun NotificationsScreen(onBack: () -> Unit, vm: NotificationsViewModel = koinVie
 }
 
 @Composable
-private fun NotificationRow(n: AppNotification, palette: AuthPalette, onClick: () -> Unit) {
+private fun NotificationRow(n: AppNotification, palette: AppPalette, onClick: () -> Unit) {
     val (icon, accent) = n.type.iconAndAccent(palette)
     Row(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp))
@@ -105,41 +105,41 @@ private fun NotificationRow(n: AppNotification, palette: AuthPalette, onClick: (
         }
         Column(Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(n.title, style = TextStyle(fontFamily = AuthFontFamily, fontSize = 13.5f.sp, fontWeight = FontWeight.ExtraBold, color = palette.ink), modifier = Modifier.weight(1f))
+                Text(n.title, style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.5f.sp, fontWeight = FontWeight.ExtraBold, color = palette.ink), modifier = Modifier.weight(1f))
                 if (!n.read) {
                     Box(Modifier.size(8.dp).clip(RoundedCornerShape(999.dp)).background(palette.primary))
                 }
             }
             Spacer(Modifier.height(2.dp))
-            Text(n.body, style = TextStyle(fontFamily = AuthFontFamily, fontSize = 12.sp, color = palette.inkMuted))
+            Text(n.body, style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.sp, color = palette.inkMuted))
             Spacer(Modifier.height(4.dp))
-            Text(n.timeLabel, style = TextStyle(fontFamily = AuthFontFamily, fontSize = 10.5f.sp, fontWeight = FontWeight.Bold, color = palette.inkFaint))
+            Text(n.timeLabel, style = TextStyle(fontFamily = AppFontFamily, fontSize = 10.5f.sp, fontWeight = FontWeight.Bold, color = palette.inkFaint))
         }
     }
 }
 
 @Composable
-private fun EmptyNotifications(palette: AuthPalette) {
+private fun EmptyNotifications(palette: AppPalette) {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Box(
                 Modifier.size(72.dp).clip(RoundedCornerShape(22.dp)).background(palette.primary.copy(alpha = 0.12f)),
                 contentAlignment = Alignment.Center,
-            ) { Icon(AuthIcons.Bell, null, tint = palette.primary, modifier = Modifier.size(34.dp)) }
-            Text("Hozircha bildirishnoma yo'q", style = TextStyle(fontFamily = AuthFontFamily, fontSize = 17.sp, fontWeight = FontWeight.Black, color = palette.ink))
+            ) { Icon(AppIcons.Bell, null, tint = palette.primary, modifier = Modifier.size(34.dp)) }
+            Text("Hozircha bildirishnoma yo'q", style = TextStyle(fontFamily = AppFontFamily, fontSize = 17.sp, fontWeight = FontWeight.Black, color = palette.ink))
             Text(
                 "Yangi elonlar, ish takliflari va xabarlar shu yerda ko'rinadi.",
-                style = TextStyle(fontFamily = AuthFontFamily, fontSize = 13.sp, color = palette.inkMuted, textAlign = TextAlign.Center),
+                style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.sp, color = palette.inkMuted, textAlign = TextAlign.Center),
                 modifier = Modifier.padding(horizontal = 40.dp),
             )
         }
     }
 }
 
-private fun NotificationType.iconAndAccent(palette: AuthPalette): Pair<ImageVector, Color> = when (this) {
-    NotificationType.JOB -> AuthIcons.Briefcase to Color(0xFF2563EB)
-    NotificationType.DISCOUNT -> AuthIcons.Tag to Color(0xFFF97316)
-    NotificationType.AD -> AuthIcons.FileText to Color(0xFF059669)
-    NotificationType.CHAT -> AuthIcons.MessageSquare to palette.primary
-    NotificationType.SYSTEM -> AuthIcons.Bell to Color(0xFFBE185D)
+private fun NotificationType.iconAndAccent(palette: AppPalette): Pair<ImageVector, Color> = when (this) {
+    NotificationType.JOB -> AppIcons.Briefcase to Color(0xFF2563EB)
+    NotificationType.DISCOUNT -> AppIcons.Tag to Color(0xFFF97316)
+    NotificationType.AD -> AppIcons.FileText to Color(0xFF059669)
+    NotificationType.CHAT -> AppIcons.MessageSquare to palette.primary
+    NotificationType.SYSTEM -> AppIcons.Bell to Color(0xFFBE185D)
 }

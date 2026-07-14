@@ -15,7 +15,8 @@ import dev.core.domain.repository.NotificationRepository
 import dev.core.domain.repository.StudentRepository
 import dev.core.domain.repository.UniversityRepository
 import dev.core.domain.usecase.ObserveCurrentUserUseCase
-import dev.core.domain.usecase.ObserveProfileUseCase
+import dev.feature.profile.domain.usecase.ObserveProfileUseCase
+import dev.feature.profile.domain.usecase.RefreshProfileUseCase
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -38,6 +39,7 @@ data class HomeUiState(
 class HomeViewModel(
     observeCurrentUserUseCase: ObserveCurrentUserUseCase,
     observeProfileUseCase: ObserveProfileUseCase,
+    private val refreshProfileUseCase: RefreshProfileUseCase,
     universityRepository: UniversityRepository,
     private val discountRepository: DiscountRepository,
     private val jobRepository: JobRepository,
@@ -49,6 +51,9 @@ class HomeViewModel(
     init {
         // Offline-first: universitetlarni backend'dan sinxronlashga urinamiz.
         viewModelScope.launch { universityRepository.refresh() }
+        // Kirishdan keyin ilova shu ekrandan boshlanadi — profilni masofaviy manbadan
+        // keshga tortamiz, shunda sarlavhadagi universitet/kurs darrov ko'rinadi.
+        viewModelScope.launch { refreshProfileUseCase() }
     }
 
     private val header = combine(
@@ -58,7 +63,10 @@ class HomeViewModel(
     ) { user, profile, universities ->
         val uni = universities.firstOrNull { it.id == profile?.universityId }
         Header(
-            name = user?.fullName?.takeIf { it.isNotBlank() } ?: "Talaba",
+            // Ism profildan olinadi; profil hali to'ldirilmagan bo'lsa — sessiya nomidan.
+            name = profile?.displayName
+                ?: user?.fullName?.takeIf { it.isNotBlank() }
+                ?: "Talaba",
             monogram = uni?.monogram,
             course = profile?.courseYear?.let(::courseLabel),
         )
@@ -111,11 +119,12 @@ class HomeViewModel(
     )
 }
 
+// Profil "1".."4" yozadi (EditProfileScreen); eski yozuvlarda "ONE".."FOUR" uchraydi.
 private fun courseLabel(courseYear: String): String = when (courseYear) {
-    "ONE" -> "1-kurs"
-    "TWO" -> "2-kurs"
-    "THREE" -> "3-kurs"
-    "FOUR" -> "4-kurs"
+    "1", "ONE" -> "1-kurs"
+    "2", "TWO" -> "2-kurs"
+    "3", "THREE" -> "3-kurs"
+    "4", "FOUR" -> "4-kurs"
     "MASTER" -> "Magistr"
     else -> courseYear
 }

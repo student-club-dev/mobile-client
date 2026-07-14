@@ -34,16 +34,18 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import dev.feature.auth.presentation.components.AuthFontFamily
-import dev.feature.auth.presentation.components.AuthIcons
-import dev.feature.auth.presentation.theme.AuthPalette
-import dev.feature.auth.presentation.theme.authPalette
+import dev.core.designsystem.components.AppFontFamily
+import dev.core.designsystem.components.AppIcons
+import dev.core.designsystem.theme.AppPalette
+import dev.core.designsystem.theme.appPalette
+import dev.feature.profile.presentation.EditProfileScreen
+import dev.feature.profile.presentation.ProfileScreen
 
 private enum class MainTab(val route: String, val label: String, val icon: ImageVector) {
-    HOME("home", "Home", AuthIcons.Home),
-    DISCOUNTS("discounts", "Chegirma", AuthIcons.Tag),
-    JOBS("jobs", "Ishlar", AuthIcons.Briefcase),
-    STUDENTS("students", "Student", AuthIcons.Users),
+    HOME("home", "Home", AppIcons.Home),
+    DISCOUNTS("discounts", "Chegirma", AppIcons.Tag),
+    JOBS("jobs", "Ishlar", AppIcons.Briefcase),
+    STUDENTS("students", "Student", AppIcons.Users),
 }
 
 private const val POST_AD = "post_ad"
@@ -59,7 +61,7 @@ private val tabRoutes = MainTab.entries.map { it.route }.toSet()
 /** Asosiy ilova karkasi — pastki navigatsiya (4 tab) + markaziy "Elon" FAB. */
 @Composable
 fun MainShell(onLoggedOut: () -> Unit) {
-    val palette = authPalette
+    val palette = appPalette
     val nav = rememberNavController()
     val backStack by nav.currentBackStackEntryAsState()
     val current = backStack?.destination?.route ?: MainTab.HOME.route
@@ -134,7 +136,7 @@ private fun BottomBar(
     current: String,
     onSelect: (String) -> Unit,
     onFab: () -> Unit,
-    palette: AuthPalette,
+    palette: AppPalette,
     modifier: Modifier = Modifier,
 ) {
     val barColor = if (palette.dark) Color(0xFF1A1630) else Color.White
@@ -164,10 +166,10 @@ private fun BottomBar(
                     .clickable(onClick = onFab),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(AuthIcons.Plus, "Elon berish", tint = Color.White, modifier = Modifier.size(26.dp))
+                Icon(AppIcons.Plus, "Elon berish", tint = Color.White, modifier = Modifier.size(26.dp))
             }
             Spacer(Modifier.height(3.dp))
-            Text("Elon", style = TextStyle(fontFamily = AuthFontFamily, fontSize = 9.sp, fontWeight = FontWeight.Bold, color = palette.primary))
+            Text("Elon", style = TextStyle(fontFamily = AppFontFamily, fontSize = 9.sp, fontWeight = FontWeight.Bold, color = palette.primary))
         }
     }
 }
@@ -177,7 +179,7 @@ private fun NavBarItem(
     tab: MainTab,
     current: String,
     onSelect: (String) -> Unit,
-    palette: AuthPalette,
+    palette: AppPalette,
     modifier: Modifier = Modifier,
 ) {
     val active = current == tab.route
@@ -188,6 +190,6 @@ private fun NavBarItem(
         verticalArrangement = Arrangement.spacedBy(3.dp),
     ) {
         Icon(tab.icon, tab.label, tint = tint, modifier = Modifier.size(21.dp))
-        Text(tab.label, style = TextStyle(fontFamily = AuthFontFamily, fontSize = 9.sp, fontWeight = if (active) FontWeight.ExtraBold else FontWeight.Bold, color = tint))
+        Text(tab.label, style = TextStyle(fontFamily = AppFontFamily, fontSize = 9.sp, fontWeight = if (active) FontWeight.ExtraBold else FontWeight.Bold, color = tint))
     }
 }
