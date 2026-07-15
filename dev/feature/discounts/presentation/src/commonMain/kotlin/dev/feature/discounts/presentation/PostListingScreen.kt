@@ -66,12 +66,17 @@ fun PostListingScreen(
     onClose: () -> Unit,
     onPublished: () -> Unit,
     editListingId: String? = null,
+    // `true` — Chegirma tab'idan, `false` — E'lon tab'idan (rejim qulflanadi).
+    initialDiscount: Boolean? = null,
     vm: PostListingViewModel = koinViewModel(),
 ) {
     val palette = appPalette
     val state by vm.state.collectAsStateWithLifecycle()
 
     LaunchedEffect(editListingId) { if (editListingId != null) vm.loadForEdit(editListingId) }
+    LaunchedEffect(initialDiscount) {
+        if (editListingId == null && initialDiscount != null) vm.setInitialMode(initialDiscount)
+    }
     LaunchedEffect(state.published) { if (state.published) onPublished() }
 
     val type = state.businessType

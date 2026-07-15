@@ -131,8 +131,8 @@ private fun ListingFormScaffold(
             }
 
             // SODDALASHTIRILGAN forma: turi + nomi + rasm + narx + tel + joylashuv.
-            // E'lon turi (Chegirma / Oddiy).
-            ListingModeSection(state, vm)
+            // E'lon turi (Chegirma / Oddiy) — faqat tab belgilamagan bo'lsa (modeLocked=false).
+            if (!state.modeLocked) ListingModeSection(state, vm)
             // Bo'lim (kategoriya) — horizontal scroll.
             CategorySection(state, copy, vm)
             // Nomi + qo'shimcha ma'lumot.

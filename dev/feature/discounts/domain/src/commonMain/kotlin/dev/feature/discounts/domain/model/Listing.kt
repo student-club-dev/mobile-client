@@ -63,6 +63,9 @@ data class Listing(
     /** Chegirmadan keyingi narx — [ListingDiscount.finalPrice] ning qisqartmasi. */
     val finalPrice: Long get() = discount.finalPrice(originalPrice)
 
+    /** `true` — chegirma e'loni, `false` — oddiy e'lon (attributes ichidagi belgiga qarab). */
+    val isDiscount: Boolean get() = attributes[ListingCatalog.REGULAR_KEY] != "1"
+
     /** Ro'yxatda ko'rsatiladigan kategoriya nomi. */
     val categoryLabel: String
         get() = customCategoryName

@@ -54,6 +54,8 @@ data class PostListingUiState(
     val attributeValues: Map<String, String> = emptyMap(),
     /** `true` — chegirma e'loni (chegirma maydonlari), `false` — oddiy e'lon (faqat narx). */
     val isDiscount: Boolean = true,
+    /** Rejim tashqaridan (tab) belgilangan — E'lon turi tanlovi yashiriladi. */
+    val modeLocked: Boolean = false,
 
     val title: String = "",
     val description: String = "",
@@ -149,6 +151,11 @@ class PostListingViewModel(
 
     /** E'lon rejimi: chegirma yoki oddiy. */
     fun onListingMode(discount: Boolean) = _state.update { it.copy(isDiscount = discount) }
+
+    /** Yaratishда rejimni tab belgilaydi — qulflab qo'yamiz (tanlov ko'rinmaydi). */
+    fun setInitialMode(discount: Boolean) = _state.update {
+        it.copy(isDiscount = discount, modeLocked = true, discountType = DiscountType.SPECIAL_PRICE)
+    }
 
     /** Aloqa telefoni. */
     fun onContactPhone(v: String) = _state.update { it.copy(contactPhone = v) }
@@ -392,6 +399,7 @@ class PostListingViewModel(
         customCategoryName = customCategoryName.orEmpty(),
         attributeValues = attributes - ListingCatalog.REGULAR_KEY - ListingCatalog.PHONE_KEY,
         isDiscount = attributes[ListingCatalog.REGULAR_KEY] != "1",
+        modeLocked = true,
         contactPhone = attributes[ListingCatalog.PHONE_KEY].orEmpty(),
         title = title,
         description = description.orEmpty(),

@@ -24,6 +24,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -53,42 +55,49 @@ fun MyListingsScreen(
     onBack: (() -> Unit)? = null,
     // Biznes shell'ida header "+" yashiriladi — u yerda o'ng-past burchakda aylana FAB bor.
     showHeaderCreate: Boolean = true,
+    // Sarlavha (biznes shell'da segment selektor bilan almashtiriladi).
+    showHeader: Boolean = true,
+    // `true` — faqat chegirma, `false` — faqat oddiy e'lon, `null` — hammasi.
+    filterDiscount: Boolean? = null,
     vm: MyListingsViewModel = koinViewModel(),
 ) {
     val palette = appPalette
     val state by vm.state.collectAsStateWithLifecycle()
+    val listings = if (filterDiscount == null) state.listings
+    else state.listings.filter { it.isDiscount == filterDiscount }
 
     Column(Modifier.fillMaxSize()) {
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(top = 54.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(11.dp),
-        ) {
-            if (onBack != null) IconSquareButton(onBack, AppIcons.ArrowLeft, palette)
-            Column(Modifier.weight(1f)) {
-                Text(
-                    "Mening chegirmalarim",
-                    style = TextStyle(fontFamily = AppFontFamily, fontSize = 18.sp, fontWeight = FontWeight.Black, color = palette.ink),
-                )
-                Text(
-                    "${state.listings.size} ta e'lon",
-                    style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.5f.sp, color = palette.inkFaint),
-                )
+        if (showHeader) {
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(top = 54.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(11.dp),
+            ) {
+                if (onBack != null) IconSquareButton(onBack, AppIcons.ArrowLeft, palette)
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        "Mening chegirmalarim",
+                        style = TextStyle(fontFamily = AppFontFamily, fontSize = 18.sp, fontWeight = FontWeight.Black, color = palette.ink),
+                    )
+                    Text(
+                        "${listings.size} ta e'lon",
+                        style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.5f.sp, color = palette.inkFaint),
+                    )
+                }
+                if (showHeaderCreate) IconSquareButton(onCreate, AppIcons.Plus, palette)
             }
-            if (showHeaderCreate) IconSquareButton(onCreate, AppIcons.Plus, palette)
+            Spacer(Modifier.height(14.dp))
         }
 
-        Spacer(Modifier.height(14.dp))
-
-        if (state.listings.isEmpty() && !state.loading) {
-            EmptyState(palette, onCreate)
+        if (listings.isEmpty() && !state.loading) {
+            EmptyState(palette, onCreate, filterDiscount)
         } else {
             LazyColumn(
                 Modifier.fillMaxWidth().weight(1f),
-                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 110.dp),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 110.dp),
                 verticalArrangement = Arrangement.spacedBy(11.dp),
             ) {
-                items(state.listings, key = { it.id }) { listing ->
+                items(listings, key = { it.id }) { listing ->
                     MyListingCard(
                         listing = listing,
                         palette = palette,
@@ -103,25 +112,44 @@ fun MyListingsScreen(
 }
 
 @Composable
-private fun EmptyState(palette: AppPalette, onCreate: () -> Unit) {
+private fun EmptyState(palette: AppPalette, onCreate: () -> Unit, discount: Boolean?) {
+    // Tab bo'yicha farqli matn — Chegirma yoki E'lon.
+    val isDiscount = discount != false
     Column(
         Modifier.fillMaxSize().padding(horizontal = 32.dp),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text("🏷️", style = TextStyle(fontSize = 40.sp))
-        Spacer(Modifier.height(10.dp))
+        // Gradient doira ichida ikonka.
+        Box(
+            Modifier.size(84.dp)
+                .shadow(18.dp, RoundedCornerShape(26.dp), spotColor = palette.primary.copy(alpha = 0.5f))
+                .clip(RoundedCornerShape(26.dp)).background(palette.primaryBrush),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                if (isDiscount) AppIcons.Tag else AppIcons.FileText,
+                null,
+                tint = Color.White,
+                modifier = Modifier.size(38.dp),
+            )
+        }
+        Spacer(Modifier.height(18.dp))
         Text(
-            "Hali chegirma e'loni yo'q",
-            style = TextStyle(fontFamily = AppFontFamily, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, color = palette.ink),
+            if (isDiscount) "Hali chegirma yo'q" else "Hali e'lon yo'q",
+            style = TextStyle(fontFamily = AppFontFamily, fontSize = 17.sp, fontWeight = FontWeight.Black, color = palette.ink),
         )
-        Spacer(Modifier.height(4.dp))
+        Spacer(Modifier.height(6.dp))
         Text(
-            "Biznesingiz uchun birinchi chegirmani joylang — talabalar Chegirmalar bo'limida ko'radi.",
-            style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.sp, color = palette.inkMuted),
+            if (isDiscount)
+                "Birinchi chegirmangizni joylang — talabalar uni Chegirmalar bo'limida ko'radi."
+            else
+                "Birinchi e'loningizni joylang — mahsulot yoki xizmatingizni talabalarga ko'rsating.",
+            style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.5f.sp, color = palette.inkMuted, lineHeight = 18.sp),
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
         )
-        Spacer(Modifier.height(16.dp))
-        PrimaryButton("Chegirma qo'shish", onCreate)
+        Spacer(Modifier.height(20.dp))
+        PrimaryButton(if (isDiscount) "Chegirma qo'shish" else "E'lon qo'shish", onCreate)
     }
 }
 
@@ -134,60 +162,82 @@ private fun MyListingCard(
     onDelete: () -> Unit,
 ) {
     val accent = Color(listing.businessType.accent)
+    val isDiscount = listing.isDiscount
 
     Column(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(palette.glass)
-            .border(1.dp, palette.border, RoundedCornerShape(18.dp)),
+        Modifier.fillMaxWidth()
+            .shadow(10.dp, RoundedCornerShape(22.dp), spotColor = accent.copy(alpha = 0.25f))
+            .clip(RoundedCornerShape(22.dp)).background(palette.glass)
+            .border(1.dp, palette.border, RoundedCornerShape(22.dp)),
     ) {
-        Row(Modifier.fillMaxWidth().padding(12.dp), horizontalArrangement = Arrangement.spacedBy(11.dp)) {
-            // Muqova rasmi (yo'q bo'lsa — tur emoji'si)
-            Box(
-                Modifier.size(64.dp).clip(RoundedCornerShape(14.dp)).background(accent.copy(alpha = 0.14f)),
-                contentAlignment = Alignment.Center,
-            ) {
-                val cover = listing.images.firstOrNull()
-                if (cover != null) {
-                    ListingImage(cover, Modifier.fillMaxSize().clip(RoundedCornerShape(14.dp)))
-                } else {
-                    Text(listing.businessType.emoji, style = TextStyle(fontSize = 24.sp))
+        Row(Modifier.fillMaxWidth().padding(13.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            // Muqova rasmi (yo'q bo'lsa — tur emoji'si). Chegirmada burchakda badge.
+            Box(Modifier.size(72.dp)) {
+                Box(
+                    Modifier.fillMaxSize().clip(RoundedCornerShape(16.dp))
+                        .background(
+                            Brush.linearGradient(listOf(accent.copy(alpha = 0.18f), accent.copy(alpha = 0.07f))),
+                        ),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    val cover = listing.images.firstOrNull()
+                    if (cover != null) {
+                        ListingImage(cover, Modifier.fillMaxSize().clip(RoundedCornerShape(16.dp)))
+                    } else {
+                        Text(listing.businessType.emoji, style = TextStyle(fontSize = 28.sp))
+                    }
                 }
-            }
-
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(
-                    listing.title,
-                    style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.5f.sp, fontWeight = FontWeight.ExtraBold, color = palette.ink),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    "${listing.businessName} · ${listing.categoryLabel}",
-                    style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.sp, color = palette.inkFaint),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                if (isDiscount) {
                     Box(
-                        Modifier.clip(RoundedCornerShape(7.dp)).background(accent).padding(horizontal = 7.dp, vertical = 3.dp),
+                        Modifier.align(Alignment.TopStart).padding(5.dp)
+                            .clip(RoundedCornerShape(8.dp)).background(accent)
+                            .padding(horizontal = 6.dp, vertical = 2.dp),
                     ) {
                         Text(
                             listing.discount.badge(),
-                            style = TextStyle(fontFamily = AppFontFamily, fontSize = 10.5f.sp, fontWeight = FontWeight.Black, color = Color.White),
+                            style = TextStyle(fontFamily = AppFontFamily, fontSize = 9.5f.sp, fontWeight = FontWeight.Black, color = Color.White),
                         )
                     }
+                }
+            }
+
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                Text(
+                    listing.title,
+                    style = TextStyle(fontFamily = AppFontFamily, fontSize = 14.sp, fontWeight = FontWeight.Black, color = palette.ink),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                // Kategoriya chipi.
+                Box(
+                    Modifier.clip(RoundedCornerShape(7.dp)).background(accent.copy(alpha = 0.12f))
+                        .padding(horizontal = 8.dp, vertical = 3.dp),
+                ) {
+                    Text(
+                        listing.categoryLabel,
+                        style = TextStyle(fontFamily = AppFontFamily, fontSize = 10.5f.sp, fontWeight = FontWeight.Bold, color = accent),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                     Text(
                         "${listing.finalPrice.formatSum()} so'm",
-                        style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.sp, fontWeight = FontWeight.ExtraBold, color = palette.ink),
+                        style = TextStyle(fontFamily = AppFontFamily, fontSize = 15.sp, fontWeight = FontWeight.Black, color = palette.ink),
                     )
-                    Text(
-                        "${listing.originalPrice.formatSum()}",
-                        style = TextStyle(
-                            fontFamily = AppFontFamily,
-                            fontSize = 11.sp,
-                            color = palette.inkFaint,
-                            textDecoration = TextDecoration.LineThrough,
-                        ),
-                    )
+                    // Chegirmada eski narx — chiziq bilan; oddiy e'londa yo'q.
+                    if (isDiscount && listing.originalPrice != listing.finalPrice) {
+                        Text(
+                            listing.originalPrice.formatSum(),
+                            style = TextStyle(
+                                fontFamily = AppFontFamily,
+                                fontSize = 11.5f.sp,
+                                color = palette.inkFaint,
+                                textDecoration = TextDecoration.LineThrough,
+                            ),
+                            modifier = Modifier.padding(bottom = 1.dp),
+                        )
+                    }
                 }
             }
 
