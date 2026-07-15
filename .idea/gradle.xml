@@ -21,6 +21,10 @@
             <option value="$PROJECT_DIR$/dev/core/network" />
             <option value="$PROJECT_DIR$/dev/feature" />
             <option value="$PROJECT_DIR$/dev/feature/auth" />
+            <option value="$PROJECT_DIR$/dev/feature/discounts" />
+            <option value="$PROJECT_DIR$/dev/feature/discounts/data" />
+            <option value="$PROJECT_DIR$/dev/feature/discounts/domain" />
+            <option value="$PROJECT_DIR$/dev/feature/discounts/presentation" />
             <option value="$PROJECT_DIR$/dev/feature/profile" />
             <option value="$PROJECT_DIR$/dev/feature/profile/data" />
             <option value="$PROJECT_DIR$/dev/feature/profile/domain" />

@@ -341,11 +341,21 @@ koordinatasiga eng yaqin filialni tanlab, masofani (`distanceMeters`) qaytaradi.
 | `mapUrl` | string(url) | ❌ | Yandex/Google Maps havolasi |
 | `metroStation` | string | ❌ | Faqat Toshkent shahri uchun |
 
-**Koordinatani olish yo'llari (biznes egasi ilovada):**
-1. **Xaritadan nuqta tanlash** — asosiy usul, ilovada xarita ochiladi (aniqroq).
-2. **"Mening joylashuvim"** — GPS'dan olinadi (biznes o'z joyida turgan bo'lsa).
-3. **Manzil bo'yicha geokodlash** — `POST /geo/geocode` matn manzilni koordinataga o'giradi.
-   Natija taxminiy, shuning uchun ilova uni xaritada tasdiqlatadi.
+**Koordinata FAQAT xaritadan olinadi** — biznes egasi manzilni qo'lda yozmaydi.
+
+Ilovada oqim shunday: e'lon formasidagi **"+"** → xarita ochiladi → egasi nuqtani bosadi →
+koordinata olinadi → manzil **teskari geokodlash** bilan avtomatik to'ladi → filial ro'yxatga
+qo'shiladi. "+" ni yana bosib **keyingi filial** qo'shiladi (bitta e'lon bir nechta manzilda
+amal qiladi).
+
+Xarita — **OpenStreetMap + Leaflet**, WebView ichida (`feature:discounts` → `map/MapPicker`).
+Tekin, API kalit va hisob talab qilmaydi; Android va iOS'da bitta HTML ishlaydi. Teskari
+geokodlash hozir **Nominatim** (OSM, tekin) orqali; backend tayyor bo'lganda
+`POST /geo/reverse-geocode` (Yandex Geocoder proksisi) o'rniga qo'yiladi — u O'zbekiston
+manzillarida aniqroq.
+
+Geokodlash ishlamasa (internet yo'q) filial baribir qo'shiladi: manzil o'rniga koordinata
+yoziladi va egasi uni tahrirlay oladi. Tanlangan nuqta yo'qolib qolmasligi kerak.
 
 **Teskari geokodlash:** `POST /geo/reverse-geocode` — koordinatadan `regionId`,
 `districtId` va taxminiy `address` ni to'ldiradi (forma avtomatik to'ladi).
@@ -703,6 +713,12 @@ Har bir e'lon javobda eng yaqin filial va masofa bilan qaytadi:
 - Filtrlar: `regionId`, `districtId`, `radiusMeters`, `isOpenNow`, `hasDelivery`.
 - `lat/lng` berilmasa — `regionId` bo'yicha filtr, masofa `null`.
 
+**Masofa qanday hisoblanadi:** e'lonning **barcha filiallari** ichidan talabaga eng yaqini
+tanlanadi va faqat o'sha ko'rsatiladi ("📍 640 m · Chilonzor filiali"). Serverda buni PostGIS
+`ST_Distance` qiladi (§9); ilovada esa xuddi shu narsa haversine formulasi bilan hisoblanadi
+(`Geo.distanceMeters`) — shu sabab backend yo'q bo'lganda ham masofa to'g'ri chiqadi.
+Joylashuvga ruxsat berilmasa masofa ko'rsatilmaydi, lekin ro'yxat baribir ishlaydi.
+
 ---
 
 ## 6. Biznes-qoidalar
@@ -982,11 +998,13 @@ va `dev.core.network.generated.model.*` da 57 ta DTO.
 
 **Ikki eslatma spec bo'yicha:**
 
-1. **`attributes`** — spec'da `ListingAttributesDto` sifatida **tekis (flat)** DTO: barcha 7 turning
-   maydonlari bir joyda, hammasi ixtiyoriy, har birida `[TUR]` prefiksli izoh bor. Sabab:
-   OpenAPI `oneOf` dan Kotlin uchun ishlatib bo'ladigan kod chiqmaydi. Haqiqiy validatsiya
-   **backendda, tur bo'yicha JSON Schema bilan** bo'ladi, forma esa
-   `GET /business/types/{type}/attributes-schema` dan dinamik quriladi.
+1. **`attributes`** — spec'da erkin `Map<String, String>` (`additionalProperties: string`).
+   Turga xos kalitlar sxema tavsifida ro'yxatlangan (to'liq izoh — §4), lekin qat'iy tuzilma
+   YO'Q. Sabab: OpenAPI `oneOf` dan Kotlin uchun ishlatib bo'ladigan kod chiqmaydi, tekis
+   (flat) DTO esa klientni har bir kalitni 70+ maydonga qo'lda tarjima qilishga majbur qiladi.
+   Haqiqiy validatsiya **backendda, tur bo'yicha JSON Schema bilan** bo'ladi
+   (`GET /business/types/{type}/attributes-schema`), forma esa o'sha sxemadan dinamik quriladi.
+   Shuning uchun yangi maydon qo'shilganda na spec, na ilova o'zgaradi.
 
 2. **`POST /media/upload`** da `purpose` — `string`, enum emas. Codegen multipart'ga enum
    qo'yganda Ktor'ning internal API'siga tayanadi va kompilyatsiya buziladi. Ruxsat etilgan

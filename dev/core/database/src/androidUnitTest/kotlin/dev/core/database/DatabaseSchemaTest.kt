@@ -76,8 +76,9 @@ class DatabaseSchemaTest {
     }
 
     @Test
-    fun schemaVersionIsSeven() {
-        assertEquals(7L, StudentClubsDatabase.Schema.version)
+    fun schemaVersionIsNine() {
+        // 7.sqm — ListingEntity (chegirma e'lonlari), 8.sqm — ko'p filial (branchesJson).
+        assertEquals(9L, StudentClubsDatabase.Schema.version)
     }
 
     @Test
@@ -178,6 +179,181 @@ class DatabaseSchemaTest {
         assertEquals("uid-1", user.uid)
         assertEquals("Eski Foydalanuvchi", user.fullName)
         assertEquals(7L, user.userId)
+
+        // v8/v9 (7.sqm + 8.sqm): chegirma e'lonlari jadvali migratsiyadan keyin mavjud
+        // va ko'p filialli (branchesJson) ustunga ega bo'lishi kerak.
+        db.listingQueries.selectAll().executeAsList().also { assertEquals(0, it.size) }
+
+        driver.close()
+    }
+
+    /**
+     * 8.sqm — eng nozik migratsiya: v8 dagi yagona manzil ustunlari (lat/lng/address)
+     * bitta filialga aylanib `branchesJson` ga ko'chishi kerak. Koordinatasiz e'lon esa
+     * filialsiz qoladi (egasi uni xaritadan qayta belgilaydi).
+     */
+    @Test
+    fun migrationV8ConvertsSingleLocationIntoBranch() {
+        val driver = freshDriver()
+
+        // v8 dagi ListingEntity (eski shakl — yagona lokatsiya ustunlari bilan).
+        driver.execute(
+            null,
+            """
+            CREATE TABLE ListingEntity (
+                id TEXT NOT NULL PRIMARY KEY,
+                ownerId TEXT NOT NULL,
+                businessId TEXT,
+                businessType TEXT NOT NULL,
+                businessName TEXT NOT NULL,
+                categoryKey TEXT NOT NULL,
+                customCategoryName TEXT,
+                title TEXT NOT NULL,
+                description TEXT,
+                imagesJson TEXT NOT NULL DEFAULT '[]',
+                priceUnit TEXT NOT NULL,
+                originalPrice INTEGER NOT NULL,
+                currency TEXT NOT NULL DEFAULT 'UZS',
+                discountType TEXT NOT NULL,
+                discountValue INTEGER NOT NULL,
+                finalPrice INTEGER NOT NULL,
+                discountConditions TEXT,
+                redemptionMethod TEXT NOT NULL,
+                promoCode TEXT,
+                perUserLimit INTEGER,
+                totalLimit INTEGER,
+                usedCount INTEGER NOT NULL DEFAULT 0,
+                regionId TEXT,
+                districtId TEXT,
+                address TEXT,
+                landmark TEXT,
+                lat REAL,
+                lng REAL,
+                validFrom INTEGER NOT NULL,
+                validTo INTEGER NOT NULL,
+                attributesJson TEXT NOT NULL DEFAULT '{}',
+                optionGroupsJson TEXT NOT NULL DEFAULT '[]',
+                status TEXT NOT NULL,
+                rejectionReason TEXT,
+                viewsCount INTEGER NOT NULL DEFAULT 0,
+                createdAt INTEGER NOT NULL,
+                updatedAt INTEGER NOT NULL
+            )
+            """.trimIndent(),
+            0,
+        )
+
+        // Koordinatasi bor e'lon — filialga aylanishi kerak.
+        driver.execute(
+            null,
+            """
+            INSERT INTO ListingEntity(
+                id, ownerId, businessType, businessName, categoryKey, title,
+                priceUnit, originalPrice, discountType, discountValue, finalPrice,
+                redemptionMethod, regionId, districtId, address, lat, lng,
+                validFrom, validTo, status, createdAt, updatedAt
+            ) VALUES (
+                'l-1', 'u1', 'CAFE_RESTAURANT', 'Navruz', 'PIZZA', 'Pepperoni',
+                'PER_ITEM', 55000, 'PERCENT', 20, 44000,
+                'QR', 'TOSHKENT_SHAHRI', 'CHILONZOR', 'Chilonzor 9-kvartal, 42-uy', 41.2856, 69.2034,
+                0, 9999999999999, 'ACTIVE', 0, 0
+            )
+            """.trimIndent(),
+            0,
+        )
+
+        // Koordinatasiz e'lon — filialsiz qolishi kerak.
+        driver.execute(
+            null,
+            """
+            INSERT INTO ListingEntity(
+                id, ownerId, businessType, businessName, categoryKey, title,
+                priceUnit, originalPrice, discountType, discountValue, finalPrice,
+                redemptionMethod, address, validFrom, validTo, status, createdAt, updatedAt
+            ) VALUES (
+                'l-2', 'u1', 'GROCERY', 'Korzinka', 'DAIRY', 'Sut',
+                'PER_ITEM', 12000, 'PERCENT', 10, 10800,
+                'STUDENT_ID', 'Qayerdadir', 0, 9999999999999, 'DRAFT', 0, 0
+            )
+            """.trimIndent(),
+            0,
+        )
+
+        StudentClubsDatabase.Schema.migrate(driver, 8L, StudentClubsDatabase.Schema.version)
+        val db = StudentClubsDatabase(driver)
+
+        val withBranch = db.listingQueries.selectById("l-1").executeAsOne()
+        assertTrue(withBranch.branchesJson.contains("41.2856"), "lat ko'chmadi: ${withBranch.branchesJson}")
+        assertTrue(withBranch.branchesJson.contains("69.2034"), "lng ko'chmadi: ${withBranch.branchesJson}")
+        assertTrue(withBranch.branchesJson.contains("Chilonzor 9-kvartal, 42-uy"), "manzil ko'chmadi")
+        assertTrue(withBranch.branchesJson.contains("CHILONZOR"), "tuman ko'chmadi")
+
+        val withoutBranch = db.listingQueries.selectById("l-2").executeAsOne()
+        assertEquals("[]", withoutBranch.branchesJson)
+
+        driver.close()
+    }
+
+    /** Chegirma e'loni (feature:discounts) — yozish, faol e'lonlarni tanlash, status, o'chirish. */
+    @Test
+    fun listingCrudAndActiveFilterWork() {
+        val driver = freshDriver()
+        StudentClubsDatabase.Schema.create(driver)
+        val db = StudentClubsDatabase(driver)
+        val q = db.listingQueries
+
+        fun insert(id: String, status: String, validTo: Long) = q.upsert(
+            id = id,
+            ownerId = "u1",
+            businessId = null,
+            businessType = "CAFE_RESTAURANT",
+            businessName = "Chaykhana Navruz",
+            categoryKey = "PIZZA",
+            customCategoryName = null,
+            title = "Pepperoni pitsa",
+            description = null,
+            imagesJson = """["data:image/jpeg;base64,AAA"]""",
+            priceUnit = "PER_ITEM",
+            originalPrice = 55_000,
+            currency = "UZS",
+            discountType = "PERCENT",
+            discountValue = 20,
+            finalPrice = 44_000,
+            discountConditions = null,
+            redemptionMethod = "QR",
+            promoCode = null,
+            perUserLimit = 1,
+            totalLimit = null,
+            usedCount = 0,
+            branchesJson = """[{"id":"br1","lat":41.2856,"lng":69.2034,"address":"Chilonzor 9-kvartal, 42-uy"}]""",
+            validFrom = 0,
+            validTo = validTo,
+            attributesJson = """{"isHalal":"true"}""",
+            optionGroupsJson = "[]",
+            status = status,
+            rejectionReason = null,
+            viewsCount = 0,
+            createdAt = 0,
+            updatedAt = 0,
+        )
+
+        insert("l-active", "ACTIVE", validTo = 2_000)
+        insert("l-draft", "DRAFT", validTo = 2_000)
+        insert("l-expired", "ACTIVE", validTo = 500) // muddati o'tgan
+
+        assertEquals(3, q.selectByOwner("u1").executeAsList().size)
+        assertEquals(44_000L, q.selectById("l-active").executeAsOne().finalPrice)
+
+        // Talabaga faqat ACTIVE va muddati o'tmaganlari ko'rinadi.
+        val visible = q.selectActive(now = 1_000).executeAsList()
+        assertEquals(1, visible.size)
+        assertEquals("l-active", visible.single().id)
+
+        q.updateStatus(status = "PAUSED", updatedAt = 5, id = "l-active")
+        assertTrue(q.selectActive(now = 1_000).executeAsList().isEmpty())
+
+        q.deleteById("l-draft")
+        assertEquals(2, q.selectByOwner("u1").executeAsList().size)
 
         driver.close()
     }

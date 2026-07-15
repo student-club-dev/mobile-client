@@ -48,15 +48,16 @@ import dev.core.designsystem.components.AppIcons
 import dev.core.designsystem.components.GlassTextField
 import dev.core.designsystem.theme.AppPalette
 import dev.core.designsystem.theme.appPalette
+import dev.feature.discounts.presentation.NearbyDiscountsSection
 import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
-fun DiscountsScreen(vm: DiscountsViewModel = koinViewModel()) {
+fun DiscountsScreen(onMyListings: () -> Unit = {}, vm: DiscountsViewModel = koinViewModel()) {
     val palette = appPalette
     val state by vm.state.collectAsStateWithLifecycle()
 
     if (state.selected == null) {
-        DiscountsGrid(state.categories, palette, onOpen = vm::open)
+        DiscountsGrid(state.categories, palette, onOpen = vm::open, onMyListings = onMyListings)
     } else {
         CategoryOffers(
             category = state.selected!!,
@@ -75,11 +76,33 @@ fun DiscountsScreen(vm: DiscountsViewModel = koinViewModel()) {
 // 1q — kategoriyalar grid
 // ---------------------------------------------------------------------------
 @Composable
-private fun DiscountsGrid(categories: List<DiscountCategory>, palette: AppPalette, onOpen: (DiscountCategory) -> Unit) {
+private fun DiscountsGrid(
+    categories: List<DiscountCategory>,
+    palette: AppPalette,
+    onOpen: (DiscountCategory) -> Unit,
+    onMyListings: () -> Unit,
+) {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).padding(top = 54.dp)) {
-        Text("Chegirmalar", style = TextStyle(fontFamily = AppFontFamily, fontSize = 24.sp, fontWeight = FontWeight.Black, color = palette.ink))
-        Spacer(Modifier.height(4.dp))
-        Text("Bo'limni tanlang — ichida takliflar ochiladi.", style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.5f.sp, color = palette.inkMuted))
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("Chegirmalar", style = TextStyle(fontFamily = AppFontFamily, fontSize = 24.sp, fontWeight = FontWeight.Black, color = palette.ink))
+                Spacer(Modifier.height(4.dp))
+                Text("Bo'limni tanlang — ichida takliflar ochiladi.", style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.5f.sp, color = palette.inkMuted))
+            }
+            // Biznes egasi uchun kirish nuqtasi — o'z chegirma e'lonlari.
+            Box(
+                Modifier.size(42.dp).clip(RoundedCornerShape(13.dp)).background(palette.primary.copy(alpha = 0.12f))
+                    .clickable(onClick = onMyListings),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(AppIcons.Store, "Mening chegirmalarim", tint = palette.primary, modifier = Modifier.size(19.dp))
+            }
+        }
+        Spacer(Modifier.height(18.dp))
+
+        // Biznes egalari yuklagan haqiqiy e'lonlar — eng yaqin filiali va masofasi bilan
+        // (feature:discounts). E'lon bo'lmasa bo'lim ko'rinmaydi.
+        NearbyDiscountsSection()
         Spacer(Modifier.height(18.dp))
 
         Column(verticalArrangement = Arrangement.spacedBy(11.dp)) {

@@ -28,6 +28,9 @@ kotlin {
             api(projects.dev.feature.profile.domain)
             implementation(projects.dev.feature.profile.presentation)
 
+            // MainShell chegirma e'loni ekranlarini ham ochadi (PostListing / MyListings).
+            implementation(projects.dev.feature.discounts.presentation)
+
             // Local sessiya keshi (offline + avtomatik kirish)
             implementation(libs.sqldelight.runtime)
             implementation(libs.sqldelight.coroutines)

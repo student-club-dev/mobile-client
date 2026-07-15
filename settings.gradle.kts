@@ -48,5 +48,11 @@ include(":dev:feature:profile:domain")
 include(":dev:feature:profile:data")
 include(":dev:feature:profile:presentation")
 
+// Chegirmalar feature'i — biznes egasi e'lon qo'yadi, talaba ko'radi.
+// Spetsifikatsiya: DISCOUNTS_BUSINESS_API.md + openapi/student-clubs.json.
+include(":dev:feature:discounts:domain")
+include(":dev:feature:discounts:data")
+include(":dev:feature:discounts:presentation")
+
 // iOS framework + Compose App() aggregator
 include(":dev:shared")

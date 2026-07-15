@@ -61,5 +61,16 @@ fun createHttpClient(
     }
 }
 
+/**
+ * Tashqi (uchinchi tomon) xizmatlar uchun klient — masalan OpenStreetMap Nominatim.
+ *
+ * Ilovaning umumiy klientidan farqi: **Bearer token qo'shmaydi** va bazaviy manzili yo'q.
+ * Firebase tokenini begona serverga yuborish mumkin emas, shuning uchun alohida klient.
+ */
+fun createPublicHttpClient(): HttpClient = platformHttpClient {
+    expectSuccess = true
+    install(ContentNegotiation) { json(appJson) }
+}
+
 /** Platformaga xos HTTP engine (Android: OkHttp, iOS: Darwin). */
 expect fun platformHttpClient(config: HttpClientConfig<*>.() -> Unit): HttpClient

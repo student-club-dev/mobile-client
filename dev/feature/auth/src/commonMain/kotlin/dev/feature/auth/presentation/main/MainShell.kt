@@ -38,6 +38,8 @@ import dev.core.designsystem.components.AppFontFamily
 import dev.core.designsystem.components.AppIcons
 import dev.core.designsystem.theme.AppPalette
 import dev.core.designsystem.theme.appPalette
+import dev.feature.discounts.presentation.MyListingsScreen
+import dev.feature.discounts.presentation.PostListingScreen
 import dev.feature.profile.presentation.EditProfileScreen
 import dev.feature.profile.presentation.ProfileScreen
 
@@ -55,6 +57,10 @@ private const val NOTIFICATIONS = "notifications"
 private const val EDIT_PROFILE = "edit_profile"
 private const val SETTINGS = "settings"
 private const val CLUBS = "clubs"
+
+// Chegirma e'loni (biznes egasi uchun) — feature:discounts.
+private const val POST_LISTING = "post_listing"
+private const val MY_LISTINGS = "my_listings"
 
 private val tabRoutes = MainTab.entries.map { it.route }.toSet()
 
@@ -88,7 +94,34 @@ fun MainShell(onLoggedOut: () -> Unit) {
                     onOpenStudents = { selectTab(MainTab.STUDENTS.route) },
                 )
             }
-            composable(MainTab.DISCOUNTS.route) { DiscountsScreen() }
+            composable(MainTab.DISCOUNTS.route) {
+                DiscountsScreen(onMyListings = { nav.navigate(MY_LISTINGS) })
+            }
+            composable(MY_LISTINGS) {
+                MyListingsScreen(
+                    onBack = { nav.popBackStack() },
+                    onCreate = { nav.navigate(POST_LISTING) },
+                    onEdit = { listingId -> nav.navigate("$POST_LISTING?listingId=$listingId") },
+                )
+            }
+            composable(
+                route = "$POST_LISTING?listingId={listingId}",
+                arguments = listOf(
+                    navArgument("listingId") { type = NavType.StringType; nullable = true; defaultValue = null },
+                ),
+            ) { entry ->
+                PostListingScreen(
+                    onClose = { nav.popBackStack() },
+                    // Joylangach ro'yxatga qaytamiz — e'lon darrov ko'rinadi.
+                    onPublished = {
+                        nav.navigate(MY_LISTINGS) {
+                            popUpTo(MY_LISTINGS) { inclusive = true }
+                            launchSingleTop = true
+                        }
+                    },
+                    editListingId = entry.arguments?.getString("listingId"),
+                )
+            }
             composable(MainTab.JOBS.route) { JobsScreen() }
             composable(MainTab.STUDENTS.route) { StudentsScreen() }
             composable(
@@ -104,6 +137,7 @@ fun MainShell(onLoggedOut: () -> Unit) {
                     onEditProfile = { nav.navigate(EDIT_PROFILE) },
                     onOpenSettings = { nav.navigate(SETTINGS) },
                     onEditAd = { adId -> nav.navigate("$POST_AD?adId=$adId") },
+                    onOpenMyBusiness = { nav.navigate(MY_LISTINGS) },
                 )
             }
             composable(CHAT) { ChatScreen(onBack = { nav.popBackStack() }) }

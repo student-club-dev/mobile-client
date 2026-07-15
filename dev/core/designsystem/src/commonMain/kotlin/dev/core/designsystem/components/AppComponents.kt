@@ -242,10 +242,12 @@ fun OutlineButton(
     text: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    enabled: Boolean = true,
     leadingIcon: ImageVector? = null,
     palette: AppPalette = appPalette,
 ) {
     val shape = RoundedCornerShape(15.dp)
+    val contentAlpha = if (enabled) 1f else 0.4f
     Row(
         modifier
             .fillMaxWidth()
@@ -253,12 +255,12 @@ fun OutlineButton(
             .clip(shape)
             .background(palette.glass)
             .border(1.dp, palette.border, shape)
-            .clickable(onClick = onClick),
+            .clickable(enabled = enabled, onClick = onClick),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center,
     ) {
         if (leadingIcon != null) {
-            Icon(leadingIcon, null, tint = palette.primary, modifier = Modifier.size(18.dp))
+            Icon(leadingIcon, null, tint = palette.primary.copy(alpha = contentAlpha), modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(9.dp))
         }
         Text(
@@ -267,7 +269,7 @@ fun OutlineButton(
                 fontFamily = AppFontFamily,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.ExtraBold,
-                color = if (palette.dark) palette.ink else Color(0xFF4A3F86),
+                color = (if (palette.dark) palette.ink else Color(0xFF4A3F86)).copy(alpha = contentAlpha),
             ),
         )
     }

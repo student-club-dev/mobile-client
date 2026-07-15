@@ -17,6 +17,8 @@ kotlin {
             api(projects.dev.feature.auth)
             // Profil feature'ining Koin moduli (`profileModule`) shu yerda ulanadi.
             api(projects.dev.feature.profile.presentation)
+            // discountsModule() — chegirma e'lonlari feature'i.
+            api(projects.dev.feature.discounts.presentation)
             api(libs.koin.core)
             implementation(libs.ktor.client.core)
             implementation(libs.ktor.client.contentNegotiation)
