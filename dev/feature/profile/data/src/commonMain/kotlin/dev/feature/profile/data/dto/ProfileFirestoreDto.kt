@@ -20,4 +20,6 @@ data class ProfileFirestoreDto(
     val birthYear: Int? = null,
     val courseYear: String? = null,
     val avatarUrl: String? = null,
+    val businessName: String? = null,
+    val businessType: String? = null,
 )

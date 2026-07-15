@@ -37,4 +37,11 @@ class SettingsRepositoryImpl(
     override suspend fun setFlag(key: String, value: Boolean) = withContext(dispatchers.io) {
         q.upsert(key, value.toString())
     }
+
+    override fun observeValue(key: String): Flow<String?> =
+        q.selectByKey(key).asFlow().mapToOneOrNull(dispatchers.io)
+
+    override suspend fun setValue(key: String, value: String?) = withContext(dispatchers.io) {
+        if (value == null) q.deleteByKey(key) else q.upsert(key, value)
+    }
 }

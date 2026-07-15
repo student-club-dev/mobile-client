@@ -16,6 +16,8 @@ kotlin {
             api(projects.dev.feature.profile.domain)
             implementation(projects.dev.feature.profile.presentation)
             implementation(projects.dev.feature.discounts.presentation)
+            // Biznesmen ekranlari alohida modulda (sof UI) — auth uni ishlatadi.
+            implementation(projects.dev.feature.business)
 
             // Local sessiya keshi (offline + avtomatik kirish)
             implementation(libs.sqldelight.runtime)

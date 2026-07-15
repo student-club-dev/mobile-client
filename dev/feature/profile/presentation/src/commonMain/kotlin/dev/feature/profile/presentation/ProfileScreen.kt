@@ -59,6 +59,8 @@ fun ProfileScreen(
     onEditAd: (String) -> Unit = {},
     /** "Mening biznesim" — chegirma e'lonlari (feature:discounts). */
     onOpenMyBusiness: () -> Unit = {},
+    /** Talaba shell'ida biznes kartasi yashiriladi — biznesmenda o'zining alohida bo'limi bor. */
+    showMyBusiness: Boolean = true,
     vm: ProfileViewModel = koinViewModel(),
 ) {
     val palette = appPalette
@@ -121,37 +123,39 @@ fun ProfileScreen(
             Spacer(Modifier.height(16.dp))
 
             // Mening biznesim — chegirma e'lonlarini shu yerdan qo'yiladi.
-            // Alohida ajratilgan: bu boshqa bo'limlardan farqli o'laroq biznes egasi uchun.
-            Row(
-                Modifier.fillMaxWidth()
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(palette.primary.copy(alpha = 0.10f))
-                    .border(1.dp, palette.primary.copy(alpha = 0.22f), RoundedCornerShape(16.dp))
-                    .clickable(onClick = onOpenMyBusiness)
-                    .padding(14.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                Box(
-                    Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(palette.primary.copy(alpha = 0.16f)),
-                    contentAlignment = Alignment.Center,
+            // Faqat biznes egasida ko'rinadi (talaba shell'ida yashirinadi — showMyBusiness=false).
+            if (showMyBusiness) {
+                Row(
+                    Modifier.fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(palette.primary.copy(alpha = 0.10f))
+                        .border(1.dp, palette.primary.copy(alpha = 0.22f), RoundedCornerShape(16.dp))
+                        .clickable(onClick = onOpenMyBusiness)
+                        .padding(14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    Icon(AppIcons.Store, null, tint = palette.primary, modifier = Modifier.size(19.dp))
+                    Box(
+                        Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(palette.primary.copy(alpha = 0.16f)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(AppIcons.Store, null, tint = palette.primary, modifier = Modifier.size(19.dp))
+                    }
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            "Mening biznesim",
+                            style = TextStyle(fontFamily = AppFontFamily, fontSize = 14.sp, fontWeight = FontWeight.ExtraBold, color = palette.ink),
+                        )
+                        Text(
+                            "Chegirma e'loni qo'yish va boshqarish",
+                            style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.5f.sp, color = palette.inkFaint),
+                        )
+                    }
+                    Icon(AppIcons.ChevronRight, null, tint = palette.primary, modifier = Modifier.size(17.dp))
                 }
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        "Mening biznesim",
-                        style = TextStyle(fontFamily = AppFontFamily, fontSize = 14.sp, fontWeight = FontWeight.ExtraBold, color = palette.ink),
-                    )
-                    Text(
-                        "Chegirma e'loni qo'yish va boshqarish",
-                        style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.5f.sp, color = palette.inkFaint),
-                    )
-                }
-                Icon(AppIcons.ChevronRight, null, tint = palette.primary, modifier = Modifier.size(17.dp))
-            }
 
-            Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(16.dp))
+            }
 
             // Menyu
             Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {

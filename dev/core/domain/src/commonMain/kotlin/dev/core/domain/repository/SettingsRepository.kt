@@ -15,8 +15,17 @@ interface SettingsRepository {
     fun observeFlag(key: String, default: Boolean): Flow<Boolean>
     suspend fun setFlag(key: String, value: Boolean)
 
+    /** Ixtiyoriy string qiymat (yo'q bo'lsa `null`). */
+    fun observeValue(key: String): Flow<String?>
+
+    /** String qiymatni yozadi; `null` bo'lsa o'chiradi. */
+    suspend fun setValue(key: String, value: String?)
+
     companion object {
         const val KEY_NOTIF_PUSH = "notif_push"
         const val KEY_NOTIF_EMAIL = "notif_email"
+
+        /** Foydalanuvchi tanlagan rol (STUDENT/BUSINESS) — logout qilgunча saqlanadi. */
+        const val KEY_SELECTED_ROLE = "selected_role"
     }
 }

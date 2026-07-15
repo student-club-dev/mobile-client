@@ -27,7 +27,6 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -38,12 +37,10 @@ import dev.core.designsystem.components.AppFontFamily
 import dev.core.designsystem.components.AppIcons
 import dev.core.designsystem.theme.AppPalette
 import dev.core.designsystem.theme.appPalette
-import dev.feature.discounts.presentation.MyListingsScreen
-import dev.feature.discounts.presentation.PostListingScreen
 import dev.feature.profile.presentation.EditProfileScreen
 import dev.feature.profile.presentation.ProfileScreen
 
-private enum class MainTab(val route: String, val label: String, val icon: ImageVector) {
+private enum class StudentTab(val route: String, val label: String, val icon: ImageVector) {
     HOME("home", "Home", AppIcons.Home),
     DISCOUNTS("discounts", "Chegirma", AppIcons.Tag),
     JOBS("jobs", "Ishlar", AppIcons.Briefcase),
@@ -58,72 +55,47 @@ private const val EDIT_PROFILE = "edit_profile"
 private const val SETTINGS = "settings"
 private const val CLUBS = "clubs"
 
-// Chegirma e'loni (biznes egasi uchun) — feature:discounts.
-private const val POST_LISTING = "post_listing"
-private const val MY_LISTINGS = "my_listings"
+private val tabRoutes = StudentTab.entries.map { it.route }.toSet()
 
-private val tabRoutes = MainTab.entries.map { it.route }.toSet()
-
-/** Asosiy ilova karkasi — pastki navigatsiya (4 tab) + markaziy "Elon" FAB. */
+/**
+ * Talaba karkasi — pastki navigatsiya (Home / Chegirma / Ishlar / Student) + markaziy "Elon" FAB
+ * (talaba e'lonlari: ish, sotuv, xizmat). Biznesmen chegirma e'lonlari bu yerda YO'Q — ular
+ * [BusinessShell] da.
+ */
 @Composable
-fun MainShell(onLoggedOut: () -> Unit) {
+fun StudentShell(onLoggedOut: () -> Unit) {
     val palette = appPalette
     val nav = rememberNavController()
     val backStack by nav.currentBackStackEntryAsState()
-    val current = backStack?.destination?.route ?: MainTab.HOME.route
+    val current = backStack?.destination?.route ?: StudentTab.HOME.route
 
-    // Pastki tab'ga o'tish (BottomBar va Home "Barchasi" havolalari uchun umumiy).
     val selectTab: (String) -> Unit = { route ->
         nav.navigate(route) {
-            popUpTo(MainTab.HOME.route) { saveState = true }
+            popUpTo(StudentTab.HOME.route) { saveState = true }
             launchSingleTop = true
             restoreState = true
         }
     }
 
     Box(Modifier.fillMaxSize().background(palette.bgBrush)) {
-        NavHost(navController = nav, startDestination = MainTab.HOME.route, modifier = Modifier.fillMaxSize()) {
-            composable(MainTab.HOME.route) {
+        NavHost(navController = nav, startDestination = StudentTab.HOME.route, modifier = Modifier.fillMaxSize()) {
+            composable(StudentTab.HOME.route) {
                 HomeScreen(
                     onOpenProfile = { nav.navigate(PROFILE) },
                     onOpenChat = { nav.navigate(CHAT) },
                     onOpenNotifications = { nav.navigate(NOTIFICATIONS) },
                     onOpenClubs = { nav.navigate(CLUBS) },
-                    onOpenDiscounts = { selectTab(MainTab.DISCOUNTS.route) },
-                    onOpenJobs = { selectTab(MainTab.JOBS.route) },
-                    onOpenStudents = { selectTab(MainTab.STUDENTS.route) },
+                    onOpenDiscounts = { selectTab(StudentTab.DISCOUNTS.route) },
+                    onOpenJobs = { selectTab(StudentTab.JOBS.route) },
+                    onOpenStudents = { selectTab(StudentTab.STUDENTS.route) },
                 )
             }
-            composable(MainTab.DISCOUNTS.route) {
-                DiscountsScreen(onMyListings = { nav.navigate(MY_LISTINGS) })
+            composable(StudentTab.DISCOUNTS.route) {
+                // Talaba faqat chegirmalarni ko'radi (e'lon qo'yish — biznesmen shell'ida).
+                DiscountsScreen()
             }
-            composable(MY_LISTINGS) {
-                MyListingsScreen(
-                    onBack = { nav.popBackStack() },
-                    onCreate = { nav.navigate(POST_LISTING) },
-                    onEdit = { listingId -> nav.navigate("$POST_LISTING?listingId=$listingId") },
-                )
-            }
-            composable(
-                route = "$POST_LISTING?listingId={listingId}",
-                arguments = listOf(
-                    navArgument("listingId") { type = NavType.StringType; nullable = true; defaultValue = null },
-                ),
-            ) { entry ->
-                PostListingScreen(
-                    onClose = { nav.popBackStack() },
-                    // Joylangach ro'yxatga qaytamiz — e'lon darrov ko'rinadi.
-                    onPublished = {
-                        nav.navigate(MY_LISTINGS) {
-                            popUpTo(MY_LISTINGS) { inclusive = true }
-                            launchSingleTop = true
-                        }
-                    },
-                    editListingId = entry.arguments?.getString("listingId"),
-                )
-            }
-            composable(MainTab.JOBS.route) { JobsScreen() }
-            composable(MainTab.STUDENTS.route) { StudentsScreen() }
+            composable(StudentTab.JOBS.route) { JobsScreen() }
+            composable(StudentTab.STUDENTS.route) { StudentsScreen() }
             composable(
                 route = "$POST_AD?adId={adId}",
                 arguments = listOf(navArgument("adId") { type = NavType.StringType; nullable = true; defaultValue = null }),
@@ -137,7 +109,8 @@ fun MainShell(onLoggedOut: () -> Unit) {
                     onEditProfile = { nav.navigate(EDIT_PROFILE) },
                     onOpenSettings = { nav.navigate(SETTINGS) },
                     onEditAd = { adId -> nav.navigate("$POST_AD?adId=$adId") },
-                    onOpenMyBusiness = { nav.navigate(MY_LISTINGS) },
+                    // Talabada biznes bo'limi ko'rinmaydi.
+                    showMyBusiness = false,
                 )
             }
             composable(CHAT) { ChatScreen(onBack = { nav.popBackStack() }) }
@@ -182,14 +155,14 @@ private fun BottomBar(
                 .padding(horizontal = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            NavBarItem(MainTab.HOME, current, onSelect, palette, Modifier.weight(1f))
-            NavBarItem(MainTab.DISCOUNTS, current, onSelect, palette, Modifier.weight(1f))
+            NavBarItem(StudentTab.HOME, current, onSelect, palette, Modifier.weight(1f))
+            NavBarItem(StudentTab.DISCOUNTS, current, onSelect, palette, Modifier.weight(1f))
             Spacer(Modifier.weight(1f)) // markaziy FAB uchun joy
-            NavBarItem(MainTab.JOBS, current, onSelect, palette, Modifier.weight(1f))
-            NavBarItem(MainTab.STUDENTS, current, onSelect, palette, Modifier.weight(1f))
+            NavBarItem(StudentTab.JOBS, current, onSelect, palette, Modifier.weight(1f))
+            NavBarItem(StudentTab.STUDENTS, current, onSelect, palette, Modifier.weight(1f))
         }
 
-        // Markaziy "Elon" FAB — ko'tarilgan
+        // Markaziy "Elon" FAB — talaba e'loni (ish/sotuv/xizmat)
         Column(
             Modifier.align(Alignment.TopCenter).offset(y = 6.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -210,7 +183,7 @@ private fun BottomBar(
 
 @Composable
 private fun NavBarItem(
-    tab: MainTab,
+    tab: StudentTab,
     current: String,
     onSelect: (String) -> Unit,
     palette: AppPalette,

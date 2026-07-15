@@ -22,6 +22,8 @@ fun ProfileEntity.toDomain(): UserProfile = UserProfile(
     birthYear = birthYear?.toInt(),
     courseYear = courseYear,
     avatarUrl = avatarUrl,
+    businessName = businessName,
+    businessType = businessType,
 )
 
 // ---------------------------------------------------------------------------
@@ -38,6 +40,8 @@ fun ProfileFirestoreDto.toDomain(): UserProfile = UserProfile(
     birthYear = birthYear,
     courseYear = courseYear,
     avatarUrl = avatarUrl,
+    businessName = businessName,
+    businessType = businessType,
 )
 
 fun UserProfile.toFirestoreDto(): ProfileFirestoreDto = ProfileFirestoreDto(
@@ -50,6 +54,8 @@ fun UserProfile.toFirestoreDto(): ProfileFirestoreDto = ProfileFirestoreDto(
     birthYear = birthYear,
     courseYear = courseYear,
     avatarUrl = avatarUrl,
+    businessName = businessName,
+    businessType = businessType,
 )
 
 // ---------------------------------------------------------------------------

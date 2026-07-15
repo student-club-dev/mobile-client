@@ -246,37 +246,39 @@ fun SignUpScreen(
         )
         Spacer(Modifier.height(9.dp))
 
-        // Universitet emaili — verified badge
-        val verified = state.universityEmail.endsWith(".uz") && state.universityEmail.contains("@")
-        Row(
-            Modifier.fillMaxWidth().height(46.dp).clip(RoundedCornerShape(13.dp))
-                .background(palette.successBg)
-                .border(1.dp, palette.successDeep.copy(alpha = 0.28f), RoundedCornerShape(13.dp))
-                .padding(horizontal = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(9.dp),
-        ) {
-            Icon(AppIcons.ShieldCheck, null, tint = palette.successDeep, modifier = Modifier.size(16.dp))
-            Box(Modifier.weight(1f)) {
-                if (state.universityEmail.isEmpty()) {
-                    Text("aziz@tuit.uz", style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.5f.sp, color = palette.inkFaint))
+        // Universitet emaili — verified badge (faqat talaba uchun; biznesmenда ko'rinmaydi).
+        if (state.role != Role.BUSINESS) {
+            val verified = state.universityEmail.endsWith(".uz") && state.universityEmail.contains("@")
+            Row(
+                Modifier.fillMaxWidth().height(46.dp).clip(RoundedCornerShape(13.dp))
+                    .background(palette.successBg)
+                    .border(1.dp, palette.successDeep.copy(alpha = 0.28f), RoundedCornerShape(13.dp))
+                    .padding(horizontal = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(9.dp),
+            ) {
+                Icon(AppIcons.ShieldCheck, null, tint = palette.successDeep, modifier = Modifier.size(16.dp))
+                Box(Modifier.weight(1f)) {
+                    if (state.universityEmail.isEmpty()) {
+                        Text("aziz@tuit.uz", style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.5f.sp, color = palette.inkFaint))
+                    }
+                    BasicTextField(
+                        state.universityEmail, vm::onUniversityEmailChange, singleLine = true,
+                        textStyle = TextStyle(fontFamily = AppFontFamily, fontSize = 12.5f.sp, fontWeight = FontWeight.SemiBold, color = palette.ink),
+                        cursorBrush = SolidColor(palette.primary),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
                 }
-                BasicTextField(
-                    state.universityEmail, vm::onUniversityEmailChange, singleLine = true,
-                    textStyle = TextStyle(fontFamily = AppFontFamily, fontSize = 12.5f.sp, fontWeight = FontWeight.SemiBold, color = palette.ink),
-                    cursorBrush = SolidColor(palette.primary),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
-            if (verified) {
-                Box(Modifier.clip(RoundedCornerShape(6.dp)).background(palette.successDeep.copy(alpha = 0.14f)).padding(horizontal = 7.dp, vertical = 3.dp)) {
-                    Text("TASDIQLANGAN", style = TextStyle(fontFamily = AppFontFamily, fontSize = 10.sp, fontWeight = FontWeight.ExtraBold, color = palette.successDeep))
+                if (verified) {
+                    Box(Modifier.clip(RoundedCornerShape(6.dp)).background(palette.successDeep.copy(alpha = 0.14f)).padding(horizontal = 7.dp, vertical = 3.dp)) {
+                        Text("TASDIQLANGAN", style = TextStyle(fontFamily = AppFontFamily, fontSize = 10.sp, fontWeight = FontWeight.ExtraBold, color = palette.successDeep))
+                    }
                 }
             }
+            Spacer(Modifier.height(6.dp))
+            HintText("Universitet emaili (ixtiyoriy) — verified talaba nishoni beradi.")
         }
-        Spacer(Modifier.height(6.dp))
-        HintText("Universitet emaili (ixtiyoriy) — verified talaba nishoni beradi.")
 
         Spacer(Modifier.height(12.dp))
         Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(9.dp), modifier = Modifier.clickableNoRipple { vm.toggleTerms() }) {

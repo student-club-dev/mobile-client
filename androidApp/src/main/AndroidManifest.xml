@@ -27,5 +27,19 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Talaba oqimi — alohida Activity -->
+        <activity
+            android:name=".StudentActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
+
+        <!-- Biznesmen oqimi — alohida Activity -->
+        <activity
+            android:name=".BusinessActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
     </application>
 </manifest>

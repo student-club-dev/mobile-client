@@ -18,6 +18,9 @@ data class UserProfile(
     val courseYear: String? = null,    // "1".."4" | "MASTER"
     /** Profil rasmi — `POST /v1/profile/me/avatar` qaytargan ochiq URL. */
     val avatarUrl: String? = null,
+    // Biznes egasi (rol == "BUSINESS") — universitet/kurs o'rniga shu maydonlar to'ldiriladi.
+    val businessName: String? = null,
+    val businessType: String? = null,
 ) {
     /** Ism + familiya (bo'sh bo'lsa `null`) — sarlavhalarda ko'rsatish uchun. */
     val displayName: String?

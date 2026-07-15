@@ -106,6 +106,8 @@ class AuthFlowViewModel(
     fun onLastNameChange(v: String) = _state.update { it.copy(lastName = v) }
     fun onRoleChange(r: Role) = _state.update { it.copy(role = r) }
     fun onUniversityEmailChange(v: String) = _state.update { it.copy(universityEmail = v) }
+    fun onBusinessNameChange(v: String) = _state.update { it.copy(businessName = v, error = null) }
+    fun onBusinessTypeChange(v: String) = _state.update { it.copy(businessType = v) }
     fun toggleTerms() = _state.update { it.copy(termsAccepted = !it.termsAccepted) }
 
     fun onBirthYearChange(y: Int) = _state.update { it.copy(birthYear = y) }
@@ -325,10 +327,12 @@ class AuthFlowViewModel(
         lastName = s.lastName.ifBlank { null },
         phoneNumber = if (s.phoneDigits.isNotBlank()) "+998${s.phoneDigits}" else null,
         role = s.role.name,
-        universityId = s.universityId,
+        universityId = if (s.role == Role.BUSINESS) null else s.universityId,
         universityEmail = s.universityEmail.ifBlank { null },
         birthYear = s.birthYear,
-        courseYear = s.courseYear.name,
+        courseYear = if (s.role == Role.BUSINESS) null else s.courseYear.name,
+        businessName = s.businessName.ifBlank { null },
+        businessType = s.businessType.ifBlank { null },
     )
 
     // ------------------------------------------------------------------

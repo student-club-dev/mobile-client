@@ -12,7 +12,10 @@ CREATE TABLE ProfileEntity (
     birthYear INTEGER,
     courseYear TEXT,
     -- Profil rasmining URL manzili (POST /v1/profile/me/avatar qaytaradi)
-    avatarUrl TEXT
+    avatarUrl TEXT,
+    -- Biznes egasi profili (rol BUSINESS bo'lganda)
+    businessName TEXT,
+    businessType TEXT
 );
 
 selectCurrent:
@@ -20,8 +23,8 @@ SELECT * FROM ProfileEntity LIMIT 1;
 
 upsert:
 INSERT OR REPLACE INTO ProfileEntity(
-    uid, firstName, lastName, phoneNumber, role, universityId, universityEmail, birthYear, courseYear, avatarUrl
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+    uid, firstName, lastName, phoneNumber, role, universityId, universityEmail, birthYear, courseYear, avatarUrl, businessName, businessType
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 clear:
 DELETE FROM ProfileEntity;

@@ -46,6 +46,11 @@ import dev.feature.auth.presentation.screens.EmailVerifyScreen
 import dev.feature.auth.presentation.screens.ProfileScreen
 import dev.feature.auth.presentation.screens.RegisterChoiceScreen
 import dev.feature.auth.presentation.screens.RegisterScreen
+import dev.feature.auth.presentation.screens.RoleChoiceScreen
+import dev.feature.business.BusinessWelcomeScreen
+import dev.feature.business.BusinessProfileScreen
+import dev.feature.business.BusinessShell
+import dev.feature.auth.presentation.main.SettingsScreen
 import dev.feature.auth.presentation.screens.SignUpScreen
 import dev.feature.auth.presentation.screens.SuccessScreen
 import dev.feature.auth.presentation.screens.UniversityPickerScreen
@@ -56,7 +61,11 @@ import org.koin.compose.viewmodel.koinViewModel
 
 private object Route {
     const val ONBOARDING = "onboarding"
+    const val ROLE = "role"
     const val WELCOME = "welcome"
+    // Biznesmen uchun alohida oqim
+    const val BUSINESS_WELCOME = "business_welcome"
+    const val BUSINESS_PROFILE = "business_profile"
     const val PHONE = "phone"
     const val EMAIL = "email"
     const val OTP = "otp"
@@ -76,14 +85,26 @@ private object Route {
  * commonMain'da yashaydi, shu bois Android va iOS'da bir xil ishlaydi.
  */
 @Composable
-fun AuthNavHost(vm: AuthFlowViewModel = koinViewModel()) {
+fun AuthNavHost(
+    flow: AuthUserFlow? = null,
+    onExit: (() -> Unit)? = null,
+    vm: AuthFlowViewModel = koinViewModel(),
+) {
+    // Rol-scoped oqim (Android'dagi StudentActivity/BusinessActivity) — rolni darrov o'rnatamiz,
+    // shunda ro'yxatdan o'tishда to'g'ri rol saqlanadi va rol tanlash ekrani o'tkazib yuboriladi.
+    LaunchedEffect(flow) { if (flow != null) vm.onRoleChange(flow.role) }
+
     // Local keshdagi sessiyani tekshiramiz: kirgan bo'lsa to'g'ridan-to'g'ri HOME.
     val loggedIn by vm.loggedIn.collectAsStateWithLifecycle()
     if (loggedIn == null) {
         BootSplash() // kesh o'qilmagунча qisqa splash
         return
     }
-    val startDestination = if (loggedIn == true) Route.HOME else Route.ONBOARDING
+    val startDestination = when {
+        loggedIn == true -> Route.HOME
+        flow == AuthUserFlow.BUSINESS -> Route.BUSINESS_WELCOME
+        else -> Route.ONBOARDING
+    }
 
     val nav = rememberNavController()
     val state by vm.state.collectAsStateWithLifecycle()
@@ -100,12 +121,25 @@ fun AuthNavHost(vm: AuthFlowViewModel = koinViewModel()) {
                     popUpTo(Route.OTP) { inclusive = true }
                 }
                 AuthEvent.EmailVerificationSent -> nav.navigate(Route.VERIFY_EMAIL)
-                // Hisob yaratildi — orqaga qaytib ro'yxat formasini qayta yubormasin.
-                AuthEvent.Registered -> nav.navigate(Route.SUCCESS) {
-                    popUpTo(Route.WELCOME)
-                }
-                AuthEvent.ProfileSaved,
-                is AuthEvent.Authenticated -> nav.navigate(Route.HOME) {
+                // Hisob yaratildi — biznesmen alohida biznes profilга, talaba esa Success/Profile'ga.
+                AuthEvent.Registered ->
+                    if (vm.state.value.role == Role.BUSINESS) {
+                        nav.navigate(Route.BUSINESS_PROFILE) { popUpTo(Route.BUSINESS_WELCOME) }
+                    } else {
+                        nav.navigate(Route.SUCCESS) { popUpTo(Route.WELCOME) }
+                    }
+                // Google/ijtimoiy kirish biznes profil rolini saqlamaydi — biznesmen bo'lsa avval
+                // biznes profilini to'ldiradi (rol=BUSINESS + biznes nomi saqlanadi), keyin HOME.
+                is AuthEvent.Authenticated ->
+                    if (vm.state.value.role == Role.BUSINESS && vm.state.value.businessName.isBlank()) {
+                        nav.navigate(Route.BUSINESS_PROFILE)
+                    } else {
+                        nav.navigate(Route.HOME) {
+                            popUpTo(Route.ONBOARDING) { inclusive = true }
+                            launchSingleTop = true
+                        }
+                    }
+                AuthEvent.ProfileSaved -> nav.navigate(Route.HOME) {
                     popUpTo(Route.ONBOARDING) { inclusive = true }
                     launchSingleTop = true
                 }
@@ -115,9 +149,46 @@ fun AuthNavHost(vm: AuthFlowViewModel = koinViewModel()) {
 
     NavHost(navController = nav, startDestination = startDestination) {
         composable(Route.ONBOARDING) {
+            // Rol-scoped oqimda (Activity) rol allaqachon tanlangan — to'g'ridan-to'g'ri login'ga.
+            val afterOnboarding = { if (flow == null) nav.navigate(Route.ROLE) else nav.navigate(Route.WELCOME) }
             OnboardingScreen(
-                onNext = { nav.navigate(Route.WELCOME) },
-                onSkip = { nav.navigate(Route.WELCOME) },
+                onNext = afterOnboarding,
+                onSkip = afterOnboarding,
+            )
+        }
+        composable(Route.ROLE) {
+            // Login'dan oldin rol tanlash — biznesmen va talaba ALOHIDA oqimga ketadi.
+            RoleChoiceScreen(
+                onPick = { role ->
+                    vm.onRoleChange(role)
+                    if (role == Role.BUSINESS) nav.navigate(Route.BUSINESS_WELCOME)
+                    else nav.navigate(Route.WELCOME)
+                },
+                onBack = { nav.popBackStack() },
+            )
+        }
+        composable(Route.BUSINESS_WELCOME) {
+            BusinessWelcomeScreen(
+                phone = state.phone,
+                onPhoneChange = vm::onPhoneChange,
+                phoneValid = state.phoneValid,
+                isLoading = state.isLoading,
+                onBack = { nav.popBackStack() },
+                onGetCode = { vm.sendOtp(socialAuth) },
+                onGoogle = { vm.signInWithGoogle(socialAuth) },
+                onEmail = { nav.navigate(Route.EMAIL) },
+            )
+        }
+        composable(Route.BUSINESS_PROFILE) {
+            BusinessProfileScreen(
+                businessName = state.businessName,
+                businessType = state.businessType,
+                error = state.error,
+                isLoading = state.isLoading,
+                onNameChange = vm::onBusinessNameChange,
+                onTypeChange = vm::onBusinessTypeChange,
+                onBack = { nav.popBackStack() },
+                onStart = { vm.completeProfile() },
             )
         }
         composable(Route.WELCOME) {
@@ -241,14 +312,25 @@ fun AuthNavHost(vm: AuthFlowViewModel = koinViewModel()) {
             )
         }
         composable(Route.HOME) {
-            dev.feature.auth.presentation.main.MainShell(
-                onLoggedOut = {
-                    nav.navigate(Route.WELCOME) {
-                        popUpTo(Route.HOME) { inclusive = true }
-                        launchSingleTop = true
-                    }
-                },
-            )
+            // Chiqish: Activity oqimida — ildiz router'ga qaytamiz (onExit); aks holda (iOS)
+            // rol tanlashga qaytamiz.
+            val loggedOut: () -> Unit = onExit ?: {
+                nav.navigate(Route.ROLE) {
+                    popUpTo(Route.HOME) { inclusive = true }
+                    launchSingleTop = true
+                }
+            }
+            when (flow) {
+                AuthUserFlow.BUSINESS -> BusinessShell(
+                    onLoggedOut = loggedOut,
+                    settingsContent = { onBack ->
+                        SettingsScreen(onBack = onBack, onEditProfile = {}, onLoggedOut = loggedOut)
+                    },
+                )
+                AuthUserFlow.STUDENT -> dev.feature.auth.presentation.main.StudentShell(onLoggedOut = loggedOut)
+                // iOS / bo'linmagan rejim — rolga qarab RootShell hal qiladi.
+                null -> dev.feature.auth.presentation.main.RootShell(onLoggedOut = loggedOut)
+            }
         }
     }
 }

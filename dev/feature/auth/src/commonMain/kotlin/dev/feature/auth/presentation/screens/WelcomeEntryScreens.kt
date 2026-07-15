@@ -54,7 +54,7 @@ import dev.core.designsystem.theme.appPalette
 
 /** Telefon maydonining "🇺🇿 +998 |" prefiksi. */
 @Composable
-internal fun PhonePrefix(palette: AppPalette) {
+fun PhonePrefix(palette: AppPalette) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(
             "🇺🇿 +998",
@@ -482,5 +482,5 @@ internal fun CheckBoxSmall(checked: Boolean, palette: AppPalette, size: Int = 20
 }
 
 /** Mayda interaktiv elementlar uchun bosish yordamchisi. */
-internal fun Modifier.clickableNoRipple(onClick: () -> Unit): Modifier =
+fun Modifier.clickableNoRipple(onClick: () -> Unit): Modifier =
     this.clickable(onClick = onClick)

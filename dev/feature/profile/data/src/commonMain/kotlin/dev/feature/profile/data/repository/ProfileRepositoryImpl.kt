@@ -111,6 +111,8 @@ class ProfileRepositoryImpl(
                 birthYear = p.birthYear?.toLong(),
                 courseYear = p.courseYear,
                 avatarUrl = p.avatarUrl,
+                businessName = p.businessName,
+                businessType = p.businessType,
             )
         }
     }

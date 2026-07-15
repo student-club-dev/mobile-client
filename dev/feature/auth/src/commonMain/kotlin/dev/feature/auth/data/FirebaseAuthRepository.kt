@@ -9,6 +9,7 @@ import dev.core.domain.model.ExternalAuthUser
 import dev.core.domain.model.User
 import dev.core.domain.model.UserRole
 import dev.core.domain.repository.AuthRepository
+import dev.core.domain.repository.SettingsRepository
 import dev.gitlive.firebase.Firebase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -102,6 +103,8 @@ class FirebaseAuthRepository(
         // Sessiya tugadi — local kesh (sessiya + profil) to'liq tozalanadi.
         userQueries.clear()
         profileQueries.clear()
+        // Tanlangan rol ham tozalanadi — keyingi kirishда rol tanlash chiqadi.
+        database.appSettingQueries.deleteByKey(SettingsRepository.KEY_SELECTED_ROLE)
     }
 
     override suspend fun currentUser(): User? {

@@ -55,11 +55,14 @@ data class AuthFlowState(
     val role: Role = Role.STUDENT,
     val universityEmail: String = "",
     val termsAccepted: Boolean = false,
-    // Profil
+    // Profil (talaba)
     val universityId: String? = null,
     val birthYear: Int = 2004,
     val courseYear: CourseYear = CourseYear.TWO,
     val universityQuery: String = "",
+    // Profil (biznes egasi) — rol BUSINESS bo'lganda
+    val businessName: String = "",
+    val businessType: String = "",
     // Umumiy
     val isLoading: Boolean = false,
     val error: String? = null,

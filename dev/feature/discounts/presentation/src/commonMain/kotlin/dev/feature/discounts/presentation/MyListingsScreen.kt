@@ -48,9 +48,11 @@ import org.koin.compose.viewmodel.koinViewModel
 /** Biznes egasining chegirma e'lonlari — status, to'xtatish, tahrirlash, o'chirish. */
 @Composable
 fun MyListingsScreen(
-    onBack: () -> Unit,
     onCreate: () -> Unit,
     onEdit: (String) -> Unit,
+    onBack: (() -> Unit)? = null,
+    // Biznes shell'ida header "+" yashiriladi — u yerda o'ng-past burchakda aylana FAB bor.
+    showHeaderCreate: Boolean = true,
     vm: MyListingsViewModel = koinViewModel(),
 ) {
     val palette = appPalette
@@ -62,7 +64,7 @@ fun MyListingsScreen(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(11.dp),
         ) {
-            IconSquareButton(onBack, AppIcons.ArrowLeft, palette)
+            if (onBack != null) IconSquareButton(onBack, AppIcons.ArrowLeft, palette)
             Column(Modifier.weight(1f)) {
                 Text(
                     "Mening chegirmalarim",
@@ -73,7 +75,7 @@ fun MyListingsScreen(
                     style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.5f.sp, color = palette.inkFaint),
                 )
             }
-            IconSquareButton(onCreate, AppIcons.Plus, palette)
+            if (showHeaderCreate) IconSquareButton(onCreate, AppIcons.Plus, palette)
         }
 
         Spacer(Modifier.height(14.dp))

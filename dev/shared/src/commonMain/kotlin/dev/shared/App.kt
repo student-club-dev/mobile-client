@@ -20,13 +20,42 @@ import dev.core.designsystem.theme.AppTheme
 import dev.core.domain.model.ThemeMode
 import dev.core.domain.repository.SettingsRepository
 import dev.feature.auth.presentation.flow.AuthNavHost
+import dev.feature.auth.presentation.flow.AuthUserFlow
+import dev.feature.auth.presentation.flow.RoleLauncher
 import dev.core.designsystem.theme.appPalette
 import io.ktor.client.HttpClient
 import org.koin.compose.koinInject
 
-/** Ilovaning ildiz Composable'i — Android va iOS bir xil ishlatadi. */
+/**
+ * Ildiz router (Android MainActivity) — sessiya/rolga qarab StudentActivity yoki
+ * BusinessActivity ochadi, aks holda rol tanlash ekranini ko'rsatadi.
+ */
+@Composable
+fun RoleLauncherApp(onStudent: () -> Unit, onBusiness: () -> Unit) {
+    AppScaffold { RoleLauncher(onStudent = onStudent, onBusiness = onBusiness) }
+}
+
+/** Talaba Activity kirish nuqtasi — talaba login oqimi + StudentShell. */
+@Composable
+fun StudentApp(onExit: () -> Unit) {
+    AppScaffold { AuthNavHost(flow = AuthUserFlow.STUDENT, onExit = onExit) }
+}
+
+/** Biznesmen Activity kirish nuqtasi — biznes login oqimi + BusinessShell. */
+@Composable
+fun BusinessApp(onExit: () -> Unit) {
+    AppScaffold { AuthNavHost(flow = AuthUserFlow.BUSINESS, onExit = onExit) }
+}
+
+/** Ilovaning ildiz Composable'i — iOS shuni ishlatadi (rol tanlash ichkarida). */
 @Composable
 fun App() {
+    AppScaffold { AuthNavHost() }
+}
+
+/** Umumiy ildiz sozlamasi (rasm yuklovchi, seed, mavzu, inset) — hamma kirish nuqtalari ishlatadi. */
+@Composable
+private fun AppScaffold(content: @Composable () -> Unit) {
     // Tarmoqdan rasm yuklash (avatar) — Coil ilovaning o'z Ktor klientidan foydalanadi,
     // shunda so'rovlarga Firebase ID token ham qo'shiladi (himoyalangan rasm URL'lari uchun).
     val httpClient = koinInject<HttpClient>()
@@ -54,7 +83,7 @@ fun App() {
         // ortida qolmasligi uchun global inset. Fon gradienti panel ostida ham to'liq chiziladi.
         Box(Modifier.fillMaxSize().background(appPalette.bgBrush)) {
             Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.navigationBars)) {
-                AuthNavHost()
+                content()
             }
         }
     }

@@ -13,7 +13,9 @@ import dev.feature.auth.presentation.main.DiscountsViewModel
 import dev.feature.auth.presentation.main.HomeViewModel
 import dev.feature.auth.presentation.main.JobsViewModel
 import dev.feature.auth.presentation.main.NotificationsViewModel
+import dev.feature.auth.presentation.flow.RoleLauncherViewModel
 import dev.feature.auth.presentation.main.PostAdViewModel
+import dev.feature.auth.presentation.main.RootShellViewModel
 import dev.feature.auth.presentation.main.SettingsViewModel
 import dev.feature.auth.presentation.main.StudentsViewModel
 import org.koin.core.module.dsl.viewModel
@@ -59,6 +61,8 @@ val authFeatureModule = module {
             useEmailCode = USE_EMAIL_CODE,
         )
     }
+    viewModelOf(::RootShellViewModel)
+    viewModelOf(::RoleLauncherViewModel)
     viewModelOf(::HomeViewModel)
     viewModelOf(::JobsViewModel)
     viewModelOf(::StudentsViewModel)
