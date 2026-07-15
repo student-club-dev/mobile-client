@@ -64,6 +64,12 @@ object ListingCatalog {
     /** "Hammasiga" — chegirma butun assortimentga amal qiladi (eng ko'p ishlatiladigan holat). */
     const val ALL_KEY = "ALL"
 
+    /** `attributes` ichidagi belgi: e'lon ODDIY (chegirmasiz). Validatsiya chegirmani o'tkazadi. */
+    const val REGULAR_KEY = "_regular"
+
+    /** `attributes` ichidagi aloqa telefoni. */
+    const val PHONE_KEY = "_phone"
+
     /** Turga qarab "hammasiga" chipining yozuvi. */
     fun allLabel(type: BusinessType): String = when (type) {
         BusinessType.CAFE_RESTAURANT -> "Butun menyuga"
@@ -81,6 +87,49 @@ object ListingCatalog {
         categories(type).firstOrNull { it.key == key }
 
     fun attributes(type: BusinessType): List<AttributeSpec> = attributeMap.getValue(type)
+
+    /**
+     * KATEGORIYAGA xos maydonlar — masalan Game Club'da "PlayStation" tanlansa model/joystik,
+     * "Billiard" tanlansa stol turi so'raladi. Hozircha Game Club uchun to'liq; boshqa turlar
+     * bo'sh (ular kategoriya-xos maydonsiz).
+     */
+    fun categoryAttributes(type: BusinessType, categoryKey: String): List<AttributeSpec> =
+        if (type == BusinessType.GAME_CLUB) gameClubCategoryAttributes[categoryKey].orEmpty() else emptyList()
+
+    private val gameClubCategoryAttributes: Map<String, List<AttributeSpec>> = mapOf(
+        "PLAYSTATION" to listOf(
+            AttributeSpec("model", "Model", AttributeKind.SELECT, options = listOf("PS5", "PS4 Pro", "PS4", "PS3"), required = true),
+            AttributeSpec("joysticks", "Joystiklar", AttributeKind.SELECT, options = listOf("2 ta", "4 ta")),
+            AttributeSpec("sessionMinutes", "Sessiya davomiyligi", AttributeKind.NUMBER, hint = "60", suffix = "daqiqa"),
+            AttributeSpec("games", "Mashhur o'yinlar", AttributeKind.TAGS, hint = "FIFA 25, Mortal Kombat, UFC"),
+        ),
+        "TABLE_TENNIS" to listOf(
+            AttributeSpec("tables", "Stollar soni", AttributeKind.NUMBER, hint = "2", suffix = "ta"),
+            AttributeSpec("sessionMinutes", "Sessiya davomiyligi", AttributeKind.NUMBER, hint = "60", suffix = "daqiqa"),
+            AttributeSpec("racketsIncluded", "Raketka va koptok beriladi", AttributeKind.BOOLEAN),
+        ),
+        "TENNIS" to listOf(
+            AttributeSpec("courtType", "Kort turi", AttributeKind.SELECT, options = listOf("Ochiq", "Yopiq"), required = true),
+            AttributeSpec("surface", "Qoplama", AttributeKind.SELECT, options = listOf("Gruntli", "Sun'iy o't", "Qattiq (hard)")),
+            AttributeSpec("sessionMinutes", "Sessiya davomiyligi", AttributeKind.NUMBER, hint = "60", suffix = "daqiqa"),
+            AttributeSpec("gearIncluded", "Raketka beriladi", AttributeKind.BOOLEAN),
+        ),
+        "PC_GAMING" to listOf(
+            AttributeSpec("pcTier", "Kompyuter quvvati", AttributeKind.SELECT, options = listOf("Standart", "Gaming", "Pro / e-sport"), required = true),
+            AttributeSpec("sessionMinutes", "Sessiya davomiyligi", AttributeKind.NUMBER, hint = "60", suffix = "daqiqa"),
+            AttributeSpec("games", "O'yinlar", AttributeKind.TAGS, hint = "CS2, Dota 2, Valorant"),
+        ),
+        "BILLIARDS" to listOf(
+            AttributeSpec("tableType", "Stol turi", AttributeKind.SELECT, options = listOf("Pul (Amerika)", "Rus", "Snuker"), required = true),
+            AttributeSpec("tables", "Stollar soni", AttributeKind.NUMBER, hint = "3", suffix = "ta"),
+            AttributeSpec("sessionMinutes", "Sessiya davomiyligi", AttributeKind.NUMBER, hint = "60", suffix = "daqiqa"),
+        ),
+        "POLYA" to listOf(
+            AttributeSpec("fieldType", "Maydon turi", AttributeKind.SELECT, options = listOf("Mini-futbol", "Basketbol", "Voleybol", "Boshqa")),
+            AttributeSpec("fields", "Maydonlar soni", AttributeKind.NUMBER, hint = "2", suffix = "ta"),
+            AttributeSpec("sessionMinutes", "Sessiya davomiyligi", AttributeKind.NUMBER, hint = "60", suffix = "daqiqa"),
+        ),
+    )
 
     /** Turga mos narx birliklari (birinchisi — odatiy). */
     fun priceUnits(type: BusinessType): List<PriceUnit> = when (type) {
@@ -112,14 +161,12 @@ object ListingCatalog {
     private val categoryMap: Map<BusinessType, List<ListingCategory>> = mapOf(
         BusinessType.GAME_CLUB to cats(
             BusinessType.GAME_CLUB,
-            "PS5" to "PlayStation 5",
-            "PS4" to "PlayStation 4",
-            "XBOX" to "Xbox",
-            "PC_GAMING" to "Kiberklub (PC)",
-            "VR" to "VR",
-            "BILLIARDS" to "Bilyard",
-            "BOARD_GAMES" to "Stol o'yinlari",
-            "TOURNAMENT" to "Turnir",
+            "PLAYSTATION" to "PlayStation",
+            "TABLE_TENNIS" to "Stol tennis",
+            "TENNIS" to "Katta tennis",
+            "PC_GAMING" to "Kompyuter o'yinlari",
+            "BILLIARDS" to "Billiard",
+            "POLYA" to "Polya",
         ),
         BusinessType.GROCERY to cats(
             BusinessType.GROCERY,

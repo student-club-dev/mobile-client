@@ -50,6 +50,10 @@ data class PostListingUiState(
     val businessName: String = "",
     val categoryKey: String = "",
     val customCategoryName: String = "",
+    /** Kategoriyaga xos maydonlar qiymatlari (ListingCatalog.categoryAttributes kalitlari). */
+    val attributeValues: Map<String, String> = emptyMap(),
+    /** `true` — chegirma e'loni (chegirma maydonlari), `false` — oddiy e'lon (faqat narx). */
+    val isDiscount: Boolean = true,
 
     val title: String = "",
     val description: String = "",
@@ -59,12 +63,15 @@ data class PostListingUiState(
     val priceUnit: PriceUnit = PriceUnit.PER_ITEM,
     val originalPrice: String = "",
 
-    val discountType: DiscountType = DiscountType.PERCENT,
+    // Chegirma endi faqat "hozirgi narx" ko'rinishida — foiz/boshqa turlar yo'q.
+    val discountType: DiscountType = DiscountType.SPECIAL_PRICE,
     val discountValue: String = "",
     val conditions: String = "",
 
     val redemptionMethod: RedemptionMethod = RedemptionMethod.STUDENT_ID,
     val promoCode: String = "",
+    /** Aloqa telefoni — soddalashtirilgan formada so'raladi. */
+    val contactPhone: String = "",
 
     /** Filiallar — har biri xaritadan tanlangan (koordinatasi bor). */
     val branches: List<ListingBranch> = emptyList(),
@@ -132,7 +139,19 @@ class PostListingViewModel(
 
     fun backToTypes() = _state.update { it.copy(step = PostListingStep.TYPE) }
 
-    fun onCategory(key: String) = _state.update { it.copy(categoryKey = key) }
+    // Kategoriya o'zgarsa — kategoriyaга xos maydonlar boshqacha, shuning uchun tozalanadi.
+    fun onCategory(key: String) = _state.update { it.copy(categoryKey = key, attributeValues = emptyMap()) }
+
+    /** Kategoriyaga xos maydon qiymatini yozadi (bo'sh bo'lsa o'chiradi). */
+    fun onAttribute(key: String, value: String) = _state.update {
+        it.copy(attributeValues = if (value.isBlank()) it.attributeValues - key else it.attributeValues + (key to value))
+    }
+
+    /** E'lon rejimi: chegirma yoki oddiy. */
+    fun onListingMode(discount: Boolean) = _state.update { it.copy(isDiscount = discount) }
+
+    /** Aloqa telefoni. */
+    fun onContactPhone(v: String) = _state.update { it.copy(contactPhone = v) }
     fun onCustomCategory(v: String) = _state.update { it.copy(customCategoryName = v) }
 
     // -----------------------------------------------------------------------
@@ -338,6 +357,10 @@ class PostListingViewModel(
             businessName = s.businessName.trim(),
             categoryKey = s.categoryKey,
             customCategoryName = s.customCategoryName.trim().ifBlank { null },
+            // Oddiy e'lon belgisi + aloqa telefoni ham attributes ichida saqlanadi (migratsiyasiz).
+            attributes = s.attributeValues +
+                (if (!s.isDiscount) mapOf(ListingCatalog.REGULAR_KEY to "1") else emptyMap()) +
+                (if (s.contactPhone.isNotBlank()) mapOf(ListingCatalog.PHONE_KEY to s.contactPhone.trim()) else emptyMap()),
             title = s.title.trim(),
             description = s.description.trim().ifBlank { null },
             images = s.images,
@@ -367,6 +390,9 @@ class PostListingViewModel(
         businessName = businessName,
         categoryKey = categoryKey,
         customCategoryName = customCategoryName.orEmpty(),
+        attributeValues = attributes - ListingCatalog.REGULAR_KEY - ListingCatalog.PHONE_KEY,
+        isDiscount = attributes[ListingCatalog.REGULAR_KEY] != "1",
+        contactPhone = attributes[ListingCatalog.PHONE_KEY].orEmpty(),
         title = title,
         description = description.orEmpty(),
         images = images,
@@ -394,4 +420,8 @@ private fun String.digits(): String = filter { it.isDigit() }
 /** Tanlangan biznes turining kategoriyalari. */
 fun PostListingUiState.categories() =
     businessType?.let { ListingCatalog.categories(it) }.orEmpty()
+
+/** Tanlangan KATEGORIYAга xos maydonlar (masalan Game Club > PlayStation). */
+fun PostListingUiState.categoryAttributes() =
+    businessType?.let { ListingCatalog.categoryAttributes(it, categoryKey) }.orEmpty()
 

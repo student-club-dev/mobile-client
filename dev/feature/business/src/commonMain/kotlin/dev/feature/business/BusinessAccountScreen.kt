@@ -45,6 +45,7 @@ import org.koin.compose.viewmodel.koinViewModel
 @Composable
 fun BusinessAccountScreen(
     onBack: () -> Unit,
+    onEdit: () -> Unit,
     onOpenListings: () -> Unit,
     onOpenSettings: () -> Unit,
     onLoggedOut: () -> Unit,
@@ -55,7 +56,8 @@ fun BusinessAccountScreen(
 
     val businessName = state.profile?.businessName?.takeIf { it.isNotBlank() } ?: state.name
     val businessType = state.profile?.businessType?.takeIf { it.isNotBlank() } ?: "Biznes"
-    val phone = state.contact.takeIf { it.isNotBlank() } ?: state.profile?.phoneNumber
+    val phone = state.profile?.phoneNumber?.takeIf { it.isNotBlank() } ?: state.contact.takeIf { it.isNotBlank() }
+    val email = state.profile?.email?.takeIf { it.isNotBlank() }
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         // Gradient sarlavha
@@ -77,8 +79,17 @@ fun BusinessAccountScreen(
                 }
                 Text(
                     "Biznes profili",
+                    modifier = Modifier.weight(1f),
                     style = TextStyle(fontFamily = AppFontFamily, fontSize = 20.sp, fontWeight = FontWeight.Black, color = Color.White),
                 )
+                // Tahrirlash
+                Box(
+                    Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(Color.White.copy(alpha = 0.18f))
+                        .clickable(onClick = onEdit),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(AppIcons.Pencil, "Tahrirlash", tint = Color.White, modifier = Modifier.size(17.dp))
+                }
             }
         }
 
@@ -138,6 +149,7 @@ fun BusinessAccountScreen(
             ) {
                 InfoRow(AppIcons.Store, "Biznes turi", businessType, palette)
                 if (phone != null) InfoRow(AppIcons.Phone, "Telefon", phone, palette)
+                if (email != null) InfoRow(AppIcons.Mail, "Email", email, palette)
                 InfoRow(AppIcons.Clock, "Ish vaqti", "Belgilanmagan", palette)
             }
 

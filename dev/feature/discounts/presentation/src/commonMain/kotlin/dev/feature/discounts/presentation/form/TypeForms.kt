@@ -106,10 +106,15 @@ private fun ListingFormScaffold(
     Column(Modifier.fillMaxSize()) {
         Column(
             Modifier.weight(1f).verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp).padding(top = 54.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+                .padding(top = 54.dp),
+            // Flat dizayn — bo'limlar orasi kengroq; yon padding har bo'lim ichida.
+            verticalArrangement = Arrangement.spacedBy(18.dp),
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(11.dp)) {
+            Row(
+                Modifier.padding(horizontal = 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(11.dp),
+            ) {
                 IconSquareButton(vm::backToTypes, AppIcons.ArrowLeft, palette)
                 Column {
                     Text(
@@ -125,17 +130,27 @@ private fun ListingFormScaffold(
                 }
             }
 
-            BusinessAndScopeSection(state, copy, vm)
-            ImagesSection(state, copy, vm, onAdd = imagePicker::pick)
+            // SODDALASHTIRILGAN forma: turi + nomi + rasm + narx + tel + joylashuv.
+            // E'lon turi (Chegirma / Oddiy).
+            ListingModeSection(state, vm)
+            // Bo'lim (kategoriya) — horizontal scroll.
+            CategorySection(state, copy, vm)
+            // Nomi + qo'shimcha ma'lumot.
             AboutSection(state, copy, vm)
+            // Rasm.
+            ImagesSection(state, copy, vm, onAdd = imagePicker::pick)
+            // Narx (chegirmada Oldingi + Hozirgi).
             PriceAndDiscountSection(state, copy, vm)
-            RedemptionSection(state, vm)
-            ValiditySection(state, vm)
+            // Telefon raqami.
+            ContactSection(state, vm)
+            // Joylashuv (filiallar / xarita).
             BranchesSection(state, palette, vm)
 
             val message = state.message
             if (message != null) {
-                MessageBar(message, palette, onDismiss = vm::consumeMessage)
+                Box(Modifier.padding(horizontal = 16.dp)) {
+                    MessageBar(message, palette, onDismiss = vm::consumeMessage)
+                }
             }
 
             Spacer(Modifier.height(4.dp))

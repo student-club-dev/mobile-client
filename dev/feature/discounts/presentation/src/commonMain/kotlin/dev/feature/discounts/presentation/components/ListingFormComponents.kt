@@ -46,7 +46,14 @@ import dev.core.designsystem.theme.appPalette
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 
-/** Forma bo'limi — sarlavha + ixtiyoriy izoh + tarkib. */
+/** Bo'lim yon (horizontal) padding'i — flat dizaynда sarlavha/maydonlar shu qadar ichkariда. */
+val SectionHPad = 16.dp
+
+/**
+ * Forma bo'limi — FLAT (kartasiz): faqat sarlavha + izoh + tarkib. Kartachalar yo'q, hamma narsa
+ * fonда to'g'ridan-to'g'ri. Yon padding shu yerda beriladi (horizontal scroll bo'limlari esa
+ * o'zi edge-to-edge chiqadi).
+ */
 @Composable
 fun FormSection(
     title: String,
@@ -57,25 +64,10 @@ fun FormSection(
     content: @Composable () -> Unit,
 ) {
     Column(
-        modifier.fillMaxWidth()
-            .clip(RoundedCornerShape(18.dp))
-            .background(palette.glass)
-            .border(1.dp, if (error != null) ErrorColor else palette.border, RoundedCornerShape(18.dp))
-            .padding(14.dp),
+        modifier.fillMaxWidth().padding(horizontal = SectionHPad),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(
-                title,
-                style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.5f.sp, fontWeight = FontWeight.ExtraBold, color = palette.ink),
-            )
-            if (subtitle != null) {
-                Text(
-                    subtitle,
-                    style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.sp, color = palette.inkFaint),
-                )
-            }
-        }
+        SectionHeader(title, subtitle, palette)
         content()
         if (error != null) {
             Text(
@@ -86,10 +78,30 @@ fun FormSection(
     }
 }
 
+/** Bo'lim sarlavhasi (flat). Horizontal-scroll bo'limlarда alohida ishlatiladi. */
+@Composable
+fun SectionHeader(title: String, subtitle: String?, palette: AppPalette = appPalette) {
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(
+            title,
+            style = TextStyle(fontFamily = AppFontFamily, fontSize = 15.sp, fontWeight = FontWeight.Black, color = palette.ink),
+        )
+        if (subtitle != null) {
+            Text(
+                subtitle,
+                style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.5f.sp, color = palette.inkFaint),
+            )
+        }
+    }
+}
+
 /** Xato matni va chegarasining rangi (palitrada xato rangi yo'q). */
 val ErrorColor = Color(0xFFEF4444)
 
-/** Tanlanadigan chip (kategoriya, chegirma turi, narx birligi...). */
+/**
+ * Tanlanadigan chip — iym-native uikit2 uslubi: 36dp balandlik, yumshoq squircle-simon shakl,
+ * tanlanганда SOLID brand fon (gradient emas), tanlanmaganда nozik chegara.
+ */
 @Composable
 fun SelectChip(
     text: String,
@@ -97,20 +109,27 @@ fun SelectChip(
     onClick: () -> Unit,
     palette: AppPalette = appPalette,
 ) {
-    Box(
+    val shape = RoundedCornerShape(14.dp)
+    Row(
         Modifier
-            .clip(RoundedCornerShape(11.dp))
+            .height(36.dp)
+            .clip(shape)
             .background(if (selected) palette.primary else palette.fieldBg)
-            .border(1.dp, if (selected) palette.primary else palette.border, RoundedCornerShape(11.dp))
+            .then(if (selected) Modifier else Modifier.border(1.dp, palette.border, shape))
             .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 8.dp),
+            .padding(horizontal = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
+        if (selected) {
+            Icon(AppIcons.Check, null, tint = palette.onPrimary, modifier = Modifier.size(14.dp))
+        }
         Text(
             text,
             style = TextStyle(
                 fontFamily = AppFontFamily,
-                fontSize = 12.sp,
-                fontWeight = if (selected) FontWeight.ExtraBold else FontWeight.Bold,
+                fontSize = 13.sp,
+                fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold,
                 color = if (selected) palette.onPrimary else palette.inkMuted,
             ),
         )

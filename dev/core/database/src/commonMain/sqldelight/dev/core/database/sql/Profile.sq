@@ -15,7 +15,8 @@ CREATE TABLE ProfileEntity (
     avatarUrl TEXT,
     -- Biznes egasi profili (rol BUSINESS bo'lganda)
     businessName TEXT,
-    businessType TEXT
+    businessType TEXT,
+    email TEXT
 );
 
 selectCurrent:
@@ -23,8 +24,8 @@ SELECT * FROM ProfileEntity LIMIT 1;
 
 upsert:
 INSERT OR REPLACE INTO ProfileEntity(
-    uid, firstName, lastName, phoneNumber, role, universityId, universityEmail, birthYear, courseYear, avatarUrl, businessName, businessType
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+    uid, firstName, lastName, phoneNumber, role, universityId, universityEmail, birthYear, courseYear, avatarUrl, businessName, businessType, email
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 clear:
 DELETE FROM ProfileEntity;

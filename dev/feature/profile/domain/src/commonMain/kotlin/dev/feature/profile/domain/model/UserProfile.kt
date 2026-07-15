@@ -21,6 +21,8 @@ data class UserProfile(
     // Biznes egasi (rol == "BUSINESS") — universitet/kurs o'rniga shu maydonlar to'ldiriladi.
     val businessName: String? = null,
     val businessType: String? = null,
+    /** Aloqa emaili (gmail) — profilда tahrirlanadi. */
+    val email: String? = null,
 ) {
     /** Ism + familiya (bo'sh bo'lsa `null`) — sarlavhalarda ko'rsatish uchun. */
     val displayName: String?

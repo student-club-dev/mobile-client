@@ -33,8 +33,8 @@ import dev.feature.discounts.presentation.PostListingScreen
 
 private const val LISTINGS = "listings"
 private const val POST_LISTING = "post_listing"
-private const val REDEMPTION = "redemption"
 private const val PROFILE = "business_profile"
+private const val BUSINESS_EDIT = "business_edit"
 private const val SETTINGS = "settings"
 
 /**
@@ -80,14 +80,17 @@ fun BusinessShell(
                     editListingId = entry.arguments?.getString("listingId"),
                 )
             }
-            composable(REDEMPTION) { RedemptionScreen(onBack = { nav.popBackStack() }) }
             composable(PROFILE) {
                 BusinessAccountScreen(
                     onBack = { nav.popBackStack() },
+                    onEdit = { nav.navigate(BUSINESS_EDIT) },
                     onOpenListings = { nav.popBackStack() },
                     onOpenSettings = { nav.navigate(SETTINGS) },
                     onLoggedOut = onLoggedOut,
                 )
+            }
+            composable(BUSINESS_EDIT) {
+                BusinessEditScreen(onBack = { nav.popBackStack() })
             }
             composable(SETTINGS) {
                 settingsContent { nav.popBackStack() }
@@ -96,12 +99,8 @@ fun BusinessShell(
 
         // Asosiy ekran (e'lonlar) ustidagi harakatlar — boshqa ekranlarда o'z back tugmasi bor.
         if (current == LISTINGS) {
-            // O'ng-yuqori: Skaner + Profil
-            Row(
-                Modifier.align(Alignment.TopEnd).padding(top = 54.dp, end = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                CircleAction(AppIcons.ScanFace, "Skaner", palette) { nav.navigate(REDEMPTION) }
+            // O'ng-yuqori: Profil
+            Box(Modifier.align(Alignment.TopEnd).padding(top = 54.dp, end = 16.dp)) {
                 CircleAction(AppIcons.Store, "Profil", palette) { nav.navigate(PROFILE) }
             }
 

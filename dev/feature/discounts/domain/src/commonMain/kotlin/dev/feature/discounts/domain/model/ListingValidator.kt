@@ -36,9 +36,7 @@ object ListingValidator {
 
     /** Bo'sh ro'yxat — e'lon publish qilishga tayyor. */
     fun validate(listing: Listing): List<ListingError> = buildList {
-        if (listing.businessName.isBlank()) {
-            add(ListingError(ListingField.BUSINESS_NAME, "Biznes nomini kiriting"))
-        }
+        // Biznes nomi endi formadan so'ralmaydi (biznes profilidан keladi) — majburiy emas.
 
         if (listing.categoryKey == ListingCatalog.OTHER_KEY && listing.customCategoryName.isNullOrBlank()) {
             add(ListingError(ListingField.CATEGORY, "\"Boshqa\" tanlandi — bo'lim nomini yozing"))
@@ -60,7 +58,10 @@ object ListingValidator {
             add(ListingError(ListingField.PRICE, "Narxni kiriting"))
         }
 
-        addAll(validateDiscount(listing))
+        // Oddiy e'londa chegirma yo'q — faqat chegirma e'lonida tekshiriladi.
+        if (listing.attributes[ListingCatalog.REGULAR_KEY] != "1") {
+            addAll(validateDiscount(listing))
+        }
 
         if (listing.redemption.method == RedemptionMethod.PROMO_CODE &&
             listing.redemption.promoCode.isNullOrBlank()

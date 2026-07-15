@@ -5,6 +5,8 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -30,8 +32,8 @@ import dev.core.designsystem.components.ScreenTitle
 import dev.core.designsystem.theme.AppPalette
 import dev.core.designsystem.theme.appPalette
 
-// Loyihaning rasmiy biznes turlari (DISCOUNTS_BUSINESS_API.md — BusinessType).
-private val businessTypes = listOf(
+// Biznes turlari — horizontal scroll qilinadi. Bir nechta ekran ishlatadi.
+internal val businessTypes = listOf(
     "Kafe va Restoran",
     "Oziq-ovqat",
     "Kiyim-kechak",
@@ -39,6 +41,13 @@ private val businessTypes = listOf(
     "O'quv markazlar",
     "Kino va ko'ngilochar",
     "Texnikalar",
+    "Sartaroshxona",
+    "Go'zallik saloni",
+    "Sport zal",
+    "Avto xizmat",
+    "Apteka",
+    "Gul do'koni",
+    "Boshqa",
 )
 
 /**
@@ -83,12 +92,10 @@ fun BusinessProfileScreen(
         Spacer(Modifier.height(18.dp))
         FieldLabel("Biznes turi")
         Spacer(Modifier.height(8.dp))
-        businessTypes.chunked(2).forEach { rowItems ->
-            Row(Modifier.fillMaxWidth().padding(bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                rowItems.forEach { type ->
-                    TypeChip(type, businessType == type, { onTypeChange(type) }, Modifier.weight(1f), palette)
-                }
-                if (rowItems.size == 1) Spacer(Modifier.weight(1f))
+        // Horizontal scroll — turlar bir qatorда suriladi.
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            items(businessTypes) { type ->
+                TypeChip(type, businessType == type, { onTypeChange(type) }, palette)
             }
         }
 
@@ -107,15 +114,15 @@ fun BusinessProfileScreen(
 }
 
 @Composable
-private fun TypeChip(label: String, active: Boolean, onClick: () -> Unit, modifier: Modifier, palette: AppPalette) {
+internal fun TypeChip(label: String, active: Boolean, onClick: () -> Unit, palette: AppPalette) {
     Row(
-        modifier
+        Modifier
             .height(44.dp)
             .clip(RoundedCornerShape(13.dp))
             .background(if (active) palette.primary.copy(alpha = 0.14f) else palette.fieldBg)
             .border(if (active) 1.5.dp else 1.dp, if (active) palette.primary else palette.border, RoundedCornerShape(13.dp))
             .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp),
+            .padding(horizontal = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center,
     ) {

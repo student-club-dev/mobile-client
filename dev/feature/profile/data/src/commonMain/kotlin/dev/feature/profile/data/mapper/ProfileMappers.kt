@@ -24,6 +24,7 @@ fun ProfileEntity.toDomain(): UserProfile = UserProfile(
     avatarUrl = avatarUrl,
     businessName = businessName,
     businessType = businessType,
+    email = email,
 )
 
 // ---------------------------------------------------------------------------
@@ -42,6 +43,7 @@ fun ProfileFirestoreDto.toDomain(): UserProfile = UserProfile(
     avatarUrl = avatarUrl,
     businessName = businessName,
     businessType = businessType,
+    email = email,
 )
 
 fun UserProfile.toFirestoreDto(): ProfileFirestoreDto = ProfileFirestoreDto(
@@ -56,6 +58,7 @@ fun UserProfile.toFirestoreDto(): ProfileFirestoreDto = ProfileFirestoreDto(
     avatarUrl = avatarUrl,
     businessName = businessName,
     businessType = businessType,
+    email = email,
 )
 
 // ---------------------------------------------------------------------------

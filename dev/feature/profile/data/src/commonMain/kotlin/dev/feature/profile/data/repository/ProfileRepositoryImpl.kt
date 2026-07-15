@@ -113,6 +113,7 @@ class ProfileRepositoryImpl(
                 avatarUrl = p.avatarUrl,
                 businessName = p.businessName,
                 businessType = p.businessType,
+                email = p.email,
             )
         }
     }
