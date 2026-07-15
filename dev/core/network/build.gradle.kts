@@ -1,13 +1,8 @@
-import org.jetbrains.kotlin.gradle.tasks.AbstractKotlinCompileTool
-
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.serialization)
-    alias(libs.plugins.openapi.generator)
 }
-
-val openApiOutput = layout.buildDirectory.dir("generated/openapi")
 
 kotlin {
     androidTarget {
@@ -19,10 +14,12 @@ kotlin {
 
     sourceSets {
         commonMain {
-            // Generated API client from the OpenAPI JSON spec
-            kotlin.srcDir(openApiOutput.map { it.dir("src/commonMain/kotlin") })
             dependencies {
                 api(projects.dev.core.common)
+                // Generatsiya qilingan API klienti endi alohida modulda
+                // (`:dev:api-client`, paket `dev.core.network.generated`). `api(...)` bilan
+                // eksport qilamiz — network'ga bog'langan modullar uni transitiv ko'radi.
+                api(projects.dev.apiClient)
                 api(libs.ktor.client.core)
                 implementation(libs.ktor.client.contentNegotiation)
                 implementation(libs.ktor.serialization.json)
@@ -50,31 +47,4 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-}
-
-// ---- JSON (OpenAPI) -> Kotlin API generatsiyasi ----
-openApiGenerate {
-    generatorName.set("kotlin")
-    library.set("multiplatform")
-    inputSpec.set("$projectDir/openapi/student-clubs.json")
-    outputDir.set(openApiOutput.get().asFile.path)
-    packageName.set("dev.core.network.generated")
-    apiPackage.set("dev.core.network.generated.api")
-    modelPackage.set("dev.core.network.generated.model")
-    configOptions.set(
-        mapOf(
-            "dateLibrary" to "kotlinx-datetime",
-            "collectionType" to "list",
-            "omitGradleWrapper" to "true",
-            "generateApiTests" to "false",
-            "generateModelTests" to "false",
-            "generateApiDocumentation" to "false",
-            "generateModelDocumentation" to "false",
-        )
-    )
-}
-
-// Kompilyatsiyadan oldin API generatsiyasi ishga tushsin
-tasks.withType<AbstractKotlinCompileTool<*>>().configureEach {
-    dependsOn(tasks.named("openApiGenerate"))
 }

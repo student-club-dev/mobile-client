@@ -3,6 +3,8 @@ rootProject.name = "StudentClubs"
 enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
 
 pluginManagement {
+    // Convention plugin'lar (yangi modul = bitta qator) shu included build'da yashaydi.
+    includeBuild("build-logic")
     repositories {
         google {
             content {
@@ -29,6 +31,13 @@ dependencyResolutionManagement {
 
 // App entry points
 include(":androidApp")
+
+// API-generatsiya — `iym-native-business` joylashuvining moslashtirilgan varianti.
+// `:dev:api-client-generator` spec'ni ushlaydi va generatsiya tasklarini beradi
+// (cleanSwagger / openApiGenerate / generateAllApi); `:dev:api-client` — generatsiya
+// qilingan klient (paket `dev.core.network.generated`).
+include(":dev:api-client-generator")
+include(":dev:api-client")
 
 // Core modules
 include(":dev:core:common")
