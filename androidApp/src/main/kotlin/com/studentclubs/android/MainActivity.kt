@@ -1,16 +1,15 @@
 package com.studentclubs.android
 
-import android.content.Intent
 import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.fragment.app.FragmentActivity
-import dev.shared.RoleLauncherApp
+import dev.shared.StudentApp
 
 /**
- * Ildiz (launcher) Activity — foydalanuvchi turini aniqlaydi va ALOHIDA Activity ochadi:
- * talaba -> [StudentActivity], biznesmen -> [BusinessActivity]. Sessiya bo'lsa rolga qarab
- * to'g'ridan-to'g'ri ochadi, aks holda rol tanlash ekranini ko'rsatadi.
+ * Yagona Activity — to'g'ridan-to'g'ri talaba login oqimi + StudentShell'ni ochadi.
+ * Rol tanlash yo'q (bu faqat talaba ilovasi; biznes tomoni alohida ElonUz ilovasida).
+ * Logout'da Activity qayta ishga tushadi va login ekraniga qaytadi.
  *
  * FragmentActivity — biometrik BiometricPrompt shuni talab qiladi (F1).
  */
@@ -18,16 +17,6 @@ class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        setContent {
-            RoleLauncherApp(
-                onStudent = { open(StudentActivity::class.java) },
-                onBusiness = { open(BusinessActivity::class.java) },
-            )
-        }
-    }
-
-    private fun open(target: Class<*>) {
-        startActivity(Intent(this, target))
-        finish()
+        setContent { StudentApp(onExit = ::recreate) }
     }
 }

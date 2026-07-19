@@ -17,6 +17,7 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.StudentClubs">
 
+        <!-- Yagona Activity — to'g'ridan-to'g'ri talaba oqimi (rol tanlash yo'q). -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -27,19 +28,5 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-
-        <!-- Talaba oqimi — alohida Activity -->
-        <activity
-            android:name=".StudentActivity"
-            android:exported="false"
-            android:windowSoftInputMode="adjustResize"
-            android:configChanges="orientation|screenSize|keyboardHidden" />
-
-        <!-- Biznesmen oqimi — alohida Activity -->
-        <activity
-            android:name=".BusinessActivity"
-            android:exported="false"
-            android:windowSoftInputMode="adjustResize"
-            android:configChanges="orientation|screenSize|keyboardHidden" />
     </application>
 </manifest>
