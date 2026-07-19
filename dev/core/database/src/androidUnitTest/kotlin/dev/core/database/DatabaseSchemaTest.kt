@@ -73,12 +73,61 @@ class DatabaseSchemaTest {
             """.trimIndent(),
             0,
         )
+        createV1DiscountTables(driver)
+    }
+
+    /**
+     * Chegirma jadvallari base sxemada (ularni yaratadigan migratsiya yo'q — v1'dan bor).
+     * 11.sqm ular ustiga ustun qo'shadi, shuning uchun migratsiya testlarida ham mavjud bo'lishi kerak.
+     * Eski (v11 gacha) shakli — 11.sqm keyin subcategory/isDiscount/narx ustunlarini qo'shadi.
+     */
+    private fun createV1DiscountTables(driver: JdbcSqliteDriver) {
+        driver.execute(
+            null,
+            """
+            CREATE TABLE DiscountCategoryEntity (
+                id TEXT NOT NULL PRIMARY KEY,
+                name TEXT NOT NULL,
+                emoji TEXT NOT NULL,
+                offerCount INTEGER NOT NULL,
+                accent INTEGER NOT NULL
+            )
+            """.trimIndent(),
+            0,
+        )
+        driver.execute(
+            null,
+            """
+            CREATE TABLE DiscountOfferEntity (
+                id TEXT NOT NULL PRIMARY KEY,
+                categoryId TEXT NOT NULL,
+                merchant TEXT NOT NULL,
+                title TEXT NOT NULL,
+                discountPercent INTEGER NOT NULL,
+                tag TEXT NOT NULL,
+                promoCode TEXT,
+                location TEXT,
+                expiry TEXT,
+                emoji TEXT NOT NULL,
+                bannerAccent INTEGER NOT NULL,
+                featured INTEGER NOT NULL
+            )
+            """.trimIndent(),
+            0,
+        )
+        driver.execute(
+            null,
+            "CREATE TABLE SavedDiscountEntity (offerId TEXT NOT NULL PRIMARY KEY)",
+            0,
+        )
     }
 
     @Test
-    fun schemaVersionIsNine() {
-        // 7.sqm — ListingEntity (chegirma e'lonlari), 8.sqm — ko'p filial (branchesJson).
-        assertEquals(9L, StudentClubsDatabase.Schema.version)
+    fun schemaVersionIsCurrent() {
+        // 7.sqm — ListingEntity (chegirma e'lonlari), 8.sqm — ko'p filial (branchesJson),
+        // 10.sqm — profil email, 11.sqm — "Siz uchun" e'lonlari (chegirmasiz + sub-kategoriya + narx),
+        // 12.sqm — e'lon jinsi (kiyim uchun Erkak/Ayol).
+        assertEquals(13L, StudentClubsDatabase.Schema.version)
     }
 
     @Test
@@ -116,6 +165,9 @@ class DatabaseSchemaTest {
             birthYear = 2004L,
             courseYear = "3",
             avatarUrl = "https://cdn.studentclubs.dev/avatars/uid-1.jpg",
+            businessName = null,
+            businessType = null,
+            email = null,
         )
         val profile = db.profileQueries.selectCurrent().executeAsOne()
         assertEquals("Quvonchbek", profile.firstName)
@@ -242,6 +294,28 @@ class DatabaseSchemaTest {
             """.trimIndent(),
             0,
         )
+
+        // v8 sxemasidagi boshqa jadvallar — 9/10/11.sqm ular ustiga ustun qo'shadi.
+        // ProfileEntity: 5.sqm base + 6.sqm avatarUrl (businessName/businessType/email keyin qo'shiladi).
+        driver.execute(
+            null,
+            """
+            CREATE TABLE ProfileEntity (
+                uid TEXT NOT NULL PRIMARY KEY,
+                firstName TEXT,
+                lastName TEXT,
+                phoneNumber TEXT,
+                role TEXT,
+                universityId TEXT,
+                universityEmail TEXT,
+                birthYear INTEGER,
+                courseYear TEXT,
+                avatarUrl TEXT
+            )
+            """.trimIndent(),
+            0,
+        )
+        createV1DiscountTables(driver)
 
         // Koordinatasi bor e'lon — filialga aylanishi kerak.
         driver.execute(

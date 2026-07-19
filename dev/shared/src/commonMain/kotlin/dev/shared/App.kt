@@ -16,6 +16,7 @@ import coil3.ImageLoader
 import coil3.compose.setSingletonImageLoaderFactory
 import coil3.network.ktor3.KtorNetworkFetcherFactory
 import dev.core.data.seed.LocalDataSeeder
+import dev.core.designsystem.generated.resources.Res
 import dev.core.designsystem.theme.AppTheme
 import dev.core.domain.model.ThemeMode
 import dev.core.domain.repository.SettingsRepository
@@ -54,6 +55,7 @@ fun App() {
 }
 
 /** Umumiy ildiz sozlamasi (rasm yuklovchi, seed, mavzu, inset) — hamma kirish nuqtalari ishlatadi. */
+@OptIn(org.jetbrains.compose.resources.ExperimentalResourceApi::class)
 @Composable
 private fun AppScaffold(content: @Composable () -> Unit) {
     // Tarmoqdan rasm yuklash (avatar) — Coil ilovaning o'z Ktor klientidan foydalanadi,
@@ -66,8 +68,12 @@ private fun AppScaffold(content: @Composable () -> Unit) {
     }
 
     // Local bazani dizayndagi namuna ma'lumot bilan to'ldiramiz (bo'sh bo'lsagina).
+    // "Siz uchun" e'lonlari bundlangan JSON'dan (composeResources/files/listings.json) o'qiladi.
     val seeder = koinInject<LocalDataSeeder>()
-    LaunchedEffect(Unit) { seeder.seedIfEmpty() }
+    LaunchedEffect(Unit) {
+        val listingsJson = runCatching { Res.readBytes("files/listings.json").decodeToString() }.getOrNull()
+        seeder.seedIfEmpty(listingsJson)
+    }
 
     // Foydalanuvchi tanlagan mavzu (Sozlamalar). SYSTEM bo'lsa qurilma rejimiga ergashadi.
     val settings = koinInject<SettingsRepository>()

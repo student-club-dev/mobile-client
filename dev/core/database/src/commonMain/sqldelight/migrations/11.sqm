@@ -1,0 +1,7 @@
+-- Migratsiya v11 -> v12
+-- "Siz uchun" e'lonlari: chegirmasiz tovarlar ham, tur ichidagi sub-kategoriya, narxlar.
+ALTER TABLE DiscountOfferEntity ADD COLUMN subcategory TEXT NOT NULL DEFAULT '';
+ALTER TABLE DiscountOfferEntity ADD COLUMN isDiscount INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE DiscountOfferEntity ADD COLUMN originalPrice INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE DiscountOfferEntity ADD COLUMN finalPrice INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE DiscountOfferEntity ADD COLUMN priceUnit TEXT NOT NULL DEFAULT 'dona';

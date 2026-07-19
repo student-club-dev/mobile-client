@@ -1,0 +1,3 @@
+-- Migratsiya v12 -> v13
+-- E'londa jins (asosan kiyim) — Filter ekranida Erkak/Ayol tanlash uchun.
+ALTER TABLE DiscountOfferEntity ADD COLUMN gender TEXT NOT NULL DEFAULT '';

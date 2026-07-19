@@ -9,9 +9,15 @@ CREATE TABLE DiscountCategoryEntity (
 CREATE TABLE DiscountOfferEntity (
     id TEXT NOT NULL PRIMARY KEY,
     categoryId TEXT NOT NULL,
+    subcategory TEXT NOT NULL DEFAULT '',
+    gender TEXT NOT NULL DEFAULT '',
     merchant TEXT NOT NULL,
     title TEXT NOT NULL,
+    isDiscount INTEGER NOT NULL DEFAULT 1,
     discountPercent INTEGER NOT NULL,
+    originalPrice INTEGER NOT NULL DEFAULT 0,
+    finalPrice INTEGER NOT NULL DEFAULT 0,
+    priceUnit TEXT NOT NULL DEFAULT 'dona',
     tag TEXT NOT NULL,
     promoCode TEXT,
     location TEXT,
@@ -27,6 +33,9 @@ CREATE TABLE SavedDiscountEntity (
 
 selectCategories:
 SELECT * FROM DiscountCategoryEntity;
+
+selectAllOffers:
+SELECT * FROM DiscountOfferEntity;
 
 selectOffersByCategory:
 SELECT * FROM DiscountOfferEntity WHERE categoryId = ?;
@@ -47,8 +56,9 @@ VALUES (?, ?, ?, ?, ?);
 
 upsertOffer:
 INSERT OR REPLACE INTO DiscountOfferEntity(
-    id, categoryId, merchant, title, discountPercent, tag, promoCode, location, expiry, emoji, bannerAccent, featured
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+    id, categoryId, subcategory, gender, merchant, title, isDiscount, discountPercent,
+    originalPrice, finalPrice, priceUnit, tag, promoCode, location, expiry, emoji, bannerAccent, featured
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 saveOffer:
 INSERT OR REPLACE INTO SavedDiscountEntity(offerId) VALUES (?);

@@ -24,6 +24,9 @@ interface UniversityRepository {
 /** Chegirmalar — kategoriyalar, takliflar, saqlangan takliflar. */
 interface DiscountRepository {
     fun observeCategories(): Flow<List<DiscountCategory>>
+
+    /** "Siz uchun" feed'i — barcha e'lonlar (chegirmali + chegirmasiz), UI o'zi filtrlaydi. */
+    fun observeAllOffers(): Flow<List<DiscountOffer>>
     fun observeOffers(categoryId: String): Flow<List<DiscountOffer>>
     fun observeFeatured(): Flow<List<DiscountOffer>>
     fun observeSaved(): Flow<List<DiscountOffer>>

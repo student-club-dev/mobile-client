@@ -85,6 +85,9 @@ class DiscountRepositoryImpl(
     override fun observeCategories(): Flow<List<DiscountCategory>> =
         q.selectCategories().asFlow().mapToList(dispatchers.io).map { r -> r.map { it.toDomain() } }
 
+    override fun observeAllOffers(): Flow<List<DiscountOffer>> =
+        q.selectAllOffers().asFlow().mapToList(dispatchers.io).map { r -> r.map { it.toDomain() } }
+
     override fun observeOffers(categoryId: String): Flow<List<DiscountOffer>> =
         q.selectOffersByCategory(categoryId).asFlow().mapToList(dispatchers.io).map { r -> r.map { it.toDomain() } }
 
@@ -116,7 +119,9 @@ class DiscountRepositoryImpl(
                         }
                         res.data.offers.forEach { o ->
                             q.upsertOffer(
-                                o.id, o.categoryId, o.merchant, o.title, o.discountPercent.toLong(),
+                                o.id, o.categoryId, o.subcategory, o.gender, o.merchant, o.title,
+                                if (o.isDiscount) 1L else 0L, o.discountPercent.toLong(),
+                                o.originalPrice, o.finalPrice, o.priceUnit,
                                 o.tag, o.promoCode, o.location, o.expiry, o.emoji, o.bannerAccent,
                                 if (o.featured) 1L else 0L,
                             )

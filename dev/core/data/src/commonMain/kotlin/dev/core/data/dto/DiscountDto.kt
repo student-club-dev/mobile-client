@@ -21,9 +21,15 @@ data class DiscountCategoryDto(
 data class DiscountOfferDto(
     val id: String,
     val categoryId: String,
+    val subcategory: String = "",
+    val gender: String = "",
     val merchant: String,
     val title: String,
-    val discountPercent: Int,
+    val isDiscount: Boolean = true,
+    val discountPercent: Int = 0,
+    val originalPrice: Long = 0,
+    val finalPrice: Long = 0,
+    val priceUnit: String = "dona",
     val tag: String = "STUDENT_ID",   // "STUDENT_ID" | "PROMO_CODE"
     val promoCode: String? = null,
     val location: String? = null,

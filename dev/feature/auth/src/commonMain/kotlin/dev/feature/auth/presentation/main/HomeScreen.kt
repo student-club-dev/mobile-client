@@ -201,7 +201,7 @@ private fun ClubsSection(clubs: List<Club>, palette: AppPalette, onOpenClubs: ()
 // ---------------------------------------------------------------------------
 @Composable
 private fun DiscountsSection(categories: List<DiscountCategory>, featured: DiscountOffer?, palette: AppPalette, onSeeAll: () -> Unit) {
-    SectionHeader("Chegirmalar", action = "Barchasi", palette = palette, onAction = onSeeAll)
+    SectionHeader("Siz uchun", action = "Barchasi", palette = palette, onAction = onSeeAll)
     Spacer(Modifier.height(12.dp))
     Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
         categories.take(4).forEach { CategoryChip(it, palette, onSeeAll) }

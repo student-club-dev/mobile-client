@@ -6,9 +6,10 @@ import dev.core.data.mapper.toDb
 import dev.core.database.sql.StudentClubsDatabase
 import dev.core.domain.model.AdType
 import dev.core.domain.model.ConversationType
-import dev.core.domain.model.DiscountTag
 import dev.core.domain.model.FriendStatus
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 
 /**
  * Local bazani dizayndagi namuna ma'lumot bilan to'ldiradi (jadval bo'sh bo'lsagina).
@@ -18,9 +19,13 @@ class LocalDataSeeder(
     private val db: StudentClubsDatabase,
     private val dispatchers: AppDispatchers,
 ) {
-    suspend fun seedIfEmpty() = withContext(dispatchers.io) {
+    /**
+     * @param discountsJson "Siz uchun" e'lonlari (composeResources/files/listings.json).
+     * UI qatlamida (App.kt) o'qib beriladi — data qatlami compose resurslariga bog'liq emas.
+     */
+    suspend fun seedIfEmpty(discountsJson: String? = null) = withContext(dispatchers.io) {
         seedUniversities()
-        seedDiscounts()
+        seedDiscounts(discountsJson)
         seedJobs()
         seedStudents()
         seedAds()
@@ -51,23 +56,40 @@ class LocalDataSeeder(
         q.transaction { list.forEach { q.upsert(it.id, it.name, it.city, it.monogram, it.faculty, it.accent) } }
     }
 
-    private fun seedDiscounts() {
+    /**
+     * "Siz uchun" e'lonlari — [listings.json] dan (barcha biznes turlari va sub-kategoriyalar,
+     * chegirmali + chegirmasiz aralash). Kategoriya `offerCount` va `finalPrice` shu yerda hisoblanadi.
+     * Eski (sub-kategoriyasiz) seed avtomatik yangi ma'lumotga almashadi.
+     */
+    private fun seedDiscounts(json: String?) {
         val q = db.discountQueries
-        if (q.countCategories().executeAsOne() > 0) return
-        q.transaction {
-            q.upsertCategory("ovqat", "Ovqat", "🍔", 124, 0xFFF97316)
-            q.upsertCategory("kiyim", "Kiyim-kechak", "👕", 86, 0xFFBE185D)
-            q.upsertCategory("kurslar", "Kurslar", "📚", 52, 0xFF2563EB)
-            q.upsertCategory("kino", "Kino & Ko‘ngil", "🎬", 33, 0xFF059669)
-            q.upsertCategory("transport", "Transport", "🚌", 18, 0xFF0EA5E9)
-            q.upsertCategory("texnika", "Texnika", "💻", 41, 0xFFD97706)
+        // Ma'lumot yo'q bo'lsa seed'ga tegmaymiz. Eski seed bo'lsa (sub-kategoriya bo'sh) — yangilaymiz.
+        val catalog = json?.let { runCatching { seedJson.decodeFromString<SeedCatalog>(it) }.getOrNull() } ?: return
+        val existing = q.selectAllOffers().executeAsList()
+        val alreadyNew = existing.isNotEmpty() && existing.all { it.subcategory.isNotEmpty() }
+        if (alreadyNew) return
 
-            // id, categoryId, merchant, title, %, tag, promo, location, expiry, emoji, banner, featured
-            q.upsertOffer("of-evos", "ovqat", "Evos", "barcha pitsalarga", 30, DiscountTag.STUDENT_ID.name, null, "5 filial", "bugun tugaydi", "🍕", 0xFFF97316, 1)
-            q.upsertOffer("of-chopar", "ovqat", "Chopar", "shirinliklar", 20, DiscountTag.PROMO_CODE.name, "STUDENT20", "yetkazib berish", null, "🍰", 0xFFBE185D, 0)
-            q.upsertOffer("of-zara", "kiyim", "Zara", "yangi kolleksiya", 15, DiscountTag.STUDENT_ID.name, null, "Samarqand Darvoza", null, "👕", 0xFFBE185D, 0)
-            q.upsertOffer("of-udemy", "kurslar", "Udemy", "online kurslar", 50, DiscountTag.PROMO_CODE.name, "STUD50", null, "shu oy", "📚", 0xFF2563EB, 1)
-            q.upsertOffer("of-nebo", "kino", "NEBO Cinema", "kechki seanslar", 25, DiscountTag.STUDENT_ID.name, null, "Chilonzor", null, "🎬", 0xFF059669, 0)
+        val counts = catalog.offers.groupingBy { it.categoryId }.eachCount()
+        q.transaction {
+            q.clearOffers()
+            q.clearCategories()
+            catalog.categories.forEach { c ->
+                q.upsertCategory(c.id, c.name, c.emoji, (counts[c.id] ?: 0).toLong(), c.accent.toLong(16))
+            }
+            catalog.offers.forEach { o ->
+                val finalPrice = when {
+                    o.finalPrice > 0 -> o.finalPrice
+                    o.isDiscount && o.discountPercent > 0 -> o.originalPrice * (100 - o.discountPercent) / 100
+                    else -> o.originalPrice
+                }
+                q.upsertOffer(
+                    o.id, o.categoryId, o.subcategory, o.gender, o.merchant, o.title,
+                    if (o.isDiscount) 1L else 0L, o.discountPercent.toLong(),
+                    o.originalPrice, finalPrice, o.priceUnit,
+                    o.tag, o.promoCode, o.location, o.expiry, o.emoji, o.bannerAccent.toLong(16),
+                    if (o.featured) 1L else 0L,
+                )
+            }
         }
     }
 
@@ -154,4 +176,45 @@ class LocalDataSeeder(
         val id: String, val name: String, val city: String,
         val monogram: String, val faculty: String?, val accent: Long,
     )
+
+    // --- listings.json tuzilmasi ("Siz uchun" e'lonlari) ---------------------
+    @Serializable
+    private data class SeedCatalog(
+        val categories: List<SeedCategory> = emptyList(),
+        val offers: List<SeedOffer> = emptyList(),
+    )
+
+    @Serializable
+    private data class SeedCategory(
+        val id: String,
+        val name: String,
+        val emoji: String,
+        val accent: String,   // ARGB hex, masalan "FFF97316"
+    )
+
+    @Serializable
+    private data class SeedOffer(
+        val id: String,
+        val categoryId: String,
+        val subcategory: String = "",
+        val gender: String = "",
+        val merchant: String,
+        val title: String,
+        val isDiscount: Boolean = true,
+        val discountPercent: Int = 0,
+        val originalPrice: Long = 0,
+        val finalPrice: Long = 0,   // 0 → foizdan hisoblanadi
+        val priceUnit: String = "dona",
+        val tag: String = "STUDENT_ID",
+        val promoCode: String? = null,
+        val location: String? = null,
+        val expiry: String? = null,
+        val emoji: String = "🎁",
+        val bannerAccent: String = "FF6C47FF",
+        val featured: Boolean = false,
+    )
+
+    private companion object {
+        val seedJson = Json { ignoreUnknownKeys = true }
+    }
 }

@@ -40,3 +40,9 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 }
+
+// `Res` klassini public qilamiz — boshqa modullar (shared) `listings.json` ni o'qiy oladi.
+compose.resources {
+    publicResClass = true
+    packageOfResClass = "dev.core.designsystem.generated.resources"
+}
