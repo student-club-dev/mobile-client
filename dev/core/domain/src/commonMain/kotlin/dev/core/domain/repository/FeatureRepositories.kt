@@ -19,6 +19,15 @@ interface UniversityRepository {
 
     /** Backend'dan sinxronlab local DB'ni yangilaydi (offline-first). Xatoда cache saqlanadi. */
     suspend fun refresh(): Resource<Unit>
+
+    /**
+     * Tanlash uchun universitetlar ro'yxatini masofaviy manbadan (prof-emis.edu.uz) oladi.
+     * Local DB'ga yozmaydi — foydalanuvchi bittasini tanlaganda [addUniversity] chaqiriladi.
+     */
+    suspend fun fetchSelectableUniversities(): Resource<List<University>>
+
+    /** Tanlangan universitetni local DB'ga qo'shadi (profil unga bog'lanishi uchun). */
+    suspend fun addUniversity(university: University)
 }
 
 /** Chegirmalar — kategoriyalar, takliflar, saqlangan takliflar. */

@@ -1,0 +1,4 @@
+-- Migratsiya v13 -> v14
+-- E'lon joylashuvi (koordinata) — "Xaritada ko'rish" bo'limi uchun.
+ALTER TABLE DiscountOfferEntity ADD COLUMN lat REAL NOT NULL DEFAULT 0.0;
+ALTER TABLE DiscountOfferEntity ADD COLUMN lng REAL NOT NULL DEFAULT 0.0;

@@ -126,8 +126,8 @@ class DatabaseSchemaTest {
     fun schemaVersionIsCurrent() {
         // 7.sqm — ListingEntity (chegirma e'lonlari), 8.sqm — ko'p filial (branchesJson),
         // 10.sqm — profil email, 11.sqm — "Siz uchun" e'lonlari (chegirmasiz + sub-kategoriya + narx),
-        // 12.sqm — e'lon jinsi (kiyim uchun Erkak/Ayol).
-        assertEquals(13L, StudentClubsDatabase.Schema.version)
+        // 12.sqm — e'lon jinsi (kiyim uchun Erkak/Ayol), 13.sqm — e'lon koordinatasi (xarita).
+        assertEquals(14L, StudentClubsDatabase.Schema.version)
     }
 
     @Test

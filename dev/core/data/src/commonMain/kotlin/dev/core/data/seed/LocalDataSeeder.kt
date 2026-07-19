@@ -63,14 +63,16 @@ class LocalDataSeeder(
      */
     private fun seedDiscounts(json: String?) {
         val q = db.discountQueries
-        // Ma'lumot yo'q bo'lsa seed'ga tegmaymiz. Eski seed bo'lsa (sub-kategoriya bo'sh) — yangilaymiz.
+        val settings = db.appSettingQueries
+        // Ma'lumot yo'q bo'lsa seed'ga tegmaymiz.
         val catalog = json?.let { runCatching { seedJson.decodeFromString<SeedCatalog>(it) }.getOrNull() } ?: return
-        val existing = q.selectAllOffers().executeAsList()
-        val alreadyNew = existing.isNotEmpty() && existing.all { it.subcategory.isNotEmpty() }
-        if (alreadyNew) return
+        // Seed-versiya belgisi: JSON o'zgarganda [DISCOUNTS_SEED_VERSION] ni oshiring — eski seed
+        // avtomatik yangi ma'lumotga almashadi (saqlangan e'lon id'lari o'zgarmaydi).
+        if (settings.selectByKey(DISCOUNTS_SEED_KEY).executeAsOneOrNull() == DISCOUNTS_SEED_VERSION) return
 
         val counts = catalog.offers.groupingBy { it.categoryId }.eachCount()
         q.transaction {
+            settings.upsert(DISCOUNTS_SEED_KEY, DISCOUNTS_SEED_VERSION)
             q.clearOffers()
             q.clearCategories()
             catalog.categories.forEach { c ->
@@ -82,12 +84,13 @@ class LocalDataSeeder(
                     o.isDiscount && o.discountPercent > 0 -> o.originalPrice * (100 - o.discountPercent) / 100
                     else -> o.originalPrice
                 }
+                val (lat, lng) = if (o.lat != 0.0 && o.lng != 0.0) o.lat to o.lng else coordsFor(o.location, o.id)
                 q.upsertOffer(
                     o.id, o.categoryId, o.subcategory, o.gender, o.merchant, o.title,
                     if (o.isDiscount) 1L else 0L, o.discountPercent.toLong(),
                     o.originalPrice, finalPrice, o.priceUnit,
                     o.tag, o.promoCode, o.location, o.expiry, o.emoji, o.bannerAccent.toLong(16),
-                    if (o.featured) 1L else 0L,
+                    if (o.featured) 1L else 0L, lat, lng,
                 )
             }
         }
@@ -212,9 +215,47 @@ class LocalDataSeeder(
         val emoji: String = "🎁",
         val bannerAccent: String = "FF6C47FF",
         val featured: Boolean = false,
+        val lat: Double = 0.0,   // 0.0 → `location` matnidan tuman koordinatasi aniqlanadi
+        val lng: Double = 0.0,
     )
+
+    /**
+     * `location` matnidan taxminiy koordinata (demo uchun). Tuman nomi topilsa — o'sha
+     * tuman markazi, aks holda Toshkent markazi. [id] bo'yicha kichik siljish (jitter) —
+     * bir tumandagi e'lonlar xaritada ustma-ust tushmasligi uchun.
+     */
+    private fun coordsFor(location: String?, id: String): Pair<Double, Double> {
+        val base = location?.let { loc -> DISTRICTS.entries.firstOrNull { loc.contains(it.key, ignoreCase = true) }?.value } ?: TASHKENT_CENTER
+        val h = id.hashCode()
+        val jLat = ((h % 200) - 100) / 100_000.0        // ±0.001° ≈ ±110 m
+        val jLng = (((h / 200) % 200) - 100) / 100_000.0
+        return (base.first + jLat) to (base.second + jLng)
+    }
 
     private companion object {
         val seedJson = Json { ignoreUnknownKeys = true }
+
+        // "Siz uchun" seed'i shu versiyada. listings.json o'zgarsa bu qiymatni oshiring.
+        const val DISCOUNTS_SEED_KEY = "discounts_seed_version"
+        const val DISCOUNTS_SEED_VERSION = "3"
+
+        val TASHKENT_CENTER = 41.311081 to 69.240562
+
+        /** Toshkent tumanlari/joylari markazi (taxminiy). */
+        val DISTRICTS = mapOf(
+            "Chilonzor" to (41.2758 to 69.2035),
+            "Yunusobod" to (41.3647 to 69.2896),
+            "Sergeli" to (41.2270 to 69.2216),
+            "Olmazor" to (41.3500 to 69.2050),
+            "Mirzo Ulug'bek" to (41.3250 to 69.3350),
+            "Mirobod" to (41.2900 to 69.2750),
+            "Yakkasaroy" to (41.2870 to 69.2560),
+            "Samarqand Darvoza" to (41.3120 to 69.2450),
+            "Compass Mall" to (41.3380 to 69.3340),
+            "Tashkent City" to (41.3150 to 69.2790),
+            "Riverside" to (41.3050 to 69.2280),
+            "Next Mall" to (41.3480 to 69.2870),
+            "Malika" to (41.2960 to 69.2380),
+        )
     }
 }

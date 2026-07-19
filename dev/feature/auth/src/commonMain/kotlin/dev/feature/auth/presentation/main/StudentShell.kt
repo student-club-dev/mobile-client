@@ -42,11 +42,12 @@ import dev.feature.profile.presentation.ProfileScreen
 
 private enum class StudentTab(val route: String, val label: String, val icon: ImageVector) {
     HOME("home", "Home", AppIcons.Home),
-    DISCOUNTS("discounts", "Chegirma", AppIcons.Tag),
+    UNIVERSITY("university", "Universitet", AppIcons.GraduationCap),
     JOBS("jobs", "Ishlar", AppIcons.Briefcase),
     STUDENTS("students", "Student", AppIcons.Users),
 }
 
+private const val DISCOUNTS = "discounts"
 private const val POST_AD = "post_ad"
 private const val PROFILE = "profile"
 private const val CHAT = "chat"
@@ -85,14 +86,15 @@ fun StudentShell(onLoggedOut: () -> Unit) {
                     onOpenChat = { nav.navigate(CHAT) },
                     onOpenNotifications = { nav.navigate(NOTIFICATIONS) },
                     onOpenClubs = { nav.navigate(CLUBS) },
-                    onOpenDiscounts = { selectTab(StudentTab.DISCOUNTS.route) },
+                    onOpenDiscounts = { nav.navigate(DISCOUNTS) },
                     onOpenJobs = { selectTab(StudentTab.JOBS.route) },
                     onOpenStudents = { selectTab(StudentTab.STUDENTS.route) },
                 )
             }
-            composable(StudentTab.DISCOUNTS.route) {
-                // Talaba faqat chegirmalarni ko'radi (e'lon qo'yish — biznesmen shell'ida).
-                DiscountsScreen()
+            composable(StudentTab.UNIVERSITY.route) { MyUniversityScreen() }
+            composable(DISCOUNTS) {
+                // "Siz uchun" — Home'dan ochiladi (endi pastki tab emas). Orqaga qaytadi.
+                DiscountsScreen(onBack = { nav.popBackStack() })
             }
             composable(StudentTab.JOBS.route) { JobsScreen() }
             composable(StudentTab.STUDENTS.route) { StudentsScreen() }
@@ -156,7 +158,7 @@ private fun BottomBar(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             NavBarItem(StudentTab.HOME, current, onSelect, palette, Modifier.weight(1f))
-            NavBarItem(StudentTab.DISCOUNTS, current, onSelect, palette, Modifier.weight(1f))
+            NavBarItem(StudentTab.UNIVERSITY, current, onSelect, palette, Modifier.weight(1f))
             Spacer(Modifier.weight(1f)) // markaziy FAB uchun joy
             NavBarItem(StudentTab.JOBS, current, onSelect, palette, Modifier.weight(1f))
             NavBarItem(StudentTab.STUDENTS, current, onSelect, palette, Modifier.weight(1f))

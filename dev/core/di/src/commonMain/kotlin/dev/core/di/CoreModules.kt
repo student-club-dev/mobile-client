@@ -104,7 +104,7 @@ val repositoryModule = module {
     single<ChatRemoteDataSource> { KtorChatRemoteDataSource(get()) }
 
     // --- Repository'lar (offline-first: DB + refresh) ---
-    single<UniversityRepository> { UniversityRepositoryImpl(get(), get(), get(), REMOTE_SYNC_ENABLED) }
+    single<UniversityRepository> { UniversityRepositoryImpl(get(), get(), get(), REMOTE_SYNC_ENABLED, get()) }
     single<DiscountRepository> { DiscountRepositoryImpl(get(), get(), get(), REMOTE_SYNC_ENABLED) }
     single<JobRepository> { JobRepositoryImpl(get(), get(), get(), REMOTE_SYNC_ENABLED) }
     single<StudentRepository> { StudentRepositoryImpl(get(), get(), get(), REMOTE_SYNC_ENABLED) }

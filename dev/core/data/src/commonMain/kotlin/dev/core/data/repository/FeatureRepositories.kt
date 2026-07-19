@@ -4,6 +4,8 @@ import app.cash.sqldelight.coroutines.asFlow
 import app.cash.sqldelight.coroutines.mapToList
 import dev.core.common.AppDispatchers
 import dev.core.common.Resource
+import dev.core.data.dto.ProfEmisUniversityDto
+import dev.core.data.dto.toUniversity
 import dev.core.data.remote.AdRemoteDataSource
 import dev.core.data.remote.ChatRemoteDataSource
 import dev.core.data.remote.DiscountRemoteDataSource
@@ -15,6 +17,9 @@ import dev.core.data.mapper.toBool
 import dev.core.data.mapper.toDb
 import dev.core.data.mapper.toDomain
 import dev.core.database.sql.StudentClubsDatabase
+import io.ktor.client.HttpClient
+import io.ktor.client.call.body
+import io.ktor.client.request.get
 import dev.core.domain.model.Ad
 import dev.core.domain.model.Conversation
 import dev.core.domain.model.DiscountCategory
@@ -39,17 +44,35 @@ import kotlinx.coroutines.withContext
 // ===========================================================================
 // Universitetlar
 // ===========================================================================
+/** prof-emis.edu.uz — barcha OTM ro'yxati (to'liq URL; klient base URL'idan mustaqil). */
+private const val EMIS_UNIVERSITIES_URL =
+    "https://prof-emis.edu.uz/api/v2/integration/stat/public/university?limit=10000"
+
 class UniversityRepositoryImpl(
     private val db: StudentClubsDatabase,
     private val dispatchers: AppDispatchers,
     private val remote: UniversityRemoteDataSource,
     private val syncEnabled: Boolean,
+    private val httpClient: HttpClient,
 ) : UniversityRepository {
     private val q get() = db.universityQueries
 
     override fun observeUniversities(): Flow<List<University>> =
         q.selectAll().asFlow().mapToList(dispatchers.io)
             .map { rows -> rows.map { it.toDomain() } }
+
+    override suspend fun fetchSelectableUniversities(): Resource<List<University>> = withContext(dispatchers.io) {
+        try {
+            val dtos: List<ProfEmisUniversityDto> = httpClient.get(EMIS_UNIVERSITIES_URL).body()
+            Resource.Success(dtos.map { it.toUniversity() }.sortedBy { it.name })
+        } catch (e: Exception) {
+            Resource.Error(e.message ?: "Universitetlarni yuklab bo'lmadi", e)
+        }
+    }
+
+    override suspend fun addUniversity(university: University) = withContext(dispatchers.io) {
+        q.upsert(university.id, university.name, university.city, university.monogram, university.faculty, university.accent)
+    }
 
     override suspend fun refresh(): Resource<Unit> {
         if (!syncEnabled) return Resource.Success(Unit)
@@ -123,7 +146,7 @@ class DiscountRepositoryImpl(
                                 if (o.isDiscount) 1L else 0L, o.discountPercent.toLong(),
                                 o.originalPrice, o.finalPrice, o.priceUnit,
                                 o.tag, o.promoCode, o.location, o.expiry, o.emoji, o.bannerAccent,
-                                if (o.featured) 1L else 0L,
+                                if (o.featured) 1L else 0L, o.lat, o.lng,
                             )
                         }
                     }

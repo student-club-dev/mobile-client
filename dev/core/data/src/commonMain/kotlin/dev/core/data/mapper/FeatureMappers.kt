@@ -64,6 +64,8 @@ fun DiscountOfferEntity.toDomain(): DiscountOffer = DiscountOffer(
     emoji = emoji,
     bannerAccent = bannerAccent,
     featured = featured.toBool(),
+    lat = lat,
+    lng = lng,
 )
 
 fun JobEntity.toDomain(): Job = Job(

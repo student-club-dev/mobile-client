@@ -51,18 +51,34 @@ import dev.core.designsystem.components.GlassTextField
 import dev.core.designsystem.theme.AppPalette
 import dev.core.designsystem.theme.appPalette
 import dev.feature.discounts.presentation.NearbyDiscountsSection
+import dev.feature.discounts.presentation.map.MapPoint
+import dev.feature.discounts.presentation.map.OfferMarker
+import dev.feature.discounts.presentation.map.OffersMap
 import kotlinx.coroutines.delay
 import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
-fun DiscountsScreen(vm: DiscountsViewModel = koinViewModel()) {
+fun DiscountsScreen(vm: DiscountsViewModel = koinViewModel(), onBack: (() -> Unit)? = null) {
     val palette = appPalette
     val state by vm.state.collectAsStateWithLifecycle()
     val filterState by vm.filterState.collectAsStateWithLifecycle()
     var showFilter by remember { mutableStateOf(false) }
+    var showMap by remember { mutableStateOf(false) }
 
     Box(Modifier.fillMaxSize()) {
-        FeedContent(state, palette, vm, onOpenFilter = { vm.openFilter(); showFilter = true })
+        FeedContent(
+            state, palette, vm,
+            onBack = onBack,
+            onOpenFilter = { vm.openFilter(); showFilter = true },
+            onOpenMap = { showMap = true },
+        )
+        if (showMap) {
+            MapOverlay(
+                state, palette, vm,
+                onClose = { showMap = false },
+                onOpenFilter = { vm.openFilter(); showFilter = true },
+            )
+        }
         if (showFilter) {
             FilterScreen(
                 filterState, palette, vm,
@@ -81,10 +97,21 @@ private fun FeedContent(
     state: DiscountsUiState,
     palette: AppPalette,
     vm: DiscountsViewModel,
+    onBack: (() -> Unit)?,
     onOpenFilter: () -> Unit,
+    onOpenMap: () -> Unit,
 ) {
     Column(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(top = 54.dp)) {
+            if (onBack != null) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(11.dp)) {
+                    Box(
+                        Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(palette.glass).border(1.dp, palette.border, RoundedCornerShape(12.dp)).clickable(onClick = onBack),
+                        contentAlignment = Alignment.Center,
+                    ) { Icon(AppIcons.ArrowLeft, "Orqaga", tint = palette.ink, modifier = Modifier.size(18.dp)) }
+                }
+                Spacer(Modifier.height(10.dp))
+            }
             Text("Siz uchun", style = TextStyle(fontFamily = AppFontFamily, fontSize = 24.sp, fontWeight = FontWeight.Black, color = palette.ink))
             Spacer(Modifier.height(4.dp))
             Text("${state.totalCount} ta e'lon — chegirmali va oddiy takliflar.", style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.5f.sp, color = palette.inkMuted))
@@ -96,6 +123,8 @@ private fun FeedContent(
                 }
                 FilterButton(state.activeFilterCount, palette, onOpenFilter)
             }
+            Spacer(Modifier.height(9.dp))
+            MapLinkButton(palette, onOpenMap)
         }
 
         Spacer(Modifier.height(12.dp))
@@ -143,6 +172,158 @@ private fun FilterButton(activeCount: Int, palette: AppPalette, onClick: () -> U
             }
         }
     }
+}
+
+@Composable
+private fun MapLinkButton(palette: AppPalette, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().height(44.dp).clip(RoundedCornerShape(13.dp))
+            .background(palette.glass).border(1.dp, palette.border, RoundedCornerShape(13.dp))
+            .clickable(onClick = onClick).padding(horizontal = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text("🗺", style = TextStyle(fontSize = 16.sp))
+        Text("Xaritada ko'rish", style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = palette.ink), modifier = Modifier.weight(1f))
+        Icon(AppIcons.ChevronRight, null, tint = palette.inkFaint, modifier = Modifier.size(16.dp))
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Xarita overlay — barcha (filtrlangan) e'lonlar narx markerlari bilan
+// ---------------------------------------------------------------------------
+@Composable
+private fun MapOverlay(
+    state: DiscountsUiState,
+    palette: AppPalette,
+    vm: DiscountsViewModel,
+    onClose: () -> Unit,
+    onOpenFilter: () -> Unit,
+) {
+    val located = state.offers.filter { it.hasLocation }
+    val markers = located.map { o ->
+        OfferMarker(
+            id = o.id, lat = o.lat, lng = o.lng,
+            label = o.effectivePrice.priceShort(),
+            colorHex = hexRgb(o.bannerAccent),
+            highlight = o.isDiscount,
+        )
+    }
+    val center = if (markers.isEmpty()) MapPoint(41.311081, 69.240562)
+    else MapPoint(markers.map { it.lat }.average(), markers.map { it.lng }.average())
+
+    var selectedId by remember { mutableStateOf<String?>(null) }
+    val selected = located.firstOrNull { it.id == selectedId }
+
+    Column(Modifier.fillMaxSize().background(palette.bgBrush)) {
+        // Ustki panel — orqaga + qidiruv + Filter
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(top = 54.dp, bottom = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(9.dp),
+        ) {
+            Box(
+                Modifier.size(46.dp).clip(RoundedCornerShape(13.dp)).background(palette.glass).border(1.dp, palette.border, RoundedCornerShape(13.dp)).clickable(onClick = onClose),
+                contentAlignment = Alignment.Center,
+            ) { Icon(AppIcons.ArrowLeft, "Yopish", tint = palette.ink, modifier = Modifier.size(18.dp)) }
+            Box(Modifier.weight(1f)) {
+                GlassTextField(state.query, vm::onQuery, "Do'kon yoki e'lon qidiring", leading = AppIcons.Search, height = 46)
+            }
+            FilterButton(state.activeFilterCount, palette, onOpenFilter)
+        }
+
+        // Xarita (pastki tab panelini ochiq qoldirish uchun bottom padding)
+        Box(Modifier.fillMaxSize().padding(bottom = 88.dp)) {
+            OffersMap(markers, center, Modifier.fillMaxSize(), onMarkerTap = { selectedId = it })
+            // Natija soni belgisi
+            Box(
+                Modifier.align(Alignment.TopCenter).padding(top = 8.dp).clip(RoundedCornerShape(11.dp))
+                    .background(palette.ink.copy(alpha = 0.82f)).padding(horizontal = 12.dp, vertical = 6.dp),
+            ) {
+                Text("${markers.size} ta e'lon xaritada", style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.5f.sp, fontWeight = FontWeight.Bold, color = Color.White))
+            }
+
+            // Marker bosilganda — tafsilot kartasi (pastda)
+            if (selected != null) {
+                MarkerDetailCard(
+                    offer = selected,
+                    saved = state.savedIds.contains(selected.id),
+                    palette = palette,
+                    onToggleSaved = vm::toggleSaved,
+                    onClose = { selectedId = null },
+                    modifier = Modifier.align(Alignment.BottomCenter).padding(12.dp),
+                )
+            }
+        }
+    }
+}
+
+// Xaritada marker bosilganda chiqadigan kengaytirilgan e'lon kartasi.
+@Composable
+private fun MarkerDetailCard(
+    offer: DiscountOffer,
+    saved: Boolean,
+    palette: AppPalette,
+    onToggleSaved: (DiscountOffer, Boolean) -> Unit,
+    onClose: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val accent = Color(offer.bannerAccent)
+    val clipboard = LocalClipboardManager.current
+    var copied by remember(offer.id) { mutableStateOf(false) }
+    LaunchedEffect(copied) { if (copied) { delay(1500); copied = false } }
+
+    Column(
+        modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(palette.glassStrong).border(1.dp, palette.border, RoundedCornerShape(18.dp)).padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(9.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(11.dp)) {
+            Box(Modifier.size(48.dp).clip(RoundedCornerShape(13.dp)).background(accent.copy(alpha = 0.16f)), contentAlignment = Alignment.Center) {
+                Text(offer.emoji, style = TextStyle(fontSize = 24.sp))
+            }
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text("${offer.merchant} — ${offer.title}", style = TextStyle(fontFamily = AppFontFamily, fontSize = 14.sp, fontWeight = FontWeight.ExtraBold, color = palette.ink), maxLines = 2, overflow = TextOverflow.Ellipsis)
+                if (offer.subcategory.isNotBlank()) {
+                    Text(offer.subcategory, style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = accent))
+                }
+            }
+            Box(
+                Modifier.size(30.dp).clip(RoundedCornerShape(9.dp)).background(palette.glass).clickable(onClick = onClose),
+                contentAlignment = Alignment.Center,
+            ) { Text("✕", style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.sp, fontWeight = FontWeight.Black, color = palette.inkMuted)) }
+        }
+
+        // Narx
+        Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+            Text("${offer.effectivePrice.sum()} so'm", style = TextStyle(fontFamily = AppFontFamily, fontSize = 16.sp, fontWeight = FontWeight.Black, color = if (offer.isDiscount) accent else palette.ink))
+            if (offer.isDiscount && offer.originalPrice > offer.finalPrice) {
+                Text("${offer.originalPrice.sum()}", style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.sp, color = palette.inkFaint, textDecoration = TextDecoration.LineThrough))
+                Box(Modifier.clip(RoundedCornerShape(8.dp)).background(accent).padding(horizontal = 8.dp, vertical = 3.dp)) {
+                    Text("−${offer.discountPercent}%", style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.sp, fontWeight = FontWeight.Black, color = Color.White))
+                }
+            }
+            Text("/ ${offer.priceUnit}", style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.sp, color = palette.inkFaint))
+        }
+
+        OfferTagRow(offer, saved, palette, clipboard, copied, onCopy = { copied = true }, onToggleSaved = onToggleSaved)
+
+        val meta = listOfNotNull(offer.location?.let { "📍 $it" }, offer.expiry).joinToString(" · ")
+        if (meta.isNotBlank()) Text(meta, style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.sp, color = palette.inkFaint))
+    }
+}
+
+// ARGB Long -> "#RRGGBB"
+private fun hexRgb(argb: Long): String = "#" + (argb and 0xFFFFFF).toString(16).padStart(6, '0').uppercase()
+
+// 21000 -> "21k", 890000 -> "890k", 6500000 -> "6.5M"
+private fun Long.priceShort(): String = when {
+    this >= 1_000_000 -> {
+        val whole = this / 1_000_000
+        val frac = (this % 1_000_000) / 100_000
+        if (frac == 0L) "${whole}M" else "$whole.${frac}M"
+    }
+    this >= 1_000 -> "${this / 1_000}k"
+    else -> "$this"
 }
 
 // ---------------------------------------------------------------------------
@@ -218,8 +399,9 @@ private fun FilterScreen(
             Spacer(Modifier.height(16.dp))
         }
 
-        // Pastki panel — Qo'llash (jonli natija soni bilan)
-        Box(Modifier.fillMaxWidth().padding(16.dp)) {
+        // Pastki panel — Qo'llash (jonli natija soni bilan).
+        // Pastki tab paneli (StudentShell BottomBar ~88.dp) ustidan ko'rinishi uchun bottom padding.
+        Box(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 96.dp)) {
             Box(
                 Modifier.fillMaxWidth().height(50.dp).clip(RoundedCornerShape(14.dp)).background(palette.primary).clickable(onClick = onApply),
                 contentAlignment = Alignment.Center,

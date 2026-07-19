@@ -12,6 +12,7 @@ import dev.feature.auth.presentation.main.ClubsViewModel
 import dev.feature.auth.presentation.main.DiscountsViewModel
 import dev.feature.auth.presentation.main.HomeViewModel
 import dev.feature.auth.presentation.main.JobsViewModel
+import dev.feature.auth.presentation.main.MyUniversityViewModel
 import dev.feature.auth.presentation.main.NotificationsViewModel
 import dev.feature.auth.presentation.flow.RoleLauncherViewModel
 import dev.feature.auth.presentation.main.PostAdViewModel
@@ -66,6 +67,7 @@ val authFeatureModule = module {
     viewModelOf(::HomeViewModel)
     viewModelOf(::JobsViewModel)
     viewModelOf(::StudentsViewModel)
+    viewModelOf(::MyUniversityViewModel)
     viewModelOf(::DiscountsViewModel)
     viewModelOf(::PostAdViewModel)
     viewModelOf(::ChatViewModel)

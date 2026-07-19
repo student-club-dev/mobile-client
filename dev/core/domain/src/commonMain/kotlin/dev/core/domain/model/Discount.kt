@@ -35,7 +35,15 @@ data class DiscountOffer(
     val emoji: String,
     val bannerAccent: Long,
     val featured: Boolean = false,   // Home feed'da ko'rsatiladimi
+    val lat: Double = 0.0,           // joylashuv (xaritada ko'rsatish uchun); 0.0 → noma'lum
+    val lng: Double = 0.0,
 ) {
     /** Chegirmadan tejaladigan summa (so'm). Chegirmasizda 0. */
     val savedAmount: Long get() = if (isDiscount) (originalPrice - finalPrice).coerceAtLeast(0) else 0
+
+    /** Xaritada ko'rsatiladigan haqiqiy koordinata bormi. */
+    val hasLocation: Boolean get() = lat != 0.0 && lng != 0.0
+
+    /** Xaritada/kartada ko'rsatiladigan asosiy narx (chegirmada — chegirmali narx). */
+    val effectivePrice: Long get() = if (isDiscount && finalPrice > 0) finalPrice else originalPrice
 }

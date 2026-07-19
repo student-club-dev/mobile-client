@@ -37,6 +37,8 @@ data class DiscountOfferDto(
     val emoji: String = "🎁",
     val bannerAccent: Long = 0xFF6C47FF,
     val featured: Boolean = false,
+    val lat: Double = 0.0,
+    val lng: Double = 0.0,
 )
 
 /** Bitta so'rovda ikkalasini olish uchun konteyner (yoki alohida endpoint'lar). */
