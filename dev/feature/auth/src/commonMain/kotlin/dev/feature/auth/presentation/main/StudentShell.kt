@@ -37,6 +37,15 @@ import dev.core.designsystem.components.AppFontFamily
 import dev.core.designsystem.components.AppIcons
 import dev.core.designsystem.theme.AppPalette
 import dev.core.designsystem.theme.appPalette
+import dev.feature.jobs.presentation.JobsScreen
+import dev.feature.students.presentation.StudentsScreen
+import dev.feature.notifications.presentation.NotificationsScreen
+import dev.feature.clubs.presentation.ClubsScreen
+import dev.feature.settings.presentation.SettingsScreen
+import dev.feature.university.presentation.MyUniversityScreen
+import dev.feature.ads.presentation.PostAdScreen
+import dev.feature.chat.presentation.ChatScreen
+import dev.feature.home.presentation.HomeScreen
 import dev.feature.profile.presentation.EditProfileScreen
 import dev.feature.profile.presentation.ProfileScreen
 

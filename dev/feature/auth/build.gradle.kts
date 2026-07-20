@@ -15,7 +15,28 @@ kotlin {
             // Ro'yxatdan o'tish oqimi profilni saqlaydi; MainShell Profil/e'lon ekranlarini ochadi.
             api(projects.dev.feature.profile.domain)
             implementation(projects.dev.feature.profile.presentation)
-            implementation(projects.dev.feature.discounts.presentation)
+            implementation(projects.dev.feature.listings.presentation)
+            // Ishlar feature'i — Home domendan Job o'qiydi, StudentShell JobsScreen'ni ochadi.
+            api(projects.dev.feature.jobs.domain)
+            implementation(projects.dev.feature.jobs.presentation)
+            api(projects.dev.feature.students.domain)
+            implementation(projects.dev.feature.students.presentation)
+            implementation(projects.dev.feature.notifications.domain)
+            implementation(projects.dev.feature.notifications.presentation)
+            implementation(projects.dev.feature.clubs.domain)
+            implementation(projects.dev.feature.clubs.presentation)
+            implementation(projects.dev.feature.settings.domain)
+            implementation(projects.dev.feature.settings.presentation)
+            api(projects.dev.feature.university.domain)
+            implementation(projects.dev.feature.university.presentation)
+            // E'lonlar feature'i — StudentShell PostAdScreen'ni ochadi.
+            implementation(projects.dev.feature.ads.presentation)
+            // Chat feature'i — FirestoreChatRealtimeSource chat.domain'ni implement qiladi;
+            // StudentShell ChatScreen'ni ochadi.
+            api(projects.dev.feature.chat.domain)
+            implementation(projects.dev.feature.chat.presentation)
+            // Home agregator ekrani — StudentShell HomeScreen'ni ochadi.
+            implementation(projects.dev.feature.home.presentation)
             // Biznesmen ekranlari alohida modulda (sof UI) — auth uni ishlatadi.
             implementation(projects.dev.feature.business)
 

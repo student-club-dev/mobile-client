@@ -17,8 +17,18 @@ kotlin {
             api(projects.dev.feature.auth)
             // Profil feature'ining Koin moduli (`profileModule`) shu yerda ulanadi.
             api(projects.dev.feature.profile.presentation)
-            // discountsModule() — chegirma e'lonlari feature'i.
-            api(projects.dev.feature.discounts.presentation)
+            // listingsModule() — e'lonlar (Listing) feature'i + "Siz uchun" feed/xarita.
+            api(projects.dev.feature.listings.presentation)
+            // jobsModule() — ishlar feature'i.
+            api(projects.dev.feature.jobs.presentation)
+            api(projects.dev.feature.students.presentation)
+            api(projects.dev.feature.notifications.presentation)
+            api(projects.dev.feature.clubs.presentation)
+            api(projects.dev.feature.settings.presentation)
+            api(projects.dev.feature.university.presentation)
+            api(projects.dev.feature.ads.presentation)
+            api(projects.dev.feature.chat.presentation)
+            api(projects.dev.feature.home.presentation)
             api(libs.koin.core)
             implementation(libs.ktor.client.core)
             implementation(libs.ktor.client.contentNegotiation)

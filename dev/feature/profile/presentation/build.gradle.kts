@@ -12,6 +12,11 @@ kotlin {
 
             // "Mening e'lonlarim / Saqlangan / Arizalar" bo'limlari umumiy domen repository'laridan o'qiydi.
             implementation(projects.dev.core.domain)
+            implementation(projects.dev.feature.university.domain)
+            // "Ish arizalarim" bo'limi ishlar feature'ining domain'idan o'qiydi (JobApplication, JobRepository).
+            implementation(projects.dev.feature.jobs.domain)
+            // "Mening e'lonlarim" bo'limi — Ad, AdRepository.
+            implementation(projects.dev.feature.ads.domain)
             implementation(projects.dev.core.network)
             // Koin moduli `ProfileRepositoryImpl(database, ...)` ni quradi.
             implementation(projects.dev.core.database)

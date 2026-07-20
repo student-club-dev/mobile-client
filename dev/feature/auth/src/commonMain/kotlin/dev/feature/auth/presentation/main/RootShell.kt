@@ -1,4 +1,5 @@
 package dev.feature.auth.presentation.main
+import dev.feature.settings.presentation.SettingsScreen
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize

@@ -24,6 +24,10 @@ kotlin {
             api(projects.dev.core.di)
             implementation(projects.dev.core.designsystem)
             implementation(projects.dev.core.data)
+            // Mavzu (ThemeMode) + SettingsRepository — App() ildizida ishlatiladi.
+            implementation(projects.dev.feature.settings.domain)
+            implementation(projects.dev.feature.university.domain)
+            implementation(projects.dev.core.domain)
             api(projects.dev.feature.auth)
 
             implementation(compose.runtime)

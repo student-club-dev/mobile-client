@@ -1,4 +1,5 @@
 package dev.feature.auth.presentation.flow
+import dev.feature.settings.presentation.SettingsScreen
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -50,7 +51,6 @@ import dev.feature.auth.presentation.screens.RoleChoiceScreen
 import dev.feature.business.BusinessWelcomeScreen
 import dev.feature.business.BusinessProfileScreen
 import dev.feature.business.BusinessShell
-import dev.feature.auth.presentation.main.SettingsScreen
 import dev.feature.auth.presentation.screens.SignUpScreen
 import dev.feature.auth.presentation.screens.SuccessScreen
 import dev.feature.auth.presentation.screens.UniversityPickerScreen

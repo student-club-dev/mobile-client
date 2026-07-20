@@ -37,7 +37,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import dev.core.domain.model.University
+import dev.feature.university.domain.model.University
 import dev.feature.profile.domain.model.UserProfile
 import dev.core.designsystem.components.AppFontFamily
 import dev.core.designsystem.components.AppIcons
@@ -77,6 +77,7 @@ fun EditProfileScreen(onBack: () -> Unit, vm: ProfileViewModel = koinViewModel()
     var courseYear by remember(profile) { mutableStateOf(profile?.courseYear) }
 
     var uniExpanded by remember { mutableStateOf(false) }
+    var uniQuery by remember { mutableStateOf("") }
     var saving by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
 
@@ -189,13 +190,25 @@ fun EditProfileScreen(onBack: () -> Unit, vm: ProfileViewModel = koinViewModel()
             }
             if (uniExpanded) {
                 Column(
-                    Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(palette.glass).border(1.dp, palette.border, RoundedCornerShape(14.dp)),
+                    Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(palette.glass).border(1.dp, palette.border, RoundedCornerShape(14.dp)).padding(8.dp),
                 ) {
-                    state.universities.forEach { uni ->
+                    GlassTextField(uniQuery, { uniQuery = it }, "Universitet qidiring", leading = AppIcons.Search, height = 44)
+                    Spacer(Modifier.height(8.dp))
+                    // Ro'yxat katta (prof-emis, ~10000) — qidiruv bo'yicha cheklab ko'rsatamiz.
+                    val filtered = remember(state.universities, uniQuery) {
+                        (if (uniQuery.isBlank()) state.universities
+                        else state.universities.filter { it.name.contains(uniQuery, ignoreCase = true) || it.city.contains(uniQuery, ignoreCase = true) })
+                            .take(40)
+                    }
+                    filtered.forEach { uni ->
                         UniversityRow(uni, selected = uni.id == universityId, palette) {
                             universityId = uni.id
                             uniExpanded = false
+                            uniQuery = ""
                         }
+                    }
+                    if (filtered.isEmpty()) {
+                        Text("Topilmadi", style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.sp, color = palette.inkFaint), modifier = Modifier.padding(8.dp))
                     }
                 }
             }
