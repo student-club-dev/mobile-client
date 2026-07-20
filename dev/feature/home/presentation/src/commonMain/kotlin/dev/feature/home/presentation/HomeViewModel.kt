@@ -34,6 +34,8 @@ data class HomeUiState(
     val featured: DiscountOffer? = null,
     /** Faol ish e'lonlari ([ListingKind.JOB]) — "E'lonlar" bo'limidagi bilan bir xil manba. */
     val jobs: List<Listing> = emptyList(),
+    /** Faol ijara e'lonlari ([ListingKind.RENTAL]) — sherik izlayotgan kvartiralar. */
+    val rentals: List<Listing> = emptyList(),
     val students: List<Student> = emptyList(),
     val clubs: List<Club> = emptyList(),
     val hasUnreadNotifications: Boolean = false,
@@ -45,7 +47,7 @@ class HomeViewModel(
     private val refreshProfileUseCase: RefreshProfileUseCase,
     universityRepository: UniversityRepository,
     private val discountRepository: DiscountRepository,
-    observeJobListings: ObserveListingsByKindUseCase,
+    observeListingsByKind: ObserveListingsByKindUseCase,
     private val studentRepository: StudentRepository,
     clubRepository: ClubRepository,
     notificationRepository: NotificationRepository,
@@ -75,14 +77,21 @@ class HomeViewModel(
         )
     }
 
+    // Ish va ijara e'lonlari bitta oqimga yig'iladi — aks holda `content` 6 ta manbaga
+    // aylanib, typed `combine` overload'i qolmaydi.
+    private val listings = combine(
+        observeListingsByKind(ListingKind.JOB),
+        observeListingsByKind(ListingKind.RENTAL),
+    ) { jobs, rentals -> jobs to rentals }
+
     private val content = combine(
         discountRepository.observeCategories(),
         discountRepository.observeFeatured(),
-        observeJobListings(ListingKind.JOB),
+        listings,
         studentRepository.observeStudents(),
         clubRepository.observeClubs(),
-    ) { categories, featured, jobs, students, clubs ->
-        Content(categories, featured.firstOrNull(), jobs, students, clubs)
+    ) { categories, featured, (jobs, rentals), students, clubs ->
+        Content(categories, featured.firstOrNull(), jobs, rentals, students, clubs)
     }
 
     val state: StateFlow<HomeUiState> = combine(
@@ -95,6 +104,7 @@ class HomeViewModel(
             categories = c.categories,
             featured = c.featured,
             jobs = c.jobs,
+            rentals = c.rentals,
             students = c.students,
             clubs = c.clubs,
             hasUnreadNotifications = unread > 0,
@@ -114,6 +124,7 @@ class HomeViewModel(
         val categories: List<DiscountCategory>,
         val featured: DiscountOffer?,
         val jobs: List<Listing>,
+        val rentals: List<Listing>,
         val students: List<Student>,
         val clubs: List<Club>,
     )

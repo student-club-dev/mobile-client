@@ -245,7 +245,19 @@ private fun countLabel(state: ListingsBrowseUiState): String = when {
  * Bo'lim tanlash. Chegirma bu yerda yo'q — uning o'z ekrani bor va mantig'i boshqacha
  * (chegirma foizi, promokod, filial).
  */
-private val browseKinds = listOf(ListingKind.RENTAL, ListingKind.SERVICE, ListingKind.JOB)
+/**
+ * Talabaga ko'rinadigan bo'limlar. [ListingKind.DISCOUNT] yo'q — u "Siz uchun" feed'ida
+ * alohida ko'rsatiladi.
+ *
+ * Yangi tur qo'shilganda shu ro'yxatga ham qo'shish ESDAN CHIQMASIN — bu qo'lda tuzilgan
+ * ro'yxat, `ListingKind.entries` emas.
+ */
+private val browseKinds = listOf(
+    ListingKind.TASK,
+    ListingKind.RENTAL,
+    ListingKind.SERVICE,
+    ListingKind.JOB,
+)
 
 @Composable
 private fun KindTabs(

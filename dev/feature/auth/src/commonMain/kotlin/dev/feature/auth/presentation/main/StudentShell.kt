@@ -76,7 +76,19 @@ private const val LISTING_DETAIL = "listing_detail"
 private const val POST_LISTING = "post_listing"
 
 /** Talaba qo'ya oladigan e'lon turlari — chegirma biznesnikidir. */
-private val studentListingKinds = listOf(ListingKind.RENTAL, ListingKind.SERVICE, ListingKind.JOB)
+/**
+ * Talaba qo'ya oladigan e'lon turlari. [ListingKind.DISCOUNT] yo'q — u biznes turini
+ * (Kafe, Game Club...) so'raydi va shaxsiy e'longa to'g'ri kelmaydi, u [BusinessShell] da.
+ *
+ * Yangi tur qo'shilganda shu ro'yxatga ham qo'shish ESDAN CHIQMASIN — bu qo'lda tuzilgan
+ * ro'yxat, `ListingKind.entries` emas.
+ */
+private val studentListingKinds = listOf(
+    ListingKind.TASK,
+    ListingKind.RENTAL,
+    ListingKind.SERVICE,
+    ListingKind.JOB,
+)
 private const val POST_AD = "post_ad"
 private const val PROFILE = "profile"
 private const val CHAT = "chat"
@@ -143,6 +155,8 @@ fun StudentShell(onLoggedOut: () -> Unit) {
                     onOpenClubs = { nav.navigateSafe(CLUBS) },
                     onOpenDiscounts = { nav.navigateSafe(DISCOUNTS) },
                     onOpenJobs = { selectTab(StudentTab.LISTINGS.route) },
+                    // Ijara — o'sha ekran, lekin darrov "Ijara" tab'i ochilgan holda.
+                    onOpenRentals = { selectTab("${StudentTab.LISTINGS.route}?kind=${ListingKind.RENTAL.name}") },
                     onOpenListing = { id -> nav.navigateSafe("$LISTING_DETAIL/${encodeArg(id)}") },
                     onOpenStudents = { selectTab(StudentTab.STUDENTS.route) },
                 )

@@ -158,6 +158,7 @@ private sealed interface DetailsJson {
         val payoutNote: String? = null,
     ) : DetailsJson
 
+    @Serializable
     @SerialName("TASK")
     data class Task(
         val category: String? = null,

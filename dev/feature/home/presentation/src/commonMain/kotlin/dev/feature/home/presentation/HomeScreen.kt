@@ -55,6 +55,7 @@ fun HomeScreen(
     onOpenClubs: () -> Unit = {},
     onOpenDiscounts: () -> Unit = {},
     onOpenJobs: () -> Unit = {},
+    onOpenRentals: () -> Unit = {},
     onOpenListing: (String) -> Unit = {},
     onOpenStudents: () -> Unit = {},
     vm: HomeViewModel = koinViewModel(),
@@ -68,6 +69,8 @@ fun HomeScreen(
             DiscountsSection(state.categories, state.featured, palette, onOpenDiscounts)
             Spacer(Modifier.height(24.dp))
             ClubsSection(state.clubs, palette, onOpenClubs)
+            Spacer(Modifier.height(24.dp))
+            RentalsSection(state.rentals, palette, onOpenRentals, onOpenListing)
             Spacer(Modifier.height(24.dp))
             JobsSection(state.jobs, palette, onOpenJobs, onOpenListing)
             Spacer(Modifier.height(24.dp))
@@ -196,6 +199,59 @@ private fun ClubsSection(clubs: List<Club>, palette: AppPalette, onOpenClubs: ()
             }
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+// Ijara kvartiralar — Klublar kabi gorizontal lenta
+// ---------------------------------------------------------------------------
+@Composable
+private fun RentalsSection(
+    rentals: List<Listing>,
+    palette: AppPalette,
+    onSeeAll: () -> Unit,
+    onOpenListing: (String) -> Unit,
+) {
+    if (rentals.isEmpty()) return
+    SectionHeader("Ijara kvartiralar", action = "Barchasi", subtitle = "Sherik izlayotgan uylar", palette = palette, onAction = onSeeAll)
+    Spacer(Modifier.height(12.dp))
+    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        rentals.take(6).forEach { RentalCard(it, palette, onOpenListing) }
+    }
+}
+
+@Composable
+private fun RentalCard(listing: Listing, palette: AppPalette, onOpenListing: (String) -> Unit) {
+    val rental = listing.rentalDetails
+    val accent = Color(listing.accent)
+    Column(
+        Modifier.width(168.dp).clip(RoundedCornerShape(16.dp)).background(palette.glass)
+            .border(1.dp, palette.border, RoundedCornerShape(16.dp))
+            .clickable { onOpenListing(listing.id) }
+            .padding(12.dp),
+        horizontalAlignment = Alignment.Start,
+    ) {
+        Box(Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(accent.copy(alpha = 0.14f)), contentAlignment = Alignment.Center) {
+            Text(listing.emoji, style = TextStyle(fontSize = 19.sp))
+        }
+        Spacer(Modifier.height(9.dp))
+        Text(listing.title, style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.5f.sp, fontWeight = FontWeight.Black, color = palette.ink), maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Spacer(Modifier.height(3.dp))
+        // "3 xonali · 2 kishi bor · 2 kishi kerak" — bo'sh bo'lsa manzilga tushamiz.
+        val meta = rental?.summary()?.takeIf { it.isNotBlank() }
+            ?: listing.branches.firstOrNull()?.address.orEmpty()
+        if (meta.isNotBlank()) {
+            Text(meta, style = TextStyle(fontFamily = AppFontFamily, fontSize = 10.5f.sp, color = palette.inkFaint), maxLines = 2, overflow = TextOverflow.Ellipsis)
+        }
+        Spacer(Modifier.height(6.dp))
+        Text(listing.rentLabel(), style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = palette.successDeep), maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+/** "1 200 000 so'm / oy" yoki "Kelishilgan". */
+private fun Listing.rentLabel(): String {
+    if (isNegotiable) return "Kelishilgan"
+    val suffix = rentalDetails?.period?.priceUnit?.suffix
+    return listOfNotNull("${price.formatSum()} so'm", suffix).joinToString(" / ")
 }
 
 // ---------------------------------------------------------------------------
