@@ -45,6 +45,7 @@ kotlin {
             implementation(libs.sqldelight.coroutines)
 
             implementation(libs.androidx.navigation.compose)
+            implementation(projects.dev.core.navigation)
             implementation(libs.kotlinx.datetime)
 
             // GitLive Firebase — email/parol, parolni tiklash, Firestore profil (backendsiz)

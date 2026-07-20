@@ -14,6 +14,7 @@ kotlin {
             implementation(projects.dev.feature.profile.domain)
             // BusinessShell ichki navigatsiyasi (NavHost).
             implementation(libs.androidx.navigation.compose)
+            implementation(projects.dev.core.navigation)
         }
     }
 }
