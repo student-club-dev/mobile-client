@@ -68,7 +68,7 @@ private enum class StudentTab(val route: String, val label: String, val icon: Im
     // Ilgari faqat "Ishlar" edi; endi bitta ekranda Ijara, Xizmatlar va Ish e'lonlari
     // tab bilan almashadi, shuning uchun umumiy nom.
     LISTINGS("listings", "E'lonlar", AppIcons.FileText),
-    STUDENTS("students", "Student", AppIcons.Users),
+    CHAT("chat", "Xabarlar", AppIcons.MessageSquare),
 }
 
 private const val DISCOUNTS = "discounts"
@@ -91,7 +91,8 @@ private val studentListingKinds = listOf(
 )
 private const val POST_AD = "post_ad"
 private const val PROFILE = "profile"
-private const val CHAT = "chat"
+/** Endi tab emas — Home'dagi "Studentlar / Barchasi" dan ochiladi. */
+private const val STUDENTS = "students"
 private const val NOTIFICATIONS = "notifications"
 private const val EDIT_PROFILE = "edit_profile"
 private const val SETTINGS = "settings"
@@ -164,7 +165,7 @@ fun StudentShell(onLoggedOut: () -> Unit) {
             ) {
                 HomeScreen(
                     onOpenProfile = { nav.navigateSafe(PROFILE) },
-                    onOpenChat = { nav.navigateSafe(CHAT) },
+                    onOpenChat = { selectTab(StudentTab.CHAT.route) },
                     onOpenNotifications = { nav.navigateSafe(NOTIFICATIONS) },
                     onOpenClubs = { nav.navigateSafe(CLUBS) },
                     onOpenDiscounts = { nav.navigateSafe(DISCOUNTS) },
@@ -172,7 +173,7 @@ fun StudentShell(onLoggedOut: () -> Unit) {
                     onOpenJobs = { openListingsKind(ListingKind.JOB) },
                     onOpenRentals = { openListingsKind(ListingKind.RENTAL) },
                     onOpenListing = { id -> nav.navigateSafe("$LISTING_DETAIL/${encodeArg(id)}") },
-                    onOpenStudents = { selectTab(StudentTab.STUDENTS.route) },
+                    onOpenStudents = { nav.navigateSafe(STUDENTS) },
                 )
             }
             composable(
@@ -212,10 +213,10 @@ fun StudentShell(onLoggedOut: () -> Unit) {
                 )
             }
             composable(
-                StudentTab.STUDENTS.route,
+                StudentTab.CHAT.route,
                 enterTransition = TabEnter, exitTransition = TabExit,
                 popEnterTransition = TabEnter, popExitTransition = TabExit,
-            ) { StudentsScreen() }
+            ) { ChatScreen() } // tab — orqaga tugmasisiz
             composable(
                 route = "$POST_AD?adId={adId}",
                 arguments = listOf(navArgument("adId") { type = NavType.StringType; nullable = true; defaultValue = null }),
@@ -249,7 +250,7 @@ fun StudentShell(onLoggedOut: () -> Unit) {
                     showMyBusiness = false,
                 )
             }
-            composable(CHAT) { ChatScreen(onBack = { nav.popSafe() }) }
+            composable(STUDENTS) { StudentsScreen(onBack = { nav.popSafe() }) }
             composable(NOTIFICATIONS) { NotificationsScreen(onBack = { nav.popSafe() }) }
             composable(CLUBS) { ClubsScreen(onBack = { nav.popSafe() }) }
             composable(EDIT_PROFILE) { EditProfileScreen(onBack = { nav.popSafe() }) }
@@ -295,7 +296,7 @@ private fun BottomBar(
             NavBarItem(StudentTab.UNIVERSITY, current, onSelect, palette, Modifier.weight(1f))
             Spacer(Modifier.weight(1f)) // markaziy FAB uchun joy
             NavBarItem(StudentTab.LISTINGS, current, onSelect, palette, Modifier.weight(1f))
-            NavBarItem(StudentTab.STUDENTS, current, onSelect, palette, Modifier.weight(1f))
+            NavBarItem(StudentTab.CHAT, current, onSelect, palette, Modifier.weight(1f))
         }
 
         // Markaziy "Elon" FAB — talaba e'loni (ish/sotuv/xizmat)
