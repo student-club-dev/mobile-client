@@ -35,22 +35,27 @@ import dev.core.designsystem.theme.AppPalette
 import dev.core.designsystem.theme.appPalette
 import dev.feature.listings.domain.model.Listing
 import dev.feature.listings.domain.model.formatSum
-import dev.feature.listings.domain.usecase.ObserveActiveListingsUseCase
+import dev.feature.listings.domain.model.ListingKind
+import dev.feature.listings.domain.usecase.ObserveListingsByKindUseCase
 import dev.feature.listings.presentation.components.ListingImage
-import dev.feature.listings.presentation.map.rememberUserLocation
+import dev.core.designsystem.map.rememberUserLocation
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import org.koin.compose.viewmodel.koinViewModel
 
-/** Talabaga ko'rinadigan faol chegirmalar (biznes egalari yuklagan e'lonlar). */
+/**
+ * Talabaga ko'rinadigan faol chegirmalar (biznes egalari yuklagan e'lonlar).
+ *
+ * Faqat [ListingKind.DISCOUNT] — ijara, xizmat va ish e'lonlari o'z bo'limlarida
+ * ko'rsatiladi va bu ro'yxatga aralashmasligi kerak.
+ */
 class NearbyDiscountsViewModel(
-    observeActive: ObserveActiveListingsUseCase,
+    observeByKind: ObserveListingsByKindUseCase,
 ) : ViewModel() {
 
-    val state: StateFlow<List<Listing>> = observeActive()
-        .map { it }
+    val state: StateFlow<List<Listing>> = observeByKind(ListingKind.DISCOUNT)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 }
 
@@ -106,7 +111,7 @@ private fun NearbyDiscountCard(
     distanceLabel: String?,
     palette: AppPalette,
 ) {
-    val accent = Color(listing.businessType.accent)
+    val accent = Color(listing.accent)
 
     Row(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(palette.glass)
@@ -121,13 +126,13 @@ private fun NearbyDiscountCard(
             if (cover != null) {
                 ListingImage(cover, Modifier.fillMaxSize().clip(RoundedCornerShape(13.dp)))
             } else {
-                Text(listing.businessType.emoji, style = TextStyle(fontSize = 22.sp))
+                Text(listing.emoji, style = TextStyle(fontSize = 22.sp))
             }
         }
 
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
             Text(
-                "${listing.businessName} — ${listing.title}",
+                "${listing.displayName} — ${listing.title}",
                 style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, color = palette.ink),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -138,15 +143,19 @@ private fun NearbyDiscountCard(
                     "${listing.finalPrice.formatSum()} so'm",
                     style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.5f.sp, fontWeight = FontWeight.Black, color = palette.successDeep),
                 )
-                Text(
-                    listing.originalPrice.formatSum(),
-                    style = TextStyle(
-                        fontFamily = AppFontFamily,
-                        fontSize = 11.sp,
-                        color = palette.inkFaint,
-                        textDecoration = TextDecoration.LineThrough,
-                    ),
-                )
+                // Chizilgan asl narx faqat chegirma bo'lganda ma'noli — aks holda bir xil
+                // raqam ikki marta chiqib qolardi.
+                if (listing.price != listing.finalPrice) {
+                    Text(
+                        listing.price.formatSum(),
+                        style = TextStyle(
+                            fontFamily = AppFontFamily,
+                            fontSize = 11.sp,
+                            color = palette.inkFaint,
+                            textDecoration = TextDecoration.LineThrough,
+                        ),
+                    )
+                }
             }
 
             // Eng yaqin filial va masofa — talabaning asosiy savoli: "qayerda va qancha uzoq?"
@@ -164,14 +173,18 @@ private fun NearbyDiscountCard(
             }
         }
 
-        Box(
-            Modifier.clip(RoundedCornerShape(10.dp)).background(accent).padding(horizontal = 9.dp, vertical = 5.dp),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                listing.discount.badge(),
-                style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.sp, fontWeight = FontWeight.Black, color = Color.White),
-            )
+        // badge() chegirmasiz e'londa `null` — u holda yorliq umuman chizilmaydi.
+        val badge = listing.discountDetails?.badge()
+        if (badge != null) {
+            Box(
+                Modifier.clip(RoundedCornerShape(10.dp)).background(accent).padding(horizontal = 9.dp, vertical = 5.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    badge,
+                    style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.sp, fontWeight = FontWeight.Black, color = Color.White),
+                )
+            }
         }
     }
 }

@@ -42,24 +42,25 @@ import dev.core.designsystem.theme.AppPalette
 import dev.core.designsystem.theme.appPalette
 import dev.feature.listings.domain.model.BusinessType
 import dev.feature.listings.domain.model.ListingField
+import dev.feature.listings.domain.model.ListingKind
 import dev.feature.listings.presentation.components.FormSection
 import dev.feature.listings.presentation.components.IconSquareButton
-import dev.feature.listings.presentation.form.TypeListingForm
-import dev.feature.listings.presentation.map.MapCenterRequest
-import dev.feature.listings.presentation.map.MapPicker
-import dev.feature.listings.presentation.map.MapPoint
-import dev.feature.listings.presentation.map.rememberUserLocation
+import dev.feature.listings.presentation.form.KindListingForm
+import dev.core.designsystem.map.MapCenterRequest
+import dev.core.designsystem.map.MapPicker
+import dev.core.designsystem.map.MapPoint
+import dev.core.designsystem.map.rememberUserLocation
 import org.koin.compose.viewmodel.koinViewModel
 
 /**
- * Chegirma e'loni qo'yish.
+ * E'lon qo'yish ekrani.
  *
- * Uch ekran: **biznes turi** → **o'sha turning formasi** → (kerak bo'lganda) **xarita**.
- * Har bir turning o'z formasi bor (`form/TypeForms.kt`), chunki yozuvlari boshqacha:
- * kafeda "Taom nomi", game club'da "Sessiya", o'quv markazda "Kurs nomi".
+ * Oqim: **e'lon turi** → (chegirmada) **biznes turi** → **o'sha turning formasi** →
+ * (kerak bo'lganda) **xarita**.
  *
- * Forma ataylab qisqa: biznes nomi, chegirma nimaga amal qilishi, rasm, narx + chegirma,
- * muddat, filial. Qolgan tafsilotlar — erkin tavsifda.
+ * Birinchi qadam aynan tur tanlash, chunki keyingi hamma narsa shunga bog'liq: ijarada
+ * "nechi kishi kerak", ishda "smena", xizmatda "qaysi soha" so'raladi va bu maydonlarning
+ * bir-biriga aloqasi yo'q.
  */
 @Composable
 fun PostListingScreen(
@@ -68,6 +69,11 @@ fun PostListingScreen(
     editListingId: String? = null,
     // `true` — Chegirma tab'idan, `false` — E'lon tab'idan (rejim qulflanadi).
     initialDiscount: Boolean? = null,
+    /**
+     * Qaysi turlarni qo'yish mumkin. Talabaga [ListingKind.DISCOUNT] berilmaydi: u biznes
+     * turini (Game Club, Kafe...) so'raydi va bu talabaning shaxsiy e'loniga to'g'ri kelmaydi.
+     */
+    availableKinds: List<ListingKind> = ListingKind.entries,
     vm: PostListingViewModel = koinViewModel(),
 ) {
     val palette = appPalette
@@ -75,29 +81,44 @@ fun PostListingScreen(
 
     LaunchedEffect(editListingId) { if (editListingId != null) vm.loadForEdit(editListingId) }
     LaunchedEffect(initialDiscount) {
-        if (editListingId == null && initialDiscount != null) vm.setInitialMode(initialDiscount)
+        if (editListingId == null && initialDiscount != null) vm.setInitialDiscountMode(initialDiscount)
     }
     LaunchedEffect(state.published) { if (state.published) onPublished() }
 
-    val type = state.businessType
+    val kind = state.kind
 
     when {
         // Xarita hamma narsadan ustun — joy tanlanmaguncha forma ko'rinmaydi.
         state.pickingOnMap -> BranchMapScreen(state, palette, vm)
-        state.step == PostListingStep.TYPE || type == null ->
-            BusinessTypePicker(palette, onClose = onClose, onPick = vm::selectType)
-        else -> TypeListingForm(type, state, palette, vm)
+
+        // 1-qadam: nima e'lon qilinmoqda. Biznes shell'idan kelinganda `initialDiscount`
+        // turni allaqachon DISCOUNT qilib qo'yadi va bu qadam o'tkazib yuboriladi.
+        state.step == PostListingStep.KIND || kind == null ->
+            ListingKindPicker(availableKinds, palette, onClose = onClose, onPick = vm::selectKind)
+
+        // 2-qadam: faqat chegirmada — qaysi biznes turi.
+        state.step == PostListingStep.TYPE ->
+            BusinessTypePicker(palette, onBack = vm::back, onPick = vm::selectBusinessType)
+
+        // 3-qadam: tanlangan turning o'z formasi.
+        else -> KindListingForm(kind, state, palette, vm)
     }
 }
 
 // ---------------------------------------------------------------------------
-// 1-qadam: biznes turi
+// 1-qadam: e'lon turi
 // ---------------------------------------------------------------------------
+
+/**
+ * Nima e'lon qilinmoqda. Turlar kam (4 ta) va har birining tushuntirishi bor — shuning
+ * uchun ikki ustunli katakcha emas, to'liq kenglikdagi satrlar: izoh o'qilarli qoladi.
+ */
 @Composable
-private fun BusinessTypePicker(
+private fun ListingKindPicker(
+    kinds: List<ListingKind>,
     palette: AppPalette,
     onClose: () -> Unit,
-    onPick: (BusinessType) -> Unit,
+    onPick: (ListingKind) -> Unit,
 ) {
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState())
@@ -105,6 +126,71 @@ private fun BusinessTypePicker(
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(11.dp)) {
             IconSquareButton(onClose, AppIcons.Close, palette)
+            Text(
+                "Yangi e'lon",
+                style = TextStyle(fontFamily = AppFontFamily, fontSize = 20.sp, fontWeight = FontWeight.Black, color = palette.ink),
+            )
+        }
+        Spacer(Modifier.height(6.dp))
+        Text(
+            "Nima e'lon qilmoqchisiz? Keyingi ekran shunga moslashadi.",
+            style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.5f.sp, color = palette.inkMuted),
+        )
+        Spacer(Modifier.height(16.dp))
+
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            kinds.forEach { kind -> ListingKindCard(kind, palette, onPick) }
+        }
+        Spacer(Modifier.height(110.dp))
+    }
+}
+
+@Composable
+private fun ListingKindCard(kind: ListingKind, palette: AppPalette, onPick: (ListingKind) -> Unit) {
+    val accent = Color(kind.accent)
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(palette.glass)
+            .border(1.dp, palette.border, RoundedCornerShape(18.dp))
+            .clickable { onPick(kind) }.padding(15.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(13.dp),
+    ) {
+        Box(
+            Modifier.size(50.dp).clip(RoundedCornerShape(15.dp)).background(accent.copy(alpha = 0.14f)),
+            contentAlignment = Alignment.Center,
+        ) { Text(kind.emoji, style = TextStyle(fontSize = 23.sp)) }
+
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Text(
+                kind.label,
+                style = TextStyle(fontFamily = AppFontFamily, fontSize = 14.5f.sp, fontWeight = FontWeight.Black, color = palette.ink),
+            )
+            Text(
+                kind.subtitle,
+                style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.5f.sp, color = palette.inkFaint),
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// 2-qadam: biznes turi (faqat chegirma e'lonida)
+// ---------------------------------------------------------------------------
+
+@Composable
+private fun BusinessTypePicker(
+    palette: AppPalette,
+    onBack: () -> Unit,
+    onPick: (BusinessType) -> Unit,
+) {
+    Column(
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState())
+            .padding(horizontal = 16.dp).padding(top = 54.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(11.dp)) {
+            IconSquareButton(onBack, AppIcons.ArrowLeft, palette)
             Text(
                 "Chegirma e'loni",
                 style = TextStyle(fontFamily = AppFontFamily, fontSize = 20.sp, fontWeight = FontWeight.Black, color = palette.ink),
@@ -158,18 +244,26 @@ private fun BusinessTypeCard(
 }
 
 // ---------------------------------------------------------------------------
-// Filiallar — xaritadan
+// Manzillar — xaritadan
 // ---------------------------------------------------------------------------
 
 /**
- * Filiallar bo'limi. Manzil qo'lda yozilmaydi: "+" bosiladi, xaritadan joy tanlanadi,
+ * Manzillar bo'limi. Manzil qo'lda yozilmaydi: "+" bosiladi, xaritadan joy tanlanadi,
  * manzil teskari geokodlash bilan o'zi to'ladi.
+ *
+ * Yozuvlari parametr — chegirmada bu "Filiallar", ijarada "Uy joyi", ishda "Ish joyi".
  */
 @Composable
-fun BranchesSection(state: PostListingUiState, palette: AppPalette, vm: PostListingViewModel) {
+fun BranchesSection(
+    state: PostListingUiState,
+    palette: AppPalette,
+    vm: PostListingViewModel,
+    title: String = "Manzil",
+    subtitle: String = "Xaritadan aniq joyni belgilang",
+) {
     FormSection(
-        title = "Filiallar",
-        subtitle = "Talabaga eng yaqini masofasi bilan ko'rsatiladi",
+        title = title,
+        subtitle = subtitle,
         error = state.errorFor(ListingField.LOCATION),
     ) {
         state.branches.forEachIndexed { index, branch ->
@@ -197,7 +291,7 @@ fun BranchesSection(state: PostListingUiState, palette: AppPalette, vm: PostList
                     )
                     Icon(
                         AppIcons.Close,
-                        "Filialni o'chirish",
+                        "Manzilni o'chirish",
                         tint = palette.inkFaint,
                         modifier = Modifier.size(15.dp).clickable { vm.removeBranch(index) },
                     )
@@ -206,7 +300,7 @@ fun BranchesSection(state: PostListingUiState, palette: AppPalette, vm: PostList
                 GlassTextField(
                     branch.name.orEmpty(),
                     { vm.onBranchName(index, it) },
-                    "Filial nomi (ixtiyoriy): Chilonzor filiali",
+                    "Nomi (ixtiyoriy): Chilonzor filiali",
                     height = 44,
                 )
             }
@@ -230,7 +324,7 @@ fun BranchesSection(state: PostListingUiState, palette: AppPalette, vm: PostList
             Icon(AppIcons.Plus, null, tint = palette.primary, modifier = Modifier.size(17.dp))
             Spacer(Modifier.size(7.dp))
             Text(
-                if (state.branches.isEmpty()) "Xaritadan filial belgilash" else "Yana bitta filial",
+                if (state.branches.isEmpty()) "Xaritadan belgilash" else "Yana bitta manzil",
                 style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.5f.sp, fontWeight = FontWeight.ExtraBold, color = palette.primary),
             )
         }
@@ -266,7 +360,7 @@ private fun BranchMapScreen(state: PostListingUiState, palette: AppPalette, vm: 
             IconSquareButton(vm::closeMap, AppIcons.ArrowLeft, palette)
             Column(Modifier.weight(1f)) {
                 Text(
-                    "Filial joyi",
+                    "Joyni belgilash",
                     style = TextStyle(fontFamily = AppFontFamily, fontSize = 18.sp, fontWeight = FontWeight.Black, color = palette.ink),
                 )
                 Text(
@@ -290,6 +384,7 @@ private fun BranchMapScreen(state: PostListingUiState, palette: AppPalette, vm: 
         Box(Modifier.fillMaxWidth().weight(1f)) {
             MapPicker(
                 initial = userLocation,
+                dark = palette.dark,
                 onCenterChanged = { point -> pickedPoint = point },
                 modifier = Modifier.fillMaxSize(),
                 centerRequest = centerRequest,

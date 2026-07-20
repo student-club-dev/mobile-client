@@ -9,6 +9,7 @@ import dev.feature.listings.data.mapper.toDomain
 import dev.feature.listings.data.mapper.toEntity
 import dev.feature.listings.data.remote.ListingRemoteDataSource
 import dev.feature.listings.domain.model.Listing
+import dev.feature.listings.domain.model.ListingKind
 import dev.feature.listings.domain.model.ListingStatus
 import dev.feature.listings.domain.repository.ListingRepository
 import kotlinx.coroutines.flow.Flow
@@ -39,6 +40,14 @@ class ListingRepositoryImpl(
 
     override fun observeActive(): Flow<List<Listing>> =
         q.selectActive(now = Clock.System.now().toEpochMilliseconds())
+            .asFlow()
+            .mapToList(dispatchers.io)
+            .map { rows -> rows.map { it.toDomain() } }
+
+    // Filtrlash SQL'da — `listing_kind_idx` indeksidan foydalanadi. Domenda filtrlash
+    // butun jadvalni o'qib, keyin tashlab yuborish bo'lar edi.
+    override fun observeActiveByKind(kind: ListingKind): Flow<List<Listing>> =
+        q.selectActiveByKind(kind = kind.name, now = Clock.System.now().toEpochMilliseconds())
             .asFlow()
             .mapToList(dispatchers.io)
             .map { rows -> rows.map { it.toDomain() } }
@@ -88,25 +97,18 @@ class ListingRepositoryImpl(
             id = e.id,
             ownerId = e.ownerId,
             businessId = e.businessId,
-            businessType = e.businessType,
-            businessName = e.businessName,
-            categoryKey = e.categoryKey,
-            customCategoryName = e.customCategoryName,
+            kind = e.kind,
+            detailsJson = e.detailsJson,
             title = e.title,
             description = e.description,
             imagesJson = e.imagesJson,
             priceUnit = e.priceUnit,
-            originalPrice = e.originalPrice,
+            price = e.price,
+            priceMax = e.priceMax,
             currency = e.currency,
-            discountType = e.discountType,
-            discountValue = e.discountValue,
+            isNegotiable = e.isNegotiable,
             finalPrice = e.finalPrice,
-            discountConditions = e.discountConditions,
-            redemptionMethod = e.redemptionMethod,
-            promoCode = e.promoCode,
-            perUserLimit = e.perUserLimit,
-            totalLimit = e.totalLimit,
-            usedCount = e.usedCount,
+            contactPhone = e.contactPhone,
             branchesJson = e.branchesJson,
             validFrom = e.validFrom,
             validTo = e.validTo,

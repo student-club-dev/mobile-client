@@ -37,7 +37,20 @@ import dev.core.designsystem.components.AppFontFamily
 import dev.core.designsystem.components.AppIcons
 import dev.core.designsystem.theme.AppPalette
 import dev.core.designsystem.theme.appPalette
-import dev.feature.jobs.presentation.JobsScreen
+import dev.core.navigation.encodeArg
+import dev.core.navigation.PushEnter
+import dev.core.navigation.PushExit
+import dev.core.navigation.PopEnter
+import dev.core.navigation.PopExit
+import dev.core.navigation.TabEnter
+import dev.core.navigation.TabExit
+import dev.core.navigation.navigateSafe
+import dev.core.navigation.popSafe
+import dev.feature.listings.domain.model.ListingKind
+import dev.feature.listings.presentation.browse.ListingsBrowseScreen
+import dev.feature.listings.presentation.PostListingScreen
+import dev.feature.listings.presentation.detail.ListingDetailScreen
+import dev.feature.listings.presentation.platform.rememberPhoneCaller
 import dev.feature.students.presentation.StudentsScreen
 import dev.feature.notifications.presentation.NotificationsScreen
 import dev.feature.clubs.presentation.ClubsScreen
@@ -52,11 +65,18 @@ import dev.feature.profile.presentation.ProfileScreen
 private enum class StudentTab(val route: String, val label: String, val icon: ImageVector) {
     HOME("home", "Home", AppIcons.Home),
     UNIVERSITY("university", "Universitet", AppIcons.GraduationCap),
-    JOBS("jobs", "Ishlar", AppIcons.Briefcase),
+    // Ilgari faqat "Ishlar" edi; endi bitta ekranda Ijara, Xizmatlar va Ish e'lonlari
+    // tab bilan almashadi, shuning uchun umumiy nom.
+    LISTINGS("listings", "E'lonlar", AppIcons.FileText),
     STUDENTS("students", "Student", AppIcons.Users),
 }
 
 private const val DISCOUNTS = "discounts"
+private const val LISTING_DETAIL = "listing_detail"
+private const val POST_LISTING = "post_listing"
+
+/** Talaba qo'ya oladigan e'lon turlari — chegirma biznesnikidir. */
+private val studentListingKinds = listOf(ListingKind.RENTAL, ListingKind.SERVICE, ListingKind.JOB)
 private const val POST_AD = "post_ad"
 private const val PROFILE = "profile"
 private const val CHAT = "chat"
@@ -68,6 +88,18 @@ private const val CLUBS = "clubs"
 private val tabRoutes = StudentTab.entries.map { it.route }.toSet()
 
 /**
+ * Route'dagi `?kind=...` qismini tashlaydi.
+ *
+ * Pastki panel `current in tabRoutes` sharti bilan chiziladi, argumentli route esa
+ * "listings?kind={kind}" ko'rinishida keladi — tozalamasak o'z tab'ida panel yo'qolib qoladi.
+ */
+private fun String.toTabRoute(): String = substringBefore("?")
+
+/** Home'dan kelgan bo'lim nomi. Noma'lum yoki bo'sh bo'lsa — Ish e'lonlari. */
+private fun String?.toListingKind(): ListingKind =
+    ListingKind.entries.firstOrNull { it.name == this } ?: ListingKind.JOB
+
+/**
  * Talaba karkasi — pastki navigatsiya (Home / Chegirma / Ishlar / Student) + markaziy "Elon" FAB
  * (talaba e'lonlari: ish, sotuv, xizmat). Biznesmen chegirma e'lonlari bu yerda YO'Q — ular
  * [BusinessShell] da.
@@ -77,61 +109,126 @@ fun StudentShell(onLoggedOut: () -> Unit) {
     val palette = appPalette
     val nav = rememberNavController()
     val backStack by nav.currentBackStackEntryAsState()
-    val current = backStack?.destination?.route ?: StudentTab.HOME.route
+    val current = backStack?.destination?.route?.toTabRoute() ?: StudentTab.HOME.route
 
+    // Tab almashish — holat saqlanadi/tiklanadi, dublikat yaratmaydi (navigateSafe).
     val selectTab: (String) -> Unit = { route ->
-        nav.navigate(route) {
+        nav.navigateSafe(route) {
             popUpTo(StudentTab.HOME.route) { saveState = true }
-            launchSingleTop = true
             restoreState = true
         }
     }
 
     Box(Modifier.fillMaxSize().background(palette.bgBrush)) {
-        NavHost(navController = nav, startDestination = StudentTab.HOME.route, modifier = Modifier.fillMaxSize()) {
-            composable(StudentTab.HOME.route) {
+        NavHost(
+            navController = nav,
+            startDestination = StudentTab.HOME.route,
+            modifier = Modifier.fillMaxSize(),
+            // Sukut — tafsilot ekranlari uchun push/pop siljishi.
+            // Tab bo'limlari o'z composable'ida fade'ga almashtiriladi (pastga qarang).
+            enterTransition = PushEnter,
+            exitTransition = PushExit,
+            popEnterTransition = PopEnter,
+            popExitTransition = PopExit,
+        ) {
+            composable(
+                StudentTab.HOME.route,
+                enterTransition = TabEnter, exitTransition = TabExit,
+                popEnterTransition = TabEnter, popExitTransition = TabExit,
+            ) {
                 HomeScreen(
-                    onOpenProfile = { nav.navigate(PROFILE) },
-                    onOpenChat = { nav.navigate(CHAT) },
-                    onOpenNotifications = { nav.navigate(NOTIFICATIONS) },
-                    onOpenClubs = { nav.navigate(CLUBS) },
-                    onOpenDiscounts = { nav.navigate(DISCOUNTS) },
-                    onOpenJobs = { selectTab(StudentTab.JOBS.route) },
+                    onOpenProfile = { nav.navigateSafe(PROFILE) },
+                    onOpenChat = { nav.navigateSafe(CHAT) },
+                    onOpenNotifications = { nav.navigateSafe(NOTIFICATIONS) },
+                    onOpenClubs = { nav.navigateSafe(CLUBS) },
+                    onOpenDiscounts = { nav.navigateSafe(DISCOUNTS) },
+                    onOpenJobs = { selectTab(StudentTab.LISTINGS.route) },
+                    onOpenListing = { id -> nav.navigateSafe("$LISTING_DETAIL/${encodeArg(id)}") },
                     onOpenStudents = { selectTab(StudentTab.STUDENTS.route) },
                 )
             }
-            composable(StudentTab.UNIVERSITY.route) { MyUniversityScreen() }
+            composable(
+                StudentTab.UNIVERSITY.route,
+                enterTransition = TabEnter, exitTransition = TabExit,
+                popEnterTransition = TabEnter, popExitTransition = TabExit,
+            ) { MyUniversityScreen() }
             composable(DISCOUNTS) {
                 // "Siz uchun" — Home'dan ochiladi (endi pastki tab emas). Orqaga qaytadi.
-                DiscountsScreen(onBack = { nav.popBackStack() })
+                DiscountsScreen(onBack = { nav.popSafe() })
             }
-            composable(StudentTab.JOBS.route) { JobsScreen() }
-            composable(StudentTab.STUDENTS.route) { StudentsScreen() }
+            // Ijara / Xizmatlar / Ish e'lonlari — uchalasi bitta ekranda, tepadagi tab bilan.
+            // `kind` argumenti Home'dan konkret bo'limga o'tish uchun (masalan to'g'ridan-to'g'ri
+            // Ijara'ga), bo'sh bo'lsa Ish e'lonlari ochiladi.
+            composable(
+                route = "${StudentTab.LISTINGS.route}?kind={kind}",
+                enterTransition = TabEnter, exitTransition = TabExit,
+                popEnterTransition = TabEnter, popExitTransition = TabExit,
+                arguments = listOf(
+                    navArgument("kind") { type = NavType.StringType; nullable = true; defaultValue = null },
+                ),
+            ) { entry ->
+                ListingsBrowseScreen(
+                    onOpenListing = { id -> nav.navigateSafe("$LISTING_DETAIL/${encodeArg(id)}") },
+                    initialKind = entry.arguments?.getString("kind").toListingKind(),
+                )
+            }
+            composable(
+                route = "$LISTING_DETAIL/{listingId}",
+                arguments = listOf(navArgument("listingId") { type = NavType.StringType }),
+            ) { entry ->
+                val onCall = rememberPhoneCaller()
+                ListingDetailScreen(
+                    listingId = entry.arguments?.getString("listingId").orEmpty(),
+                    onBack = { nav.popSafe() },
+                    onCall = onCall,
+                )
+            }
+            composable(
+                StudentTab.STUDENTS.route,
+                enterTransition = TabEnter, exitTransition = TabExit,
+                popEnterTransition = TabEnter, popExitTransition = TabExit,
+            ) { StudentsScreen() }
             composable(
                 route = "$POST_AD?adId={adId}",
                 arguments = listOf(navArgument("adId") { type = NavType.StringType; nullable = true; defaultValue = null }),
             ) { entry ->
-                PostAdScreen(onClose = { nav.popBackStack() }, editAdId = entry.arguments?.getString("adId"))
+                // Eski (feature:ads) e'lonlarini TAHRIRLASH uchun qoldirilgan — yangi e'lon
+                // bu yerdan qo'yilmaydi, "Elon" tugmasi POST_LISTING ga boradi.
+                PostAdScreen(onClose = { nav.popSafe() }, editAdId = entry.arguments?.getString("adId"))
+            }
+            composable(
+                route = "$POST_LISTING?listingId={listingId}",
+                arguments = listOf(
+                    navArgument("listingId") { type = NavType.StringType; nullable = true; defaultValue = null },
+                ),
+            ) { entry ->
+                PostListingScreen(
+                    onClose = { nav.popSafe() },
+                    onPublished = { nav.popSafe() },
+                    editListingId = entry.arguments?.getString("listingId"),
+                    // Chegirma e'loni biznes turini so'raydi — u BusinessShell'da qoladi.
+                    availableKinds = studentListingKinds,
+                )
             }
             composable(PROFILE) {
                 ProfileScreen(
-                    onBack = { nav.popBackStack() },
+                    onBack = { nav.popSafe() },
                     onLoggedOut = onLoggedOut,
-                    onEditProfile = { nav.navigate(EDIT_PROFILE) },
-                    onOpenSettings = { nav.navigate(SETTINGS) },
-                    onEditAd = { adId -> nav.navigate("$POST_AD?adId=$adId") },
+                    onEditProfile = { nav.navigateSafe(EDIT_PROFILE) },
+                    onOpenSettings = { nav.navigateSafe(SETTINGS) },
+                    onEditAd = { adId -> nav.navigateSafe("$POST_AD?adId=${encodeArg(adId)}") },
                     // Talabada biznes bo'limi ko'rinmaydi.
                     showMyBusiness = false,
                 )
             }
-            composable(CHAT) { ChatScreen(onBack = { nav.popBackStack() }) }
-            composable(NOTIFICATIONS) { NotificationsScreen(onBack = { nav.popBackStack() }) }
-            composable(CLUBS) { ClubsScreen(onBack = { nav.popBackStack() }) }
-            composable(EDIT_PROFILE) { EditProfileScreen(onBack = { nav.popBackStack() }) }
+            composable(CHAT) { ChatScreen(onBack = { nav.popSafe() }) }
+            composable(NOTIFICATIONS) { NotificationsScreen(onBack = { nav.popSafe() }) }
+            composable(CLUBS) { ClubsScreen(onBack = { nav.popSafe() }) }
+            composable(EDIT_PROFILE) { EditProfileScreen(onBack = { nav.popSafe() }) }
             composable(SETTINGS) {
                 SettingsScreen(
-                    onBack = { nav.popBackStack() },
-                    onEditProfile = { nav.navigate(EDIT_PROFILE) },
+                    onBack = { nav.popSafe() },
+                    onEditProfile = { nav.navigateSafe(EDIT_PROFILE) },
                     onLoggedOut = onLoggedOut,
                 )
             }
@@ -141,7 +238,7 @@ fun StudentShell(onLoggedOut: () -> Unit) {
             BottomBar(
                 current = current,
                 onSelect = selectTab,
-                onFab = { nav.navigate(POST_AD) { launchSingleTop = true } },
+                onFab = { nav.navigateSafe(POST_LISTING) },
                 palette = palette,
                 modifier = Modifier.align(Alignment.BottomCenter),
             )
@@ -169,7 +266,7 @@ private fun BottomBar(
             NavBarItem(StudentTab.HOME, current, onSelect, palette, Modifier.weight(1f))
             NavBarItem(StudentTab.UNIVERSITY, current, onSelect, palette, Modifier.weight(1f))
             Spacer(Modifier.weight(1f)) // markaziy FAB uchun joy
-            NavBarItem(StudentTab.JOBS, current, onSelect, palette, Modifier.weight(1f))
+            NavBarItem(StudentTab.LISTINGS, current, onSelect, palette, Modifier.weight(1f))
             NavBarItem(StudentTab.STUDENTS, current, onSelect, palette, Modifier.weight(1f))
         }
 

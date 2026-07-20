@@ -51,10 +51,12 @@ import dev.core.designsystem.components.GlassTextField
 import dev.core.designsystem.theme.AppPalette
 import dev.core.designsystem.theme.appPalette
 import dev.feature.listings.presentation.NearbyDiscountsSection
-import dev.feature.listings.presentation.map.MapPoint
-import dev.feature.listings.presentation.map.OfferMarker
-import dev.feature.listings.presentation.map.OffersMap
-import dev.feature.listings.presentation.map.rememberUserLocation
+import dev.core.designsystem.map.MapPoint
+import dev.core.designsystem.map.OfferMarker
+import dev.core.designsystem.map.MapLinkButton
+import dev.core.designsystem.map.OffersMapOverlay
+import dev.core.designsystem.map.markersCenter
+import dev.core.designsystem.map.rememberUserLocation
 import kotlinx.coroutines.delay
 import org.koin.compose.viewmodel.koinViewModel
 
@@ -175,21 +177,6 @@ private fun FilterButton(activeCount: Int, palette: AppPalette, onClick: () -> U
     }
 }
 
-@Composable
-private fun MapLinkButton(palette: AppPalette, onClick: () -> Unit) {
-    Row(
-        Modifier.fillMaxWidth().height(44.dp).clip(RoundedCornerShape(13.dp))
-            .background(palette.glass).border(1.dp, palette.border, RoundedCornerShape(13.dp))
-            .clickable(onClick = onClick).padding(horizontal = 14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Text("🗺", style = TextStyle(fontSize = 16.sp))
-        Text("Xaritada ko'rish", style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = palette.ink), modifier = Modifier.weight(1f))
-        Icon(AppIcons.ChevronRight, null, tint = palette.inkFaint, modifier = Modifier.size(16.dp))
-    }
-}
-
 // ---------------------------------------------------------------------------
 // Xarita overlay — barcha (filtrlangan) e'lonlar narx markerlari bilan
 // ---------------------------------------------------------------------------
@@ -210,52 +197,36 @@ private fun MapOverlay(
             highlight = o.isDiscount,
         )
     }
-    val center = if (markers.isEmpty()) MapPoint(41.311081, 69.240562)
-    else MapPoint(markers.map { it.lat }.average(), markers.map { it.lng }.average())
 
     var selectedId by remember { mutableStateOf<String?>(null) }
     val selected = located.firstOrNull { it.id == selectedId }
 
-    // Xarita to'liq ekran (full-bleed) — ustki panel ustida suzadi, kulrang band yo'q.
-    Box(Modifier.fillMaxSize()) {
-        OffersMap(markers, center, palette.dark, rememberUserLocation(), 16, Modifier.fillMaxSize(), onMarkerTap = { selectedId = it })
-
-        // Suzuvchi ustki panel — orqaga + qidiruv + Filter
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(top = 54.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(9.dp),
-        ) {
-            Box(
-                Modifier.size(46.dp).clip(RoundedCornerShape(13.dp)).background(palette.glass).border(1.dp, palette.border, RoundedCornerShape(13.dp)).clickable(onClick = onClose),
-                contentAlignment = Alignment.Center,
-            ) { Icon(AppIcons.ArrowLeft, "Yopish", tint = palette.ink, modifier = Modifier.size(18.dp)) }
+    OffersMapOverlay(
+        markers = markers,
+        palette = palette,
+        onClose = onClose,
+        center = markersCenter(markers),
+        onMarkerTap = { selectedId = it },
+        topBarExtras = {
             Box(Modifier.weight(1f)) {
                 GlassTextField(state.query, vm::onQuery, "Do'kon yoki e'lon qidiring", leading = AppIcons.Search, height = 46)
             }
             FilterButton(state.activeFilterCount, palette, onOpenFilter)
-        }
-
-        // Natija soni belgisi (panel ostida)
-        Box(
-            Modifier.align(Alignment.TopCenter).padding(top = 108.dp).clip(RoundedCornerShape(11.dp))
-                .background(palette.ink.copy(alpha = 0.82f)).padding(horizontal = 12.dp, vertical = 6.dp),
-        ) {
-            Text("${markers.size} ta e'lon xaritada", style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.5f.sp, fontWeight = FontWeight.Bold, color = Color.White))
-        }
-
-        // Marker bosilganda — tafsilot kartasi (pastda)
-        if (selected != null) {
-            MarkerDetailCard(
-                offer = selected,
-                saved = state.savedIds.contains(selected.id),
-                palette = palette,
-                onToggleSaved = vm::toggleSaved,
-                onClose = { selectedId = null },
-                modifier = Modifier.align(Alignment.BottomCenter).padding(12.dp),
-            )
-        }
-    }
+        },
+        detail = {
+            // Marker bosilganda — tafsilot kartasi (pastda)
+            if (selected != null) {
+                MarkerDetailCard(
+                    offer = selected,
+                    saved = state.savedIds.contains(selected.id),
+                    palette = palette,
+                    onToggleSaved = vm::toggleSaved,
+                    onClose = { selectedId = null },
+                    modifier = Modifier.align(Alignment.BottomCenter).padding(12.dp),
+                )
+            }
+        },
+    )
 }
 
 // Xaritada marker bosilganda chiqadigan kengaytirilgan e'lon kartasi.

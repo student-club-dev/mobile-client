@@ -2,10 +2,11 @@ package dev.feature.listings.domain.repository
 
 import dev.core.common.Resource
 import dev.feature.listings.domain.model.Listing
+import dev.feature.listings.domain.model.ListingKind
 import kotlinx.coroutines.flow.Flow
 
 /**
- * Chegirma e'lonlariga egalik qiluvchi repository (offline-first).
+ * E'lonlarga egalik qiluvchi repository (offline-first).
  *
  * UI **har doim** local DB'ni kuzatadi ([observeMyListings] / [observeActive]) — shu sabab
  * tarmoq bo'lmasa ham e'lonlar ko'rinadi. [save] va [submit] masofaviy manba bilan
@@ -13,11 +14,17 @@ import kotlinx.coroutines.flow.Flow
  */
 interface ListingRepository {
 
-    /** Joriy foydalanuvchi yuklagan e'lonlar (barcha statuslar). */
+    /** Joriy foydalanuvchi yuklagan e'lonlar (barcha statuslar va turlar). */
     fun observeMyListings(ownerId: String): Flow<List<Listing>>
 
-    /** Talabaga ko'rinadigan e'lonlar — faqat ACTIVE va muddati o'tmaganlar. */
+    /** Talabaga ko'rinadigan **barcha turdagi** e'lonlar — ACTIVE va muddati o'tmaganlar. */
     fun observeActive(): Flow<List<Listing>>
+
+    /**
+     * Bitta bo'limning faol e'lonlari. Chegirmalar, Ijara, Xizmatlar va Ish e'lonlari
+     * ilovada alohida ro'yxatlar — ular aralashib ketmasligi kerak.
+     */
+    fun observeActiveByKind(kind: ListingKind): Flow<List<Listing>>
 
     suspend fun byId(id: String): Listing?
 

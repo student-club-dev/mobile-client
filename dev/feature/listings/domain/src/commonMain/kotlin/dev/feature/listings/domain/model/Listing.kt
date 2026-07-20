@@ -8,25 +8,27 @@ import kotlin.math.sin
 import kotlin.math.sqrt
 
 /**
- * Chegirma e'loni — Chegirmalar bo'limining markaziy modeli.
+ * E'lon — ilovadagi barcha e'lon turlarining umumiy modeli.
  *
- * Spetsifikatsiya: `DISCOUNTS_BUSINESS_API.md` (§3.4) va `openapi/student-clubs.json`
- * (`ListingDto`). Bu yerdagi maydonlar API bilan bir xil nom bilan atalgan — backend
- * yoqilganda mapper'lar to'g'ridan-to'g'ri mos tushadi.
+ * Bu yerda **faqat hamma turga tegishli** maydonlar turadi: sarlavha, rasm, narx,
+ * joylashuv, aloqa, status. Turga xos hamma narsa [details] ichida ([ListingDetails]).
  *
- * **Chegirmasiz e'lon bo'lmaydi** — [discount] majburiy.
+ * Nega shunday: chegirma e'lonida "nechi kishi kerak", ijara e'lonida esa "promokod"
+ * degan maydon ma'nosiz. Ularni bitta yassi modelga yig'ish — yarmi doim `null` turadigan
+ * va qaysi biri qachon to'ldirilishi faqat kod o'qib bilинadigan model demakdir. Sealed
+ * tur esa kompilyator darajasida kafolat beradi: ijara e'lonini qurayotganda chegirma
+ * maydonlariga umuman kirib bo'lmaydi.
+ *
+ * Spetsifikatsiya: `DISCOUNTS_BUSINESS_API.md` (§3.4) va `openapi/student-clubs.json`.
  */
 data class Listing(
     val id: String,
     val ownerId: String,
-    /** Backenddagi biznes id'si. Offline rejimda `null`. */
+    /** Backenddagi biznes id'si. Offline rejimda va shaxsiy e'lonlarda `null`. */
     val businessId: String? = null,
-    val businessType: BusinessType,
-    /** Biznes nomi ("Chaykhana Navruz"). Offline rejimda e'lon bilan birga kiritiladi. */
-    val businessName: String,
-    val categoryKey: String,
-    /** `categoryKey == ListingCatalog.OTHER_KEY` bo'lganda majburiy. */
-    val customCategoryName: String? = null,
+
+    /** Turga xos qism — e'lonning haqiqiy mazmuni shu yerda. */
+    val details: ListingDetails,
 
     val title: String,
     val description: String? = null,
@@ -34,15 +36,24 @@ data class Listing(
     val images: List<String> = emptyList(),
 
     val priceUnit: PriceUnit,
-    /** Chegirmasiz asl narx, butun so'mda (tiyinsiz). */
-    val originalPrice: Long,
-    val currency: String = "UZS",
-
-    val discount: ListingDiscount,
-    val redemption: ListingRedemption,
+    /** Narx, butun so'mda (tiyinsiz). Chegirma e'lonida — chegirmasiz asl narx. */
+    val price: Long,
     /**
-     * Filiallar — e'lon shu manzillarning **hammasida** amal qiladi.
-     * Har biri xaritadan tanlanadi, shuning uchun koordinatasi bor (qo'lda kiritilmaydi).
+     * Narx oralig'ining yuqori chegarasi — ish e'lonida "3–5 mln" kabi maosh vilkasi uchun.
+     * `null` — aniq narx.
+     */
+    val priceMax: Long? = null,
+    val currency: String = "UZS",
+    /** Narx kelishiladimi ("kelishilgan holda"). */
+    val isNegotiable: Boolean = false,
+
+    /** Aloqa telefoni. Ilgari `attributes` ichida edi — endi hamma turga kerak. */
+    val contactPhone: String? = null,
+
+    /**
+     * Manzillar — e'lon shu joylarning **hammasida** amal qiladi. Chegirmada bu filiallar,
+     * ijarada uyning joyi, ishda ish joyi. Har biri xaritadan tanlanadi, shuning uchun
+     * koordinatasi bor (qo'lda kiritilmaydi).
      */
     val branches: List<ListingBranch> = emptyList(),
 
@@ -50,7 +61,7 @@ data class Listing(
     val validFrom: Long,
     val validTo: Long,
 
-    /** Turga xos maydonlar — kalitlar [ListingCatalog.attributes] dan keladi. */
+    /** Qo'shimcha erkin maydonlar (turga xoslari [details] da). */
     val attributes: Map<String, String> = emptyMap(),
     val optionGroups: List<OptionGroup> = emptyList(),
 
@@ -60,21 +71,48 @@ data class Listing(
     val createdAt: Long,
     val updatedAt: Long,
 ) {
-    /** Chegirmadan keyingi narx — [ListingDiscount.finalPrice] ning qisqartmasi. */
-    val finalPrice: Long get() = discount.finalPrice(originalPrice)
+    val kind: ListingKind get() = details.kind
 
-    /** `true` — chegirma e'loni, `false` — oddiy e'lon (attributes ichidagi belgiga qarab). */
-    val isDiscount: Boolean get() = attributes[ListingCatalog.REGULAR_KEY] != "1"
+    /** Chegirma e'loni bo'lsa — uning tafsilotlari, aks holda `null`. */
+    val discountDetails: ListingDetails.Discount? get() = details as? ListingDetails.Discount
+    val rentalDetails: ListingDetails.Rental? get() = details as? ListingDetails.Rental
+    val serviceDetails: ListingDetails.Service? get() = details as? ListingDetails.Service
+    val jobDetails: ListingDetails.Job? get() = details as? ListingDetails.Job
 
-    /** Ro'yxatda ko'rsatiladigan kategoriya nomi. */
+    /** Talaba to'laydigan narx. Chegirmasiz turlarda — oddiy narx. */
+    val finalPrice: Long get() = discountDetails?.finalPrice(price) ?: price
+
+    /** `true` — chegirmali e'lon (kartochkada yashil yorliq chiqadi). */
+    val isDiscount: Boolean get() = discountDetails?.isDiscounted == true
+
+    /** Kartochkadagi rang va belgi — turga qarab. */
+    val accent: Long get() = discountDetails?.businessType?.accent ?: kind.accent
+    val emoji: String get() = discountDetails?.businessType?.emoji ?: kind.emoji
+
+    /** Ro'yxatda ko'rsatiladigan kategoriya nomi — har turning o'z katalogidan. */
     val categoryLabel: String
-        get() = customCategoryName
-            ?: ListingCatalog.category(businessType, categoryKey)?.label
-            ?: categoryKey
+        get() = when (val d = details) {
+            is ListingDetails.Discount -> d.customCategoryName
+                ?: ListingCatalog.category(d.businessType, d.categoryKey)?.label
+                ?: d.businessType.label
+
+            is ListingDetails.Rental -> d.propertyType?.label ?: ListingKind.RENTAL.label
+            is ListingDetails.Service -> d.serviceType?.label ?: ListingKind.SERVICE.label
+            is ListingDetails.Job -> JobCatalog.category(d.categoryKey)?.label ?: d.employment.label
+            is ListingDetails.Task -> d.typeLabel()
+        }
+
+    /** E'lon egasining ko'rinadigan nomi (biznes nomi, kompaniya nomi yoki bo'sh). */
+    val displayName: String
+        get() = when (val d = details) {
+            is ListingDetails.Discount -> d.businessName
+            is ListingDetails.Job -> d.companyName
+            else -> ""
+        }
 
     /**
-     * Talabaning joylashuviga eng yaqin filial va unga bo'lgan masofa.
-     * Talaba koordinatasi noma'lum bo'lsa (`null`) — birinchi filial, masofasiz.
+     * Talabaning joylashuviga eng yaqin manzil va unga bo'lgan masofa.
+     * Talaba koordinatasi noma'lum bo'lsa (`null`) — birinchi manzil, masofasiz.
      */
     fun nearestBranch(userLat: Double?, userLng: Double?): NearestBranch? {
         if (branches.isEmpty()) return null
@@ -92,7 +130,7 @@ data class Listing(
     }
 }
 
-/** Eng yaqin filial va unga bo'lgan masofa (talaba koordinatasi bo'lmasa — `null`). */
+/** Eng yaqin manzil va unga bo'lgan masofa (talaba koordinatasi bo'lmasa — `null`). */
 data class NearestBranch(val branch: ListingBranch, val distanceMeters: Double?) {
 
     /** "640 m" yoki "2.4 km". Masofa noma'lum bo'lsa — `null`. */
@@ -130,56 +168,30 @@ enum class PriceUnit(val label: String, val suffix: String) {
     PER_ITEM("Dona", "dona"),
     PER_HOUR("Soat", "soat"),
     PER_KG("Kilogramm", "kg"),
+    PER_DAY("Kun", "kun"),
     PER_MONTH("Oy", "oy"),
     PER_COURSE("Kurs", "kurs"),
     PER_LESSON("Dars", "dars"),
     PER_TICKET("Chipta", "chipta"),
     PER_PERSON("Kishi", "kishi"),
     PER_SESSION("Sessiya", "sessiya"),
+    /** Chop etish xizmatlari uchun. */
+    PER_PAGE("Sahifa", "sahifa"),
 }
 
-/** Chegirma turi — `value` maydonining ma'nosini belgilaydi. */
+/** Chegirma turi — [ListingDetails.Discount.discountValue] maydonining ma'nosini belgilaydi. */
 enum class DiscountType(val label: String, val valueLabel: String, val hint: String) {
-    /** `value` = foiz (1..90). */
+    /** Qiymat = foiz (1..90). */
     PERCENT("Foiz chegirma", "Foiz (%)", "20"),
 
-    /** `value` = so'mda ayiriladigan summa. */
+    /** Qiymat = so'mda ayiriladigan summa. */
     FIXED_AMOUNT("Summa chegirma", "Chegirma (so'm)", "10000"),
 
-    /** `value` = talabaga beriladigan yangi narx. */
+    /** Qiymat = talabaga beriladigan yangi narx. */
     SPECIAL_PRICE("Talaba narxi", "Yangi narx (so'm)", "40000"),
 
     /** 1+1 kabi aksiya — narx o'zgarmaydi, shartlar matnda. */
     FREE_ITEM("Sovg'a (1+1)", "—", ""),
-}
-
-/**
- * Chegirma. [finalPrice] — yakuniy narxni hisoblovchi yagona formula.
- *
- * Backend yoqilganda yakuniy narxni **server** hisoblaydi (klient uni yubormaydi),
- * lekin formula bir xil — shuning uchun offline rejim va server bir xil natija beradi.
- */
-data class ListingDiscount(
-    val type: DiscountType,
-    val value: Long,
-    val conditions: String? = null,
-    /** `false` — chegirma qo'shimchalar narxiga (`Option.priceDelta`) tarqalmaydi. */
-    val appliesToOptions: Boolean = false,
-) {
-    fun finalPrice(originalPrice: Long): Long = when (type) {
-        DiscountType.PERCENT -> originalPrice * (100 - value) / 100
-        DiscountType.FIXED_AMOUNT -> originalPrice - value
-        DiscountType.SPECIAL_PRICE -> value
-        DiscountType.FREE_ITEM -> originalPrice
-    }.coerceAtLeast(0)
-
-    /** Kartochkada ko'rsatiladigan yorliq: "−20%", "−10 000 so'm", "1+1". */
-    fun badge(): String = when (type) {
-        DiscountType.PERCENT -> "−$value%"
-        DiscountType.FIXED_AMOUNT -> "−${value.formatSum()} so'm"
-        DiscountType.SPECIAL_PRICE -> "${value.formatSum()} so'm"
-        DiscountType.FREE_ITEM -> "1+1"
-    }
 }
 
 /** Talaba chegirmani qanday ishlatadi. */
@@ -203,7 +215,7 @@ data class ListingRedemption(
 )
 
 /**
- * Filial — **xaritada tanlangan nuqta**. Koordinata majburiy: talabaga eng yaqin filialni
+ * Manzil — **xaritada tanlangan nuqta**. Koordinata majburiy: talabaga eng yaqinini
  * ko'rsatish uchun ([Listing.nearestBranch]) va backendga `lat`/`lng` yuborish uchun.
  *
  * [address] xaritadan teskari geokodlash bilan avtomatik to'ladi (foydalanuvchi qo'lda yozmaydi),

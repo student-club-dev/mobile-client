@@ -126,8 +126,10 @@ class DatabaseSchemaTest {
     fun schemaVersionIsCurrent() {
         // 7.sqm — ListingEntity (chegirma e'lonlari), 8.sqm — ko'p filial (branchesJson),
         // 10.sqm — profil email, 11.sqm — "Siz uchun" e'lonlari (chegirmasiz + sub-kategoriya + narx),
-        // 12.sqm — e'lon jinsi (kiyim uchun Erkak/Ayol), 13.sqm — e'lon koordinatasi (xarita).
-        assertEquals(14L, StudentClubsDatabase.Schema.version)
+        // 12.sqm — e'lon jinsi (kiyim uchun Erkak/Ayol), 13.sqm — e'lon koordinatasi (xarita),
+        // 14.sqm — e'lonning to'rt turi (chegirma/ijara/xizmat/ish): ListingEntity qayta qurildi,
+        // turga xos maydonlar detailsJson ga ko'chdi.
+        assertEquals(15L, StudentClubsDatabase.Schema.version)
     }
 
     @Test
@@ -353,8 +355,50 @@ class DatabaseSchemaTest {
             0,
         )
 
+        // Nomida qo'shtirnoq bor e'lon — 14.sqm detailsJson ni matn birlashtirish bilan
+        // yig'adi, shuning uchun ekranlash buzilmasligini alohida tekshiramiz.
+        // Aloqa telefoni ham eski `attributes._phone` dan ustunga ko'chishi kerak.
+        driver.execute(
+            null,
+            """
+            INSERT INTO ListingEntity(
+                id, ownerId, businessType, businessName, categoryKey, title,
+                priceUnit, originalPrice, discountType, discountValue, finalPrice,
+                redemptionMethod, attributesJson, validFrom, validTo, status, createdAt, updatedAt
+            ) VALUES (
+                'l-3', 'u1', 'CAFE_RESTAURANT', 'Kafe "Bahor"', 'PIZZA', 'Lavash',
+                'PER_ITEM', 30000, 'PERCENT', 10, 27000,
+                'QR', '{"_phone":"+998901234567","_regular":"1"}', 0, 9999999999999, 'ACTIVE', 0, 0
+            )
+            """.trimIndent(),
+            0,
+        )
+
         StudentClubsDatabase.Schema.migrate(driver, 8L, StudentClubsDatabase.Schema.version)
         val db = StudentClubsDatabase(driver)
+
+        // 14.sqm — chegirma ustunlari detailsJson ga ko'chdi, umumiylari ustun bo'lib qoldi.
+        val migrated = db.listingQueries.selectById("l-1").executeAsOne()
+        assertEquals("DISCOUNT", migrated.kind)
+        assertEquals(55_000L, migrated.price)
+        assertTrue(
+            migrated.detailsJson.contains("\"businessType\":\"CAFE_RESTAURANT\""),
+            "biznes turi detailsJson ga ko'chmadi: ${migrated.detailsJson}",
+        )
+        assertTrue(
+            migrated.detailsJson.contains("\"discountValue\":20"),
+            "chegirma qiymati ko'chmadi: ${migrated.detailsJson}",
+        )
+        assertTrue(migrated.detailsJson.contains("\"isDiscounted\":true"))
+
+        val quoted = db.listingQueries.selectById("l-3").executeAsOne()
+        assertTrue(
+            quoted.detailsJson.contains("""\"Bahor\""""),
+            "qo'shtirnoq ekranlanmadi: ${quoted.detailsJson}",
+        )
+        // `_regular` belgisi bo'lgan qator — oddiy (chegirmasiz) e'lon.
+        assertTrue(quoted.detailsJson.contains("\"isDiscounted\":false"))
+        assertEquals("+998901234567", quoted.contactPhone)
 
         val withBranch = db.listingQueries.selectById("l-1").executeAsOne()
         assertTrue(withBranch.branchesJson.contains("41.2856"), "lat ko'chmadi: ${withBranch.branchesJson}")
@@ -368,7 +412,7 @@ class DatabaseSchemaTest {
         driver.close()
     }
 
-    /** Chegirma e'loni (feature:discounts) — yozish, faol e'lonlarni tanlash, status, o'chirish. */
+    /** E'lon (feature:listings) — yozish, faol e'lonlarni tanlash, status, o'chirish. */
     @Test
     fun listingCrudAndActiveFilterWork() {
         val driver = freshDriver()
@@ -376,29 +420,30 @@ class DatabaseSchemaTest {
         val db = StudentClubsDatabase(driver)
         val q = db.listingQueries
 
-        fun insert(id: String, status: String, validTo: Long) = q.upsert(
+        fun insert(
+            id: String,
+            status: String,
+            validTo: Long,
+            kind: String = "DISCOUNT",
+            detailsJson: String = """{"kind":"DISCOUNT","businessType":"CAFE_RESTAURANT",""" +
+                """"businessName":"Chaykhana Navruz","categoryKey":"PIZZA",""" +
+                """"isDiscounted":true,"discountType":"PERCENT","discountValue":20}""",
+        ) = q.upsert(
             id = id,
             ownerId = "u1",
             businessId = null,
-            businessType = "CAFE_RESTAURANT",
-            businessName = "Chaykhana Navruz",
-            categoryKey = "PIZZA",
-            customCategoryName = null,
+            kind = kind,
+            detailsJson = detailsJson,
             title = "Pepperoni pitsa",
             description = null,
             imagesJson = """["data:image/jpeg;base64,AAA"]""",
             priceUnit = "PER_ITEM",
-            originalPrice = 55_000,
+            price = 55_000,
+            priceMax = null,
             currency = "UZS",
-            discountType = "PERCENT",
-            discountValue = 20,
+            isNegotiable = 0,
             finalPrice = 44_000,
-            discountConditions = null,
-            redemptionMethod = "QR",
-            promoCode = null,
-            perUserLimit = 1,
-            totalLimit = null,
-            usedCount = 0,
+            contactPhone = "+998901234567",
             branchesJson = """[{"id":"br1","lat":41.2856,"lng":69.2034,"address":"Chilonzor 9-kvartal, 42-uy"}]""",
             validFrom = 0,
             validTo = validTo,
@@ -414,6 +459,24 @@ class DatabaseSchemaTest {
         insert("l-active", "ACTIVE", validTo = 2_000)
         insert("l-draft", "DRAFT", validTo = 2_000)
         insert("l-expired", "ACTIVE", validTo = 500) // muddati o'tgan
+
+        // Turga qarab filtrlash — Ijara va Ish alohida bo'limlar bo'lgani uchun.
+        insert(
+            "l-rental",
+            "ACTIVE",
+            validTo = 2_000,
+            kind = "RENTAL",
+            detailsJson = """{"kind":"RENTAL","roomCount":3,"currentTenants":2,""" +
+                """"neededTenants":2,"gender":"MALE","period":"MONTHLY"}""",
+        )
+
+        val rentals = q.selectActiveByKind(kind = "RENTAL", now = 1_000).executeAsList()
+        assertEquals(1, rentals.size)
+        assertEquals("l-rental", rentals.single().id)
+        assertTrue(rentals.single().detailsJson.contains("\"gender\":\"MALE\""))
+
+        assertEquals(1, q.selectActiveByKind(kind = "DISCOUNT", now = 1_000).executeAsList().size)
+        q.deleteById("l-rental")
 
         assertEquals(3, q.selectByOwner("u1").executeAsList().size)
         assertEquals(44_000L, q.selectById("l-active").executeAsOne().finalPrice)

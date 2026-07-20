@@ -1,19 +1,26 @@
--- Chegirma e'loni (feature:discounts). Biznes egasi yuklaydi, talaba ko'radi.
+-- E'lon (feature:listings). Chegirma, ijara, xizmat va ish e'lonlari — hammasi shu jadvalda.
 -- Offline-first: UI **faqat** shu jadvalni kuzatadi; backend yoqilganda repository
 -- masofaviy manba bilan sinxronlab shu keshni yangilaydi.
 --
 -- Spetsifikatsiya: DISCOUNTS_BUSINESS_API.md + openapi/student-clubs.json (ListingDto).
--- Ro'yxatli maydonlar (rasmlar, qo'shimchalar, turga xos atributlar) JSON matn sifatida
--- saqlanadi — sxemani har yangi biznes turida o'zgartirmaslik uchun.
+--
+-- Ustunlar faqat **hamma turga umumiy** maydonlar uchun. Turga xos hamma narsa
+-- `detailsJson` ichida (domendagi ListingDetails sealed turining serializatsiyasi).
+-- Nega: aks holda har yangi tur jadvalga o'nlab NULL ustun qo'shar edi — ijara e'loni
+-- uchun `promoCode`, chegirma uchun `neededTenants` doim bo'sh turadi. JSON esa yangi
+-- tur qo'shilganda sxemani umuman o'zgartirmaydi.
 CREATE TABLE ListingEntity (
     id TEXT NOT NULL PRIMARY KEY,
     ownerId TEXT NOT NULL,
-    -- Backend yoqilganda serverdagi biznes id'si (offline rejimda NULL).
+    -- Backend yoqilganda serverdagi biznes id'si (offline va shaxsiy e'lonlarda NULL).
     businessId TEXT,
-    businessType TEXT NOT NULL,
-    businessName TEXT NOT NULL,
-    categoryKey TEXT NOT NULL,
-    customCategoryName TEXT,
+
+    -- ListingKind nomi: 'DISCOUNT' | 'RENTAL' | 'SERVICE' | 'JOB'.
+    -- Alohida ustun (detailsJson ichida ham bor) — ro'yxatni tur bo'yicha filtrlash
+    -- JSON ochmasdan, indeks bilan ishlashi uchun.
+    kind TEXT NOT NULL DEFAULT 'DISCOUNT',
+    -- JSON: turga xos maydonlar. Shakli domendagi ListingDetails ga mos.
+    detailsJson TEXT NOT NULL DEFAULT '{}',
 
     title TEXT NOT NULL,
     description TEXT,
@@ -21,23 +28,18 @@ CREATE TABLE ListingEntity (
     imagesJson TEXT NOT NULL DEFAULT '[]',
 
     priceUnit TEXT NOT NULL,
-    originalPrice INTEGER NOT NULL,
+    price INTEGER NOT NULL,
+    -- Narx oralig'ining yuqori chegarasi (ish e'lonidagi maosh vilkasi). NULL — aniq narx.
+    priceMax INTEGER,
     currency TEXT NOT NULL DEFAULT 'UZS',
-
-    discountType TEXT NOT NULL,
-    discountValue INTEGER NOT NULL,
-    -- Chegirmadan keyingi narx. Backend bo'lganda uni SERVER hisoblaydi; offline rejimda
-    -- shu qiymat domendagi bir xil formula bilan hisoblanadi.
+    isNegotiable INTEGER NOT NULL DEFAULT 0,
+    -- Talaba to'laydigan narx. Backend bo'lganda uni SERVER hisoblaydi; offline rejimda
+    -- shu qiymat domendagi bir xil formula bilan hisoblanadi. Saralash uchun ustun sifatida.
     finalPrice INTEGER NOT NULL,
-    discountConditions TEXT,
 
-    redemptionMethod TEXT NOT NULL,
-    promoCode TEXT,
-    perUserLimit INTEGER,
-    totalLimit INTEGER,
-    usedCount INTEGER NOT NULL DEFAULT 0,
+    contactPhone TEXT,
 
-    -- Filiallar. E'lon bir nechta manzilda amal qilishi mumkin, har biri xaritadan
+    -- Manzillar. E'lon bir nechta joyda amal qilishi mumkin, har biri xaritadan
     -- tanlangani uchun koordinatasi bor (talabaga eng yaqinini ko'rsatish uchun).
     -- JSON: [{"id":"br1","lat":41.2856,"lng":69.2034,"address":"...","name":"Chilonzor"}]
     branchesJson TEXT NOT NULL DEFAULT '[]',
@@ -45,7 +47,7 @@ CREATE TABLE ListingEntity (
     validFrom INTEGER NOT NULL,
     validTo INTEGER NOT NULL,
 
-    -- JSON: {"portionGrams":"550","isHalal":"true"} — turga xos maydonlar.
+    -- JSON: qo'shimcha erkin maydonlar (turga xoslari detailsJson da).
     attributesJson TEXT NOT NULL DEFAULT '{}',
     -- JSON: [{"name":"Hajm","selectionType":"SINGLE","isRequired":true,"options":[...]}]
     optionGroupsJson TEXT NOT NULL DEFAULT '[]',
@@ -59,6 +61,9 @@ CREATE TABLE ListingEntity (
 
 CREATE INDEX listing_owner_idx ON ListingEntity(ownerId, updatedAt);
 CREATE INDEX listing_status_idx ON ListingEntity(status, validTo);
+-- Talabaga ko'rsatiladigan ro'yxat doim tur bo'yicha filtrlanadi (Ijara / Ish / Xizmat
+-- alohida bo'limlar) — shuning uchun status bilan birga indekslanadi.
+CREATE INDEX listing_kind_idx ON ListingEntity(kind, status, updatedAt);
 
 selectAll:
 SELECT * FROM ListingEntity ORDER BY updatedAt DESC;
@@ -75,22 +80,33 @@ SELECT * FROM ListingEntity
 WHERE status = 'ACTIVE' AND validTo >= :now
 ORDER BY updatedAt DESC;
 
+-- Bitta bo'limning faol e'lonlari: Ijara, Xizmatlar, Ish e'lonlari.
+selectActiveByKind:
+SELECT * FROM ListingEntity
+WHERE kind = :kind AND status = 'ACTIVE' AND validTo >= :now
+ORDER BY updatedAt DESC;
+
+selectByOwnerAndKind:
+SELECT * FROM ListingEntity
+WHERE ownerId = :ownerId AND kind = :kind
+ORDER BY updatedAt DESC;
+
 upsert:
 INSERT OR REPLACE INTO ListingEntity(
-    id, ownerId, businessId, businessType, businessName, categoryKey, customCategoryName,
+    id, ownerId, businessId,
+    kind, detailsJson,
     title, description, imagesJson,
-    priceUnit, originalPrice, currency,
-    discountType, discountValue, finalPrice, discountConditions,
-    redemptionMethod, promoCode, perUserLimit, totalLimit, usedCount,
+    priceUnit, price, priceMax, currency, isNegotiable, finalPrice,
+    contactPhone,
     branchesJson,
     validFrom, validTo, attributesJson, optionGroupsJson,
     status, rejectionReason, viewsCount, createdAt, updatedAt
 ) VALUES (
-    ?, ?, ?, ?, ?, ?, ?,
     ?, ?, ?,
+    ?, ?,
     ?, ?, ?,
-    ?, ?, ?, ?,
-    ?, ?, ?, ?, ?,
+    ?, ?, ?, ?, ?, ?,
+    ?,
     ?,
     ?, ?, ?, ?,
     ?, ?, ?, ?, ?

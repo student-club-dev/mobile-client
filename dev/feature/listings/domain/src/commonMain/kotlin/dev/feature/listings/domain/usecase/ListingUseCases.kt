@@ -4,6 +4,7 @@ import dev.core.common.Resource
 import dev.feature.listings.domain.model.Listing
 import dev.feature.listings.domain.model.ListingBranch
 import dev.feature.listings.domain.model.ListingError
+import dev.feature.listings.domain.model.ListingKind
 import dev.feature.listings.domain.model.ListingStatus
 import dev.feature.listings.domain.model.ListingValidator
 import dev.feature.listings.domain.repository.GeoRepository
@@ -16,9 +17,19 @@ class ObserveMyListingsUseCase(private val repository: ListingRepository) {
     operator fun invoke(ownerId: String): Flow<List<Listing>> = repository.observeMyListings(ownerId)
 }
 
-/** Talabaga ko'rinadigan faol e'lonlar — Chegirmalar ro'yxati. */
+/** Talabaga ko'rinadigan barcha turdagi faol e'lonlar (masalan xaritada hammasi birga). */
 class ObserveActiveListingsUseCase(private val repository: ListingRepository) {
     operator fun invoke(): Flow<List<Listing>> = repository.observeActive()
+}
+
+/**
+ * Bitta bo'limning faol e'lonlari: Chegirmalar, Ijara, Xizmatlar yoki Ish e'lonlari.
+ *
+ * Ro'yxatlar aralashmasligi kerak — talaba "Chegirmalar" bo'limida ijara e'lonini
+ * ko'rmasligi lozim.
+ */
+class ObserveListingsByKindUseCase(private val repository: ListingRepository) {
+    operator fun invoke(kind: ListingKind): Flow<List<Listing>> = repository.observeActiveByKind(kind)
 }
 
 /** Qoralama sifatida saqlaydi — validatsiyasiz (yarim to'ldirilgan forma ham saqlanadi). */

@@ -38,7 +38,8 @@ import dev.core.domain.model.DiscountCategory
 import dev.core.domain.model.DiscountOffer
 import dev.core.domain.model.DiscountTag
 import dev.feature.students.domain.model.FriendStatus
-import dev.feature.jobs.domain.model.Job
+import dev.feature.listings.domain.model.Listing
+import dev.feature.listings.domain.model.formatSum
 import dev.feature.students.domain.model.Student
 import dev.core.designsystem.components.AppFontFamily
 import dev.core.designsystem.components.AppIcons
@@ -54,6 +55,7 @@ fun HomeScreen(
     onOpenClubs: () -> Unit = {},
     onOpenDiscounts: () -> Unit = {},
     onOpenJobs: () -> Unit = {},
+    onOpenListing: (String) -> Unit = {},
     onOpenStudents: () -> Unit = {},
     vm: HomeViewModel = koinViewModel(),
 ) {
@@ -67,7 +69,7 @@ fun HomeScreen(
             Spacer(Modifier.height(24.dp))
             ClubsSection(state.clubs, palette, onOpenClubs)
             Spacer(Modifier.height(24.dp))
-            JobsSection(state.jobs, palette, onOpenJobs) { vm.toggleBookmark(it) }
+            JobsSection(state.jobs, palette, onOpenJobs, onOpenListing)
             Spacer(Modifier.height(24.dp))
             StudentsSection(state.students, palette, onOpenStudents) { vm.toggleFriend(it) }
             Spacer(Modifier.height(110.dp)) // pastki navigatsiya uchun joy
@@ -271,18 +273,27 @@ private fun FeaturedOfferCard(offer: DiscountOffer, palette: AppPalette, onClick
 // Ishlar
 // ---------------------------------------------------------------------------
 @Composable
-private fun JobsSection(jobs: List<Job>, palette: AppPalette, onSeeAll: () -> Unit, onBookmark: (Job) -> Unit) {
-    SectionHeader("Ishlar", action = "Barchasi", subtitle = "Sizning bo'limlaringiz bo'yicha", palette = palette, onAction = onSeeAll)
+private fun JobsSection(
+    jobs: List<Listing>,
+    palette: AppPalette,
+    onSeeAll: () -> Unit,
+    onOpenListing: (String) -> Unit,
+) {
+    SectionHeader("Ish e'lonlari", action = "Barchasi", subtitle = "Kunlik va doimiy ishlar", palette = palette, onAction = onSeeAll)
     Spacer(Modifier.height(12.dp))
     Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
-        jobs.take(3).forEach { JobRow(it, palette, onBookmark) }
+        jobs.take(3).forEach { JobRow(it, palette, onOpenListing) }
     }
 }
 
 @Composable
-private fun JobRow(job: Job, palette: AppPalette, onBookmark: (Job) -> Unit) {
+private fun JobRow(listing: Listing, palette: AppPalette, onOpenListing: (String) -> Unit) {
+    val job = listing.jobDetails
     Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(palette.glass).border(1.dp, palette.border, RoundedCornerShape(16.dp)).padding(12.dp),
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(palette.glass)
+            .border(1.dp, palette.border, RoundedCornerShape(16.dp))
+            .clickable { onOpenListing(listing.id) }
+            .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(11.dp),
     ) {
@@ -290,25 +301,47 @@ private fun JobRow(job: Job, palette: AppPalette, onBookmark: (Job) -> Unit) {
             Modifier.size(42.dp).clip(RoundedCornerShape(12.dp)).background(palette.primary.copy(alpha = 0.12f)),
             contentAlignment = Alignment.Center,
         ) {
-            Text(job.companyMonogram, style = TextStyle(fontFamily = AppFontFamily, fontSize = 16.sp, fontWeight = FontWeight.ExtraBold, color = palette.primary))
+            Text(job?.companyName.monogram(), style = TextStyle(fontFamily = AppFontFamily, fontSize = 16.sp, fontWeight = FontWeight.ExtraBold, color = palette.primary))
         }
         Column(Modifier.weight(1f)) {
-            Text(job.title, style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.5f.sp, fontWeight = FontWeight.ExtraBold, color = palette.ink), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(listing.title, style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.5f.sp, fontWeight = FontWeight.ExtraBold, color = palette.ink), maxLines = 1, overflow = TextOverflow.Ellipsis)
             Spacer(Modifier.height(2.dp))
             Text(
-                "${job.company} · ${job.location} · ${job.category}",
+                // Bo'sh bo'laklar tushib qoladi — aks holda "· ·" ko'rinishida chiqardi.
+                listOfNotNull(
+                    job?.companyName?.takeIf { it.isNotBlank() },
+                    listing.branches.firstOrNull()?.address,
+                    listing.categoryLabel,
+                ).joinToString(" · "),
                 style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.sp, color = palette.inkFaint),
                 maxLines = 1, overflow = TextOverflow.Ellipsis,
             )
             Spacer(Modifier.height(4.dp))
-            Text(job.salary, style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.5f.sp, fontWeight = FontWeight.Bold, color = palette.successDeep))
+            Text(listing.salaryLabel(), style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.5f.sp, fontWeight = FontWeight.Bold, color = palette.successDeep))
         }
-        Icon(
-            AppIcons.Bookmark, "Saqlash",
-            tint = if (job.bookmarked) palette.primary else palette.inkFaint,
-            modifier = Modifier.size(20.dp).clickable { onBookmark(job) },
-        )
+        if (job?.isDaily == true) {
+            Box(
+                Modifier.clip(RoundedCornerShape(8.dp)).background(palette.primary.copy(alpha = 0.12f))
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
+            ) {
+                Text("Kunlik", style = TextStyle(fontFamily = AppFontFamily, fontSize = 10.5f.sp, fontWeight = FontWeight.ExtraBold, color = palette.primary))
+            }
+        }
     }
+}
+
+/** "Korzinka" → "K". Logotip yo'q, shuning uchun nomning birinchi harfi ishlatiladi. */
+private fun String?.monogram(): String =
+    this?.trim()?.firstOrNull()?.uppercase() ?: "?"
+
+/** "300 000 so'm / kuniga" yoki "Kelishilgan". */
+private fun Listing.salaryLabel(): String {
+    if (isNegotiable) return "Kelishilgan"
+    val suffix = jobDetails?.payPeriod?.suffix
+    val amount = priceMax?.takeIf { it > price }
+        ?.let { "${price.formatSum()} — ${it.formatSum()}" }
+        ?: price.formatSum()
+    return listOfNotNull("$amount so'm", suffix).joinToString(" / ")
 }
 
 // ---------------------------------------------------------------------------

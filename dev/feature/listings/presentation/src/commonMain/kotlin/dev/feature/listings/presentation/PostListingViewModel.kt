@@ -5,19 +5,20 @@ import androidx.lifecycle.viewModelScope
 import dev.core.common.Resource
 import dev.core.domain.usecase.ObserveCurrentUserUseCase
 import dev.feature.listings.domain.model.BusinessType
-import dev.feature.listings.domain.model.DiscountType
+import dev.feature.listings.domain.model.EmploymentType
+import dev.feature.listings.domain.model.JobCatalog
 import dev.feature.listings.domain.model.Listing
-import dev.feature.listings.domain.model.ListingCatalog
-import dev.feature.listings.domain.model.ListingDiscount
-import dev.feature.listings.domain.model.ListingError
-import dev.feature.listings.domain.model.ListingField
-import dev.feature.listings.domain.model.ListingBranch
+import dev.feature.listings.domain.model.ListingDetails
+import dev.feature.listings.domain.model.ListingKind
 import dev.feature.listings.domain.model.ListingRedemption
 import dev.feature.listings.domain.model.ListingStatus
 import dev.feature.listings.domain.model.ListingValidator
+import dev.feature.listings.domain.model.PayPeriod
 import dev.feature.listings.domain.model.PriceUnit
-import dev.feature.listings.domain.model.RedemptionMethod
-import dev.feature.listings.domain.repository.PlaceSuggestion
+import dev.feature.listings.domain.model.ServiceCatalog
+import dev.feature.listings.domain.model.TaskCatalog
+import dev.feature.listings.domain.model.TaskFormat
+import dev.feature.listings.domain.model.WorkSchedule
 import dev.feature.listings.domain.usecase.CreateBranchFromPointUseCase
 import dev.feature.listings.domain.usecase.GetListingUseCase
 import dev.feature.listings.domain.usecase.PublishListingUseCase
@@ -35,75 +36,20 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.datetime.Clock
 
-/** E'lon qo'yish oqimi: avval biznes turi, keyin forma. */
-enum class PostListingStep { TYPE, FORM }
-
 /**
- * E'lon qo'yish formasining holati. Barcha raqamli maydonlar **matn** ko'rinishida —
- * foydalanuvchi yozayotganda qisman kiritishga yo'l qo'yish uchun ("5" → "55" → "55000").
- * Domen modeliga o'girish [PostListingViewModel.buildListing] da bo'ladi.
+ * E'lon qo'yish ekranining ViewModel'i — to'rt xil e'lon uchun bitta oqim.
+ *
+ * Umumiy maydonlar (sarlavha, rasm, narx, joylashuv) har turda bir xil ishlaydi va shu
+ * yerda nomlangan metodlar bilan boshqariladi. Turga xos maydonlar esa o'z holatiga ega
+ * ([RentalFormState], [ServiceFormState], [JobFormState]) va ular `updateRental { ... }`
+ * ko'rinishidagi metodlar orqali yangilanadi.
+ *
+ * Nega har bir maydon uchun alohida metod emas: to'rt turda jami yuzga yaqin maydon bor,
+ * ularning har biriga `onX` yozish ViewModel'ni faqat bir qatorli o'tkazgichlardan iborat
+ * ming qatorlik faylga aylantirar edi. Turga xos holat esa baribir yaxlit `copy` bilan
+ * yangilanadi — shuning uchun o'zgartirish funksiyasini uzatish ham qisqa, ham xavfsiz
+ * (boshqa turning holatiga tegib bo'lmaydi).
  */
-data class PostListingUiState(
-    val step: PostListingStep = PostListingStep.TYPE,
-    val businessType: BusinessType? = null,
-
-    val businessName: String = "",
-    val categoryKey: String = "",
-    val customCategoryName: String = "",
-    /** Kategoriyaga xos maydonlar qiymatlari (ListingCatalog.categoryAttributes kalitlari). */
-    val attributeValues: Map<String, String> = emptyMap(),
-    /** `true` — chegirma e'loni (chegirma maydonlari), `false` — oddiy e'lon (faqat narx). */
-    val isDiscount: Boolean = true,
-    /** Rejim tashqaridan (tab) belgilangan — E'lon turi tanlovi yashiriladi. */
-    val modeLocked: Boolean = false,
-
-    val title: String = "",
-    val description: String = "",
-    val images: List<String> = emptyList(),
-    val uploadingImage: Boolean = false,
-
-    val priceUnit: PriceUnit = PriceUnit.PER_ITEM,
-    val originalPrice: String = "",
-
-    // Chegirma endi faqat "hozirgi narx" ko'rinishida — foiz/boshqa turlar yo'q.
-    val discountType: DiscountType = DiscountType.SPECIAL_PRICE,
-    val discountValue: String = "",
-    val conditions: String = "",
-
-    val redemptionMethod: RedemptionMethod = RedemptionMethod.STUDENT_ID,
-    val promoCode: String = "",
-    /** Aloqa telefoni — soddalashtirilgan formada so'raladi. */
-    val contactPhone: String = "",
-
-    /** Filiallar — har biri xaritadan tanlangan (koordinatasi bor). */
-    val branches: List<ListingBranch> = emptyList(),
-    /** Xarita ochiqmi (yangi filial belgilash uchun). */
-    val pickingOnMap: Boolean = false,
-    /** Xaritadan nuqta tanlandi, manzil aniqlanmoqda. */
-    val resolvingAddress: Boolean = false,
-
-    /** Xaritadagi qidiruv. */
-    val searchQuery: String = "",
-    val searchResults: List<PlaceSuggestion> = emptyList(),
-    val searching: Boolean = false,
-
-    val durationDays: Int = 30,
-
-    val errors: List<ListingError> = emptyList(),
-    val submitting: Boolean = false,
-    val published: Boolean = false,
-    /** Bir martalik xabar (masalan rasm yuklashdagi xato). */
-    val message: String? = null,
-    val editing: Boolean = false,
-) {
-    /** Live hisoblanadigan yakuniy narx — foydalanuvchi yozayotganda ko'rinadi. */
-    val finalPrice: Long
-        get() = ListingDiscount(discountType, discountValue.toLongOrNull() ?: 0)
-            .finalPrice(originalPrice.toLongOrNull() ?: 0)
-
-    fun errorFor(field: ListingField): String? = errors.firstOrNull { it.field == field }?.message
-}
-
 class PostListingViewModel(
     observeCurrentUserUseCase: ObserveCurrentUserUseCase,
     private val publishListing: PublishListingUseCase,
@@ -126,65 +72,170 @@ class PostListingViewModel(
     private var editingBusinessId: String? = null
 
     // -----------------------------------------------------------------------
-    // Tur va kategoriya
+    // Qadamlar: tur → (biznes turi) → forma
     // -----------------------------------------------------------------------
 
-    fun selectType(type: BusinessType) = _state.update {
-        it.copy(
-            businessType = type,
-            step = PostListingStep.FORM,
-            // Har turning o'z narx birligi va kategoriyalari bor — eskilarini tashlaymiz.
-            priceUnit = type.defaultPriceUnit,
-            categoryKey = "",
+    /**
+     * E'lon turi tanlandi. Chegirmada yana bir qadam bor (biznes turi), qolganlarida
+     * to'g'ridan-to'g'ri formaga o'tiladi.
+     */
+    fun selectKind(kind: ListingKind) = _state.update { state ->
+        state.copy(
+            kind = kind,
+            step = if (kind == ListingKind.DISCOUNT) PostListingStep.TYPE else PostListingStep.FORM,
+            priceUnit = defaultPriceUnit(kind, state),
         )
     }
 
-    fun backToTypes() = _state.update { it.copy(step = PostListingStep.TYPE) }
-
-    // Kategoriya o'zgarsa — kategoriyaга xos maydonlar boshqacha, shuning uchun tozalanadi.
-    fun onCategory(key: String) = _state.update { it.copy(categoryKey = key, attributeValues = emptyMap()) }
-
-    /** Kategoriyaga xos maydon qiymatini yozadi (bo'sh bo'lsa o'chiradi). */
-    fun onAttribute(key: String, value: String) = _state.update {
-        it.copy(attributeValues = if (value.isBlank()) it.attributeValues - key else it.attributeValues + (key to value))
+    fun selectBusinessType(type: BusinessType) = _state.update { state ->
+        state.copy(
+            step = PostListingStep.FORM,
+            // Har turning o'z narx birligi va kategoriyalari bor — eskilarini tashlaymiz.
+            priceUnit = type.defaultPriceUnit,
+            discount = state.discount.copy(businessType = type, categoryKey = ""),
+        )
     }
 
-    /** E'lon rejimi: chegirma yoki oddiy. */
-    fun onListingMode(discount: Boolean) = _state.update { it.copy(isDiscount = discount) }
-
-    /** Yaratishда rejimni tab belgilaydi — qulflab qo'yamiz (tanlov ko'rinmaydi). */
-    fun setInitialMode(discount: Boolean) = _state.update {
-        it.copy(isDiscount = discount, modeLocked = true, discountType = DiscountType.SPECIAL_PRICE)
+    /** Formadan orqaga: chegirmada biznes turiga, qolganlarida e'lon turiga qaytadi. */
+    fun back() = _state.update { state ->
+        when {
+            state.step == PostListingStep.FORM && state.kind == ListingKind.DISCOUNT ->
+                state.copy(step = PostListingStep.TYPE)
+            state.step == PostListingStep.FORM || state.step == PostListingStep.TYPE ->
+                state.copy(step = PostListingStep.KIND)
+            else -> state
+        }
     }
 
-    /** Aloqa telefoni. */
-    fun onContactPhone(v: String) = _state.update { it.copy(contactPhone = v) }
-    fun onCustomCategory(v: String) = _state.update { it.copy(customCategoryName = v) }
+    private fun defaultPriceUnit(kind: ListingKind, state: PostListingUiState): PriceUnit =
+        when (kind) {
+            ListingKind.DISCOUNT -> state.discount.businessType?.defaultPriceUnit ?: PriceUnit.PER_ITEM
+            ListingKind.RENTAL -> state.rental.period.priceUnit
+            ListingKind.SERVICE -> state.service.serviceType?.defaultPriceUnit ?: PriceUnit.PER_HOUR
+            ListingKind.JOB -> JobCatalog.priceUnit(state.job.payPeriod)
+            // Topshiriq — bir martalik ish, narx butun ish uchun.
+            ListingKind.TASK -> PriceUnit.PER_ITEM
+        }
 
     // -----------------------------------------------------------------------
-    // Asosiy maydonlar
+    // Umumiy maydonlar
     // -----------------------------------------------------------------------
 
-    fun onBusinessName(v: String) = _state.update { it.copy(businessName = v) }
     fun onTitle(v: String) = _state.update { it.copy(title = v) }
     fun onDescription(v: String) = _state.update { it.copy(description = v) }
     fun onPriceUnit(v: PriceUnit) = _state.update { it.copy(priceUnit = v) }
-    fun onPrice(v: String) = _state.update { it.copy(originalPrice = v.digits()) }
-
-    fun onDiscountType(v: DiscountType) = _state.update {
-        // 1+1 da qiymat maydoni yo'q — eski foizni tozalaymiz, aks holda u yashirin qolib ketadi.
-        it.copy(discountType = v, discountValue = if (v == DiscountType.FREE_ITEM) "" else it.discountValue)
-    }
-
-    fun onDiscountValue(v: String) = _state.update { it.copy(discountValue = v.digits()) }
-    fun onConditions(v: String) = _state.update { it.copy(conditions = v) }
-
-    fun onRedemptionMethod(v: RedemptionMethod) = _state.update { it.copy(redemptionMethod = v) }
-    fun onPromoCode(v: String) = _state.update { it.copy(promoCode = v.uppercase()) }
+    fun onPrice(v: String) = _state.update { it.copy(price = v.digits()) }
+    fun onPriceMax(v: String) = _state.update { it.copy(priceMax = v.digits()) }
+    fun onNegotiable(v: Boolean) = _state.update { it.copy(isNegotiable = v) }
+    fun onContactPhone(v: String) = _state.update { it.copy(contactPhone = v) }
     fun onDuration(days: Int) = _state.update { it.copy(durationDays = days) }
+    fun consumeMessage() = _state.update { it.copy(message = null) }
 
     // -----------------------------------------------------------------------
-    // Filiallar — xaritadan
+    // Turga xos holatlar
+    // -----------------------------------------------------------------------
+
+    fun updateDiscount(transform: (DiscountFormState) -> DiscountFormState) =
+        _state.update { it.copy(discount = transform(it.discount)) }
+
+    /**
+     * Ijara holatini yangilaydi. Ijara muddati (oylik/kunlik) narx birligini ham belgilaydi —
+     * ikkalasi doim mos bo'lishi uchun shu yerda birga yangilanadi.
+     */
+    fun updateRental(transform: (RentalFormState) -> RentalFormState) = _state.update { state ->
+        val rental = transform(state.rental)
+        state.copy(rental = rental, priceUnit = rental.period.priceUnit)
+    }
+
+    /**
+     * Xizmat holatini yangilaydi. Soha o'zgarsa maydonlar boshqacha bo'ladi — eski
+     * qiymatlar tozalanadi, aks holda ular ko'rinmas holda saqlanib qoladi va e'longa
+     * boshqa sohaning ma'lumoti tushib ketadi.
+     */
+    fun updateService(transform: (ServiceFormState) -> ServiceFormState) = _state.update { state ->
+        val next = transform(state.service)
+        val typeChanged = next.serviceType != state.service.serviceType
+        val subjectChanged = next.subjectKey != state.service.subjectKey
+
+        val cleaned = when {
+            typeChanged -> next.copy(subjectKey = "", customSubject = "", fields = emptyMap())
+            // Yo'nalish o'zgarsa faqat YO'NALISHGA xos maydonlar tozalanadi,
+            // sohaning umumiy maydonlari (narx, tajriba) joyida qoladi.
+            subjectChanged -> next.copy(fields = next.fields.retainingOnly(next.serviceType))
+            else -> next
+        }
+        state.copy(
+            service = cleaned,
+            priceUnit = if (typeChanged) {
+                cleaned.serviceType?.defaultPriceUnit ?: state.priceUnit
+            } else {
+                state.priceUnit
+            },
+        )
+    }
+
+    /** Sohaning umumiy maydonlarigina qoldiriladi (yo'nalishga xoslari olib tashlanadi). */
+    private fun Map<String, String>.retainingOnly(
+        type: dev.feature.listings.domain.model.ServiceType?,
+    ): Map<String, String> {
+        if (type == null) return emptyMap()
+        val commonKeys = ServiceCatalog.fields(type).map { it.key }.toSet()
+        return filterKeys { it in commonKeys }
+    }
+
+    /** Xizmatning bitta maydonini yozadi (bo'sh bo'lsa o'chiradi). */
+    fun onServiceField(key: String, value: String) = updateService { service ->
+        service.copy(
+            fields = if (value.isBlank()) service.fields - key else service.fields + (key to value),
+        )
+    }
+
+    /**
+     * Ish holatini yangilaydi. To'lov davri narx birligini belgilaydi, ish turi esa
+     * mavjud smenalar ro'yxatini — mos kelmay qolgan smena tozalanadi.
+     */
+    fun updateTask(transform: (TaskFormState) -> TaskFormState) = _state.update { state ->
+        val next = transform(state.task)
+        // Fan almashsa erkin nom eskirib qoladi — "Boshqa" bo'lmasa tozalaymiz.
+        // Kategoriya almashsa eski tur unga tegishli emas — tozalaymiz.
+        val categoryChanged = next.category != state.task.category
+        var task = if (categoryChanged) next.copy(typeKey = "", customTypeName = "") else next
+        if (task.typeKey != TaskCatalog.OTHER_KEY) task = task.copy(customTypeName = "")
+        // Onlayn ishga aylansa xaritadan tanlangan manzillar ortiqcha.
+        val branches = if (task.format == TaskFormat.IN_PERSON) state.branches else emptyList()
+        state.copy(task = task, branches = branches)
+    }
+
+    fun updateJob(transform: (JobFormState) -> JobFormState) = _state.update { state ->
+        val next = transform(state.job)
+        val employmentChanged = next.employment != state.job.employment
+
+        val job = if (employmentChanged) {
+            next.copy(
+                shift = next.shift?.takeIf { it in JobCatalog.shifts(next.employment) },
+                payPeriod = next.payPeriod.takeIf { it in JobCatalog.payPeriods(next.employment) }
+                    ?: JobCatalog.payPeriods(next.employment).first(),
+                // Kunlik ishda haftalik grafik, doimiy ishda esa aniq sana ma'nosiz.
+                days = if (next.employment == EmploymentType.DAILY) emptySet() else next.days,
+                workDate = if (next.employment == EmploymentType.PERMANENT) null else next.workDate,
+            )
+        } else {
+            next
+        }
+        state.copy(job = job, priceUnit = JobCatalog.priceUnit(job.payPeriod))
+    }
+
+    /** Chegirma rejimi tab tomonidan belgilanadi — qulflab qo'yamiz (tanlov ko'rinmaydi). */
+    fun setInitialDiscountMode(discounted: Boolean) = _state.update { state ->
+        state.copy(
+            kind = ListingKind.DISCOUNT,
+            step = if (state.discount.businessType == null) PostListingStep.TYPE else state.step,
+            discount = state.discount.copy(isDiscounted = discounted, modeLocked = true),
+        )
+    }
+
+    // -----------------------------------------------------------------------
+    // Manzillar — xaritadan
     // -----------------------------------------------------------------------
 
     /** "+" bosilganda xarita ochiladi. */
@@ -193,10 +244,6 @@ class PostListingViewModel(
     fun closeMap() = _state.update {
         it.copy(pickingOnMap = false, searchQuery = "", searchResults = emptyList())
     }
-
-    // -----------------------------------------------------------------------
-    // Xaritadagi qidiruv
-    // -----------------------------------------------------------------------
 
     private var searchJob: Job? = null
 
@@ -229,7 +276,7 @@ class PostListingViewModel(
     /**
      * Xaritada nuqta tanlandi. Manzil teskari geokodlash bilan avtomatik to'ladi —
      * foydalanuvchi uni qo'lda yozmaydi. Internet bo'lmasa manzil o'rniga koordinata
-     * yoziladi va filial baribir qo'shiladi (nuqta yo'qolmasligi kerak).
+     * yoziladi va manzil baribir qo'shiladi (nuqta yo'qolmasligi kerak).
      */
     fun addBranchFromMap(lat: Double, lng: Double) {
         viewModelScope.launch {
@@ -262,7 +309,7 @@ class PostListingViewModel(
         )
     }
 
-    /** Filial nomi ("Chilonzor filiali") — ixtiyoriy. */
+    /** Manzil nomi ("Chilonzor filiali") — ixtiyoriy. */
     fun onBranchName(index: Int, name: String) = _state.update { state ->
         state.copy(
             branches = state.branches.mapIndexed { i, branch ->
@@ -270,8 +317,6 @@ class PostListingViewModel(
             },
         )
     }
-
-    fun consumeMessage() = _state.update { it.copy(message = null) }
 
     // -----------------------------------------------------------------------
     // Rasmlar
@@ -349,10 +394,16 @@ class PostListingViewModel(
         }
     }
 
+    // -----------------------------------------------------------------------
+    // Forma ↔ domen
+    // -----------------------------------------------------------------------
+
     /** Forma holatidan domen modelini quradi. Tur tanlanmagan bo'lsa — `null`. */
     private fun buildListing(): Listing? {
         val s = _state.value
-        val type = s.businessType ?: return null
+        val kind = s.kind ?: return null
+        val details = s.buildDetails(kind) ?: return null
+
         val ownerId = (user.value?.id ?: 0L).toString()
         val now = Clock.System.now().toEpochMilliseconds()
 
@@ -360,28 +411,17 @@ class PostListingViewModel(
             id = editingId ?: "lst-$ownerId-$now",
             ownerId = ownerId,
             businessId = editingBusinessId,
-            businessType = type,
-            businessName = s.businessName.trim(),
-            categoryKey = s.categoryKey,
-            customCategoryName = s.customCategoryName.trim().ifBlank { null },
-            // Oddiy e'lon belgisi + aloqa telefoni ham attributes ichida saqlanadi (migratsiyasiz).
-            attributes = s.attributeValues +
-                (if (!s.isDiscount) mapOf(ListingCatalog.REGULAR_KEY to "1") else emptyMap()) +
-                (if (s.contactPhone.isNotBlank()) mapOf(ListingCatalog.PHONE_KEY to s.contactPhone.trim()) else emptyMap()),
+            details = details,
             title = s.title.trim(),
             description = s.description.trim().ifBlank { null },
             images = s.images,
             priceUnit = s.priceUnit,
-            originalPrice = s.originalPrice.toLongOrNull() ?: 0,
-            discount = ListingDiscount(
-                type = s.discountType,
-                value = s.discountValue.toLongOrNull() ?: 0,
-                conditions = s.conditions.trim().ifBlank { null },
-            ),
-            redemption = ListingRedemption(
-                method = s.redemptionMethod,
-                promoCode = s.promoCode.trim().ifBlank { null },
-            ),
+            price = s.price.toLongOrNull() ?: 0,
+            priceMax = s.priceMax.toLongOrNull(),
+            isNegotiable = s.isNegotiable,
+            contactPhone = s.contactPhone.trim().ifBlank { null },
+            // Chegirmada kategoriyaga xos maydonlar shu yerda saqlanadi.
+            attributes = s.discount.attributeValues.takeIf { kind == ListingKind.DISCOUNT }.orEmpty(),
             branches = s.branches,
             validFrom = now,
             validTo = now + s.durationDays.toLong() * MILLIS_PER_DAY,
@@ -391,30 +431,192 @@ class PostListingViewModel(
         )
     }
 
-    private fun Listing.toUiState() = PostListingUiState(
-        step = PostListingStep.FORM,
-        businessType = businessType,
-        businessName = businessName,
-        categoryKey = categoryKey,
-        customCategoryName = customCategoryName.orEmpty(),
-        attributeValues = attributes - ListingCatalog.REGULAR_KEY - ListingCatalog.PHONE_KEY,
-        isDiscount = attributes[ListingCatalog.REGULAR_KEY] != "1",
-        modeLocked = true,
-        contactPhone = attributes[ListingCatalog.PHONE_KEY].orEmpty(),
-        title = title,
-        description = description.orEmpty(),
-        images = images,
-        priceUnit = priceUnit,
-        originalPrice = originalPrice.toString(),
-        discountType = discount.type,
-        discountValue = discount.value.toString(),
-        conditions = discount.conditions.orEmpty(),
-        redemptionMethod = redemption.method,
-        promoCode = redemption.promoCode.orEmpty(),
-        branches = branches,
-        durationDays = ((validTo - validFrom) / MILLIS_PER_DAY).toInt().coerceAtLeast(1),
-        editing = true,
-    )
+    /** Turga xos holatdan [ListingDetails] quradi. Chegirmada biznes turi tanlanmagan — `null`. */
+    private fun PostListingUiState.buildDetails(kind: ListingKind): ListingDetails? = when (kind) {
+        ListingKind.TASK -> ListingDetails.Task(
+            category = task.category,
+            typeKey = task.typeKey,
+            customTypeName = task.customTypeName.trim().ifBlank { null },
+            deadline = task.deadline,
+            format = task.format,
+            volume = task.volume.trim().ifBlank { null },
+        )
+
+        ListingKind.DISCOUNT -> discount.businessType?.let { type ->
+            ListingDetails.Discount(
+                businessType = type,
+                businessName = discount.businessName.trim(),
+                categoryKey = discount.categoryKey,
+                customCategoryName = discount.customCategoryName.trim().ifBlank { null },
+                isDiscounted = discount.isDiscounted,
+                discountType = discount.discountType,
+                discountValue = discount.discountValue.toLongOrNull() ?: 0,
+                conditions = discount.conditions.trim().ifBlank { null },
+                redemption = ListingRedemption(
+                    method = discount.redemptionMethod,
+                    promoCode = discount.promoCode.trim().ifBlank { null },
+                ),
+            )
+        }
+
+        ListingKind.RENTAL -> ListingDetails.Rental(
+            propertyType = rental.propertyType,
+            roomCount = rental.roomCount.toIntOrNull(),
+            currentTenants = rental.currentTenants.toIntOrNull(),
+            neededTenants = rental.neededTenants.toIntOrNull(),
+            gender = rental.gender,
+            period = rental.period,
+            utilitiesIncluded = rental.utilitiesIncluded,
+            depositMonths = rental.depositMonths.toIntOrNull(),
+            floor = rental.floor.toIntOrNull(),
+            totalFloors = rental.totalFloors.toIntOrNull(),
+            amenities = rental.amenities.toList(),
+            availableFrom = rental.availableFrom,
+        )
+
+        ListingKind.SERVICE -> ListingDetails.Service(
+            serviceType = service.serviceType,
+            // Yo'nalish ham maydonlar ichida saqlanadi — domen uni shu kalitda kutadi.
+            fields = service.fields +
+                buildMap {
+                    if (service.subjectKey.isNotBlank()) put(ServiceCatalog.SUBJECT_KEY, service.subjectKey)
+                    if (service.customSubject.isNotBlank()) {
+                        put(ServiceCatalog.CUSTOM_SUBJECT_KEY, service.customSubject.trim())
+                    }
+                },
+            format = service.format,
+            experienceYears = service.experienceYears.toIntOrNull(),
+            workingHours = service.workingHours.trim().ifBlank { null },
+            hasHomeVisit = service.hasHomeVisit,
+            hasFreeTrial = service.hasFreeTrial,
+        )
+
+        ListingKind.JOB -> ListingDetails.Job(
+            employment = job.employment,
+            categoryKey = job.categoryKey,
+            companyName = job.companyName.trim(),
+            shift = job.shift,
+            schedule = WorkSchedule(
+                days = job.days.toList().sortedBy { it.ordinal },
+                startTime = job.startTime.ifBlank { null },
+                endTime = job.endTime.ifBlank { null },
+                hoursPerDay = job.hoursPerDay.toIntOrNull(),
+            ),
+            payPeriod = job.payPeriod,
+            vacancies = job.vacancies.toIntOrNull(),
+            gender = job.gender,
+            experience = job.experience,
+            ageFrom = job.ageFrom.toIntOrNull(),
+            ageTo = job.ageTo.toIntOrNull(),
+            requirements = job.requirements,
+            benefits = job.benefits,
+            workDate = job.workDate,
+            payoutNote = job.payoutNote.trim().ifBlank { null },
+        )
+    }
+
+    /** Domen modelidan forma holatini tiklaydi (tahrirlash). */
+    private fun Listing.toUiState(): PostListingUiState {
+        val base = PostListingUiState(
+            step = PostListingStep.FORM,
+            kind = kind,
+            title = title,
+            description = description.orEmpty(),
+            images = images,
+            priceUnit = priceUnit,
+            price = price.toString(),
+            priceMax = priceMax?.toString().orEmpty(),
+            isNegotiable = isNegotiable,
+            contactPhone = contactPhone.orEmpty(),
+            branches = branches,
+            durationDays = ((validTo - validFrom) / MILLIS_PER_DAY).toInt().coerceAtLeast(1),
+            editing = true,
+        )
+
+        return when (val d = details) {
+            is ListingDetails.Task -> base.copy(
+                task = TaskFormState(
+                    category = d.category,
+                    typeKey = d.typeKey,
+                    customTypeName = d.customTypeName.orEmpty(),
+                    deadline = d.deadline,
+                    format = d.format,
+                    volume = d.volume.orEmpty(),
+                ),
+            )
+
+            is ListingDetails.Discount -> base.copy(
+                discount = DiscountFormState(
+                    businessType = d.businessType,
+                    businessName = d.businessName,
+                    categoryKey = d.categoryKey,
+                    customCategoryName = d.customCategoryName.orEmpty(),
+                    attributeValues = attributes,
+                    isDiscounted = d.isDiscounted,
+                    modeLocked = true,
+                    discountType = d.discountType,
+                    discountValue = d.discountValue.toString(),
+                    conditions = d.conditions.orEmpty(),
+                    redemptionMethod = d.redemption.method,
+                    promoCode = d.redemption.promoCode.orEmpty(),
+                ),
+            )
+
+            is ListingDetails.Rental -> base.copy(
+                rental = RentalFormState(
+                    propertyType = d.propertyType,
+                    roomCount = d.roomCount?.toString().orEmpty(),
+                    currentTenants = d.currentTenants?.toString().orEmpty(),
+                    neededTenants = d.neededTenants?.toString().orEmpty(),
+                    gender = d.gender,
+                    period = d.period,
+                    utilitiesIncluded = d.utilitiesIncluded,
+                    depositMonths = d.depositMonths?.toString().orEmpty(),
+                    floor = d.floor?.toString().orEmpty(),
+                    totalFloors = d.totalFloors?.toString().orEmpty(),
+                    amenities = d.amenities.toSet(),
+                    availableFrom = d.availableFrom,
+                ),
+            )
+
+            is ListingDetails.Service -> base.copy(
+                service = ServiceFormState(
+                    serviceType = d.serviceType,
+                    subjectKey = d.fields[ServiceCatalog.SUBJECT_KEY].orEmpty(),
+                    customSubject = d.fields[ServiceCatalog.CUSTOM_SUBJECT_KEY].orEmpty(),
+                    fields = d.fields - ServiceCatalog.SUBJECT_KEY - ServiceCatalog.CUSTOM_SUBJECT_KEY,
+                    format = d.format,
+                    experienceYears = d.experienceYears?.toString().orEmpty(),
+                    workingHours = d.workingHours.orEmpty(),
+                    hasHomeVisit = d.hasHomeVisit,
+                    hasFreeTrial = d.hasFreeTrial,
+                ),
+            )
+
+            is ListingDetails.Job -> base.copy(
+                job = JobFormState(
+                    employment = d.employment,
+                    categoryKey = d.categoryKey,
+                    companyName = d.companyName,
+                    shift = d.shift,
+                    days = d.schedule.days.toSet(),
+                    startTime = d.schedule.startTime.orEmpty(),
+                    endTime = d.schedule.endTime.orEmpty(),
+                    hoursPerDay = d.schedule.hoursPerDay?.toString().orEmpty(),
+                    payPeriod = d.payPeriod,
+                    vacancies = d.vacancies?.toString().orEmpty(),
+                    gender = d.gender,
+                    experience = d.experience,
+                    ageFrom = d.ageFrom?.toString().orEmpty(),
+                    ageTo = d.ageTo?.toString().orEmpty(),
+                    requirements = d.requirements,
+                    benefits = d.benefits,
+                    workDate = d.workDate,
+                    payoutNote = d.payoutNote.orEmpty(),
+                ),
+            )
+        }
+    }
 
     private companion object {
         const val MILLIS_PER_DAY = 24L * 60 * 60 * 1000
@@ -425,11 +627,5 @@ class PostListingViewModel(
 /** Raqamli maydonlarga faqat raqam kiritiladi (klaviatura turi kafolat bermaydi). */
 private fun String.digits(): String = filter { it.isDigit() }
 
-/** Tanlangan biznes turining kategoriyalari. */
-fun PostListingUiState.categories() =
-    businessType?.let { ListingCatalog.categories(it) }.orEmpty()
-
-/** Tanlangan KATEGORIYAга xos maydonlar (masalan Game Club > PlayStation). */
-fun PostListingUiState.categoryAttributes() =
-    businessType?.let { ListingCatalog.categoryAttributes(it, categoryKey) }.orEmpty()
-
+/** Ish e'lonida to'lov davri o'zgarganda narx birligi ham mos bo'lishi uchun. */
+internal fun PayPeriod.toPriceUnit(): PriceUnit = JobCatalog.priceUnit(this)
