@@ -36,6 +36,8 @@ data class HomeUiState(
     val jobs: List<Listing> = emptyList(),
     /** Faol ijara e'lonlari ([ListingKind.RENTAL]) — sherik izlayotgan kvartiralar. */
     val rentals: List<Listing> = emptyList(),
+    /** Faol yordam e'lonlari ([ListingKind.TASK]) — bir martalik topshiriqlar. */
+    val tasks: List<Listing> = emptyList(),
     val students: List<Student> = emptyList(),
     val clubs: List<Club> = emptyList(),
     val hasUnreadNotifications: Boolean = false,
@@ -77,12 +79,13 @@ class HomeViewModel(
         )
     }
 
-    // Ish va ijara e'lonlari bitta oqimga yig'iladi — aks holda `content` 6 ta manbaga
-    // aylanib, typed `combine` overload'i qolmaydi.
+    // E'lon turlari bitta oqimga yig'iladi — aks holda `content` 6+ manbaga aylanib,
+    // typed `combine` overload'i qolmaydi.
     private val listings = combine(
         observeListingsByKind(ListingKind.JOB),
         observeListingsByKind(ListingKind.RENTAL),
-    ) { jobs, rentals -> jobs to rentals }
+        observeListingsByKind(ListingKind.TASK),
+    ) { jobs, rentals, tasks -> Triple(jobs, rentals, tasks) }
 
     private val content = combine(
         discountRepository.observeCategories(),
@@ -90,8 +93,8 @@ class HomeViewModel(
         listings,
         studentRepository.observeStudents(),
         clubRepository.observeClubs(),
-    ) { categories, featured, (jobs, rentals), students, clubs ->
-        Content(categories, featured.firstOrNull(), jobs, rentals, students, clubs)
+    ) { categories, featured, (jobs, rentals, tasks), students, clubs ->
+        Content(categories, featured.firstOrNull(), jobs, rentals, tasks, students, clubs)
     }
 
     val state: StateFlow<HomeUiState> = combine(
@@ -105,6 +108,7 @@ class HomeViewModel(
             featured = c.featured,
             jobs = c.jobs,
             rentals = c.rentals,
+            tasks = c.tasks,
             students = c.students,
             clubs = c.clubs,
             hasUnreadNotifications = unread > 0,
@@ -125,6 +129,7 @@ class HomeViewModel(
         val featured: DiscountOffer?,
         val jobs: List<Listing>,
         val rentals: List<Listing>,
+        val tasks: List<Listing>,
         val students: List<Student>,
         val clubs: List<Club>,
     )

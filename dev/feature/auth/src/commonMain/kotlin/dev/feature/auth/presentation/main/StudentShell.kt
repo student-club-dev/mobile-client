@@ -172,6 +172,7 @@ fun StudentShell(onLoggedOut: () -> Unit) {
                     // Ikkalasi ham o'sha ekran, lekin darrov kerakli tab ochilgan holda.
                     onOpenJobs = { openListingsKind(ListingKind.JOB) },
                     onOpenRentals = { openListingsKind(ListingKind.RENTAL) },
+                    onOpenTasks = { openListingsKind(ListingKind.TASK) },
                     onOpenListing = { id -> nav.navigateSafe("$LISTING_DETAIL/${encodeArg(id)}") },
                     onOpenStudents = { nav.navigateSafe(STUDENTS) },
                 )

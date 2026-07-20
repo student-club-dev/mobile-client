@@ -45,6 +45,10 @@ import dev.core.designsystem.components.AppFontFamily
 import dev.core.designsystem.components.AppIcons
 import dev.core.designsystem.theme.AppPalette
 import dev.core.designsystem.theme.appPalette
+import kotlinx.datetime.Clock
+import kotlinx.datetime.Instant
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
@@ -56,6 +60,7 @@ fun HomeScreen(
     onOpenDiscounts: () -> Unit = {},
     onOpenJobs: () -> Unit = {},
     onOpenRentals: () -> Unit = {},
+    onOpenTasks: () -> Unit = {},
     onOpenListing: (String) -> Unit = {},
     onOpenStudents: () -> Unit = {},
     vm: HomeViewModel = koinViewModel(),
@@ -67,6 +72,8 @@ fun HomeScreen(
         HomeHeader(state, palette, onOpenProfile, onOpenChat, onOpenNotifications)
         Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(top = 18.dp)) {
             DiscountsSection(state.categories, state.featured, palette, onOpenDiscounts)
+            Spacer(Modifier.height(24.dp))
+            TasksSection(state.tasks, palette, onOpenTasks, onOpenListing)
             Spacer(Modifier.height(24.dp))
             ClubsSection(state.clubs, palette, onOpenClubs)
             Spacer(Modifier.height(24.dp))
@@ -198,6 +205,89 @@ private fun ClubsSection(clubs: List<Club>, palette: AppPalette, onOpenClubs: ()
                 Text("${club.membersCount} a'zo", style = TextStyle(fontFamily = AppFontFamily, fontSize = 10.5f.sp, fontWeight = FontWeight.Bold, color = if (club.joined) accent else palette.inkFaint))
             }
         }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Fanlardan yordam — bir martalik topshiriqlar
+// ---------------------------------------------------------------------------
+@Composable
+private fun TasksSection(
+    tasks: List<Listing>,
+    palette: AppPalette,
+    onSeeAll: () -> Unit,
+    onOpenListing: (String) -> Unit,
+) {
+    if (tasks.isEmpty()) return
+    SectionHeader("Yordam e'lonlari", action = "Barchasi", subtitle = "Referat, masala, qo'lyozma va IT ishlari", palette = palette, onAction = onSeeAll)
+    Spacer(Modifier.height(12.dp))
+    Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+        tasks.take(3).forEach { TaskRow(it, palette, onOpenListing) }
+    }
+}
+
+@Composable
+private fun TaskRow(listing: Listing, palette: AppPalette, onOpenListing: (String) -> Unit) {
+    val task = listing.taskDetails
+    val accent = Color(listing.accent)
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(palette.glass)
+            .border(1.dp, palette.border, RoundedCornerShape(16.dp))
+            .clickable { onOpenListing(listing.id) }
+            .padding(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(11.dp),
+    ) {
+        Box(
+            Modifier.size(42.dp).clip(RoundedCornerShape(12.dp)).background(accent.copy(alpha = 0.12f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(listing.emoji, style = TextStyle(fontSize = 19.sp))
+        }
+        Column(Modifier.weight(1f)) {
+            Text(listing.title, style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.5f.sp, fontWeight = FontWeight.ExtraBold, color = palette.ink), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Spacer(Modifier.height(2.dp))
+            // "Referat · 20 bet · Onlayn"
+            val summary = task?.summary().orEmpty()
+            if (summary.isNotBlank()) {
+                Text(summary, style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.sp, color = palette.inkFaint), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            Spacer(Modifier.height(4.dp))
+            Text(listing.taskPriceLabel(), style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.5f.sp, fontWeight = FontWeight.Bold, color = palette.successDeep))
+        }
+        // Muddat — bajaruvchi uchun eng muhim ma'lumot, shuning uchun o'ng chekkada ajratilgan.
+        deadlineLabel(task?.deadline)?.let { deadline ->
+            Box(
+                Modifier.clip(RoundedCornerShape(8.dp)).background(accent.copy(alpha = 0.12f))
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
+            ) {
+                Text(deadline, style = TextStyle(fontFamily = AppFontFamily, fontSize = 10.5f.sp, fontWeight = FontWeight.ExtraBold, color = accent))
+            }
+        }
+    }
+}
+
+/** "150 000 so'm" yoki "Kelishilgan". */
+private fun Listing.taskPriceLabel(): String =
+    if (isNegotiable) "Kelishilgan" else "${price.formatSum()} so'm"
+
+/**
+ * Muddat yorlig'i: "Bugun 18:00", "Ertaga 12:00", "5 kundan keyin" yoki "24.12".
+ * O'tib ketgan muddat ko'rsatilmaydi — e'lon hali faol bo'lsa ham foyda bermaydi.
+ */
+private fun deadlineLabel(deadline: Long?): String? {
+    if (deadline == null) return null
+    val zone = TimeZone.currentSystemDefault()
+    val at = Instant.fromEpochMilliseconds(deadline).toLocalDateTime(zone)
+    val today = Clock.System.now().toLocalDateTime(zone).date
+    val days = at.date.toEpochDays() - today.toEpochDays()
+    val time = "${at.hour.toString().padStart(2, '0')}:${at.minute.toString().padStart(2, '0')}"
+    return when {
+        days < 0 -> null
+        days == 0 -> "Bugun $time"
+        days == 1 -> "Ertaga $time"
+        days in 2..13 -> "$days kundan keyin"
+        else -> "${at.date.dayOfMonth}.${at.date.monthNumber}"
     }
 }
 

@@ -12,4 +12,6 @@ kotlin { sourceSets { commonMain.dependencies {
     implementation(projects.dev.feature.profile.domain)
     // DiscountRepository/DiscountCategory/DiscountOffer + ObserveCurrentUserUseCase.
     implementation(projects.dev.core.domain)
+    // Yordam e'lonlari kartochkasidagi muddat yorlig'i ("Ertaga 12:00").
+    implementation(libs.kotlinx.datetime)
 } } }

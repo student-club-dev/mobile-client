@@ -78,6 +78,7 @@ data class Listing(
     val rentalDetails: ListingDetails.Rental? get() = details as? ListingDetails.Rental
     val serviceDetails: ListingDetails.Service? get() = details as? ListingDetails.Service
     val jobDetails: ListingDetails.Job? get() = details as? ListingDetails.Job
+    val taskDetails: ListingDetails.Task? get() = details as? ListingDetails.Task
 
     /** Talaba to'laydigan narx. Chegirmasiz turlarda — oddiy narx. */
     val finalPrice: Long get() = discountDetails?.finalPrice(price) ?: price
