@@ -1,8 +1,8 @@
-package dev.feature.listings.presentation.map
+package dev.core.designsystem.map
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
@@ -22,18 +22,29 @@ import platform.darwin.NSObject
 @Composable
 actual fun MapPicker(
     initial: MapPoint?,
+    dark: Boolean,
     onCenterChanged: (MapPoint) -> Unit,
     modifier: Modifier,
     centerRequest: MapCenterRequest?,
 ) {
     val currentOnCenter by rememberUpdatedState(onCenterChanged)
 
+    // MapLibre ilova ichidan o'qiladi (CDN emas) — tayyor bo'lmaguncha WebView qurilmaydi.
+    if (!rememberMapLibreReady()) return
+
+    // Boshlang'ich markaz bir marta olinadi; keyingi ko'chishlar JS orqali (reload YO'Q).
+    val initialCenter = remember { initial ?: DefaultMapCenter }
+    val html = remember(dark) { pickerMapHtml(initialCenter, dark) }
+
     // Handler WKWebView'dan uzoq yashashi kerak — aks holda JS xabari kelguncha
     // u yig'ib yuboriladi va callback hech qachon chaqirilmaydi.
     val handler = remember { MapMessageHandler() }
-    handler.onCenter = { point -> currentOnCenter(point) }
+    // Yon ta'sirni kompozitsiya tanasida emas, SideEffect'da o'rnatamiz (bekor qilingan
+    // kompozitsiyada eski lambda o'rnatilib qolmasin).
+    SideEffect { handler.onCenter = { point -> currentOnCenter(point) } }
 
-    val lastCenterId = remember { mutableStateOf<Int?>(null) }
+    val htmlHolder = remember { Holder("") }
+    val lastCenterId = remember { Holder<Int?>(null) }
 
     UIKitView(
         modifier = modifier,
@@ -44,23 +55,31 @@ actual fun MapPicker(
             val config = WKWebViewConfiguration().apply { userContentController = controller }
             val webView = WKWebView(frame = CGRectZero.readValue(), configuration = config)
             webView.opaque = false
-
-            val center = initial ?: DefaultMapCenter
-            webView.loadHTMLString(
-                string = mapHtml(center),
-                baseURL = NSURL(string = TILE_HOST),
-            )
+            webView.loadHTMLString(html, baseURL = NSURL(string = MAP_BASE_URL))
+            htmlHolder.value = html
             webView
         },
         update = { webView ->
+            // Mavzu o'zgardi — sahifani qayta qurish shart (uslub havolasi HTML ichida).
+            if (htmlHolder.value != html) {
+                htmlHolder.value = html
+                webView.loadHTMLString(html, baseURL = NSURL(string = MAP_BASE_URL))
+                return@UIKitView
+            }
             // Joylashuv keyinroq aniqlansa yoki "Mening joylashuvim" bosilsa — xaritani ko'chiramiz.
             if (centerRequest != null && centerRequest.id != lastCenterId.value) {
                 lastCenterId.value = centerRequest.id
-                webView.evaluateJavaScript(
-                    jsSetCenter(centerRequest.point),
-                    completionHandler = null,
-                )
+                webView.evaluateJavaScript(jsSetCenter(centerRequest.point), completionHandler = null)
             }
+        },
+        // Ekran yopilganda handler'ni yechamiz — aks holda WKUserContentController handler'ni
+        // KUCHLI ushlaydi, handler esa Composition'ni; natijada WKWebView va uning alohida
+        // WebContent jarayoni ekran yopilgandan keyin ham yashab, xotira o'sib boradi.
+        onRelease = { webView ->
+            webView.configuration.userContentController
+                .removeScriptMessageHandlerForName(MAP_BRIDGE)
+            webView.stopLoading()
+            webView.loadHTMLString("", baseURL = null)
         },
     )
 }

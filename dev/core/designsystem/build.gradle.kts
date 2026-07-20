@@ -26,7 +26,10 @@ kotlin {
 
         androidMain.dependencies {
             // Galereyadan rasm tanlash (`media/ImagePicker`) — ActivityResultContracts.PickVisualMedia.
+            // Xarita uchun joylashuv ruxsatini so'rash (`map/UserLocation`) ham shu API'da.
             implementation(libs.androidx.activity.compose)
+            // ContextCompat.checkSelfPermission — `map/UserLocation`.
+            implementation(libs.androidx.core.ktx)
         }
     }
 }
