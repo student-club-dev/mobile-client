@@ -49,7 +49,7 @@ import dev.core.designsystem.theme.appPalette
 import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
-fun StudentsScreen(vm: StudentsViewModel = koinViewModel()) {
+fun StudentsScreen(onBack: () -> Unit = {}, vm: StudentsViewModel = koinViewModel()) {
     val palette = appPalette
     val state by vm.state.collectAsStateWithLifecycle()
     var selectedId by remember { mutableStateOf<String?>(null) }
@@ -62,7 +62,17 @@ fun StudentsScreen(vm: StudentsViewModel = koinViewModel()) {
 
     Column(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(top = 54.dp)) {
-            Text("Studentlar", style = TextStyle(fontFamily = AppFontFamily, fontSize = 24.sp, fontWeight = FontWeight.Black, color = palette.ink))
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(11.dp)) {
+                Box(
+                    Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(palette.glass)
+                        .border(1.dp, palette.border, RoundedCornerShape(12.dp))
+                        .clickable(onClick = onBack),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(AppIcons.ArrowLeft, "Orqaga", tint = palette.ink, modifier = Modifier.size(18.dp))
+                }
+                Text("Studentlar", style = TextStyle(fontFamily = AppFontFamily, fontSize = 24.sp, fontWeight = FontWeight.Black, color = palette.ink))
+            }
             Spacer(Modifier.height(14.dp))
             Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 SortChip("Mening univer", state.sort == StudentSort.MY_UNIVERSITY, { vm.setSort(StudentSort.MY_UNIVERSITY) }, palette)
@@ -75,7 +85,8 @@ fun StudentsScreen(vm: StudentsViewModel = koinViewModel()) {
 
         LazyColumn(
             Modifier.fillMaxWidth().weight(1f),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 110.dp),
+            // Endi bu tab emas, ochilgan ekran — pastda navigatsiya paneli yo'q.
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(9.dp),
         ) {
             items(state.students, key = { it.id }) { student ->

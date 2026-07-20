@@ -54,8 +54,15 @@ import dev.core.designsystem.theme.AppPalette
 import dev.core.designsystem.theme.appPalette
 import org.koin.compose.viewmodel.koinViewModel
 
+/**
+ * Suhbatlar. Ikki rejimda ishlaydi:
+ *
+ * - **Tab** (`onBack == null`) — pastki navigatsiyaning "Xabarlar" tab'i. Orqaga tugmasi
+ *   ko'rsatilmaydi (tab'da qaytadigan joy yo'q) va ro'yxat pastdan panel bo'yi bo'sh joy oladi.
+ * - **Ochilgan ekran** (`onBack != null`) — stack'ka qo'yilganda, sarlavhada orqaga tugmasi.
+ */
 @Composable
-fun ChatScreen(onBack: () -> Unit, vm: ChatViewModel = koinViewModel()) {
+fun ChatScreen(onBack: (() -> Unit)? = null, vm: ChatViewModel = koinViewModel()) {
     val palette = appPalette
     val state by vm.state.collectAsStateWithLifecycle()
 
@@ -81,7 +88,7 @@ private fun ConversationList(
     conversations: List<Conversation>,
     archivedConversations: List<Conversation>,
     palette: AppPalette,
-    onBack: () -> Unit,
+    onBack: (() -> Unit)?,
     onOpen: (Conversation) -> Unit,
     onDelete: (Conversation) -> Unit,
     onArchive: (Conversation) -> Unit,
@@ -98,7 +105,11 @@ private fun ConversationList(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(11.dp),
         ) {
-            IconBox(AppIcons.ArrowLeft, palette) { if (showArchived) showArchived = false else onBack() }
+            // Arxivda — orqaga tugmasi har doim kerak (ro'yxatga qaytadi). Aks holda faqat
+            // ekran stack'ka qo'yilgan bo'lsa; tab rejimida qaytadigan joy yo'q.
+            if (showArchived || onBack != null) {
+                IconBox(AppIcons.ArrowLeft, palette) { if (showArchived) showArchived = false else onBack?.invoke() }
+            }
             Text(if (showArchived) "Arxiv" else "Xabarlar", style = TextStyle(fontFamily = AppFontFamily, fontSize = 22.sp, fontWeight = FontWeight.Black, color = palette.ink), modifier = Modifier.weight(1f))
             if (!showArchived && archivedConversations.isNotEmpty()) {
                 Row(
@@ -119,7 +130,8 @@ private fun ConversationList(
         } else {
             LazyColumn(
                 Modifier.fillMaxWidth().weight(1f),
-                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 24.dp),
+                // Tab rejimida pastda navigatsiya paneli turadi — oxirgi suhbat berkilmasin.
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = if (onBack == null) 110.dp else 24.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 items(list, key = { it.id }) { c ->

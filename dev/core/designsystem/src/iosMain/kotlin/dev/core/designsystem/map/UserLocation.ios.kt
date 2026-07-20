@@ -1,4 +1,4 @@
-package dev.feature.listings.presentation.map
+package dev.core.designsystem.map
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect

@@ -44,6 +44,15 @@ import androidx.navigation.navArgument
 import dev.core.designsystem.components.AppIcons
 import dev.core.designsystem.theme.AppPalette
 import dev.core.designsystem.theme.appPalette
+import dev.core.navigation.encodeArg
+import dev.core.navigation.PushEnter
+import dev.core.navigation.PushExit
+import dev.core.navigation.PopEnter
+import dev.core.navigation.PopExit
+import dev.core.navigation.TabEnter
+import dev.core.navigation.TabExit
+import dev.core.navigation.navigateSafe
+import dev.core.navigation.popSafe
 import dev.feature.listings.presentation.MyListingsScreen
 import dev.feature.listings.presentation.PostListingScreen
 
@@ -74,18 +83,27 @@ fun BusinessShell(
     var discountTab by remember { mutableStateOf(true) }
 
     Box(Modifier.fillMaxSize().background(palette.bgBrush)) {
-        NavHost(navController = nav, startDestination = LISTINGS, modifier = Modifier.fillMaxSize()) {
+        NavHost(
+            navController = nav,
+            startDestination = LISTINGS,
+            modifier = Modifier.fillMaxSize(),
+            // Animatsiyasiz — ekran bosilgan zahoti almashadi.
+            enterTransition = PushEnter,
+            exitTransition = PushExit,
+            popEnterTransition = PopEnter,
+            popExitTransition = PopExit,
+        ) {
             composable(LISTINGS) {
                 Column(Modifier.fillMaxSize()) {
                     BusinessTopBar(
                         discount = discountTab,
                         onSelect = { discountTab = it },
-                        onProfile = { nav.navigate(PROFILE) },
+                        onProfile = { nav.navigateSafe(PROFILE) },
                         palette = palette,
                     )
                     MyListingsScreen(
-                        onCreate = { nav.navigate("$POST_LISTING?discount=$discountTab") },
-                        onEdit = { listingId -> nav.navigate("$POST_LISTING?listingId=$listingId") },
+                        onCreate = { nav.navigateSafe("$POST_LISTING?discount=$discountTab") },
+                        onEdit = { listingId -> nav.navigateSafe("$POST_LISTING?listingId=${encodeArg(listingId)}") },
                         showHeaderCreate = false,
                         showHeader = false,
                         filterDiscount = discountTab,
@@ -100,7 +118,7 @@ fun BusinessShell(
                 ),
             ) { entry ->
                 PostListingScreen(
-                    onClose = { nav.popBackStack() },
+                    onClose = { nav.popSafe() },
                     onPublished = {
                         nav.navigate(LISTINGS) {
                             popUpTo(LISTINGS) { inclusive = true }
@@ -113,18 +131,18 @@ fun BusinessShell(
             }
             composable(PROFILE) {
                 BusinessAccountScreen(
-                    onBack = { nav.popBackStack() },
-                    onEdit = { nav.navigate(BUSINESS_EDIT) },
-                    onOpenListings = { nav.popBackStack() },
-                    onOpenSettings = { nav.navigate(SETTINGS) },
+                    onBack = { nav.popSafe() },
+                    onEdit = { nav.navigateSafe(BUSINESS_EDIT) },
+                    onOpenListings = { nav.popSafe() },
+                    onOpenSettings = { nav.navigateSafe(SETTINGS) },
                     onLoggedOut = onLoggedOut,
                 )
             }
             composable(BUSINESS_EDIT) {
-                BusinessEditScreen(onBack = { nav.popBackStack() })
+                BusinessEditScreen(onBack = { nav.popSafe() })
             }
             composable(SETTINGS) {
-                settingsContent { nav.popBackStack() }
+                settingsContent { nav.popSafe() }
             }
         }
 
@@ -133,7 +151,7 @@ fun BusinessShell(
             CreateFab(
                 discount = discountTab,
                 palette = palette,
-                onClick = { nav.navigate("$POST_LISTING?discount=$discountTab") },
+                onClick = { nav.navigateSafe("$POST_LISTING?discount=$discountTab") },
                 modifier = Modifier.align(Alignment.BottomEnd).padding(end = 18.dp, bottom = 26.dp),
             )
         }

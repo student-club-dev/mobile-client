@@ -1,4 +1,4 @@
-package dev.feature.listings.presentation.map
+package dev.core.designsystem.map
 
 import android.Manifest
 import android.content.Context
@@ -11,25 +11,36 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 actual fun rememberUserLocation(): MapPoint? {
     val context = LocalContext.current
     var location by remember { mutableStateOf<MapPoint?>(null) }
 
+    // Ruxsat natijasi Main thread'da keladi — o'qishni IO'ga o'tkazamiz (pastdagi izohga qarang).
+    val scope = rememberCoroutineScope()
     val launcher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions(),
     ) { granted ->
         // Foydalanuvchi rad etsa — masofasiz davom etamiz, ekran baribir ishlaydi.
-        if (granted.values.any { it }) location = context.lastKnownPoint()
+        if (granted.values.any { it }) {
+            scope.launch { location = withContext(Dispatchers.IO) { context.lastKnownPoint() } }
+        }
     }
 
     LaunchedEffect(Unit) {
         if (context.hasLocationPermission()) {
-            location = context.lastKnownPoint()
+            // MUHIM: `lastKnownPoint()` LocationManagerService'ga binder IPC qiladi va GPS
+            // provayderi band bo'lsa o'nlab millisekund bloklaydi. Bu aynan xarita ochilayotgan
+            // payt (WebView init bilan bir vaqtda) — Main thread'da bajarilsa sezilarli jank.
+            location = withContext(Dispatchers.IO) { context.lastKnownPoint() }
         } else {
             launcher.launch(
                 arrayOf(

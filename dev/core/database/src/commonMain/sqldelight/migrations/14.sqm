@@ -1,0 +1,107 @@
+-- Migratsiya v14 -> v15
+-- E'lon endi to'rt xil bo'ladi: chegirma, ijara (turarjoy), xizmat va ish e'loni.
+--
+-- Turga xos maydonlar jadvalda alohida ustun bo'lolmaydi — ijara e'loni uchun `promoCode`,
+-- chegirma uchun `neededTenants` doim bo'sh turardi. Shuning uchun ular `detailsJson` ga
+-- ko'chiriladi (domendagi ListingDetails sealed turi).
+--
+-- SQLite'da ustun o'chirib bo'lmagani sabab jadval qayta quriladi. Mavjud e'lonlar
+-- YO'QOLMAYDI: eski chegirma ustunlari o'qilib, detailsJson matni sifatida yig'iladi.
+
+ALTER TABLE ListingEntity RENAME TO ListingEntity_old;
+
+CREATE TABLE ListingEntity (
+    id TEXT NOT NULL PRIMARY KEY,
+    ownerId TEXT NOT NULL,
+    businessId TEXT,
+
+    kind TEXT NOT NULL DEFAULT 'DISCOUNT',
+    detailsJson TEXT NOT NULL DEFAULT '{}',
+
+    title TEXT NOT NULL,
+    description TEXT,
+    imagesJson TEXT NOT NULL DEFAULT '[]',
+
+    priceUnit TEXT NOT NULL,
+    price INTEGER NOT NULL,
+    priceMax INTEGER,
+    currency TEXT NOT NULL DEFAULT 'UZS',
+    isNegotiable INTEGER NOT NULL DEFAULT 0,
+    finalPrice INTEGER NOT NULL,
+
+    contactPhone TEXT,
+
+    branchesJson TEXT NOT NULL DEFAULT '[]',
+
+    validFrom INTEGER NOT NULL,
+    validTo INTEGER NOT NULL,
+
+    attributesJson TEXT NOT NULL DEFAULT '{}',
+    optionGroupsJson TEXT NOT NULL DEFAULT '[]',
+
+    status TEXT NOT NULL,
+    rejectionReason TEXT,
+    viewsCount INTEGER NOT NULL DEFAULT 0,
+    createdAt INTEGER NOT NULL,
+    updatedAt INTEGER NOT NULL
+);
+
+-- Eski qatorlar. Hammasi chegirma e'loni edi (boshqa turlar hali yo'q edi), shuning uchun
+-- kind = 'DISCOUNT'. detailsJson qo'lda yig'iladi: JSON1 kengaytmasi hamma platformada
+-- mavjudligiga tayanib bo'lmaydi, matn birlashtirish esa hamma joyda ishlaydi.
+--
+-- Erkin matnlar (biznes nomi, shartlar) JSON ichiga tushishidan oldin ekranlanadi:
+-- avval teskari chiziq, keyin qo'shtirnoq — tartib muhim, aks holda ekranlash belgisining
+-- o'zi qayta ekranlanib ketadi.
+INSERT INTO ListingEntity(
+    id, ownerId, businessId,
+    kind, detailsJson,
+    title, description, imagesJson,
+    priceUnit, price, priceMax, currency, isNegotiable, finalPrice,
+    contactPhone,
+    branchesJson,
+    validFrom, validTo, attributesJson, optionGroupsJson,
+    status, rejectionReason, viewsCount, createdAt, updatedAt
+)
+SELECT
+    id, ownerId, businessId,
+    'DISCOUNT',
+    '{"kind":"DISCOUNT"'
+        || ',"businessType":"' || businessType || '"'
+        || ',"businessName":"' || replace(replace(businessName, '\', '\\'), '"', '\"') || '"'
+        || ',"categoryKey":"' || categoryKey || '"'
+        || CASE WHEN customCategoryName IS NULL THEN ''
+                ELSE ',"customCategoryName":"' || replace(replace(customCategoryName, '\', '\\'), '"', '\"') || '"' END
+        -- Eski modelda "oddiy e'lon" belgisi attributes ichida `_regular` kaliti edi.
+        || ',"isDiscounted":' || CASE WHEN attributesJson LIKE '%"_regular":"1"%' THEN 'false' ELSE 'true' END
+        || ',"discountType":"' || discountType || '"'
+        || ',"discountValue":' || discountValue
+        || CASE WHEN discountConditions IS NULL THEN ''
+                ELSE ',"conditions":"' || replace(replace(discountConditions, '\', '\\'), '"', '\"') || '"' END
+        || ',"redemptionMethod":"' || redemptionMethod || '"'
+        || CASE WHEN promoCode IS NULL THEN ''
+                ELSE ',"promoCode":"' || replace(replace(promoCode, '\', '\\'), '"', '\"') || '"' END
+        || CASE WHEN perUserLimit IS NULL THEN '' ELSE ',"perUserLimit":' || perUserLimit END
+        || CASE WHEN totalLimit IS NULL THEN '' ELSE ',"totalLimit":' || totalLimit END
+        || ',"usedCount":' || usedCount
+        || '}',
+    title, description, imagesJson,
+    priceUnit, originalPrice, NULL, currency, 0, finalPrice,
+    -- Aloqa telefoni ham attributes ichida (`_phone`) edi — endi alohida ustun.
+    CASE WHEN instr(attributesJson, '"_phone":"') > 0
+         THEN substr(
+                  attributesJson,
+                  instr(attributesJson, '"_phone":"') + 10,
+                  instr(substr(attributesJson, instr(attributesJson, '"_phone":"') + 10), '"') - 1
+              )
+         ELSE NULL END,
+    branchesJson,
+    validFrom, validTo, attributesJson, optionGroupsJson,
+    status, rejectionReason, viewsCount, createdAt, updatedAt
+FROM ListingEntity_old;
+
+DROP TABLE ListingEntity_old;
+
+CREATE INDEX listing_owner_idx ON ListingEntity(ownerId, updatedAt);
+CREATE INDEX listing_status_idx ON ListingEntity(status, validTo);
+CREATE INDEX listing_kind_idx ON ListingEntity(kind, status, updatedAt);

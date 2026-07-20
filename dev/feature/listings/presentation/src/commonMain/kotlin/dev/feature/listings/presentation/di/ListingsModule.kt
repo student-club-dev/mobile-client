@@ -15,6 +15,9 @@ import dev.feature.listings.domain.usecase.CreateBranchFromPointUseCase
 import dev.feature.listings.domain.usecase.DeleteListingUseCase
 import dev.feature.listings.domain.usecase.GetListingUseCase
 import dev.feature.listings.domain.usecase.ObserveActiveListingsUseCase
+import dev.feature.listings.domain.usecase.ObserveListingsByKindUseCase
+import dev.feature.listings.presentation.browse.ListingsBrowseViewModel
+import dev.feature.listings.presentation.detail.ListingDetailViewModel
 import dev.feature.listings.domain.usecase.ObserveMyListingsUseCase
 import dev.feature.listings.domain.usecase.PublishListingUseCase
 import dev.feature.listings.domain.usecase.SaveDraftUseCase
@@ -57,6 +60,7 @@ fun listingsModule(useRemoteApi: Boolean) = module {
     factory { SearchPlacesUseCase(get()) }
     factory { ObserveMyListingsUseCase(get()) }
     factory { ObserveActiveListingsUseCase(get()) }
+    factory { ObserveListingsByKindUseCase(get()) }
     factory { SaveDraftUseCase(get()) }
     factory { PublishListingUseCase(get()) }
     factory { ToggleListingPausedUseCase(get()) }
@@ -64,6 +68,8 @@ fun listingsModule(useRemoteApi: Boolean) = module {
     factory { UploadListingImageUseCase(get()) }
     factory { GetListingUseCase(get()) }
 
+    viewModelOf(::ListingsBrowseViewModel)
+    viewModelOf(::ListingDetailViewModel)
     viewModelOf(::PostListingViewModel)
     viewModelOf(::MyListingsViewModel)
     viewModelOf(::NearbyDiscountsViewModel)

@@ -48,10 +48,10 @@ import dev.core.designsystem.components.AppIcons
 import dev.core.designsystem.components.GlassTextField
 import dev.core.designsystem.theme.AppPalette
 import dev.core.designsystem.theme.appPalette
-import dev.feature.listings.presentation.map.MapPoint
-import dev.feature.listings.presentation.map.OfferMarker
-import dev.feature.listings.presentation.map.OffersMap
-import dev.feature.listings.presentation.map.rememberUserLocation
+import dev.core.designsystem.map.MapPoint
+import dev.core.designsystem.map.OfferMarker
+import dev.core.designsystem.map.OffersMap
+import dev.core.designsystem.map.rememberUserLocation
 import androidx.compose.ui.text.style.TextDecoration
 import org.koin.compose.viewmodel.koinViewModel
 

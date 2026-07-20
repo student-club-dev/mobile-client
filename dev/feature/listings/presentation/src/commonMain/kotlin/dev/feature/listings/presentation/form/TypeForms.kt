@@ -3,6 +3,7 @@ package dev.feature.listings.presentation.form
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -24,10 +25,8 @@ import dev.core.designsystem.components.AppFontFamily
 import dev.core.designsystem.components.AppIcons
 import dev.core.designsystem.components.OutlineButton
 import dev.core.designsystem.components.PrimaryButton
-import dev.core.designsystem.media.rememberImagePicker
 import dev.core.designsystem.theme.AppPalette
-import dev.feature.listings.domain.model.BusinessType
-import dev.feature.listings.presentation.BranchesSection
+import dev.feature.listings.domain.model.ListingKind
 import dev.feature.listings.presentation.MessageBar
 import dev.feature.listings.presentation.PostListingUiState
 import dev.feature.listings.presentation.PostListingViewModel
@@ -35,78 +34,47 @@ import dev.feature.listings.presentation.components.ErrorColor
 import dev.feature.listings.presentation.components.IconSquareButton
 
 /**
- * Har bir biznes turining **o'z ekrani**.
+ * Tanlangan e'lon turining formasini ochadi.
  *
- * Ekranlar bir xil bloklardan yig'iladi, lekin yozuvlari har xil: kafeda "Taom nomi",
- * game club'da "Sessiya", o'quv markazda "Kurs nomi". Shu sabab bitta umumiy forma emas —
- * [ListingFormCopy] orqali har turga alohida matn beriladi va ekran o'sha turga tegishli
- * bo'ladi. Blok mantiqi esa bitta joyda ([ListingFormSections]) turadi, takrorlanmaydi.
+ * Har bir tur o'z faylida ([DiscountForm], [RentalForm], [ServiceForm], [JobForm]) —
+ * ularning maydonlari bir-biriga umuman o'xshamaydi va bitta "universal" formaga
+ * sig'dirishga urinish har bir maydon atrofida shartlar to'plamini keltirib chiqaradi.
+ * Umumiy qismlar esa takrorlanmaydi: karkas shu yerda, bloklar [CommonSections] da.
  */
 @Composable
-fun TypeListingForm(
-    type: BusinessType,
+fun KindListingForm(
+    kind: ListingKind,
     state: PostListingUiState,
     palette: AppPalette,
     vm: PostListingViewModel,
 ) {
-    when (type) {
-        BusinessType.CAFE_RESTAURANT -> CafeListingForm(state, palette, vm)
-        BusinessType.GAME_CLUB -> GameClubListingForm(state, palette, vm)
-        BusinessType.GROCERY -> GroceryListingForm(state, palette, vm)
-        BusinessType.CLOTHING -> ClothingListingForm(state, palette, vm)
-        BusinessType.EDUCATION_CENTER -> EducationListingForm(state, palette, vm)
-        BusinessType.ENTERTAINMENT -> EntertainmentListingForm(state, palette, vm)
-        BusinessType.ELECTRONICS -> ElectronicsListingForm(state, palette, vm)
+    when (kind) {
+        ListingKind.DISCOUNT -> DiscountForm(state, palette, vm)
+        ListingKind.RENTAL -> RentalForm(state, palette, vm)
+        ListingKind.SERVICE -> ServiceForm(state, palette, vm)
+        ListingKind.JOB -> JobForm(state, palette, vm)
+        ListingKind.TASK -> TaskForm(state, palette, vm)
     }
 }
 
-@Composable
-private fun CafeListingForm(state: PostListingUiState, palette: AppPalette, vm: PostListingViewModel) =
-    ListingFormScaffold(ListingFormCopy.of(BusinessType.CAFE_RESTAURANT), state, palette, vm)
-
-@Composable
-private fun GameClubListingForm(state: PostListingUiState, palette: AppPalette, vm: PostListingViewModel) =
-    ListingFormScaffold(ListingFormCopy.of(BusinessType.GAME_CLUB), state, palette, vm)
-
-@Composable
-private fun GroceryListingForm(state: PostListingUiState, palette: AppPalette, vm: PostListingViewModel) =
-    ListingFormScaffold(ListingFormCopy.of(BusinessType.GROCERY), state, palette, vm)
-
-@Composable
-private fun ClothingListingForm(state: PostListingUiState, palette: AppPalette, vm: PostListingViewModel) =
-    ListingFormScaffold(ListingFormCopy.of(BusinessType.CLOTHING), state, palette, vm)
-
-@Composable
-private fun EducationListingForm(state: PostListingUiState, palette: AppPalette, vm: PostListingViewModel) =
-    ListingFormScaffold(ListingFormCopy.of(BusinessType.EDUCATION_CENTER), state, palette, vm)
-
-@Composable
-private fun EntertainmentListingForm(state: PostListingUiState, palette: AppPalette, vm: PostListingViewModel) =
-    ListingFormScaffold(ListingFormCopy.of(BusinessType.ENTERTAINMENT), state, palette, vm)
-
-@Composable
-private fun ElectronicsListingForm(state: PostListingUiState, palette: AppPalette, vm: PostListingViewModel) =
-    ListingFormScaffold(ListingFormCopy.of(BusinessType.ELECTRONICS), state, palette, vm)
-
 /**
- * Ekranning umumiy karkasi: sarlavha → 6 ta blok → tugmalar.
- * Bloklarning ketma-ketligi barcha turlarda bir xil (o'rganish oson), yozuvlari — har xil.
+ * Forma ekranining karkasi: sarlavha → bloklar → tugmalar.
+ *
+ * Bloklar ketma-ketligi har turda boshqacha (ijarada avval uy tafsiloti, ishda avval
+ * ish sharti), shuning uchun ularni karkas emas, turning o'z formasi joylashtiradi.
  */
 @Composable
-private fun ListingFormScaffold(
-    copy: ListingFormCopy,
+fun ListingFormShell(
+    title: String,
+    subtitle: String,
     state: PostListingUiState,
     palette: AppPalette,
     vm: PostListingViewModel,
+    content: @Composable ColumnScope.() -> Unit,
 ) {
-    val imagePicker = rememberImagePicker { picked ->
-        if (picked != null) vm.addImage(picked.bytes, picked.fileName)
-    }
-
     Column(Modifier.fillMaxSize()) {
         Column(
-            Modifier.weight(1f).verticalScroll(rememberScrollState())
-                .padding(top = 54.dp),
+            Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(top = 54.dp),
             // Flat dizayn — bo'limlar orasi kengroq; yon padding har bo'lim ichida.
             verticalArrangement = Arrangement.spacedBy(18.dp),
         ) {
@@ -115,36 +83,22 @@ private fun ListingFormScaffold(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(11.dp),
             ) {
-                IconSquareButton(vm::backToTypes, AppIcons.ArrowLeft, palette)
+                IconSquareButton(vm::back, AppIcons.ArrowLeft, palette)
                 Column {
                     Text(
-                        if (state.editing) "E'lonni tahrirlash" else copy.screenTitle,
+                        if (state.editing) "E'lonni tahrirlash" else title,
                         style = TextStyle(fontFamily = AppFontFamily, fontSize = 18.sp, fontWeight = FontWeight.Black, color = palette.ink),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
                     Text(
-                        copy.screenSubtitle,
+                        subtitle,
                         style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.5f.sp, color = palette.inkFaint),
                     )
                 }
             }
 
-            // SODDALASHTIRILGAN forma: turi + nomi + rasm + narx + tel + joylashuv.
-            // E'lon turi (Chegirma / Oddiy) — faqat tab belgilamagan bo'lsa (modeLocked=false).
-            if (!state.modeLocked) ListingModeSection(state, vm)
-            // Bo'lim (kategoriya) — horizontal scroll.
-            CategorySection(state, copy, vm)
-            // Nomi + qo'shimcha ma'lumot.
-            AboutSection(state, copy, vm)
-            // Rasm.
-            ImagesSection(state, copy, vm, onAdd = imagePicker::pick)
-            // Narx (chegirmada Oldingi + Hozirgi).
-            PriceAndDiscountSection(state, copy, vm)
-            // Telefon raqami.
-            ContactSection(state, vm)
-            // Joylashuv (filiallar / xarita).
-            BranchesSection(state, palette, vm)
+            content()
 
             val message = state.message
             if (message != null) {

@@ -161,7 +161,9 @@ private fun MyListingCard(
     onTogglePaused: () -> Unit,
     onDelete: () -> Unit,
 ) {
-    val accent = Color(listing.businessType.accent)
+    // `accent`/`emoji` endi Listing'ning o'zida — chegirmada biznes turidan, boshqa
+    // turlarda ListingKind'dan olinadi, shuning uchun to'rtala tur uchun ham ishlaydi.
+    val accent = Color(listing.accent)
     val isDiscount = listing.isDiscount
 
     Column(
@@ -184,17 +186,19 @@ private fun MyListingCard(
                     if (cover != null) {
                         ListingImage(cover, Modifier.fillMaxSize().clip(RoundedCornerShape(16.dp)))
                     } else {
-                        Text(listing.businessType.emoji, style = TextStyle(fontSize = 28.sp))
+                        Text(listing.emoji, style = TextStyle(fontSize = 28.sp))
                     }
                 }
-                if (isDiscount) {
+                // badge() endi `null` qaytarishi mumkin (chegirmasiz e'lon) — yorliq shunda chiqmaydi.
+                val badge = listing.discountDetails?.badge()
+                if (badge != null) {
                     Box(
                         Modifier.align(Alignment.TopStart).padding(5.dp)
                             .clip(RoundedCornerShape(8.dp)).background(accent)
                             .padding(horizontal = 6.dp, vertical = 2.dp),
                     ) {
                         Text(
-                            listing.discount.badge(),
+                            badge,
                             style = TextStyle(fontFamily = AppFontFamily, fontSize = 9.5f.sp, fontWeight = FontWeight.Black, color = Color.White),
                         )
                     }
@@ -226,9 +230,9 @@ private fun MyListingCard(
                         style = TextStyle(fontFamily = AppFontFamily, fontSize = 15.sp, fontWeight = FontWeight.Black, color = palette.ink),
                     )
                     // Chegirmada eski narx — chiziq bilan; oddiy e'londa yo'q.
-                    if (isDiscount && listing.originalPrice != listing.finalPrice) {
+                    if (isDiscount && listing.price != listing.finalPrice) {
                         Text(
-                            listing.originalPrice.formatSum(),
+                            listing.price.formatSum(),
                             style = TextStyle(
                                 fontFamily = AppFontFamily,
                                 fontSize = 11.5f.sp,

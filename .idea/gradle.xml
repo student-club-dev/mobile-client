@@ -32,6 +32,7 @@
             <option value="$PROJECT_DIR$/dev/core/designsystem" />
             <option value="$PROJECT_DIR$/dev/core/di" />
             <option value="$PROJECT_DIR$/dev/core/domain" />
+            <option value="$PROJECT_DIR$/dev/core/navigation" />
             <option value="$PROJECT_DIR$/dev/core/network" />
             <option value="$PROJECT_DIR$/dev/feature" />
             <option value="$PROJECT_DIR$/dev/feature/ads" />

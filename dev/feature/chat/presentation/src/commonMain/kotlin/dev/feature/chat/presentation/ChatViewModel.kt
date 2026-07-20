@@ -9,9 +9,11 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.datetime.Clock
@@ -39,8 +41,18 @@ class ChatViewModel(
     private val selectedId = MutableStateFlow<String?>(null)
     private val draft = MutableStateFlow("")
 
+    // MUHIM: `messagesFlow` combine'ning majburiy a'zosi. Realtime (Firestore) yoqilganda
+    // `observeMessages` birinchi snapshot kelmaguncha HECH NARSA emit qilmaydi — u holda combine
+    // ham emit qilmay, bosilgan suhbat umuman ochilmaydi. `onStart` darhol bo'sh ro'yxat beradi,
+    // `catch` esa oqim xatosida butun chat state'i abadiy muzlab qolishining oldini oladi.
     private val messagesFlow = selectedId.flatMapLatest { id ->
-        if (id == null) flowOf(emptyList()) else chatRepository.observeMessages(id)
+        if (id == null) {
+            flowOf(emptyList())
+        } else {
+            chatRepository.observeMessages(id)
+                .onStart { emit(emptyList()) }
+                .catch { emit(emptyList()) }
+        }
     }
 
     val state: StateFlow<ChatUiState> = combine(
@@ -57,7 +69,10 @@ class ChatViewModel(
             messages = messages,
             draft = d,
         )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), ChatUiState())
+    }
+        // Manbalardan biri istisno tashlasa kolektor o'lib, state abadiy muzlab qolardi.
+        .catch { emit(ChatUiState()) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), ChatUiState())
 
     fun open(conversation: Conversation) {
         selectedId.value = conversation.id

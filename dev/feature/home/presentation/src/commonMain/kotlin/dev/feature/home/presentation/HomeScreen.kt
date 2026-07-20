@@ -38,12 +38,17 @@ import dev.core.domain.model.DiscountCategory
 import dev.core.domain.model.DiscountOffer
 import dev.core.domain.model.DiscountTag
 import dev.feature.students.domain.model.FriendStatus
-import dev.feature.jobs.domain.model.Job
+import dev.feature.listings.domain.model.Listing
+import dev.feature.listings.domain.model.formatSum
 import dev.feature.students.domain.model.Student
 import dev.core.designsystem.components.AppFontFamily
 import dev.core.designsystem.components.AppIcons
 import dev.core.designsystem.theme.AppPalette
 import dev.core.designsystem.theme.appPalette
+import kotlinx.datetime.Clock
+import kotlinx.datetime.Instant
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
@@ -54,6 +59,9 @@ fun HomeScreen(
     onOpenClubs: () -> Unit = {},
     onOpenDiscounts: () -> Unit = {},
     onOpenJobs: () -> Unit = {},
+    onOpenRentals: () -> Unit = {},
+    onOpenTasks: () -> Unit = {},
+    onOpenListing: (String) -> Unit = {},
     onOpenStudents: () -> Unit = {},
     vm: HomeViewModel = koinViewModel(),
 ) {
@@ -65,9 +73,13 @@ fun HomeScreen(
         Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(top = 18.dp)) {
             DiscountsSection(state.categories, state.featured, palette, onOpenDiscounts)
             Spacer(Modifier.height(24.dp))
+            TasksSection(state.tasks, palette, onOpenTasks, onOpenListing)
+            Spacer(Modifier.height(24.dp))
             ClubsSection(state.clubs, palette, onOpenClubs)
             Spacer(Modifier.height(24.dp))
-            JobsSection(state.jobs, palette, onOpenJobs) { vm.toggleBookmark(it) }
+            RentalsSection(state.rentals, palette, onOpenRentals, onOpenListing)
+            Spacer(Modifier.height(24.dp))
+            JobsSection(state.jobs, palette, onOpenJobs, onOpenListing)
             Spacer(Modifier.height(24.dp))
             StudentsSection(state.students, palette, onOpenStudents) { vm.toggleFriend(it) }
             Spacer(Modifier.height(110.dp)) // pastki navigatsiya uchun joy
@@ -197,6 +209,142 @@ private fun ClubsSection(clubs: List<Club>, palette: AppPalette, onOpenClubs: ()
 }
 
 // ---------------------------------------------------------------------------
+// Fanlardan yordam — bir martalik topshiriqlar
+// ---------------------------------------------------------------------------
+@Composable
+private fun TasksSection(
+    tasks: List<Listing>,
+    palette: AppPalette,
+    onSeeAll: () -> Unit,
+    onOpenListing: (String) -> Unit,
+) {
+    if (tasks.isEmpty()) return
+    SectionHeader("Yordam e'lonlari", action = "Barchasi", subtitle = "Referat, masala, qo'lyozma va IT ishlari", palette = palette, onAction = onSeeAll)
+    Spacer(Modifier.height(12.dp))
+    Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+        tasks.take(3).forEach { TaskRow(it, palette, onOpenListing) }
+    }
+}
+
+@Composable
+private fun TaskRow(listing: Listing, palette: AppPalette, onOpenListing: (String) -> Unit) {
+    val task = listing.taskDetails
+    val accent = Color(listing.accent)
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(palette.glass)
+            .border(1.dp, palette.border, RoundedCornerShape(16.dp))
+            .clickable { onOpenListing(listing.id) }
+            .padding(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(11.dp),
+    ) {
+        Box(
+            Modifier.size(42.dp).clip(RoundedCornerShape(12.dp)).background(accent.copy(alpha = 0.12f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(listing.emoji, style = TextStyle(fontSize = 19.sp))
+        }
+        Column(Modifier.weight(1f)) {
+            Text(listing.title, style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.5f.sp, fontWeight = FontWeight.ExtraBold, color = palette.ink), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Spacer(Modifier.height(2.dp))
+            // "Referat · 20 bet · Onlayn"
+            val summary = task?.summary().orEmpty()
+            if (summary.isNotBlank()) {
+                Text(summary, style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.sp, color = palette.inkFaint), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            Spacer(Modifier.height(4.dp))
+            Text(listing.taskPriceLabel(), style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.5f.sp, fontWeight = FontWeight.Bold, color = palette.successDeep))
+        }
+        // Muddat — bajaruvchi uchun eng muhim ma'lumot, shuning uchun o'ng chekkada ajratilgan.
+        deadlineLabel(task?.deadline)?.let { deadline ->
+            Box(
+                Modifier.clip(RoundedCornerShape(8.dp)).background(accent.copy(alpha = 0.12f))
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
+            ) {
+                Text(deadline, style = TextStyle(fontFamily = AppFontFamily, fontSize = 10.5f.sp, fontWeight = FontWeight.ExtraBold, color = accent))
+            }
+        }
+    }
+}
+
+/** "150 000 so'm" yoki "Kelishilgan". */
+private fun Listing.taskPriceLabel(): String =
+    if (isNegotiable) "Kelishilgan" else "${price.formatSum()} so'm"
+
+/**
+ * Muddat yorlig'i: "Bugun 18:00", "Ertaga 12:00", "5 kundan keyin" yoki "24.12".
+ * O'tib ketgan muddat ko'rsatilmaydi — e'lon hali faol bo'lsa ham foyda bermaydi.
+ */
+private fun deadlineLabel(deadline: Long?): String? {
+    if (deadline == null) return null
+    val zone = TimeZone.currentSystemDefault()
+    val at = Instant.fromEpochMilliseconds(deadline).toLocalDateTime(zone)
+    val today = Clock.System.now().toLocalDateTime(zone).date
+    val days = at.date.toEpochDays() - today.toEpochDays()
+    val time = "${at.hour.toString().padStart(2, '0')}:${at.minute.toString().padStart(2, '0')}"
+    return when {
+        days < 0 -> null
+        days == 0 -> "Bugun $time"
+        days == 1 -> "Ertaga $time"
+        days in 2..13 -> "$days kundan keyin"
+        else -> "${at.date.dayOfMonth}.${at.date.monthNumber}"
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Ijara kvartiralar — Klublar kabi gorizontal lenta
+// ---------------------------------------------------------------------------
+@Composable
+private fun RentalsSection(
+    rentals: List<Listing>,
+    palette: AppPalette,
+    onSeeAll: () -> Unit,
+    onOpenListing: (String) -> Unit,
+) {
+    if (rentals.isEmpty()) return
+    SectionHeader("Ijara kvartiralar", action = "Barchasi", subtitle = "Sherik izlayotgan uylar", palette = palette, onAction = onSeeAll)
+    Spacer(Modifier.height(12.dp))
+    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        rentals.take(6).forEach { RentalCard(it, palette, onOpenListing) }
+    }
+}
+
+@Composable
+private fun RentalCard(listing: Listing, palette: AppPalette, onOpenListing: (String) -> Unit) {
+    val rental = listing.rentalDetails
+    val accent = Color(listing.accent)
+    Column(
+        Modifier.width(168.dp).clip(RoundedCornerShape(16.dp)).background(palette.glass)
+            .border(1.dp, palette.border, RoundedCornerShape(16.dp))
+            .clickable { onOpenListing(listing.id) }
+            .padding(12.dp),
+        horizontalAlignment = Alignment.Start,
+    ) {
+        Box(Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(accent.copy(alpha = 0.14f)), contentAlignment = Alignment.Center) {
+            Text(listing.emoji, style = TextStyle(fontSize = 19.sp))
+        }
+        Spacer(Modifier.height(9.dp))
+        Text(listing.title, style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.5f.sp, fontWeight = FontWeight.Black, color = palette.ink), maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Spacer(Modifier.height(3.dp))
+        // "3 xonali · 2 kishi bor · 2 kishi kerak" — bo'sh bo'lsa manzilga tushamiz.
+        val meta = rental?.summary()?.takeIf { it.isNotBlank() }
+            ?: listing.branches.firstOrNull()?.address.orEmpty()
+        if (meta.isNotBlank()) {
+            Text(meta, style = TextStyle(fontFamily = AppFontFamily, fontSize = 10.5f.sp, color = palette.inkFaint), maxLines = 2, overflow = TextOverflow.Ellipsis)
+        }
+        Spacer(Modifier.height(6.dp))
+        Text(listing.rentLabel(), style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = palette.successDeep), maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+/** "1 200 000 so'm / oy" yoki "Kelishilgan". */
+private fun Listing.rentLabel(): String {
+    if (isNegotiable) return "Kelishilgan"
+    val suffix = rentalDetails?.period?.priceUnit?.suffix
+    return listOfNotNull("${price.formatSum()} so'm", suffix).joinToString(" / ")
+}
+
+// ---------------------------------------------------------------------------
 // Chegirmalar
 // ---------------------------------------------------------------------------
 @Composable
@@ -271,18 +419,27 @@ private fun FeaturedOfferCard(offer: DiscountOffer, palette: AppPalette, onClick
 // Ishlar
 // ---------------------------------------------------------------------------
 @Composable
-private fun JobsSection(jobs: List<Job>, palette: AppPalette, onSeeAll: () -> Unit, onBookmark: (Job) -> Unit) {
-    SectionHeader("Ishlar", action = "Barchasi", subtitle = "Sizning bo'limlaringiz bo'yicha", palette = palette, onAction = onSeeAll)
+private fun JobsSection(
+    jobs: List<Listing>,
+    palette: AppPalette,
+    onSeeAll: () -> Unit,
+    onOpenListing: (String) -> Unit,
+) {
+    SectionHeader("Ish e'lonlari", action = "Barchasi", subtitle = "Kunlik va doimiy ishlar", palette = palette, onAction = onSeeAll)
     Spacer(Modifier.height(12.dp))
     Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
-        jobs.take(3).forEach { JobRow(it, palette, onBookmark) }
+        jobs.take(3).forEach { JobRow(it, palette, onOpenListing) }
     }
 }
 
 @Composable
-private fun JobRow(job: Job, palette: AppPalette, onBookmark: (Job) -> Unit) {
+private fun JobRow(listing: Listing, palette: AppPalette, onOpenListing: (String) -> Unit) {
+    val job = listing.jobDetails
     Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(palette.glass).border(1.dp, palette.border, RoundedCornerShape(16.dp)).padding(12.dp),
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(palette.glass)
+            .border(1.dp, palette.border, RoundedCornerShape(16.dp))
+            .clickable { onOpenListing(listing.id) }
+            .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(11.dp),
     ) {
@@ -290,25 +447,47 @@ private fun JobRow(job: Job, palette: AppPalette, onBookmark: (Job) -> Unit) {
             Modifier.size(42.dp).clip(RoundedCornerShape(12.dp)).background(palette.primary.copy(alpha = 0.12f)),
             contentAlignment = Alignment.Center,
         ) {
-            Text(job.companyMonogram, style = TextStyle(fontFamily = AppFontFamily, fontSize = 16.sp, fontWeight = FontWeight.ExtraBold, color = palette.primary))
+            Text(job?.companyName.monogram(), style = TextStyle(fontFamily = AppFontFamily, fontSize = 16.sp, fontWeight = FontWeight.ExtraBold, color = palette.primary))
         }
         Column(Modifier.weight(1f)) {
-            Text(job.title, style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.5f.sp, fontWeight = FontWeight.ExtraBold, color = palette.ink), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(listing.title, style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.5f.sp, fontWeight = FontWeight.ExtraBold, color = palette.ink), maxLines = 1, overflow = TextOverflow.Ellipsis)
             Spacer(Modifier.height(2.dp))
             Text(
-                "${job.company} · ${job.location} · ${job.category}",
+                // Bo'sh bo'laklar tushib qoladi — aks holda "· ·" ko'rinishida chiqardi.
+                listOfNotNull(
+                    job?.companyName?.takeIf { it.isNotBlank() },
+                    listing.branches.firstOrNull()?.address,
+                    listing.categoryLabel,
+                ).joinToString(" · "),
                 style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.sp, color = palette.inkFaint),
                 maxLines = 1, overflow = TextOverflow.Ellipsis,
             )
             Spacer(Modifier.height(4.dp))
-            Text(job.salary, style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.5f.sp, fontWeight = FontWeight.Bold, color = palette.successDeep))
+            Text(listing.salaryLabel(), style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.5f.sp, fontWeight = FontWeight.Bold, color = palette.successDeep))
         }
-        Icon(
-            AppIcons.Bookmark, "Saqlash",
-            tint = if (job.bookmarked) palette.primary else palette.inkFaint,
-            modifier = Modifier.size(20.dp).clickable { onBookmark(job) },
-        )
+        if (job?.isDaily == true) {
+            Box(
+                Modifier.clip(RoundedCornerShape(8.dp)).background(palette.primary.copy(alpha = 0.12f))
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
+            ) {
+                Text("Kunlik", style = TextStyle(fontFamily = AppFontFamily, fontSize = 10.5f.sp, fontWeight = FontWeight.ExtraBold, color = palette.primary))
+            }
+        }
     }
+}
+
+/** "Korzinka" → "K". Logotip yo'q, shuning uchun nomning birinchi harfi ishlatiladi. */
+private fun String?.monogram(): String =
+    this?.trim()?.firstOrNull()?.uppercase() ?: "?"
+
+/** "300 000 so'm / kuniga" yoki "Kelishilgan". */
+private fun Listing.salaryLabel(): String {
+    if (isNegotiable) return "Kelishilgan"
+    val suffix = jobDetails?.payPeriod?.suffix
+    val amount = priceMax?.takeIf { it > price }
+        ?.let { "${price.formatSum()} — ${it.formatSum()}" }
+        ?: price.formatSum()
+    return listOfNotNull("$amount so'm", suffix).joinToString(" / ")
 }
 
 // ---------------------------------------------------------------------------

@@ -33,6 +33,12 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import dev.core.navigation.PushEnter
+import dev.core.navigation.PushExit
+import dev.core.navigation.PopEnter
+import dev.core.navigation.PopExit
+import dev.core.navigation.TabEnter
+import dev.core.navigation.TabExit
 import dev.core.designsystem.components.AppFontFamily
 import dev.core.designsystem.components.AppIcons
 import dev.core.designsystem.components.AppScreenScaffold
@@ -147,7 +153,15 @@ fun AuthNavHost(
         }
     }
 
-    NavHost(navController = nav, startDestination = startDestination) {
+    NavHost(
+        navController = nav,
+        startDestination = startDestination,
+        // Animatsiyasiz — ekran bosilgan zahoti almashadi.
+        enterTransition = PushEnter,
+        exitTransition = PushExit,
+        popEnterTransition = PopEnter,
+        popExitTransition = PopExit,
+    ) {
         composable(Route.ONBOARDING) {
             // Rol-scoped oqimda (Activity) rol allaqachon tanlangan — to'g'ridan-to'g'ri login'ga.
             val afterOnboarding = { if (flow == null) nav.navigate(Route.ROLE) else nav.navigate(Route.WELCOME) }
