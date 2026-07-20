@@ -131,6 +131,20 @@ fun StudentShell(onLoggedOut: () -> Unit) {
         }
     }
 
+    /**
+     * E'lonlar tab'ini KONKRET bo'lim ochilgan holda ochadi (Home'dagi "Barchasi" tugmalari).
+     *
+     * [selectTab] dan farqi — `restoreState` YO'Q. Saqlangan holat tiklanganda Navigation
+     * eski `NavBackStackEntry` ni argumentlari bilan qaytaradi va yangi `?kind=...` bekor
+     * bo'ladi — ya'ni "Ijara" bosilib Ish tab'i ochilib qolardi. Evaziga bu yo'l bilan
+     * kirilganda ekranning scroll holati tiklanmaydi; to'g'ri bo'lim muhimroq.
+     */
+    val openListingsKind: (ListingKind) -> Unit = { kind ->
+        nav.navigateSafe("${StudentTab.LISTINGS.route}?kind=${kind.name}") {
+            popUpTo(StudentTab.HOME.route) { saveState = true }
+        }
+    }
+
     Box(Modifier.fillMaxSize().background(palette.bgBrush)) {
         NavHost(
             navController = nav,
@@ -154,9 +168,9 @@ fun StudentShell(onLoggedOut: () -> Unit) {
                     onOpenNotifications = { nav.navigateSafe(NOTIFICATIONS) },
                     onOpenClubs = { nav.navigateSafe(CLUBS) },
                     onOpenDiscounts = { nav.navigateSafe(DISCOUNTS) },
-                    onOpenJobs = { selectTab(StudentTab.LISTINGS.route) },
-                    // Ijara — o'sha ekran, lekin darrov "Ijara" tab'i ochilgan holda.
-                    onOpenRentals = { selectTab("${StudentTab.LISTINGS.route}?kind=${ListingKind.RENTAL.name}") },
+                    // Ikkalasi ham o'sha ekran, lekin darrov kerakli tab ochilgan holda.
+                    onOpenJobs = { openListingsKind(ListingKind.JOB) },
+                    onOpenRentals = { openListingsKind(ListingKind.RENTAL) },
                     onOpenListing = { id -> nav.navigateSafe("$LISTING_DETAIL/${encodeArg(id)}") },
                     onOpenStudents = { selectTab(StudentTab.STUDENTS.route) },
                 )
