@@ -3,40 +3,14 @@ package dev.core.di
 import dev.core.common.AppDispatchers
 import dev.core.common.AuthTokenProvider
 import dev.core.common.DefaultAppDispatchers
-import dev.core.data.repository.AdRepositoryImpl
-import dev.core.data.repository.ChatRepositoryImpl
-import dev.core.data.repository.ClubRepositoryImpl
 import dev.core.data.repository.DiscountRepositoryImpl
-import dev.core.data.remote.AdRemoteDataSource
-import dev.core.data.remote.ChatRemoteDataSource
 import dev.core.data.remote.DiscountRemoteDataSource
-import dev.core.data.remote.JobRemoteDataSource
-import dev.core.data.remote.KtorAdRemoteDataSource
-import dev.core.data.remote.KtorChatRemoteDataSource
 import dev.core.data.remote.KtorDiscountRemoteDataSource
-import dev.core.data.remote.KtorJobRemoteDataSource
-import dev.core.data.remote.KtorStudentRemoteDataSource
-import dev.core.data.remote.KtorUniversityRemoteDataSource
-import dev.core.data.remote.StudentRemoteDataSource
-import dev.core.data.remote.UniversityRemoteDataSource
-import dev.core.data.repository.JobRepositoryImpl
-import dev.core.data.repository.NotificationRepositoryImpl
-import dev.core.data.repository.SettingsRepositoryImpl
-import dev.core.data.repository.StudentRepositoryImpl
-import dev.core.data.repository.UniversityRepositoryImpl
 import dev.core.data.seed.LocalDataSeeder
 import dev.core.database.DatabaseFactory
 import dev.core.database.DriverFactory
 import dev.core.database.sql.StudentClubsDatabase
-import dev.core.domain.repository.AdRepository
-import dev.core.domain.repository.ChatRepository
-import dev.core.domain.repository.ClubRepository
 import dev.core.domain.repository.DiscountRepository
-import dev.core.domain.repository.JobRepository
-import dev.core.domain.repository.NotificationRepository
-import dev.core.domain.repository.SettingsRepository
-import dev.core.domain.repository.StudentRepository
-import dev.core.domain.repository.UniversityRepository
 import dev.core.domain.usecase.ConfirmEmailSignupUseCase
 import dev.core.domain.usecase.LoginUseCase
 import dev.core.domain.usecase.LogoutUseCase
@@ -92,27 +66,13 @@ val dispatchersModule = module {
 
 val repositoryModule = module {
     // AuthRepository (Firebase) auth feature modulida bog'lanadi (authFeatureModule).
-    single<ClubRepository> { ClubRepositoryImpl(get(), get(), get()) }
 
     // Barcha domenlar — local DB (SQLDelight) ustidagi repository'lar.
     // --- B4 offline-first: masofaviy manbalar (Ktor) ---
     single<DiscountRemoteDataSource> { KtorDiscountRemoteDataSource(get()) }
-    single<JobRemoteDataSource> { KtorJobRemoteDataSource(get()) }
-    single<StudentRemoteDataSource> { KtorStudentRemoteDataSource(get()) }
-    single<AdRemoteDataSource> { KtorAdRemoteDataSource(get()) }
-    single<UniversityRemoteDataSource> { KtorUniversityRemoteDataSource(get()) }
-    single<ChatRemoteDataSource> { KtorChatRemoteDataSource(get()) }
 
     // --- Repository'lar (offline-first: DB + refresh) ---
-    single<UniversityRepository> { UniversityRepositoryImpl(get(), get(), get(), REMOTE_SYNC_ENABLED, get()) }
     single<DiscountRepository> { DiscountRepositoryImpl(get(), get(), get(), REMOTE_SYNC_ENABLED) }
-    single<JobRepository> { JobRepositoryImpl(get(), get(), get(), REMOTE_SYNC_ENABLED) }
-    single<StudentRepository> { StudentRepositoryImpl(get(), get(), get(), REMOTE_SYNC_ENABLED) }
-    single<AdRepository> { AdRepositoryImpl(get(), get(), get(), REMOTE_SYNC_ENABLED) }
-    // ChatRealtimeSource (Firestore) auth feature'da bog'lanadi (B7).
-    single<ChatRepository> { ChatRepositoryImpl(get(), get(), get(), REMOTE_SYNC_ENABLED, get()) }
-    single<SettingsRepository> { SettingsRepositoryImpl(get(), get()) }
-    single<NotificationRepository> { NotificationRepositoryImpl(get(), get()) }
 
     // Dizayndagi namuna ma'lumot bilan bazani to'ldiruvchi (bo'sh bo'lsa).
     single { LocalDataSeeder(get(), get()) }

@@ -9,7 +9,7 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             // Biznesning e'lon ekranlari (MyListings/PostListing) va biznes profil (ProfileViewModel).
-            implementation(projects.dev.feature.discounts.presentation)
+            implementation(projects.dev.feature.listings.presentation)
             implementation(projects.dev.feature.profile.presentation)
             implementation(projects.dev.feature.profile.domain)
             // BusinessShell ichki navigatsiyasi (NavHost).

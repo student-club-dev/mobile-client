@@ -18,8 +18,9 @@ import coil3.network.ktor3.KtorNetworkFetcherFactory
 import dev.core.data.seed.LocalDataSeeder
 import dev.core.designsystem.generated.resources.Res
 import dev.core.designsystem.theme.AppTheme
-import dev.core.domain.model.ThemeMode
-import dev.core.domain.repository.SettingsRepository
+import dev.feature.settings.domain.model.ThemeMode
+import dev.feature.settings.domain.repository.SettingsRepository
+import dev.feature.university.domain.repository.UniversityRepository
 import dev.feature.auth.presentation.flow.AuthNavHost
 import dev.feature.auth.presentation.flow.AuthUserFlow
 import dev.feature.auth.presentation.flow.RoleLauncher
@@ -70,9 +71,12 @@ private fun AppScaffold(content: @Composable () -> Unit) {
     // Local bazani dizayndagi namuna ma'lumot bilan to'ldiramiz (bo'sh bo'lsagina).
     // "Siz uchun" e'lonlari bundlangan JSON'dan (composeResources/files/listings.json) o'qiladi.
     val seeder = koinInject<LocalDataSeeder>()
+    // Universitetlar ro'yxati prof-emis'dan (barcha tanlash joylari shu manbani ishlatadi).
+    val universityRepository = koinInject<UniversityRepository>()
     LaunchedEffect(Unit) {
         val listingsJson = runCatching { Res.readBytes("files/listings.json").decodeToString() }.getOrNull()
         seeder.seedIfEmpty(listingsJson)
+        runCatching { universityRepository.ensureRemoteUniversities() }
     }
 
     // Foydalanuvchi tanlagan mavzu (Sozlamalar). SYSTEM bo'lsa qurilma rejimiga ergashadi.

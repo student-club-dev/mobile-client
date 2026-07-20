@@ -1,9 +1,9 @@
 package dev.feature.auth.data
 
-import dev.core.domain.model.Conversation
-import dev.core.domain.model.ConversationType
-import dev.core.domain.model.Message
-import dev.core.domain.repository.ChatRealtimeSource
+import dev.feature.chat.domain.model.Conversation
+import dev.feature.chat.domain.model.ConversationType
+import dev.feature.chat.domain.model.Message
+import dev.feature.chat.domain.repository.ChatRealtimeSource
 import dev.gitlive.firebase.Firebase
 import dev.gitlive.firebase.auth.auth
 import dev.gitlive.firebase.firestore.Direction

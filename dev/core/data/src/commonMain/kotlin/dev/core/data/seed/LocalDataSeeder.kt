@@ -4,9 +4,6 @@ import dev.core.common.AppDispatchers
 import dev.core.data.mapper.joinDb
 import dev.core.data.mapper.toDb
 import dev.core.database.sql.StudentClubsDatabase
-import dev.core.domain.model.AdType
-import dev.core.domain.model.ConversationType
-import dev.core.domain.model.FriendStatus
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -114,12 +111,12 @@ class LocalDataSeeder(
         if (q.countStudents().executeAsOne() > 0) return
         q.transaction {
             // id, first, last, initial, uniId, uniMono, course, faculty, friendStatus, interests, friends, ads, rating
-            q.upsert("st-dilnoza", "Dilnoza", "Rahimova", "D", "tatu", "TATU", 2, "IT", FriendStatus.NONE.name,
+            q.upsert("st-dilnoza", "Dilnoza", "Rahimova", "D", "tatu", "TATU", 2, "IT", "NONE",
                 listOf("🎨 Dizayn", "💻 Frontend", "📷 Foto", "🏀 Sport").joinDb(), 148, 12, 4.9)
-            q.upsert("st-sardor", "Sardor", "Aliyev", "S", "tatu", "TATU", 3, "Telekom", FriendStatus.NONE.name, "", 96, 3, 4.7)
-            q.upsert("st-malika", "Malika", "Yo‘ldosheva", "M", "nuu", "O‘zMU", 2, "Iqtisod", FriendStatus.PENDING.name, "", 54, 1, 4.5)
-            q.upsert("st-kamron", "Kamron", "Yusupov", "K", "tatu", "TATU", 2, "Dasturiy inj.", FriendStatus.NONE.name, "", 71, 5, 4.8)
-            q.upsert("st-nigora", "Nigora", "Tosheva", "N", "tatu", "TATU", 1, "Kiberxavfsizlik", FriendStatus.NONE.name, "", 33, 0, 4.6)
+            q.upsert("st-sardor", "Sardor", "Aliyev", "S", "tatu", "TATU", 3, "Telekom", "NONE", "", 96, 3, 4.7)
+            q.upsert("st-malika", "Malika", "Yo‘ldosheva", "M", "nuu", "O‘zMU", 2, "Iqtisod", "PENDING", "", 54, 1, 4.5)
+            q.upsert("st-kamron", "Kamron", "Yusupov", "K", "tatu", "TATU", 2, "Dasturiy inj.", "NONE", "", 71, 5, 4.8)
+            q.upsert("st-nigora", "Nigora", "Tosheva", "N", "tatu", "TATU", 1, "Kiberxavfsizlik", "NONE", "", 33, 0, 4.6)
         }
     }
 
@@ -127,9 +124,9 @@ class LocalDataSeeder(
         val q = db.adQueries
         if (q.selectAll().executeAsList().isNotEmpty()) return
         q.transaction {
-            q.upsert("ad-1", AdType.RENTAL.name, "Chilonzorda room-mate", "Turar joy", "1.2 mln/oy",
+            q.upsert("ad-1", "RENTAL", "Chilonzorda room-mate", "Turar joy", "1.2 mln/oy",
                 "2 xonali, metroga yaqin, student uchun qulay.", "", "seed-user", "3 soat oldin")
-            q.upsert("ad-2", AdType.SALE.name, "MacBook Air M1 sotiladi", "Texnika", "9.5 mln",
+            q.upsert("ad-2", "SALE", "MacBook Air M1 sotiladi", "Texnika", "9.5 mln",
                 "Holati a'lo, 100% batareya sikli past.", "", "seed-user", "kecha")
         }
     }
@@ -138,9 +135,9 @@ class LocalDataSeeder(
         val q = db.chatQueries
         if (q.countConversations().executeAsOne() > 0) return
         q.transaction {
-            q.upsertConversation("c-dilnoza", "Dilnoza Rahimova", "D", ConversationType.PEER.name, true.toDb(), "Konspekt bormi? 😊", "14:22", 2)
-            q.upsertConversation("c-sardor", "Sardor Aliyev", "S", ConversationType.PEER.name, false.toDb(), "Rahmat, ko‘rishguncha!", "12:05", 0)
-            q.upsertConversation("c-uzumhr", "Uzum Market · HR", "U", ConversationType.HR.name, false.toDb(), "Suhbatga taklif qilamiz", "Kecha", 1)
+            q.upsertConversation("c-dilnoza", "Dilnoza Rahimova", "D", "PEER", true.toDb(), "Konspekt bormi? 😊", "14:22", 2)
+            q.upsertConversation("c-sardor", "Sardor Aliyev", "S", "PEER", false.toDb(), "Rahmat, ko‘rishguncha!", "12:05", 0)
+            q.upsertConversation("c-uzumhr", "Uzum Market · HR", "U", "HR", false.toDb(), "Suhbatga taklif qilamiz", "Kecha", 1)
 
             // Dilnoza suhbati xabarlari
             q.insertMessage("c-dilnoza-1", "c-dilnoza", "Salom! Diskret matematikadan konspekt bormi? 😊", false.toDb(), "14:20", 1000)
@@ -237,7 +234,7 @@ class LocalDataSeeder(
 
         // "Siz uchun" seed'i shu versiyada. listings.json o'zgarsa bu qiymatni oshiring.
         const val DISCOUNTS_SEED_KEY = "discounts_seed_version"
-        const val DISCOUNTS_SEED_VERSION = "3"
+        const val DISCOUNTS_SEED_VERSION = "4"
 
         val TASHKENT_CENTER = 41.311081 to 69.240562
 

@@ -50,10 +50,11 @@ import dev.core.designsystem.components.AppIcons
 import dev.core.designsystem.components.GlassTextField
 import dev.core.designsystem.theme.AppPalette
 import dev.core.designsystem.theme.appPalette
-import dev.feature.discounts.presentation.NearbyDiscountsSection
-import dev.feature.discounts.presentation.map.MapPoint
-import dev.feature.discounts.presentation.map.OfferMarker
-import dev.feature.discounts.presentation.map.OffersMap
+import dev.feature.listings.presentation.NearbyDiscountsSection
+import dev.feature.listings.presentation.map.MapPoint
+import dev.feature.listings.presentation.map.OfferMarker
+import dev.feature.listings.presentation.map.OffersMap
+import dev.feature.listings.presentation.map.rememberUserLocation
 import kotlinx.coroutines.delay
 import org.koin.compose.viewmodel.koinViewModel
 
@@ -204,7 +205,7 @@ private fun MapOverlay(
     val markers = located.map { o ->
         OfferMarker(
             id = o.id, lat = o.lat, lng = o.lng,
-            label = o.effectivePrice.priceShort(),
+            label = "${o.effectivePrice.priceShort()} so'm",
             colorHex = hexRgb(o.bannerAccent),
             highlight = o.isDiscount,
         )
@@ -215,10 +216,13 @@ private fun MapOverlay(
     var selectedId by remember { mutableStateOf<String?>(null) }
     val selected = located.firstOrNull { it.id == selectedId }
 
-    Column(Modifier.fillMaxSize().background(palette.bgBrush)) {
-        // Ustki panel — orqaga + qidiruv + Filter
+    // Xarita to'liq ekran (full-bleed) — ustki panel ustida suzadi, kulrang band yo'q.
+    Box(Modifier.fillMaxSize()) {
+        OffersMap(markers, center, palette.dark, rememberUserLocation(), 16, Modifier.fillMaxSize(), onMarkerTap = { selectedId = it })
+
+        // Suzuvchi ustki panel — orqaga + qidiruv + Filter
         Row(
-            Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(top = 54.dp, bottom = 10.dp),
+            Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(top = 54.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(9.dp),
         ) {
@@ -232,28 +236,24 @@ private fun MapOverlay(
             FilterButton(state.activeFilterCount, palette, onOpenFilter)
         }
 
-        // Xarita (pastki tab panelini ochiq qoldirish uchun bottom padding)
-        Box(Modifier.fillMaxSize().padding(bottom = 88.dp)) {
-            OffersMap(markers, center, Modifier.fillMaxSize(), onMarkerTap = { selectedId = it })
-            // Natija soni belgisi
-            Box(
-                Modifier.align(Alignment.TopCenter).padding(top = 8.dp).clip(RoundedCornerShape(11.dp))
-                    .background(palette.ink.copy(alpha = 0.82f)).padding(horizontal = 12.dp, vertical = 6.dp),
-            ) {
-                Text("${markers.size} ta e'lon xaritada", style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.5f.sp, fontWeight = FontWeight.Bold, color = Color.White))
-            }
+        // Natija soni belgisi (panel ostida)
+        Box(
+            Modifier.align(Alignment.TopCenter).padding(top = 108.dp).clip(RoundedCornerShape(11.dp))
+                .background(palette.ink.copy(alpha = 0.82f)).padding(horizontal = 12.dp, vertical = 6.dp),
+        ) {
+            Text("${markers.size} ta e'lon xaritada", style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.5f.sp, fontWeight = FontWeight.Bold, color = Color.White))
+        }
 
-            // Marker bosilganda — tafsilot kartasi (pastda)
-            if (selected != null) {
-                MarkerDetailCard(
-                    offer = selected,
-                    saved = state.savedIds.contains(selected.id),
-                    palette = palette,
-                    onToggleSaved = vm::toggleSaved,
-                    onClose = { selectedId = null },
-                    modifier = Modifier.align(Alignment.BottomCenter).padding(12.dp),
-                )
-            }
+        // Marker bosilganda — tafsilot kartasi (pastda)
+        if (selected != null) {
+            MarkerDetailCard(
+                offer = selected,
+                saved = state.savedIds.contains(selected.id),
+                palette = palette,
+                onToggleSaved = vm::toggleSaved,
+                onClose = { selectedId = null },
+                modifier = Modifier.align(Alignment.BottomCenter).padding(12.dp),
+            )
         }
     }
 }

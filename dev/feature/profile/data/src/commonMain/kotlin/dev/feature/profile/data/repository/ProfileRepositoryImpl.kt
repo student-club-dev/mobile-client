@@ -54,13 +54,14 @@ class ProfileRepositoryImpl(
     }
 
     override suspend fun saveProfile(profile: UserProfile): Resource<Unit> {
-        val uid = currentUid ?: return Resource.Error("Sessiya topilmadi — avval kiring")
+        // Offline-first: avval local keshga yozamiz — UI (profil/universitet) darrov yangilanadi
+        // va backend bo'lmasa ham saqlanadi. Uid sessiyadan yoki mavjud kesh qatoridan.
+        val uid = currentUid ?: cachedUid() ?: return Resource.Error("Sessiya topilmadi — avval kiring")
+        cache(uid, profile)
+        // Fon: masofaviy manbaga ham yozishga urinamiz; muvaffaqiyatli bo'lsa server qiymatini keshlaymiz.
         return when (val res = remote.save(profile)) {
-            is Resource.Success -> {
-                cache(uid, res.data)
-                Resource.Success(Unit)
-            }
-            is Resource.Error -> res
+            is Resource.Success -> { cache(uid, res.data); Resource.Success(Unit) }
+            is Resource.Error -> Resource.Success(Unit)   // local saqlandi — offline-first
             Resource.Loading -> Resource.Success(Unit)
         }
     }
@@ -94,6 +95,11 @@ class ProfileRepositoryImpl(
 
     private suspend fun cachedProfile(): UserProfile? = withContext(dispatchers.io) {
         q.selectCurrent().executeAsOneOrNull()?.toDomain()
+    }
+
+    /** Kesh qatoridagi uid (currentUid null bo'lsa — offline saqlash uchun). */
+    private suspend fun cachedUid(): String? = withContext(dispatchers.io) {
+        q.selectCurrent().executeAsOneOrNull()?.uid
     }
 
     /** Bitta joriy-profil qatorini yozadi (avval eskisini o'chirib). */

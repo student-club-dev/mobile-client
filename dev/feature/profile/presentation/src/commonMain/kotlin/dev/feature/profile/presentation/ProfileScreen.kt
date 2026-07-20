@@ -40,7 +40,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import dev.core.domain.model.Ad
+import dev.feature.ads.domain.model.Ad
 import dev.core.designsystem.components.AppFontFamily
 import dev.core.designsystem.components.AppIcons
 import dev.core.designsystem.theme.AppPalette

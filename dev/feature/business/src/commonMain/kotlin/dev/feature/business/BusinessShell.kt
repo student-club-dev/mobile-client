@@ -44,8 +44,8 @@ import androidx.navigation.navArgument
 import dev.core.designsystem.components.AppIcons
 import dev.core.designsystem.theme.AppPalette
 import dev.core.designsystem.theme.appPalette
-import dev.feature.discounts.presentation.MyListingsScreen
-import dev.feature.discounts.presentation.PostListingScreen
+import dev.feature.listings.presentation.MyListingsScreen
+import dev.feature.listings.presentation.PostListingScreen
 
 private const val LISTINGS = "listings"
 private const val POST_LISTING = "post_listing"
