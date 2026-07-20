@@ -6,11 +6,12 @@ import dev.feature.clubs.domain.model.Club
 import dev.core.domain.model.DiscountCategory
 import dev.core.domain.model.DiscountOffer
 import dev.feature.students.domain.model.FriendStatus
-import dev.feature.jobs.domain.model.Job
+import dev.feature.listings.domain.model.Listing
+import dev.feature.listings.domain.model.ListingKind
+import dev.feature.listings.domain.usecase.ObserveListingsByKindUseCase
 import dev.feature.students.domain.model.Student
 import dev.feature.clubs.domain.repository.ClubRepository
 import dev.core.domain.repository.DiscountRepository
-import dev.feature.jobs.domain.repository.JobRepository
 import dev.feature.notifications.domain.repository.NotificationRepository
 import dev.feature.students.domain.repository.StudentRepository
 import dev.feature.university.domain.repository.UniversityRepository
@@ -19,6 +20,7 @@ import dev.feature.profile.domain.usecase.ObserveProfileUseCase
 import dev.feature.profile.domain.usecase.RefreshProfileUseCase
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -30,7 +32,8 @@ data class HomeUiState(
     val courseLabel: String? = null,
     val categories: List<DiscountCategory> = emptyList(),
     val featured: DiscountOffer? = null,
-    val jobs: List<Job> = emptyList(),
+    /** Faol ish e'lonlari ([ListingKind.JOB]) — "E'lonlar" bo'limidagi bilan bir xil manba. */
+    val jobs: List<Listing> = emptyList(),
     val students: List<Student> = emptyList(),
     val clubs: List<Club> = emptyList(),
     val hasUnreadNotifications: Boolean = false,
@@ -42,7 +45,7 @@ class HomeViewModel(
     private val refreshProfileUseCase: RefreshProfileUseCase,
     universityRepository: UniversityRepository,
     private val discountRepository: DiscountRepository,
-    private val jobRepository: JobRepository,
+    observeJobListings: ObserveListingsByKindUseCase,
     private val studentRepository: StudentRepository,
     clubRepository: ClubRepository,
     notificationRepository: NotificationRepository,
@@ -75,7 +78,7 @@ class HomeViewModel(
     private val content = combine(
         discountRepository.observeCategories(),
         discountRepository.observeFeatured(),
-        jobRepository.observeJobs(),
+        observeJobListings(ListingKind.JOB),
         studentRepository.observeStudents(),
         clubRepository.observeClubs(),
     ) { categories, featured, jobs, students, clubs ->
@@ -96,7 +99,9 @@ class HomeViewModel(
             clubs = c.clubs,
             hasUnreadNotifications = unread > 0,
         )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HomeUiState())
+    }
+        .catch { emit(HomeUiState()) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HomeUiState())
 
     /** Student kartasidagi "+Do'st" ↔ "Kutilmoqda" o'zgartirish. */
     fun toggleFriend(student: Student) {
@@ -104,16 +109,11 @@ class HomeViewModel(
         viewModelScope.launch { studentRepository.setFriendStatus(student.id, next) }
     }
 
-    /** Ish kartasidagi bookmark. */
-    fun toggleBookmark(job: Job) {
-        viewModelScope.launch { jobRepository.setBookmarked(job.id, !job.bookmarked) }
-    }
-
     private data class Header(val name: String, val monogram: String?, val course: String?)
     private data class Content(
         val categories: List<DiscountCategory>,
         val featured: DiscountOffer?,
-        val jobs: List<Job>,
+        val jobs: List<Listing>,
         val students: List<Student>,
         val clubs: List<Club>,
     )

@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 /** Login'dan keyingi ildiz ekran holati — rolga qarab qaysi shell ochilishini hal qiladi. */
 data class RootShellState(
@@ -36,9 +37,21 @@ class RootShellViewModel(
 
     init {
         // Rol masofaviy profilda bo'lishi mumkin — keshni yangilaymiz, so'ng "tugadi" deb belgilaymiz.
+        //
+        // MUHIM: bu chaqiruv Firestore `get()` ga boradi va tarmoq yo'q + keshda hujjat bo'lmasa
+        // ISTISNO TASHLAMASDAN cheksiz kutib qolishi mumkin. `refreshDone` hech qachon `true`
+        // bo'lmasa — yangi sessiyada ilova abadiy BootSplash'da qotadi. Shuning uchun:
+        //   • withTimeoutOrNull — eng ko'pi PROFILE_REFRESH_TIMEOUT_MS kutamiz;
+        //   • try/finally — istisno bo'lsa ham bayroq baribir qo'yiladi.
+        // Har qanday holatda ilova ochiladi (kesh yoki default rol bilan).
         viewModelScope.launch {
-            refreshProfileUseCase()
-            refreshDone.value = true
+            try {
+                withTimeoutOrNull(PROFILE_REFRESH_TIMEOUT_MS) { refreshProfileUseCase() }
+            } catch (_: Exception) {
+                // Yangilash muvaffaqiyatsiz — local kesh/default rol bilan davom etamiz.
+            } finally {
+                refreshDone.value = true
+            }
         }
     }
 
@@ -56,5 +69,8 @@ class RootShellViewModel(
 
     private companion object {
         const val ROLE_BUSINESS = "BUSINESS"
+
+        /** Profil yangilanishini eng ko'pi shuncha kutamiz — keyin baribir ilovani ochamiz. */
+        const val PROFILE_REFRESH_TIMEOUT_MS = 5_000L
     }
 }

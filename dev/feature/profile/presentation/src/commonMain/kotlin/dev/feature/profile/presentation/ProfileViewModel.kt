@@ -20,6 +20,7 @@ import dev.feature.profile.domain.usecase.SaveProfileUseCase
 import dev.feature.profile.domain.usecase.UploadAvatarUseCase
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -97,7 +98,9 @@ class ProfileViewModel(
             profile = h.profile,
             universities = h.universities,
         )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), ProfileUiState())
+    }
+        .catch { emit(ProfileUiState()) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), ProfileUiState())
 
     /** E'lonni o'chirish ("Mening e'lonlarim"). */
     fun deleteAd(adId: String) {

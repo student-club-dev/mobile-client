@@ -28,6 +28,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -424,7 +425,16 @@ class AuthFlowViewModel(
      */
     private suspend fun onPhoneVerified(external: ExternalAuthUser) {
         verifiedExternal = external
-        if (hasProfileUseCase()) {
+        // MUHIM: hasProfileUseCase() Firestore `get()` ga boradi va tarmoqsiz holatda istisno
+        // TASHLAMASDAN cheksiz kutishi mumkin. Bu chaqiruv `isLoading = true` ostida bo'lgani
+        // uchun osilib qolsa OTP ekrani abadiy spinnerda qoladi va qayta urinish ham bloklanadi.
+        // Timeout'da "profil yo'q" deb hisoblaymiz — foydalanuvchi SignUp'ga o'tadi (xavfsiz yo'l).
+        val hasProfile = try {
+            withTimeoutOrNull(PROFILE_CHECK_TIMEOUT_MS) { hasProfileUseCase() } ?: false
+        } catch (_: Exception) {
+            false
+        }
+        if (hasProfile) {
             syncAndFinish(external) // mavjud foydalanuvchi → HOME
         } else {
             _state.update { it.copy(isLoading = false) }
@@ -448,5 +458,10 @@ class AuthFlowViewModel(
     override fun onCleared() {
         timerJob?.cancel()
         super.onCleared()
+    }
+
+    private companion object {
+        /** Profil mavjudligini tekshirishni eng ko'pi shuncha kutamiz (aks holda spinner qotadi). */
+        const val PROFILE_CHECK_TIMEOUT_MS = 5_000L
     }
 }

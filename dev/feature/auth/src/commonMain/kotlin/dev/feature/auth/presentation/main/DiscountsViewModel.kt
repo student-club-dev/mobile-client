@@ -8,6 +8,7 @@ import dev.core.domain.repository.DiscountRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -80,7 +81,9 @@ class DiscountsViewModel(
             totalCount = filtered.size,
             activeFilterCount = f.activeCount,
         )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), DiscountsUiState())
+    }
+        .catch { emit(DiscountsUiState()) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), DiscountsUiState())
 
     val filterState: StateFlow<FilterDraftState> = combine(
         offersFlow, discountRepository.observeCategories(), draft, query,
@@ -94,7 +97,9 @@ class DiscountsViewModel(
             genderApplicable = inCategory.any { it.gender.isNotBlank() },
             previewCount = filter(offers, d, q).size,
         )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), FilterDraftState())
+    }
+        .catch { emit(FilterDraftState()) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), FilterDraftState())
 
     init {
         viewModelScope.launch { discountRepository.refresh() }
