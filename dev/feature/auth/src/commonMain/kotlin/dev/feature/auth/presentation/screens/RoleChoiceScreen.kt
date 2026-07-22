@@ -26,11 +26,11 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import dev.core.designsystem.components.AppFontFamily
-import dev.core.designsystem.components.AppIcons
-import dev.core.designsystem.components.AppScreenScaffold
-import dev.core.designsystem.theme.ModuleFood
-import dev.core.designsystem.theme.appPalette
+import dev.core.uikit.components.AppFontFamily
+import dev.core.uikit.components.AppIcons
+import dev.core.uikit.components.AppScreenScaffold
+import dev.core.uikit.theme.ModuleFood
+import dev.core.uikit.theme.appPalette
 import dev.feature.auth.presentation.flow.Role
 
 /**
@@ -98,7 +98,7 @@ private fun RoleCard(
     icon: ImageVector,
     accent: Color,
     onClick: () -> Unit,
-    palette: dev.core.designsystem.theme.AppPalette,
+    palette: dev.core.uikit.theme.AppPalette,
 ) {
     Row(
         Modifier.fillMaxWidth()

@@ -38,11 +38,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.Image
 import coil3.compose.AsyncImage
-import dev.core.designsystem.components.AppFontFamily
-import dev.core.designsystem.components.AppIcons
-import dev.core.designsystem.media.toImageBitmapOrNull
-import dev.core.designsystem.theme.AppPalette
-import dev.core.designsystem.theme.appPalette
+import dev.core.uikit.components.AppFontFamily
+import dev.core.uikit.theme.Sc
+import dev.core.uikit.components.AppIcons
+import dev.core.uikit.media.toImageBitmapOrNull
+import dev.core.uikit.theme.AppPalette
+import dev.core.uikit.theme.appPalette
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 
@@ -109,28 +110,24 @@ fun SelectChip(
     onClick: () -> Unit,
     palette: AppPalette = appPalette,
 ) {
+    // Dizayndagi filtr chipi: tanlanganda gradient + oq matn, aks holda kulrang plashka.
     val shape = RoundedCornerShape(14.dp)
     Row(
         Modifier
-            .height(36.dp)
             .clip(shape)
-            .background(if (selected) palette.primary else palette.fieldBg)
-            .then(if (selected) Modifier else Modifier.border(1.dp, palette.border, shape))
+            .then(if (selected) Modifier.background(Sc.buttonBrush) else Modifier.background(Sc.Chip))
             .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp),
+            .padding(horizontal = 15.dp, vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        if (selected) {
-            Icon(AppIcons.Check, null, tint = palette.onPrimary, modifier = Modifier.size(14.dp))
-        }
         Text(
             text,
             style = TextStyle(
                 fontFamily = AppFontFamily,
-                fontSize = 13.sp,
-                fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold,
-                color = if (selected) palette.onPrimary else palette.inkMuted,
+                fontSize = 13.5f.sp,
+                fontWeight = FontWeight.Bold,
+                color = if (selected) Color.White else Sc.ChipInk,
             ),
         )
     }

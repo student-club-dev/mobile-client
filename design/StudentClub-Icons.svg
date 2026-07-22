@@ -1,0 +1,185 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="968" viewBox="0 0 1024 968" font-family="&#39;Plus Jakarta Sans&#39;, Arial, sans-serif">
+<rect width="1024" height="968" fill="#EEF3F8"></rect>
+<text x="32" y="46" font-size="26" font-weight="800" fill="#0F2A43">StudentClub — Iconlar</text>
+<text x="32" y="72" font-size="14" font-weight="500" fill="#6B7A8D">36 ta icon · 24×24 · TBC #00ADEE — har biri nomlangan (ic_*)</text>
+<g>
+<rect x="40" y="96" width="144" height="120" rx="20" fill="#FFFFFF" stroke="#E4EBF2"></rect>
+<g transform="translate(90.0,116) scale(1.833)"><path d="M3 10l9-7 9 7v9a1 1 0 01-1 1h-5v-6H9v6H4a1 1 0 01-1-1v-9z" stroke="#00ADEE" stroke-width="1.9" stroke-linejoin="round" fill="none"></path></g>
+<text x="112.0" y="206" font-size="13" font-weight="600" fill="#0091D8" text-anchor="middle" font-family="monospace">ic_home</text>
+</g>
+<g>
+<rect x="200" y="96" width="144" height="120" rx="20" fill="#FFFFFF" stroke="#E4EBF2"></rect>
+<g transform="translate(250.0,116) scale(1.833)"><path d="M12 4L2 9l10 5 8-4" stroke="#00ADEE" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none"></path><path d="M6 12v4c0 1 2.7 3 6 3s6-2 6-3v-4" stroke="#00ADEE" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none"></path></g>
+<text x="272.0" y="206" font-size="13" font-weight="600" fill="#0091D8" text-anchor="middle" font-family="monospace">ic_university</text>
+</g>
+<g>
+<rect x="360" y="96" width="144" height="120" rx="20" fill="#FFFFFF" stroke="#E4EBF2"></rect>
+<g transform="translate(410.0,116) scale(1.833)"><path d="M12 5v14M5 12h14" stroke="#00ADEE" stroke-width="2.6" stroke-linecap="round"></path></g>
+<text x="432.0" y="206" font-size="13" font-weight="600" fill="#0091D8" text-anchor="middle" font-family="monospace">ic_add</text>
+</g>
+<g>
+<rect x="520" y="96" width="144" height="120" rx="20" fill="#FFFFFF" stroke="#E4EBF2"></rect>
+<g transform="translate(570.0,116) scale(1.833)"><path d="M6 3h8l4 4v14H6V3z" stroke="#00ADEE" stroke-width="1.9" stroke-linejoin="round" fill="none"></path><path d="M14 3v4h4M9 13h6M9 16h4" stroke="#00ADEE" stroke-width="1.9" stroke-linecap="round" fill="none"></path></g>
+<text x="592.0" y="206" font-size="13" font-weight="600" fill="#0091D8" text-anchor="middle" font-family="monospace">ic_ads</text>
+</g>
+<g>
+<rect x="680" y="96" width="144" height="120" rx="20" fill="#FFFFFF" stroke="#E4EBF2"></rect>
+<g transform="translate(730.0,116) scale(1.833)"><path d="M4 5h16v11H8l-4 4V5z" stroke="#00ADEE" stroke-width="1.9" stroke-linejoin="round" fill="none"></path></g>
+<text x="752.0" y="206" font-size="13" font-weight="600" fill="#0091D8" text-anchor="middle" font-family="monospace">ic_messages</text>
+</g>
+<g>
+<rect x="840" y="96" width="144" height="120" rx="20" fill="#FFFFFF" stroke="#E4EBF2"></rect>
+<g transform="translate(890.0,116) scale(1.833)"><path d="M21 11.5a8.4 8.4 0 01-11.9 7.6L4 21l1.9-5.1A8.4 8.4 0 1121 11.5z" stroke="#0091D8" stroke-width="1.8" stroke-linejoin="round" fill="none"></path></g>
+<text x="912.0" y="206" font-size="13" font-weight="600" fill="#0091D8" text-anchor="middle" font-family="monospace">ic_chat</text>
+</g>
+<g>
+<rect x="40" y="236" width="144" height="120" rx="20" fill="#FFFFFF" stroke="#E4EBF2"></rect>
+<g transform="translate(90.0,256) scale(1.833)"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9" stroke="#0091D8" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"></path><path d="M13.7 21a2 2 0 01-3.4 0" stroke="#0091D8" stroke-width="1.8" stroke-linecap="round" fill="none"></path></g>
+<text x="112.0" y="346" font-size="13" font-weight="600" fill="#0091D8" text-anchor="middle" font-family="monospace">ic_bell</text>
+</g>
+<g>
+<rect x="200" y="236" width="144" height="120" rx="20" fill="#FFFFFF" stroke="#E4EBF2"></rect>
+<g transform="translate(250.0,256) scale(1.833)"><circle cx="11" cy="11" r="7" stroke="#0091D8" stroke-width="1.9" fill="none"></circle><path d="M20 20l-3.5-3.5" stroke="#0091D8" stroke-width="1.9" stroke-linecap="round"></path></g>
+<text x="272.0" y="346" font-size="13" font-weight="600" fill="#0091D8" text-anchor="middle" font-family="monospace">ic_search</text>
+</g>
+<g>
+<rect x="360" y="236" width="144" height="120" rx="20" fill="#FFFFFF" stroke="#E4EBF2"></rect>
+<g transform="translate(410.0,256) scale(1.833)"><path d="M3 5h18l-7 8v5l-4 2v-7L3 5z" stroke="#0091D8" stroke-width="1.9" stroke-linejoin="round" fill="none"></path></g>
+<text x="432.0" y="346" font-size="13" font-weight="600" fill="#0091D8" text-anchor="middle" font-family="monospace">ic_filter</text>
+</g>
+<g>
+<rect x="520" y="236" width="144" height="120" rx="20" fill="#FFFFFF" stroke="#E4EBF2"></rect>
+<g transform="translate(570.0,256) scale(1.833)"><path d="M15 5l-7 7 7 7" stroke="#0091D8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="none"></path></g>
+<text x="592.0" y="346" font-size="13" font-weight="600" fill="#0091D8" text-anchor="middle" font-family="monospace">ic_back</text>
+</g>
+<g>
+<rect x="680" y="236" width="144" height="120" rx="20" fill="#FFFFFF" stroke="#E4EBF2"></rect>
+<g transform="translate(730.0,256) scale(1.833)"><path d="M9 6l6 6-6 6" stroke="#0091D8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="none"></path></g>
+<text x="752.0" y="346" font-size="13" font-weight="600" fill="#0091D8" text-anchor="middle" font-family="monospace">ic_chevron_right</text>
+</g>
+<g>
+<rect x="840" y="236" width="144" height="120" rx="20" fill="#FFFFFF" stroke="#E4EBF2"></rect>
+<g transform="translate(890.0,256) scale(1.833)"><path d="M8 9l4-4 4 4M8 15l4 4 4-4" stroke="#0091D8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"></path></g>
+<text x="912.0" y="346" font-size="13" font-weight="600" fill="#0091D8" text-anchor="middle" font-family="monospace">ic_chevron_updown</text>
+</g>
+<g>
+<rect x="40" y="376" width="144" height="120" rx="20" fill="#FFFFFF" stroke="#E4EBF2"></rect>
+<g transform="translate(90.0,396) scale(1.833)"><path d="M6 6l12 12M18 6L6 18" stroke="#0091D8" stroke-width="2.2" stroke-linecap="round"></path></g>
+<text x="112.0" y="486" font-size="13" font-weight="600" fill="#0091D8" text-anchor="middle" font-family="monospace">ic_close</text>
+</g>
+<g>
+<rect x="200" y="376" width="144" height="120" rx="20" fill="#FFFFFF" stroke="#E4EBF2"></rect>
+<g transform="translate(250.0,396) scale(1.833)"><path d="M6.5 4h3l1.5 4-2 1.5a11 11 0 005.5 5.5l1.5-2 4 1.5v3a2 2 0 01-2.2 2A16 16 0 014.5 6.2 2 2 0 016.5 4z" stroke="#0091D8" stroke-width="1.8" stroke-linejoin="round" fill="none"></path></g>
+<text x="272.0" y="486" font-size="13" font-weight="600" fill="#0091D8" text-anchor="middle" font-family="monospace">ic_call</text>
+</g>
+<g>
+<rect x="360" y="376" width="144" height="120" rx="20" fill="#FFFFFF" stroke="#E4EBF2"></rect>
+<g transform="translate(410.0,396) scale(1.833)"><circle cx="12" cy="5" r="1.6" fill="#0091D8"></circle><circle cx="12" cy="12" r="1.6" fill="#0091D8"></circle><circle cx="12" cy="19" r="1.6" fill="#0091D8"></circle></g>
+<text x="432.0" y="486" font-size="13" font-weight="600" fill="#0091D8" text-anchor="middle" font-family="monospace">ic_more</text>
+</g>
+<g>
+<rect x="520" y="376" width="144" height="120" rx="20" fill="#FFFFFF" stroke="#E4EBF2"></rect>
+<g transform="translate(570.0,396) scale(1.833)"><rect x="2" y="7" width="20" height="10" rx="5" stroke="#00ADEE" stroke-width="1.8" fill="none"></rect><path d="M7 11v2M6 12h2" stroke="#00ADEE" stroke-width="1.8" stroke-linecap="round"></path><circle cx="16" cy="11.5" r="1" fill="#00ADEE"></circle><circle cx="18" cy="13.5" r="1" fill="#00ADEE"></circle></g>
+<text x="592.0" y="486" font-size="13" font-weight="600" fill="#0091D8" text-anchor="middle" font-family="monospace">ic_gamepad</text>
+</g>
+<g>
+<rect x="680" y="376" width="144" height="120" rx="20" fill="#FFFFFF" stroke="#E4EBF2"></rect>
+<g transform="translate(730.0,396) scale(1.833)"><path d="M4 8h13a3 3 0 010 6h-1M4 8v7a4 4 0 004 4h4a4 4 0 004-4" stroke="#F0842B" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"></path><path d="M8 3v2M11 3v2" stroke="#F0842B" stroke-width="1.8" stroke-linecap="round"></path></g>
+<text x="752.0" y="486" font-size="13" font-weight="600" fill="#0091D8" text-anchor="middle" font-family="monospace">ic_cafe</text>
+</g>
+<g>
+<rect x="840" y="376" width="144" height="120" rx="20" fill="#FFFFFF" stroke="#E4EBF2"></rect>
+<g transform="translate(890.0,396) scale(1.833)"><path d="M3 4h2l2 12h11l2-8H6" stroke="#16B364" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"></path><circle cx="9" cy="20" r="1.4" fill="#16B364"></circle><circle cx="17" cy="20" r="1.4" fill="#16B364"></circle></g>
+<text x="912.0" y="486" font-size="13" font-weight="600" fill="#0091D8" text-anchor="middle" font-family="monospace">ic_cart</text>
+</g>
+<g>
+<rect x="40" y="516" width="144" height="120" rx="20" fill="#FFFFFF" stroke="#E4EBF2"></rect>
+<g transform="translate(90.0,536) scale(1.833)"><path d="M4 5.5A1.5 1.5 0 015.5 4H11v15H5.5A1.5 1.5 0 014 17.5v-12z" fill="#F0567C"></path><path d="M13 4h5.5A1.5 1.5 0 0120 5.5v12a1.5 1.5 0 01-1.5 1.5H13V4z" fill="#F98FA9"></path></g>
+<text x="112.0" y="626" font-size="13" font-weight="600" fill="#0091D8" text-anchor="middle" font-family="monospace">ic_book</text>
+</g>
+<g>
+<rect x="200" y="516" width="144" height="120" rx="20" fill="#FFFFFF" stroke="#E4EBF2"></rect>
+<g transform="translate(250.0,536) scale(1.833)"><rect x="3" y="5" width="18" height="12" rx="2.5" stroke="#00ADEE" stroke-width="1.8" fill="none"></rect><path d="M2 21h20" stroke="#00ADEE" stroke-width="1.8" stroke-linecap="round"></path><path d="M9 10l-2 2 2 2M13 10l2 2-2 2" stroke="#00ADEE" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none"></path></g>
+<text x="272.0" y="626" font-size="13" font-weight="600" fill="#0091D8" text-anchor="middle" font-family="monospace">ic_laptop</text>
+</g>
+<g>
+<rect x="360" y="516" width="144" height="120" rx="20" fill="#FFFFFF" stroke="#E4EBF2"></rect>
+<g transform="translate(410.0,536) scale(1.833)"><path d="M4 5h16v11H8l-4 4V5z" stroke="#7C6BE0" stroke-width="1.8" stroke-linejoin="round" fill="none"></path><path d="M8 9h8M8 12h5" stroke="#7C6BE0" stroke-width="1.8" stroke-linecap="round"></path></g>
+<text x="432.0" y="626" font-size="13" font-weight="600" fill="#0091D8" text-anchor="middle" font-family="monospace">ic_debate</text>
+</g>
+<g>
+<rect x="520" y="516" width="144" height="120" rx="20" fill="#FFFFFF" stroke="#E4EBF2"></rect>
+<g transform="translate(570.0,536) scale(1.833)"><circle cx="12" cy="12" r="8.5" stroke="#16B364" stroke-width="1.8" fill="none"></circle><path d="M12 7l2.4 1.7-.9 2.8h-3l-.9-2.8L12 7z" fill="#16B364"></path></g>
+<text x="592.0" y="626" font-size="13" font-weight="600" fill="#0091D8" text-anchor="middle" font-family="monospace">ic_ball</text>
+</g>
+<g>
+<rect x="680" y="516" width="144" height="120" rx="20" fill="#FFFFFF" stroke="#E4EBF2"></rect>
+<g transform="translate(730.0,536) scale(1.833)"><path d="M4 11l8-6 8 6v8a1 1 0 01-1 1H5a1 1 0 01-1-1v-8z" fill="#F0842B"></path><path d="M10 20v-5h4v5" stroke="#fff" stroke-width="1.8" fill="none"></path></g>
+<text x="752.0" y="626" font-size="13" font-weight="600" fill="#0091D8" text-anchor="middle" font-family="monospace">ic_home_filled</text>
+</g>
+<g>
+<rect x="840" y="516" width="144" height="120" rx="20" fill="#FFFFFF" stroke="#E4EBF2"></rect>
+<g transform="translate(890.0,536) scale(1.833)"><rect x="3" y="7" width="18" height="13" rx="2.5" stroke="#E0A020" stroke-width="1.8" fill="none"></rect><path d="M8 7V6a2 2 0 012-2h4a2 2 0 012 2v1M3 12h18" stroke="#E0A020" stroke-width="1.8" stroke-linecap="round" fill="none"></path></g>
+<text x="912.0" y="626" font-size="13" font-weight="600" fill="#0091D8" text-anchor="middle" font-family="monospace">ic_briefcase</text>
+</g>
+<g>
+<rect x="40" y="656" width="144" height="120" rx="20" fill="#FFFFFF" stroke="#E4EBF2"></rect>
+<g transform="translate(90.0,676) scale(1.833)"><path d="M14.5 6a3.5 3.5 0 00-4.8 4.3l-5 5a1.5 1.5 0 002.1 2.1l5-5A3.5 3.5 0 0018 8.5l-2.3 2.3-1.8-1.8L16.2 6.7A3.5 3.5 0 0014.5 6z" fill="#00ADEE"></path></g>
+<text x="112.0" y="766" font-size="13" font-weight="600" fill="#0091D8" text-anchor="middle" font-family="monospace">ic_tools</text>
+</g>
+<g>
+<rect x="200" y="656" width="144" height="120" rx="20" fill="#FFFFFF" stroke="#E4EBF2"></rect>
+<g transform="translate(250.0,676) scale(1.833)"><path d="M9 3L3 5v16l6-2 6 2 6-2V3l-6 2-6-2z" stroke="#00ADEE" stroke-width="1.7" stroke-linejoin="round" fill="none"></path><path d="M9 3v16M15 5v16" stroke="#00ADEE" stroke-width="1.7"></path></g>
+<text x="272.0" y="766" font-size="13" font-weight="600" fill="#0091D8" text-anchor="middle" font-family="monospace">ic_map</text>
+</g>
+<g>
+<rect x="360" y="656" width="144" height="120" rx="20" fill="#FFFFFF" stroke="#E4EBF2"></rect>
+<g transform="translate(410.0,676) scale(1.833)"><path d="M12 21s7-6.3 7-11a7 7 0 10-14 0c0 4.7 7 11 7 11z" stroke="#F0567C" stroke-width="1.8" fill="none"></path><circle cx="12" cy="10" r="2.4" fill="#F0567C"></circle></g>
+<text x="432.0" y="766" font-size="13" font-weight="600" fill="#0091D8" text-anchor="middle" font-family="monospace">ic_pin</text>
+</g>
+<g>
+<rect x="520" y="656" width="144" height="120" rx="20" fill="#FFFFFF" stroke="#E4EBF2"></rect>
+<g transform="translate(570.0,676) scale(1.833)"><circle cx="9" cy="8" r="3" stroke="#00ADEE" stroke-width="1.8" fill="none"></circle><path d="M3 20c0-3.3 2.7-5 6-5s6 1.7 6 5" stroke="#00ADEE" stroke-width="1.8" stroke-linecap="round" fill="none"></path><path d="M16 6a3 3 0 010 5.6M18 20c0-2.6-1.3-4.2-3.4-4.8" stroke="#00ADEE" stroke-width="1.8" stroke-linecap="round" fill="none"></path></g>
+<text x="592.0" y="766" font-size="13" font-weight="600" fill="#0091D8" text-anchor="middle" font-family="monospace">ic_users</text>
+</g>
+<g>
+<rect x="680" y="656" width="144" height="120" rx="20" fill="#FFFFFF" stroke="#E4EBF2"></rect>
+<g transform="translate(730.0,676) scale(1.833)"><path d="M3 12l8-8h8v8l-8 8-8-8z" stroke="#F0842B" stroke-width="1.8" stroke-linejoin="round" fill="none"></path><circle cx="15.5" cy="8.5" r="1.4" fill="#F0842B"></circle></g>
+<text x="752.0" y="766" font-size="13" font-weight="600" fill="#0091D8" text-anchor="middle" font-family="monospace">ic_tag</text>
+</g>
+<g>
+<rect x="840" y="656" width="144" height="120" rx="20" fill="#FFFFFF" stroke="#E4EBF2"></rect>
+<g transform="translate(890.0,676) scale(1.833)"><path d="M21 11l-8.5 8.5a5 5 0 01-7-7L14 4a3.3 3.3 0 014.7 4.7l-8.5 8.5a1.6 1.6 0 01-2.3-2.3l7.8-7.8" stroke="#8A98A8" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" fill="none"></path></g>
+<text x="912.0" y="766" font-size="13" font-weight="600" fill="#0091D8" text-anchor="middle" font-family="monospace">ic_attach</text>
+</g>
+<g>
+<rect x="40" y="796" width="144" height="120" rx="20" fill="#FFFFFF" stroke="#E4EBF2"></rect>
+<g transform="translate(90.0,816) scale(1.833)"><circle cx="12" cy="12" r="9" stroke="#5A5A5F" stroke-width="1.7" fill="none"></circle><circle cx="9" cy="10" r="1.1" fill="#5A5A5F"></circle><circle cx="15" cy="10" r="1.1" fill="#5A5A5F"></circle><path d="M8.5 14c.9 1.2 2.1 1.8 3.5 1.8s2.6-.6 3.5-1.8" stroke="#5A5A5F" stroke-width="1.7" stroke-linecap="round" fill="none"></path></g>
+<text x="112.0" y="906" font-size="13" font-weight="600" fill="#0091D8" text-anchor="middle" font-family="monospace">ic_emoji</text>
+</g>
+<g>
+<rect x="200" y="796" width="144" height="120" rx="20" fill="#FFFFFF" stroke="#E4EBF2"></rect>
+<g transform="translate(250.0,816) scale(1.833)"><rect x="9" y="3" width="6" height="11" rx="3" fill="#00ADEE"></rect><path d="M6 11a6 6 0 0012 0M12 17v3" stroke="#00ADEE" stroke-width="1.8" stroke-linecap="round" fill="none"></path></g>
+<text x="272.0" y="906" font-size="13" font-weight="600" fill="#0091D8" text-anchor="middle" font-family="monospace">ic_mic</text>
+</g>
+<g>
+<rect x="360" y="796" width="144" height="120" rx="20" fill="#FFFFFF" stroke="#E4EBF2"></rect>
+<g transform="translate(410.0,816) scale(1.833)"><path d="M9 10V7a1 1 0 011-1h9M19 6v6a1 1 0 01-1 1H6" stroke="#00ADEE" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none"></path><path d="M9 10l-3 3 3 3" stroke="#00ADEE" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none"></path></g>
+<text x="432.0" y="906" font-size="13" font-weight="600" fill="#0091D8" text-anchor="middle" font-family="monospace">ic_send_enter</text>
+</g>
+<g>
+<rect x="520" y="796" width="144" height="120" rx="20" fill="#FFFFFF" stroke="#E4EBF2"></rect>
+<g transform="translate(570.0,816) scale(1.833)"><path d="M12 5l7 7h-4v6H9v-6H5l7-7z" fill="#3A3A3C"></path></g>
+<text x="592.0" y="906" font-size="13" font-weight="600" fill="#0091D8" text-anchor="middle" font-family="monospace">ic_shift</text>
+</g>
+<g>
+<rect x="680" y="796" width="144" height="120" rx="20" fill="#FFFFFF" stroke="#E4EBF2"></rect>
+<g transform="translate(730.0,816) scale(1.833)"><path d="M21 5H9L3 12l6 7h12V5z" stroke="#3A3A3C" stroke-width="1.6" stroke-linejoin="round" fill="none"></path><path d="M12 9.5l5 5M17 9.5l-5 5" stroke="#3A3A3C" stroke-width="1.8" stroke-linecap="round"></path></g>
+<text x="752.0" y="906" font-size="13" font-weight="600" fill="#0091D8" text-anchor="middle" font-family="monospace">ic_backspace</text>
+</g>
+<g>
+<rect x="840" y="796" width="144" height="120" rx="20" fill="#FFFFFF" stroke="#E4EBF2"></rect>
+<g transform="translate(890.0,816) scale(1.833)"><g transform="translate(0,3)"><path d="M1 9l5 5L15 4" stroke="#00ADEE" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"></path><path d="M9 14L18.5 4" stroke="#00ADEE" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"></path></g></g>
+<text x="912.0" y="906" font-size="13" font-weight="600" fill="#0091D8" text-anchor="middle" font-family="monospace">ic_check_double</text>
+</g>
+</svg>

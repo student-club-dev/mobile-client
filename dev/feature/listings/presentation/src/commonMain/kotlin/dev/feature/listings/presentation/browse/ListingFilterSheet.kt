@@ -14,18 +14,22 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import dev.core.designsystem.components.AppFontFamily
-import dev.core.designsystem.components.AppIcons
-import dev.core.designsystem.theme.AppPalette
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.ui.graphics.Color
+import dev.core.uikit.components.ScGradientButton
+import dev.core.uikit.components.ScSheetClose
+import dev.core.uikit.components.ScSheetHandle
+import dev.core.uikit.components.ScSoftButton
+import dev.core.uikit.components.ScText
+import dev.core.uikit.theme.Sc
+import dev.core.uikit.theme.AppPalette
 import dev.feature.listings.domain.model.EmploymentType
 import dev.feature.listings.domain.model.JobCatalog
 import dev.feature.listings.domain.model.ListingFilters
@@ -40,7 +44,6 @@ import dev.feature.listings.domain.model.TenantGender
 import dev.feature.listings.domain.model.WorkShift
 import dev.feature.listings.domain.model.formatSum
 import dev.feature.listings.presentation.components.ChipFlow
-import dev.feature.listings.presentation.components.IconSquareButton
 import dev.feature.listings.presentation.components.SelectChip
 
 /**
@@ -62,54 +65,58 @@ fun ListingFilterSheet(
     onApply: () -> Unit,
     onClose: () -> Unit,
 ) {
-    Column(Modifier.fillMaxSize().background(palette.bgBrush)) {
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(top = 54.dp, bottom = 14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(11.dp),
-        ) {
-            IconSquareButton(onClose, AppIcons.ArrowLeft, palette)
-            Text(
-                "Filter",
-                style = TextStyle(fontFamily = AppFontFamily, fontSize = 20.sp, fontWeight = FontWeight.Black, color = palette.ink),
-                modifier = Modifier.weight(1f),
-            )
-            Text(
-                "Tozalash",
-                style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = palette.primary),
-                modifier = Modifier.clickable(onClick = vm::resetDraft),
-            )
-        }
-
+    // Dizaynda filtr — modal bottom sheet: pastda oq varaq, orqasi qoraytirilgan.
+    Box(Modifier.fillMaxSize()) {
+        Box(Modifier.fillMaxSize().background(Color(0xFF0B1622).copy(alpha = 0.42f)).clickable(onClick = onClose))
         Column(
-            Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp),
+            Modifier.align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .statusBarsPadding()
+                .padding(top = 60.dp)
+                .clip(RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp))
+                .background(Color.White),
         ) {
-            when (state.kind) {
-                ListingKind.RENTAL -> RentalFilters(state.draft, palette, vm)
-                ListingKind.SERVICE -> ServiceFilters(state.draft, palette, vm)
-                ListingKind.JOB -> JobFilters(state.draft, palette, vm)
-                ListingKind.TASK -> TaskFilters(state.draft, palette, vm)
-                ListingKind.DISCOUNT -> Unit
-            }
-
-            PriceFilter(state.kind, state.draft, palette, vm)
-            Spacer(Modifier.height(8.dp))
-        }
-
-        Box(Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 96.dp, top = 8.dp)) {
+            ScSheetHandle()
             Row(
-                Modifier.fillMaxWidth()
-                    .height(50.dp)
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(palette.primary)
-                    .clickable(onClick = onApply),
-                horizontalArrangement = Arrangement.Center,
+                Modifier.fillMaxWidth().padding(start = 22.dp, end = 22.dp, top = 6.dp, bottom = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(
-                    "Qo'llash · ${state.previewCount} ta e'lon",
-                    style = TextStyle(fontFamily = AppFontFamily, fontSize = 14.sp, fontWeight = FontWeight.ExtraBold, color = palette.onPrimary),
+                ScText("Filtrlar", 20f, FontWeight.ExtraBold, Sc.Ink, Modifier.weight(1f), letterSpacing = -0.3f)
+                ScSheetClose(onClose)
+            }
+
+            Column(
+                Modifier.weight(1f, fill = false)
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 22.dp)
+                    .padding(top = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(18.dp),
+            ) {
+                when (state.kind) {
+                    ListingKind.RENTAL -> RentalFilters(state.draft, palette, vm)
+                    ListingKind.SERVICE -> ServiceFilters(state.draft, palette, vm)
+                    ListingKind.JOB -> JobFilters(state.draft, palette, vm)
+                    ListingKind.TASK -> TaskFilters(state.draft, palette, vm)
+                    ListingKind.DISCOUNT -> Unit
+                }
+
+                PriceFilter(state.kind, state.draft, palette, vm)
+                Spacer(Modifier.height(2.dp))
+            }
+
+            Row(
+                Modifier.fillMaxWidth()
+                    .navigationBarsPadding()
+                    .padding(start = 22.dp, end = 22.dp, top = 12.dp, bottom = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(11.dp),
+            ) {
+                ScSoftButton("Tozalash", vm::resetDraft, Modifier.weight(1f))
+                ScGradientButton(
+                    "Qo'llash · ${state.previewCount}",
+                    onApply,
+                    Modifier.weight(1.6f),
+                    radius = 16.dp,
+                    fontSize = 15f,
                 )
             }
         }
@@ -317,15 +324,9 @@ private fun FilterSection(
 ) {
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(9.dp)) {
         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(
-                title,
-                style = TextStyle(fontFamily = AppFontFamily, fontSize = 14.sp, fontWeight = FontWeight.Black, color = palette.ink),
-            )
+            ScText(title, 13f, FontWeight.ExtraBold, Sc.Ink)
             if (subtitle != null) {
-                Text(
-                    subtitle,
-                    style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.sp, color = palette.inkFaint),
-                )
+                ScText(subtitle, 11.5f, FontWeight.Medium, Sc.Muted)
             }
         }
         content()

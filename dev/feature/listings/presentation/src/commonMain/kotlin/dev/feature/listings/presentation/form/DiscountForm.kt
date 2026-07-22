@@ -25,11 +25,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import dev.core.designsystem.components.AppFontFamily
-import dev.core.designsystem.components.GlassTextField
-import dev.core.designsystem.media.rememberImagePicker
-import dev.core.designsystem.theme.AppPalette
-import dev.core.designsystem.theme.appPalette
+import dev.core.uikit.components.AppFontFamily
+import dev.core.uikit.components.GlassTextField
+import dev.core.uikit.media.rememberImagePicker
+import dev.core.uikit.theme.AppPalette
+import dev.core.uikit.theme.appPalette
 import dev.feature.listings.domain.model.BusinessType
 import dev.feature.listings.domain.model.ListingCatalog
 import dev.feature.listings.domain.model.ListingField

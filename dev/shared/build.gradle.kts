@@ -22,7 +22,7 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             api(projects.dev.core.di)
-            implementation(projects.dev.core.designsystem)
+            implementation(projects.dev.core.uikit)
             implementation(projects.dev.core.data)
             // Mavzu (ThemeMode) + SettingsRepository — App() ildizida ishlatiladi.
             implementation(projects.dev.feature.settings.domain)

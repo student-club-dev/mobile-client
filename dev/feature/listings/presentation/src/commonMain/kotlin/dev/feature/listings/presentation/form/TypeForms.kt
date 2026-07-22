@@ -21,11 +21,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import dev.core.designsystem.components.AppFontFamily
-import dev.core.designsystem.components.AppIcons
-import dev.core.designsystem.components.OutlineButton
-import dev.core.designsystem.components.PrimaryButton
-import dev.core.designsystem.theme.AppPalette
+import dev.core.uikit.components.AppFontFamily
+import dev.core.uikit.components.AppIcons
+import dev.core.uikit.components.OutlineButton
+import dev.core.uikit.components.PrimaryButton
+import dev.core.uikit.components.scTopInset
+import dev.core.uikit.theme.AppPalette
 import dev.feature.listings.domain.model.ListingKind
 import dev.feature.listings.presentation.MessageBar
 import dev.feature.listings.presentation.PostListingUiState
@@ -74,8 +75,7 @@ fun ListingFormShell(
 ) {
     Column(Modifier.fillMaxSize()) {
         Column(
-            Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(top = 54.dp),
-            // Flat dizayn — bo'limlar orasi kengroq; yon padding har bo'lim ichida.
+            Modifier.weight(1f).verticalScroll(rememberScrollState()).scTopInset(),
             verticalArrangement = Arrangement.spacedBy(18.dp),
         ) {
             Row(
@@ -87,13 +87,22 @@ fun ListingFormShell(
                 Column {
                     Text(
                         if (state.editing) "E'lonni tahrirlash" else title,
-                        style = TextStyle(fontFamily = AppFontFamily, fontSize = 18.sp, fontWeight = FontWeight.Black, color = palette.ink),
+                        style = TextStyle(
+                            fontFamily = AppFontFamily,
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Black,
+                            color = palette.ink
+                        ),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
                     Text(
                         subtitle,
-                        style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.5f.sp, color = palette.inkFaint),
+                        style = TextStyle(
+                            fontFamily = AppFontFamily,
+                            fontSize = 11.5f.sp,
+                            color = palette.inkFaint
+                        ),
                     )
                 }
             }
@@ -117,7 +126,12 @@ fun ListingFormShell(
             if (state.errors.isNotEmpty()) {
                 Text(
                     "To'ldirilmagan ${state.errors.size} ta joy bor — yuqorida qizil bilan belgilandi.",
-                    style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.5f.sp, fontWeight = FontWeight.Bold, color = ErrorColor),
+                    style = TextStyle(
+                        fontFamily = AppFontFamily,
+                        fontSize = 11.5f.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = ErrorColor
+                    ),
                 )
             }
             Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) {

@@ -17,8 +17,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import coil3.compose.AsyncImage
-import dev.core.designsystem.components.AppFontFamily
-import dev.core.designsystem.theme.AppPalette
+import dev.core.uikit.components.AppFontFamily
+import dev.core.uikit.theme.Sc
 
 /**
  * Profil rasmi — uchta holat, shu tartibda:
@@ -31,7 +31,6 @@ fun ProfileAvatar(
     name: String,
     size: Dp,
     fontSize: TextUnit,
-    palette: AppPalette,
     avatarUrl: String? = null,
     localPreview: ImageBitmap? = null,
     modifier: Modifier = Modifier,
@@ -40,7 +39,7 @@ fun ProfileAvatar(
         modifier
             .size(size)
             .clip(CircleShape)
-            .background(palette.primary.copy(alpha = 0.14f)),
+            .background(Sc.TintBlue),
         contentAlignment = Alignment.Center,
     ) {
         when {
@@ -64,7 +63,7 @@ fun ProfileAvatar(
                     fontFamily = AppFontFamily,
                     fontSize = fontSize,
                     fontWeight = FontWeight.Black,
-                    color = palette.primary,
+                    color = Sc.Brand,
                 ),
             )
         }

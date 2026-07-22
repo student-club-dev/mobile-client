@@ -1,5 +1,6 @@
 package dev.feature.students.presentation
 
+import dev.core.uikit.components.scTopInset
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -15,7 +16,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -42,10 +42,15 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.feature.students.domain.model.FriendStatus
 import dev.feature.students.domain.model.Student
 import dev.feature.students.domain.model.StudentSort
-import dev.core.designsystem.components.AppFontFamily
-import dev.core.designsystem.components.AppIcons
-import dev.core.designsystem.theme.AppPalette
-import dev.core.designsystem.theme.appPalette
+import dev.core.uikit.components.AppFontFamily
+import dev.core.uikit.components.ScCircleButton
+import dev.core.uikit.components.ScHeader
+import dev.core.uikit.components.ScHeaderTitle
+import dev.core.uikit.components.ScIcons
+import dev.core.uikit.theme.Sc
+import dev.core.uikit.components.AppIcons
+import dev.core.uikit.theme.AppPalette
+import dev.core.uikit.theme.appPalette
 import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
@@ -60,20 +65,18 @@ fun StudentsScreen(onBack: () -> Unit = {}, vm: StudentsViewModel = koinViewMode
         return
     }
 
-    Column(Modifier.fillMaxSize()) {
-        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(top = 54.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(11.dp)) {
-                Box(
-                    Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(palette.glass)
-                        .border(1.dp, palette.border, RoundedCornerShape(12.dp))
-                        .clickable(onClick = onBack),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(AppIcons.ArrowLeft, "Orqaga", tint = palette.ink, modifier = Modifier.size(18.dp))
-                }
-                Text("Studentlar", style = TextStyle(fontFamily = AppFontFamily, fontSize = 24.sp, fontWeight = FontWeight.Black, color = palette.ink))
+    Column(Modifier.fillMaxSize().background(Sc.Bg)) {
+        ScHeader {
+            Row(
+                Modifier.fillMaxWidth().padding(top = 18.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(13.dp),
+            ) {
+                ScCircleButton(ScIcons.ChevronLeft, onBack, contentDescription = "Orqaga")
+                ScHeaderTitle("Studentlar", modifier = Modifier.weight(1f))
             }
-            Spacer(Modifier.height(14.dp))
+        }
+        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(top = 16.dp)) {
             Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 SortChip("Mening univer", state.sort == StudentSort.MY_UNIVERSITY, { vm.setSort(StudentSort.MY_UNIVERSITY) }, palette)
                 SortChip("Barcha univer", state.sort == StudentSort.ALL, { vm.setSort(StudentSort.ALL) }, palette)
@@ -175,7 +178,7 @@ private fun StudentProfile(student: Student, palette: AppPalette, onBack: () -> 
         Box(
             Modifier.fillMaxWidth()
                 .background(Brush.linearGradient(listOf(Color(0xFF6C47FF), Color(0xFF7C4DFF), Color(0xFF5B34D6))), RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp))
-                .padding(start = 20.dp, end = 20.dp, top = 54.dp, bottom = 26.dp),
+                .scTopInset().padding(start = 20.dp, end = 20.dp, bottom = 26.dp),
         ) {
             Column {
                 Box(Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(Color.White.copy(alpha = 0.18f)).clickable(onClick = onBack), contentAlignment = Alignment.Center) {

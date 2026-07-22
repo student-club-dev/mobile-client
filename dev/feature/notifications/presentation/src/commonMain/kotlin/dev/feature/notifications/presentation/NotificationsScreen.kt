@@ -1,7 +1,6 @@
 package dev.feature.notifications.presentation
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -14,132 +13,135 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.core.uikit.components.ScCircleButton
+import dev.core.uikit.components.ScHeader
+import dev.core.uikit.components.ScHeaderTitle
+import dev.core.uikit.components.ScIconTile
+import dev.core.uikit.components.ScIcons
+import dev.core.uikit.components.ScText
+import dev.core.uikit.components.scCard
+import dev.core.uikit.components.scStyle
+import dev.core.uikit.theme.Sc
 import dev.feature.notifications.domain.model.AppNotification
 import dev.feature.notifications.domain.model.NotificationType
-import dev.core.designsystem.components.AppFontFamily
-import dev.core.designsystem.components.AppIcons
-import dev.core.designsystem.theme.AppPalette
-import dev.core.designsystem.theme.appPalette
+import androidx.compose.material3.Text
 import org.koin.compose.viewmodel.koinViewModel
 
 /**
- * Bildirishnomalar ekrani (C1). Local DB'dan (`NotificationEntity`) real ro'yxat.
- * Bosilganda o'qilgan deb belgilanadi; "Hammasini o'qildi" — barchasini.
+ * Bildirishnomalar ekrani. Gradient topbar (aylana `‹` orqaga tugma) + rangli
+ * plitkali kartalar; o'qilmagan bildirishnomada o'ng chetda ko'k nuqta.
  */
 @Composable
 fun NotificationsScreen(onBack: () -> Unit, vm: NotificationsViewModel = koinViewModel()) {
-    val palette = appPalette
     val state by vm.state.collectAsStateWithLifecycle()
 
-    Column(Modifier.fillMaxSize()) {
-        // Header
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(top = 54.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(11.dp),
-        ) {
-            Box(
-                Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(palette.glass)
-                    .border(1.dp, palette.border, RoundedCornerShape(12.dp)).clickable(onClick = onBack),
-                contentAlignment = Alignment.Center,
-            ) { Icon(AppIcons.ArrowLeft, "Orqaga", tint = palette.ink, modifier = Modifier.size(18.dp)) }
-            Text("Bildirishnomalar", style = TextStyle(fontFamily = AppFontFamily, fontSize = 20.sp, fontWeight = FontWeight.Black, color = palette.ink), modifier = Modifier.weight(1f))
-            if (state.unreadCount > 0) {
-                Text(
-                    "Hammasini o'qildi",
-                    style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = palette.primary),
-                    modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable { vm.markAllRead() }.padding(horizontal = 6.dp, vertical = 4.dp),
-                )
+    Column(Modifier.fillMaxSize().background(Sc.Bg)) {
+        ScHeader(horizontalPadding = 18.dp) {
+            Row(
+                Modifier.fillMaxWidth().padding(top = 18.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(13.dp),
+            ) {
+                ScCircleButton(ScIcons.ChevronLeft, onBack, contentDescription = "Orqaga")
+                ScHeaderTitle("Bildirishnomalar", modifier = Modifier.weight(1f))
+                if (state.unreadCount > 0) {
+                    Text(
+                        "Hammasi o'qildi",
+                        style = scStyle(12.5f, FontWeight.Bold, Color.White),
+                        modifier = Modifier
+                            .background(Color.White.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
+                            .clickable { vm.markAllRead() }
+                            .padding(horizontal = 10.dp, vertical = 6.dp),
+                    )
+                }
             }
         }
-        Spacer(Modifier.height(14.dp))
 
         if (state.items.isEmpty()) {
-            EmptyNotifications(palette)
+            EmptyNotifications()
         } else {
             LazyColumn(
                 Modifier.fillMaxWidth().weight(1f),
-                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 24.dp),
-                verticalArrangement = Arrangement.spacedBy(9.dp),
+                contentPadding = PaddingValues(
+                    start = Sc.ScreenPadding, end = Sc.ScreenPadding, top = 20.dp, bottom = 24.dp,
+                ),
+                verticalArrangement = Arrangement.spacedBy(13.dp),
             ) {
-                items(state.items, key = { it.id }) { n ->
-                    NotificationRow(n, palette) { vm.markRead(n.id) }
-                }
+                items(state.items, key = { it.id }) { n -> NotificationCard(n) { vm.markRead(n.id) } }
             }
         }
     }
 }
 
 @Composable
-private fun NotificationRow(n: AppNotification, palette: AppPalette, onClick: () -> Unit) {
-    val (icon, accent) = n.type.iconAndAccent(palette)
+private fun NotificationCard(n: AppNotification, onClick: () -> Unit) {
+    val (icon, tint, accent) = n.type.visual()
     Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp))
-            .background(if (n.read) palette.glass else palette.primary.copy(alpha = 0.06f))
-            .border(1.dp, if (n.read) palette.border else palette.primary.copy(alpha = 0.30f), RoundedCornerShape(14.dp))
-            .clickable(onClick = onClick).padding(14.dp),
+        Modifier.fillMaxWidth().scCard(radius = 22.dp, onClick = onClick).padding(15.dp),
         verticalAlignment = Alignment.Top,
-        horizontalArrangement = Arrangement.spacedBy(11.dp),
+        horizontalArrangement = Arrangement.spacedBy(13.dp),
     ) {
-        Box(Modifier.size(38.dp).clip(RoundedCornerShape(11.dp)).background(accent.copy(alpha = 0.14f)), contentAlignment = Alignment.Center) {
-            Icon(icon, null, tint = accent, modifier = Modifier.size(18.dp))
+        ScIconTile(tint, size = 48.dp, radius = 15.dp) {
+            Icon(icon, null, tint = accent, modifier = Modifier.size(24.dp))
         }
         Column(Modifier.weight(1f)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(n.title, style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.5f.sp, fontWeight = FontWeight.ExtraBold, color = palette.ink), modifier = Modifier.weight(1f))
-                if (!n.read) {
-                    Box(Modifier.size(8.dp).clip(RoundedCornerShape(999.dp)).background(palette.primary))
-                }
-            }
-            Spacer(Modifier.height(2.dp))
-            Text(n.body, style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.sp, color = palette.inkMuted))
-            Spacer(Modifier.height(4.dp))
-            Text(n.timeLabel, style = TextStyle(fontFamily = AppFontFamily, fontSize = 10.5f.sp, fontWeight = FontWeight.Bold, color = palette.inkFaint))
+            ScText(n.title, 15.5f, FontWeight.ExtraBold, Sc.Ink, maxLines = 1)
+            Spacer(Modifier.height(3.dp))
+            ScText(n.body, 13f, FontWeight.Medium, Sc.InkSoft, lineHeight = 19f)
+            Spacer(Modifier.height(7.dp))
+            ScText(n.timeLabel, 12f, FontWeight.SemiBold, Sc.MutedLight)
+        }
+        if (!n.read) {
+            Box(
+                Modifier.padding(top = 6.dp).size(8.dp)
+                    .background(Sc.Brand, RoundedCornerShape(percent = 50)),
+            )
         }
     }
 }
 
 @Composable
-private fun EmptyNotifications(palette: AppPalette) {
+private fun EmptyNotifications() {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Box(
-                Modifier.size(72.dp).clip(RoundedCornerShape(22.dp)).background(palette.primary.copy(alpha = 0.12f)),
-                contentAlignment = Alignment.Center,
-            ) { Icon(AppIcons.Bell, null, tint = palette.primary, modifier = Modifier.size(34.dp)) }
-            Text("Hozircha bildirishnoma yo'q", style = TextStyle(fontFamily = AppFontFamily, fontSize = 17.sp, fontWeight = FontWeight.Black, color = palette.ink))
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            ScIconTile(Sc.TintBlue, size = 96.dp, radius = 30.dp) {
+                Icon(ScIcons.Bell, null, tint = Sc.Brand, modifier = Modifier.size(46.dp))
+            }
+            Spacer(Modifier.height(12.dp))
+            ScText("Hozircha bo'sh", 19f, FontWeight.ExtraBold, Sc.Ink)
             Text(
-                "Yangi elonlar, ish takliflari va xabarlar shu yerda ko'rinadi.",
-                style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.sp, color = palette.inkMuted, textAlign = TextAlign.Center),
+                "Yangi e'lonlar, ish takliflari va xabarlar shu yerda ko'rinadi.",
+                style = scStyle(14f, FontWeight.Medium, Sc.Muted, lineHeight = 21f)
+                    .copy(textAlign = TextAlign.Center),
                 modifier = Modifier.padding(horizontal = 40.dp),
             )
         }
     }
 }
 
-private fun NotificationType.iconAndAccent(palette: AppPalette): Pair<ImageVector, Color> = when (this) {
-    NotificationType.JOB -> AppIcons.Briefcase to Color(0xFF2563EB)
-    NotificationType.DISCOUNT -> AppIcons.Tag to Color(0xFFF97316)
-    NotificationType.AD -> AppIcons.FileText to Color(0xFF059669)
-    NotificationType.CHAT -> AppIcons.MessageSquare to palette.primary
-    NotificationType.SYSTEM -> AppIcons.Bell to Color(0xFFBE185D)
+/** Bildirishnoma turi → ikona, plitka foni va accent rangi (dizayn palitrasidan). */
+@Composable
+private fun NotificationType.visual(): Triple<ImageVector, Color, Color> = when (this) {
+    NotificationType.JOB -> Triple(ScIcons.Briefcase, Sc.TintBlue, Sc.Brand)
+    NotificationType.DISCOUNT -> Triple(ScIcons.DiscountTag, Sc.TintOrange, Sc.Orange)
+    NotificationType.AD -> Triple(ScIcons.FileText, Sc.TintGreenDeep, Sc.Success)
+    NotificationType.CHAT -> Triple(ScIcons.MessageLines, Sc.TintViolet, Sc.Violet)
+    NotificationType.SYSTEM -> Triple(ScIcons.Bell, Sc.TintPink, Sc.Pink)
 }

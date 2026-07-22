@@ -22,15 +22,15 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import dev.core.designsystem.components.AppFontFamily
-import dev.core.designsystem.components.AppScreenScaffold
-import dev.core.designsystem.components.BackButton
-import dev.core.designsystem.components.FieldLabel
-import dev.core.designsystem.components.GlassTextField
-import dev.core.designsystem.components.PrimaryButton
-import dev.core.designsystem.components.ScreenTitle
-import dev.core.designsystem.theme.AppPalette
-import dev.core.designsystem.theme.appPalette
+import dev.core.uikit.components.AppFontFamily
+import dev.core.uikit.components.AppScreenScaffold
+import dev.core.uikit.components.BackButton
+import dev.core.uikit.components.FieldLabel
+import dev.core.uikit.components.GlassTextField
+import dev.core.uikit.components.PrimaryButton
+import dev.core.uikit.components.ScreenTitle
+import dev.core.uikit.theme.AppPalette
+import dev.core.uikit.theme.appPalette
 
 // Biznes turlari — horizontal scroll qilinadi. Bir nechta ekran ishlatadi.
 internal val businessTypes = listOf(

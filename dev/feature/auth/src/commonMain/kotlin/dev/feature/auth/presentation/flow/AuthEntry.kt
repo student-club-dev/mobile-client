@@ -10,8 +10,8 @@ import androidx.compose.ui.Modifier
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import dev.core.designsystem.components.AppScreenScaffold
-import dev.core.designsystem.components.LogoTile
+import dev.core.uikit.components.AppScreenScaffold
+import dev.core.uikit.components.LogoTile
 import dev.feature.settings.domain.repository.SettingsRepository
 import dev.feature.auth.presentation.screens.RoleChoiceScreen
 import kotlinx.coroutines.flow.SharingStarted

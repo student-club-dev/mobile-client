@@ -1,5 +1,6 @@
 package dev.feature.business
 
+import dev.core.uikit.components.scTopInset
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -31,10 +32,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import dev.core.designsystem.components.AppFontFamily
-import dev.core.designsystem.components.AppIcons
-import dev.core.designsystem.theme.AppPalette
-import dev.core.designsystem.theme.appPalette
+import dev.core.uikit.components.AppFontFamily
+import dev.core.uikit.components.AppIcons
+import dev.core.uikit.theme.AppPalette
+import dev.core.uikit.theme.appPalette
 import dev.feature.profile.presentation.ProfileViewModel
 import org.koin.compose.viewmodel.koinViewModel
 
@@ -67,7 +68,7 @@ fun BusinessAccountScreen(
                     Brush.linearGradient(listOf(Color(0xFF6C47FF), Color(0xFF7C4DFF), Color(0xFF5B34D6))),
                     RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp),
                 )
-                .padding(start = 20.dp, end = 20.dp, top = 54.dp, bottom = 26.dp),
+                .scTopInset().padding(start = 20.dp, end = 20.dp, bottom = 26.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Box(
@@ -179,6 +180,7 @@ fun BusinessAccountScreen(
 }
 
 /** Biznes turiga mos ikonka (mavjud ikonkalar ichidan). */
+@Composable
 private fun typeIcon(type: String): ImageVector = when {
     type.contains("O'quv", ignoreCase = true) -> AppIcons.GraduationCap
     type.contains("Kino", ignoreCase = true) -> AppIcons.Star

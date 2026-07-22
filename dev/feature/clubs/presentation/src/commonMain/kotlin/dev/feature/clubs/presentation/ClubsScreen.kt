@@ -32,10 +32,16 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.feature.clubs.domain.model.Club
-import dev.core.designsystem.components.AppFontFamily
-import dev.core.designsystem.components.AppIcons
-import dev.core.designsystem.theme.AppPalette
-import dev.core.designsystem.theme.appPalette
+import dev.core.uikit.components.AppFontFamily
+import dev.core.uikit.components.ScCircleButton
+import dev.core.uikit.components.ScHeader
+import dev.core.uikit.components.ScHeaderSubtitle
+import dev.core.uikit.components.ScHeaderTitle
+import dev.core.uikit.components.ScIcons
+import dev.core.uikit.theme.Sc
+import dev.core.uikit.components.AppIcons
+import dev.core.uikit.theme.AppPalette
+import dev.core.uikit.theme.appPalette
 import org.koin.compose.viewmodel.koinViewModel
 
 private val clubAccents = listOf(
@@ -50,25 +56,24 @@ fun ClubsScreen(onBack: () -> Unit, vm: ClubsViewModel = koinViewModel()) {
     val palette = appPalette
     val state by vm.state.collectAsStateWithLifecycle()
 
-    Column(Modifier.fillMaxSize()) {
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(top = 54.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(11.dp),
-        ) {
-            Box(
-                Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(palette.glass)
-                    .border(1.dp, palette.border, RoundedCornerShape(12.dp)).clickable(onClick = onBack),
-                contentAlignment = Alignment.Center,
-            ) { Icon(AppIcons.ArrowLeft, "Orqaga", tint = palette.ink, modifier = Modifier.size(18.dp)) }
-            Column(Modifier.weight(1f)) {
-                Text("Klublar", style = TextStyle(fontFamily = AppFontFamily, fontSize = 22.sp, fontWeight = FontWeight.Black, color = palette.ink))
-                if (state.joinedCount > 0) {
-                    Text("${state.joinedCount} ta klubga a'zosiz", style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.5f.sp, color = palette.inkFaint))
+    Column(Modifier.fillMaxSize().background(Sc.Bg)) {
+        ScHeader {
+            Row(
+                Modifier.fillMaxWidth().padding(top = 18.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(13.dp),
+            ) {
+                ScCircleButton(ScIcons.ChevronLeft, onBack, contentDescription = "Orqaga")
+                Column(Modifier.weight(1f)) {
+                    ScHeaderTitle("Klublar")
+                    if (state.joinedCount > 0) {
+                        Spacer(Modifier.height(3.dp))
+                        ScHeaderSubtitle("${state.joinedCount} ta klubga a'zosiz")
+                    }
                 }
             }
         }
-        Spacer(Modifier.height(14.dp))
+        Spacer(Modifier.height(18.dp))
 
         LazyColumn(
             Modifier.fillMaxWidth().weight(1f),
