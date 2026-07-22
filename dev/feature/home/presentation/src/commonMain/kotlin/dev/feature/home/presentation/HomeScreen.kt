@@ -1,12 +1,14 @@
 package dev.feature.home.presentation
 
+import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -15,6 +17,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -24,32 +28,52 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.lerp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import dev.feature.clubs.domain.model.Club
+import dev.core.uikit.components.ScGlyph
+import dev.core.uikit.components.ScGradientButton
+import dev.core.uikit.components.ScHeader
+import dev.core.uikit.components.ScIconTile
+import dev.core.uikit.components.ScIcons
+import dev.core.uikit.components.ScMonogramTile
+import dev.core.uikit.components.ScSectionHeader
+import dev.core.uikit.components.ScSoftButton
+import dev.core.uikit.components.ScText
+import dev.core.uikit.components.scCard
+import dev.core.uikit.components.scSoftShadow
+import dev.core.uikit.components.scStyle
+import dev.core.uikit.theme.Sc
 import dev.core.domain.model.DiscountCategory
 import dev.core.domain.model.DiscountOffer
 import dev.core.domain.model.DiscountTag
-import dev.feature.students.domain.model.FriendStatus
+import dev.feature.clubs.domain.model.Club
 import dev.feature.listings.domain.model.Listing
 import dev.feature.listings.domain.model.formatSum
+import dev.feature.students.domain.model.FriendStatus
 import dev.feature.students.domain.model.Student
-import dev.core.designsystem.components.AppFontFamily
-import dev.core.designsystem.components.AppIcons
-import dev.core.designsystem.theme.AppPalette
-import dev.core.designsystem.theme.appPalette
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import org.koin.compose.viewmodel.koinViewModel
+import androidx.compose.runtime.ReadOnlyComposable
+
+/** Dizayndagi `cubic-bezier(.4,0,.2,1)` — topbar kichrayishi shu egri bilan. */
+private val ScEasing = CubicBezierEasing(0.4f, 0f, 0.2f, 1f)
+
+/** Shu masofadan ortiq scroll qilinganda topbar siqiladi (maketda `scrollTop > 36`). */
+private val CondenseThreshold = 36.dp
 
 @Composable
 fun HomeScreen(
@@ -65,106 +89,368 @@ fun HomeScreen(
     onOpenStudents: () -> Unit = {},
     vm: HomeViewModel = koinViewModel(),
 ) {
-    val palette = appPalette
     val state by vm.state.collectAsStateWithLifecycle()
+    val scroll = rememberScrollState()
+    // `scroll.value` — piksel, chegara esa dp: to'g'ridan-to'g'ri solishtirsak zich
+    // ekranlarda topbar 12dp scroll'dayoq siqilib ketardi.
+    val thresholdPx = with(LocalDensity.current) { CondenseThreshold.roundToPx() }
+    val condensed = scroll.value > thresholdPx
+    val p by animateFloatAsState(
+        if (condensed) 1f else 0f, tween(300, easing = ScEasing), label = "condense"
+    )
 
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-        HomeHeader(state, palette, onOpenProfile, onOpenChat, onOpenNotifications)
-        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(top = 18.dp)) {
-            DiscountsSection(state.categories, state.featured, palette, onOpenDiscounts)
-            Spacer(Modifier.height(24.dp))
-            TasksSection(state.tasks, palette, onOpenTasks, onOpenListing)
-            Spacer(Modifier.height(24.dp))
-            ClubsSection(state.clubs, palette, onOpenClubs)
-            Spacer(Modifier.height(24.dp))
-            RentalsSection(state.rentals, palette, onOpenRentals, onOpenListing)
-            Spacer(Modifier.height(24.dp))
-            JobsSection(state.jobs, palette, onOpenJobs, onOpenListing)
-            Spacer(Modifier.height(24.dp))
-            StudentsSection(state.students, palette, onOpenStudents) { vm.toggleFriend(it) }
-            Spacer(Modifier.height(110.dp)) // pastki navigatsiya uchun joy
+    Column(Modifier.fillMaxSize().background(Sc.Bg)) {
+        HomeHeader(state, p, onOpenProfile, onOpenChat, onOpenNotifications)
+        Column(
+            Modifier.fillMaxWidth().weight(1f).verticalScroll(scroll).padding(top = 22.dp),
+            verticalArrangement = Arrangement.spacedBy(26.dp),
+        ) {
+            ForYouSection(state.categories, state.featured, onOpenDiscounts)
+            TasksSection(state.tasks, onOpenTasks, onOpenListing)
+            ClubsSection(state.clubs, onOpenClubs)
+            RentalsSection(state.rentals, onOpenRentals, onOpenListing)
+            JobsSection(state.jobs, onOpenJobs, onOpenListing)
+            StudentsSection(state.students, onOpenStudents) { vm.toggleFriend(it) }
+            // Pastki navigatsiya + FAB uchun joy.
+            Spacer(Modifier.height(96.dp))
         }
     }
 }
 
 // ---------------------------------------------------------------------------
-// Header
+// Topbar — scroll'da kichrayadi
 // ---------------------------------------------------------------------------
+
+/**
+ * Gradient topbar. [p] — siqilish darajasi (0 = to'liq, 1 = siqilgan):
+ * salomlashish, universitet chipi va chat tugmasi yo'qoladi, avatar 54→40 ga
+ * kichrayadi, ism 20→16 sp bo'lib markazga suriladi.
+ */
 @Composable
-private fun HomeHeader(state: HomeUiState, palette: AppPalette, onOpenProfile: () -> Unit, onOpenChat: () -> Unit, onOpenNotifications: () -> Unit) {
-    val gradient = Brush.linearGradient(listOf(Color(0xFF6C47FF), Color(0xFF7C4DFF), Color(0xFF5B34D6)))
-    Box(
-        Modifier.fillMaxWidth()
-            .background(gradient, RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp))
-            .padding(start = 20.dp, end = 20.dp, top = 54.dp, bottom = 24.dp),
+private fun HomeHeader(
+    state: HomeUiState,
+    p: Float,
+    onOpenProfile: () -> Unit,
+    onOpenChat: () -> Unit,
+    onOpenNotifications: () -> Unit,
+) {
+    val fade = 1f - p
+    ScHeader(
+        bottomRadius = lerp(36.dp, 26.dp, p),
+        bottomPadding = lerp(28.dp, 12.dp, p),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            Modifier.fillMaxWidth().padding(top = lerp(22.dp, 6.dp, p)),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(13.dp),
+        ) {
+            val avatarSize = lerp(54.dp, 40.dp, p)
             Box(
-                Modifier.size(46.dp).clip(RoundedCornerShape(999.dp)).background(Color.White.copy(alpha = 0.20f)).clickable(onClick = onOpenProfile),
+                Modifier.size(avatarSize).clip(RoundedCornerShape(lerp(20.dp, 14.dp, p)))
+                    .background(Color.White.copy(alpha = 0.22f)).clickable(onClick = onOpenProfile),
                 contentAlignment = Alignment.Center,
             ) {
-                Text(
+                ScText(
                     state.userName.take(1).uppercase(),
-                    style = TextStyle(fontFamily = AppFontFamily, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = Color.White),
+                    size = 22f - 5f * p,
+                    weight = FontWeight.ExtraBold,
+                    color = Color.White,
                 )
             }
-            Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
-                Text("Assalomu alaykum 👋", style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.5f.sp, color = Color.White.copy(alpha = 0.85f)))
-                Spacer(Modifier.height(2.dp))
-                Text(state.userName, style = TextStyle(fontFamily = AppFontFamily, fontSize = 18.sp, fontWeight = FontWeight.Black, color = Color.White), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                val badge = listOfNotNull(state.universityMonogram, state.courseLabel).joinToString(" · ")
+                // "Assalomu alaykum 👋" — siqilganda balandligi 0 ga tushadi.
+                CollapsingRow(p, fullHeight = 18.dp) {
+                    ScText(
+                        "Assalomu alaykum 👋",
+                        13f,
+                        FontWeight.Medium,
+                        Color.White.copy(alpha = 0.85f),
+                        maxLines = 1
+                    )
+                }
+                // Siqilganda ism markazga suriladi (dizayndagi `.cond .sc-name`).
+                Text(
+                    state.userName,
+                    style = scStyle(
+                        20f - 4f * p,
+                        FontWeight.ExtraBold,
+                        Color.White,
+                        lineHeight = 26f,
+                        letterSpacing = -0.3f
+                    ).copy(textAlign = if (p > 0.5f) TextAlign.Center else TextAlign.Start),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
+                )
+                val badge =
+                    listOfNotNull(state.universityMonogram, state.courseLabel).joinToString(" · ")
                 if (badge.isNotBlank()) {
-                    Spacer(Modifier.height(6.dp))
-                    Row(
-                        Modifier.clip(RoundedCornerShape(999.dp)).background(Color.White.copy(alpha = 0.18f)).padding(horizontal = 9.dp, vertical = 3.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Icon(AppIcons.GraduationCap, null, tint = Color.White, modifier = Modifier.size(12.dp))
-                        Spacer(Modifier.width(5.dp))
-                        Text(badge, style = TextStyle(fontFamily = AppFontFamily, fontSize = 10.5f.sp, fontWeight = FontWeight.Bold, color = Color.White))
+                    CollapsingRow(p, fullHeight = 30.dp) {
+                        Row(
+                            Modifier.padding(top = 7.dp).clip(RoundedCornerShape(20.dp))
+                                .background(Color.White.copy(alpha = 0.2f))
+                                .padding(horizontal = 11.dp, vertical = 3.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(5.dp),
+                        ) {
+                            Icon(
+                                ScIcons.CapBadge,
+                                null,
+                                tint = Color.White,
+                                modifier = Modifier.size(13.dp)
+                            )
+                            ScText(badge, 12f, FontWeight.Bold, Color.White, maxLines = 1)
+                        }
                     }
                 }
             }
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Box(
-                    Modifier.size(40.dp).clip(RoundedCornerShape(13.dp)).background(Color.White.copy(alpha = 0.18f)).clickable(onClick = onOpenChat),
-                    contentAlignment = Alignment.Center,
-                ) { Icon(AppIcons.MessageSquare, "Xabarlar", tint = Color.White, modifier = Modifier.size(18.dp)) }
-                Box(
-                    Modifier.size(40.dp).clip(RoundedCornerShape(13.dp)).background(Color.White.copy(alpha = 0.18f)).clickable(onClick = onOpenNotifications),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(AppIcons.Bell, "Bildirishnomalar", tint = Color.White, modifier = Modifier.size(18.dp))
-                    if (state.hasUnreadNotifications) {
-                        Box(Modifier.align(Alignment.TopEnd).padding(10.dp).size(7.dp).clip(RoundedCornerShape(999.dp)).background(Color(0xFFFF5A5A)))
-                    }
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(9.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Chat tugmasi siqilganda butunlay yo'qoladi (eni 0 ga tushadi).
+                Box(Modifier.width(lerp(42.dp, 0.dp, p)).clipToBounds().alpha(fade)) {
+                    HeaderCircleButton(ScIcons.ChatRound, "Xabarlar", onOpenChat)
                 }
+                HeaderCircleButton(
+                    ScIcons.Bell,
+                    "Bildirishnomalar",
+                    onOpenNotifications,
+                    badge = state.hasUnreadNotifications
+                )
+            }
+        }
+    }
+}
+
+/** Gradient topbar ichidagi oq aylana tugma (soyasi topbar gradientida ko'rinmaydi). */
+@Composable
+private fun HeaderCircleButton(
+    icon: ImageVector, label: String, onClick: () -> Unit, badge: Boolean = false
+) {
+    val shape = RoundedCornerShape(percent = 50)
+    Box(
+        Modifier.size(42.dp).scSoftShadow(6.dp, shape).clip(shape).background(Color.White)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(icon, label, tint = Sc.BrandDark, modifier = Modifier.size(20.dp))
+        if (badge) {
+            Box(
+                Modifier.align(Alignment.TopEnd).padding(top = 7.dp, end = 8.dp).size(8.dp)
+                    .background(Sc.Danger, shape),
+            )
+        }
+    }
+}
+
+/** Siqilganda balandligi va shaffofligi bilan yo'qoladigan blok. */
+@Composable
+private fun CollapsingRow(p: Float, fullHeight: Dp, content: @Composable () -> Unit) {
+    Box(
+        Modifier.height(lerp(fullHeight, 0.dp, p)).clipToBounds().alpha(1f - p),
+        contentAlignment = Alignment.CenterStart,
+    ) { content() }
+}
+
+// ---------------------------------------------------------------------------
+// Umumiy o'ramlar
+// ---------------------------------------------------------------------------
+
+/** Ekran chetigacha siljiydigan gorizontal lenta — kartalar chetda kesilmaydi. */
+@Composable
+private fun <T> EdgeRow(items: List<T>, spacing: Dp = 13.dp, item: @Composable (Int, T) -> Unit) {
+    LazyRow(
+        Modifier.fillMaxWidth(),
+        contentPadding = PaddingValues(horizontal = Sc.ScreenPadding),
+        horizontalArrangement = Arrangement.spacedBy(spacing),
+    ) {
+        itemsIndexed(items) { index, value -> item(index, value) }
+    }
+}
+
+@Composable
+private fun PaddedHeader(
+    title: String,
+    subtitle: String? = null,
+    action: String? = "Barchasi",
+    actionIcon: ImageVector? = null,
+    onAction: (() -> Unit)? = null,
+) {
+    ScSectionHeader(
+        title,
+        Modifier.padding(horizontal = Sc.ScreenPadding),
+        subtitle = subtitle,
+        action = action,
+        actionIcon = actionIcon,
+        onAction = onAction,
+    )
+}
+
+// ---------------------------------------------------------------------------
+// Siz uchun — kategoriya chiplari + promo karta
+// ---------------------------------------------------------------------------
+
+/** Kategoriya ikonasi va uning tint foni. */
+private data class CategoryVisual(val icon: ImageVector, val tint: Color, val accent: Color)
+
+@Composable
+private fun categoryVisual(category: DiscountCategory): CategoryVisual {
+    val key = (category.id + " " + category.name).lowercase()
+    return when {
+        "game" in key || "oyin" in key -> CategoryVisual(ScIcons.Gamepad, Sc.TintBlue, Sc.Brand)
+        "kafe" in key || "restoran" in key || "cafe" in key -> CategoryVisual(
+            ScIcons.Coffee, Sc.TintOrange, Sc.Orange
+        )
+
+        "oziq" in key || "ovqat" in key || "food" in key -> CategoryVisual(
+            ScIcons.Cart, Sc.TintGreen, Sc.Success
+        )
+
+        "kiyim" in key -> CategoryVisual(ScIcons.Cart, Sc.TintViolet, Sc.Violet)
+        "kitob" in key || "ta'lim" in key || "talim" in key -> CategoryVisual(
+            ScIcons.FileText, Sc.TintPink, Sc.Pink
+        )
+
+        else -> CategoryVisual(ScIcons.Cart, Sc.TintAmber, Sc.Amber)
+    }
+}
+
+@Composable
+private fun ForYouSection(
+    categories: List<DiscountCategory>,
+    featured: DiscountOffer?,
+    onSeeAll: () -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        PaddedHeader("Siz uchun", onAction = onSeeAll)
+        if (categories.isNotEmpty()) {
+            EdgeRow(categories, spacing = 11.dp) { _, category -> CategoryChip(category, onSeeAll) }
+        }
+        if (featured != null) {
+            Box(Modifier.padding(horizontal = Sc.ScreenPadding)) { PromoCard(featured, onSeeAll) }
+        }
+    }
+}
+
+@Composable
+private fun CategoryChip(category: DiscountCategory, onClick: () -> Unit) {
+    val visual = categoryVisual(category)
+    Row(
+        Modifier.scCard(radius = 20.dp, elevation = 4.dp, onClick = onClick)
+            .padding(horizontal = 15.dp, vertical = 11.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(9.dp),
+    ) {
+        ScIconTile(visual.tint, size = 30.dp, radius = 12.dp) {
+            Icon(visual.icon, null, tint = visual.accent, modifier = Modifier.size(17.dp))
+        }
+        ScText(category.name, 14f, FontWeight.Bold, Sc.Ink, maxLines = 1)
+    }
+}
+
+@Composable
+private fun PromoCard(offer: DiscountOffer, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().scCard(radius = 26.dp, elevation = 10.dp, onClick = onClick)
+            .padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        Box(
+            Modifier.size(62.dp).clip(RoundedCornerShape(22.dp)).background(Sc.tileBrush),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(ScIcons.Gamepad, null, tint = Color.White, modifier = Modifier.size(32.dp))
+        }
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            val title =
+                if (offer.isDiscount) "${offer.merchant} — ${offer.discountPercent}% chegirma" else offer.merchant
+            ScText(title, 15.5f, FontWeight.ExtraBold, Sc.Ink, letterSpacing = -0.2f, maxLines = 1)
+            val tag = if (offer.tag == DiscountTag.STUDENT_ID) "Talaba ID bilan" else "Promokod"
+            ScText(
+                listOfNotNull(tag, offer.expiry).joinToString(" · "),
+                12.5f,
+                FontWeight.Medium,
+                Sc.Muted,
+                maxLines = 1
+            )
+        }
+        if (offer.isDiscount && offer.discountPercent > 0) {
+            Box(
+                Modifier.clip(RoundedCornerShape(16.dp)).background(Sc.buttonBrush)
+                    .padding(horizontal = 13.dp, vertical = 9.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                ScText(
+                    "−${offer.discountPercent}%",
+                    14f,
+                    FontWeight.ExtraBold,
+                    Color.White,
+                    maxLines = 1
+                )
             }
         }
     }
 }
 
 // ---------------------------------------------------------------------------
-// Umumiy bo'lim sarlavhasi
+// Yordam e'lonlari
 // ---------------------------------------------------------------------------
+
 @Composable
-private fun SectionHeader(title: String, action: String? = null, subtitle: String? = null, palette: AppPalette, onAction: (() -> Unit)? = null) {
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Column(Modifier.weight(1f)) {
-            Text(title, style = TextStyle(fontFamily = AppFontFamily, fontSize = 17.sp, fontWeight = FontWeight.Black, color = palette.ink))
-            if (subtitle != null) {
-                Text(subtitle, style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.5f.sp, color = palette.inkFaint))
-            }
+private fun TasksSection(tasks: List<Listing>, onSeeAll: () -> Unit, onOpen: (String) -> Unit) {
+    if (tasks.isEmpty()) return
+    Column(verticalArrangement = Arrangement.spacedBy(13.dp)) {
+        PaddedHeader(
+            "Yordam e'lonlari", "Referat, masala, qo'lyozma va IT ishlari", onAction = onSeeAll
+        )
+        Column(
+            Modifier.padding(horizontal = Sc.ScreenPadding),
+            verticalArrangement = Arrangement.spacedBy(11.dp),
+        ) {
+            tasks.take(3).forEach { TaskCard(it, onOpen) }
         }
-        if (action != null) {
+    }
+}
+
+@Composable
+private fun TaskCard(listing: Listing, onOpen: (String) -> Unit) {
+    val book = ScIcons.Book
+    Row(
+        Modifier.fillMaxWidth().scCard(radius = 24.dp, onClick = { onOpen(listing.id) })
+            .padding(15.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(13.dp),
+    ) {
+        ScIconTile(Sc.TintPink, size = 52.dp, radius = 18.dp) { ScGlyph(book, 26.dp) }
+        Column(Modifier.weight(1f)) {
             Row(
-                Modifier.then(if (onAction != null) Modifier.clip(RoundedCornerShape(8.dp)).clickable(onClick = onAction).padding(horizontal = 4.dp, vertical = 2.dp) else Modifier),
-                verticalAlignment = Alignment.CenterVertically,
+                verticalAlignment = Alignment.Top,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text(action, style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = palette.primary))
-                Icon(AppIcons.ChevronRight, null, tint = palette.primary, modifier = Modifier.size(15.dp))
+                ScText(
+                    listing.title,
+                    15.5f,
+                    FontWeight.ExtraBold,
+                    Sc.Ink,
+                    Modifier.weight(1f),
+                    maxLines = 1
+                )
+                deadlineLabel(listing.taskDetails?.deadline)?.let { deadline ->
+                    Box(
+                        Modifier.clip(RoundedCornerShape(10.dp)).background(Sc.TintPink)
+                            .padding(horizontal = 9.dp, vertical = 4.dp),
+                    ) { ScText(deadline, 11f, FontWeight.Bold, Sc.PinkDeep, maxLines = 1) }
+                }
             }
+            val summary = listing.taskDetails?.summary().orEmpty()
+            if (summary.isNotBlank()) {
+                Spacer(Modifier.height(3.dp))
+                ScText(summary, 12.5f, FontWeight.Medium, Sc.Muted, maxLines = 1)
+            }
+            Spacer(Modifier.height(7.dp))
+            ScText(listing.priceLabel(), 14.5f, FontWeight.ExtraBold, Sc.Success, maxLines = 1)
         }
     }
 }
@@ -172,108 +458,216 @@ private fun SectionHeader(title: String, action: String? = null, subtitle: Strin
 // ---------------------------------------------------------------------------
 // Klublar
 // ---------------------------------------------------------------------------
-private val homeClubAccents = listOf(
-    Color(0xFF6C47FF), Color(0xFF2563EB), Color(0xFF059669),
-    Color(0xFFD97706), Color(0xFFBE185D), Color(0xFF0EA5E9),
-)
-private val homeClubEmojis = listOf("💻", "🗣️", "⚽", "🤝", "🎨", "🌍", "🎬", "📚")
+
+/** Klub kartalari dizaynda navbat bilan ko'k / binafsha / yashil bo'ladi. */
+@Composable
+private fun clubVisual(index: Int): Triple<Color, Color, ImageVector> = when (index.mod(3)) {
+    0 -> Triple(Sc.TintBlue, Sc.Brand, ScIcons.Laptop)
+    1 -> Triple(Sc.TintViolet, Sc.Violet, ScIcons.MessageLines)
+    else -> Triple(Sc.TintGreen, Sc.Success, ScIcons.Medal)
+}
 
 @Composable
-private fun ClubsSection(clubs: List<Club>, palette: AppPalette, onOpenClubs: () -> Unit) {
+private fun ClubsSection(clubs: List<Club>, onOpenClubs: () -> Unit) {
     if (clubs.isEmpty()) return
-    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable(onClick = onOpenClubs), verticalAlignment = Alignment.CenterVertically) {
-        Text("Klublar", style = TextStyle(fontFamily = AppFontFamily, fontSize = 17.sp, fontWeight = FontWeight.Black, color = palette.ink), modifier = Modifier.weight(1f))
-        Text("Barchasi", style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = palette.primary))
-        Icon(AppIcons.ChevronRight, null, tint = palette.primary, modifier = Modifier.size(15.dp))
-    }
-    Spacer(Modifier.height(12.dp))
-    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        clubs.take(6).forEach { club ->
-            val idx = ((club.id - 1).toInt()).mod(homeClubAccents.size)
-            val accent = homeClubAccents[idx]
-            val emoji = homeClubEmojis[((club.id - 1).toInt()).mod(homeClubEmojis.size)]
+    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        PaddedHeader("Klublar", onAction = onOpenClubs)
+        EdgeRow(clubs.take(6), spacing = 12.dp) { _, club ->
+            val (tint, accent, icon) = clubVisual((club.id - 1).toInt())
             Column(
-                Modifier.width(120.dp).clip(RoundedCornerShape(16.dp)).background(palette.glass).border(1.dp, palette.border, RoundedCornerShape(16.dp)).clickable(onClick = onOpenClubs).padding(12.dp),
-                horizontalAlignment = Alignment.Start,
+                Modifier.width(138.dp).scCard(radius = 24.dp, onClick = onOpenClubs).padding(15.dp),
             ) {
-                Box(Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(accent.copy(alpha = 0.14f)), contentAlignment = Alignment.Center) {
-                    Text(emoji, style = TextStyle(fontSize = 19.sp))
+                ScIconTile(tint, size = 48.dp, radius = 17.dp) {
+                    Icon(icon, null, tint = accent, modifier = Modifier.size(24.dp))
                 }
-                Spacer(Modifier.height(9.dp))
-                Text(club.name, style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.5f.sp, fontWeight = FontWeight.Black, color = palette.ink), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Spacer(Modifier.height(3.dp))
-                Text("${club.membersCount} a'zo", style = TextStyle(fontFamily = AppFontFamily, fontSize = 10.5f.sp, fontWeight = FontWeight.Bold, color = if (club.joined) accent else palette.inkFaint))
+                Spacer(Modifier.height(14.dp))
+                ScText(club.name, 15.5f, FontWeight.ExtraBold, Sc.Ink, maxLines = 1)
+                Spacer(Modifier.height(4.dp))
+                ScText("${club.membersCount} a'zo", 13f, FontWeight.Bold, accent, maxLines = 1)
             }
         }
     }
 }
 
 // ---------------------------------------------------------------------------
-// Fanlardan yordam — bir martalik topshiriqlar
+// Ijara kvartiralar
 // ---------------------------------------------------------------------------
-@Composable
-private fun TasksSection(
-    tasks: List<Listing>,
-    palette: AppPalette,
-    onSeeAll: () -> Unit,
-    onOpenListing: (String) -> Unit,
-) {
-    if (tasks.isEmpty()) return
-    SectionHeader("Yordam e'lonlari", action = "Barchasi", subtitle = "Referat, masala, qo'lyozma va IT ishlari", palette = palette, onAction = onSeeAll)
-    Spacer(Modifier.height(12.dp))
-    Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
-        tasks.take(3).forEach { TaskRow(it, palette, onOpenListing) }
-    }
-}
 
 @Composable
-private fun TaskRow(listing: Listing, palette: AppPalette, onOpenListing: (String) -> Unit) {
-    val task = listing.taskDetails
-    val accent = Color(listing.accent)
-    Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(palette.glass)
-            .border(1.dp, palette.border, RoundedCornerShape(16.dp))
-            .clickable { onOpenListing(listing.id) }
-            .padding(12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(11.dp),
-    ) {
-        Box(
-            Modifier.size(42.dp).clip(RoundedCornerShape(12.dp)).background(accent.copy(alpha = 0.12f)),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(listing.emoji, style = TextStyle(fontSize = 19.sp))
-        }
-        Column(Modifier.weight(1f)) {
-            Text(listing.title, style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.5f.sp, fontWeight = FontWeight.ExtraBold, color = palette.ink), maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Spacer(Modifier.height(2.dp))
-            // "Referat · 20 bet · Onlayn"
-            val summary = task?.summary().orEmpty()
-            if (summary.isNotBlank()) {
-                Text(summary, style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.sp, color = palette.inkFaint), maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
-            Spacer(Modifier.height(4.dp))
-            Text(listing.taskPriceLabel(), style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.5f.sp, fontWeight = FontWeight.Bold, color = palette.successDeep))
-        }
-        // Muddat — bajaruvchi uchun eng muhim ma'lumot, shuning uchun o'ng chekkada ajratilgan.
-        deadlineLabel(task?.deadline)?.let { deadline ->
-            Box(
-                Modifier.clip(RoundedCornerShape(8.dp)).background(accent.copy(alpha = 0.12f))
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
+private fun RentalsSection(rentals: List<Listing>, onSeeAll: () -> Unit, onOpen: (String) -> Unit) {
+    if (rentals.isEmpty()) return
+    val house = ScIcons.HouseFilled
+    Column(verticalArrangement = Arrangement.spacedBy(13.dp)) {
+        PaddedHeader("Ijara kvartiralar", "Sherik izlayotgan uylar", onAction = onSeeAll)
+        EdgeRow(rentals.take(6)) { _, listing ->
+            Column(
+                Modifier.width(250.dp).scCard(radius = 26.dp, onClick = { onOpen(listing.id) })
+                    .padding(16.dp),
             ) {
-                Text(deadline, style = TextStyle(fontFamily = AppFontFamily, fontSize = 10.5f.sp, fontWeight = FontWeight.ExtraBold, color = accent))
+                ScIconTile(Sc.TintOrange, size = 50.dp, radius = 18.dp) { ScGlyph(house, 26.dp) }
+                Spacer(Modifier.height(14.dp))
+                ScText(listing.title, 16f, FontWeight.ExtraBold, Sc.Ink, maxLines = 1)
+                val meta = listing.rentalDetails?.summary()?.takeIf { it.isNotBlank() }
+                    ?: listing.branches.firstOrNull()?.address.orEmpty()
+                if (meta.isNotBlank()) {
+                    Spacer(Modifier.height(5.dp))
+                    ScText(meta, 12.5f, FontWeight.Medium, Sc.Muted, lineHeight = 19f, maxLines = 2)
+                }
+                Spacer(Modifier.height(10.dp))
+                ScText(listing.rentLabel(), 15f, FontWeight.ExtraBold, Sc.Success, maxLines = 1)
             }
         }
     }
 }
 
-/** "150 000 so'm" yoki "Kelishilgan". */
-private fun Listing.taskPriceLabel(): String =
+// ---------------------------------------------------------------------------
+// Ish e'lonlari
+// ---------------------------------------------------------------------------
+
+@Composable
+private fun JobsSection(jobs: List<Listing>, onSeeAll: () -> Unit, onOpen: (String) -> Unit) {
+    if (jobs.isEmpty()) return
+    Column(verticalArrangement = Arrangement.spacedBy(13.dp)) {
+        PaddedHeader("Ish e'lonlari", "Kunlik va doimiy ishlar", onAction = onSeeAll)
+        Column(
+            Modifier.padding(horizontal = Sc.ScreenPadding),
+            verticalArrangement = Arrangement.spacedBy(11.dp),
+        ) {
+            jobs.take(3).forEach { listing ->
+                Row(
+                    Modifier.fillMaxWidth().scCard(radius = 24.dp, onClick = { onOpen(listing.id) })
+                        .padding(15.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(13.dp),
+                ) {
+                    ScIconTile(Sc.TintBlue, size = 52.dp, radius = 18.dp) {
+                        Icon(
+                            ScIcons.Briefcase,
+                            null,
+                            tint = Sc.Brand,
+                            modifier = Modifier.size(26.dp)
+                        )
+                    }
+                    Column(Modifier.weight(1f)) {
+                        ScText(listing.title, 15.5f, FontWeight.ExtraBold, Sc.Ink, maxLines = 1)
+                        val meta = listOfNotNull(
+                            listing.branches.firstOrNull()?.address,
+                            listing.jobDetails?.companyName?.takeIf { it.isNotBlank() },
+                            listing.categoryLabel,
+                        ).joinToString(" · ")
+                        if (meta.isNotBlank()) {
+                            Spacer(Modifier.height(3.dp))
+                            ScText(meta, 12.5f, FontWeight.Medium, Sc.Muted, maxLines = 1)
+                        }
+                        Spacer(Modifier.height(7.dp))
+                        ScText(
+                            listing.salaryLabel(),
+                            14.5f,
+                            FontWeight.ExtraBold,
+                            Sc.Success,
+                            maxLines = 1
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Studentlar
+// ---------------------------------------------------------------------------
+
+/** Talaba kartasidagi monogramma plitkasi navbat bilan uch rangda. */
+private val studentVisuals: List<Pair<Color, Color>>
+    @Composable @ReadOnlyComposable get() = listOf(
+    Sc.TintViolet to Sc.Violet,
+    Sc.TintBlue to Sc.Brand,
+    Sc.TintGreen to Sc.Success,
+)
+
+@Composable
+private fun StudentsSection(
+    students: List<Student>, onSeeAll: () -> Unit, onFriend: (Student) -> Unit
+) {
+    if (students.isEmpty()) return
+    Column(verticalArrangement = Arrangement.spacedBy(13.dp)) {
+        PaddedHeader(
+            "Studentlar",
+            "Universitet bo'yicha do'st toping",
+            action = "Ko'proq",
+            onAction = onSeeAll
+        )
+        EdgeRow(students.take(6)) { index, student ->
+            val (tint, accent) = studentVisuals[index.mod(studentVisuals.size)]
+            Column(
+                Modifier.width(150.dp).scCard(radius = 26.dp)
+                    .padding(horizontal = 16.dp, vertical = 18.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                ScMonogramTile(student.initial, tint, accent)
+                Spacer(Modifier.height(12.dp))
+                ScText(student.firstName, 16f, FontWeight.ExtraBold, Sc.Ink, maxLines = 1)
+                Spacer(Modifier.height(3.dp))
+                ScText(
+                    student.universityMonogram, 12.5f, FontWeight.SemiBold, Sc.Muted, maxLines = 1
+                )
+                Spacer(Modifier.height(14.dp))
+                FriendButton(student, onFriend)
+            }
+        }
+    }
+}
+
+@Composable
+private fun FriendButton(student: Student, onFriend: (Student) -> Unit) {
+    when (student.friendStatus) {
+        FriendStatus.NONE -> ScGradientButton(
+            "+ Do'st", { onFriend(student) },
+            radius = 16.dp, verticalPadding = 10.dp, fontSize = 13.5f, weight = FontWeight.Bold,
+        )
+
+        FriendStatus.PENDING -> ScSoftButton(
+            "Kutilmoqda", { onFriend(student) },
+            radius = 16.dp, verticalPadding = 10.dp, fontSize = 13.5f,
+            background = Sc.TintBlue, color = Sc.Brand,
+        )
+
+        FriendStatus.FRIENDS -> ScSoftButton(
+            "Do'st", { onFriend(student) },
+            radius = 16.dp, verticalPadding = 10.dp, fontSize = 13.5f,
+            background = Sc.TintBlue, color = Sc.Brand,
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Matn yordamchilari
+// ---------------------------------------------------------------------------
+
+/** "50 000 so'm" yoki "Kelishilgan". */
+private fun Listing.priceLabel(): String =
     if (isNegotiable) "Kelishilgan" else "${price.formatSum()} so'm"
+
+/** "1 500 000 so'm / oy". */
+private fun Listing.rentLabel(): String {
+    if (isNegotiable) return "Kelishilgan"
+    val suffix = rentalDetails?.period?.priceUnit?.suffix
+    return listOfNotNull("${price.formatSum()} so'm", suffix).joinToString(" / ")
+}
+
+/** "40 000 so'm / kun" yoki oraliq. */
+private fun Listing.salaryLabel(): String {
+    if (isNegotiable) return "Kelishilgan"
+    val suffix = jobDetails?.payPeriod?.suffix
+    val amount = priceMax?.takeIf { it > price }?.let { "${price.formatSum()} — ${it.formatSum()}" }
+        ?: price.formatSum()
+    return listOfNotNull("$amount so'm", suffix).joinToString(" / ")
+}
 
 /**
  * Muddat yorlig'i: "Bugun 18:00", "Ertaga 12:00", "5 kundan keyin" yoki "24.12".
- * O'tib ketgan muddat ko'rsatilmaydi — e'lon hali faol bo'lsa ham foyda bermaydi.
+ * O'tib ketgan muddat ko'rsatilmaydi.
  */
 private fun deadlineLabel(deadline: Long?): String? {
     if (deadline == null) return null
@@ -288,254 +682,5 @@ private fun deadlineLabel(deadline: Long?): String? {
         days == 1 -> "Ertaga $time"
         days in 2..13 -> "$days kundan keyin"
         else -> "${at.date.dayOfMonth}.${at.date.monthNumber}"
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Ijara kvartiralar — Klublar kabi gorizontal lenta
-// ---------------------------------------------------------------------------
-@Composable
-private fun RentalsSection(
-    rentals: List<Listing>,
-    palette: AppPalette,
-    onSeeAll: () -> Unit,
-    onOpenListing: (String) -> Unit,
-) {
-    if (rentals.isEmpty()) return
-    SectionHeader("Ijara kvartiralar", action = "Barchasi", subtitle = "Sherik izlayotgan uylar", palette = palette, onAction = onSeeAll)
-    Spacer(Modifier.height(12.dp))
-    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        rentals.take(6).forEach { RentalCard(it, palette, onOpenListing) }
-    }
-}
-
-@Composable
-private fun RentalCard(listing: Listing, palette: AppPalette, onOpenListing: (String) -> Unit) {
-    val rental = listing.rentalDetails
-    val accent = Color(listing.accent)
-    Column(
-        Modifier.width(168.dp).clip(RoundedCornerShape(16.dp)).background(palette.glass)
-            .border(1.dp, palette.border, RoundedCornerShape(16.dp))
-            .clickable { onOpenListing(listing.id) }
-            .padding(12.dp),
-        horizontalAlignment = Alignment.Start,
-    ) {
-        Box(Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(accent.copy(alpha = 0.14f)), contentAlignment = Alignment.Center) {
-            Text(listing.emoji, style = TextStyle(fontSize = 19.sp))
-        }
-        Spacer(Modifier.height(9.dp))
-        Text(listing.title, style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.5f.sp, fontWeight = FontWeight.Black, color = palette.ink), maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Spacer(Modifier.height(3.dp))
-        // "3 xonali · 2 kishi bor · 2 kishi kerak" — bo'sh bo'lsa manzilga tushamiz.
-        val meta = rental?.summary()?.takeIf { it.isNotBlank() }
-            ?: listing.branches.firstOrNull()?.address.orEmpty()
-        if (meta.isNotBlank()) {
-            Text(meta, style = TextStyle(fontFamily = AppFontFamily, fontSize = 10.5f.sp, color = palette.inkFaint), maxLines = 2, overflow = TextOverflow.Ellipsis)
-        }
-        Spacer(Modifier.height(6.dp))
-        Text(listing.rentLabel(), style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = palette.successDeep), maxLines = 1, overflow = TextOverflow.Ellipsis)
-    }
-}
-
-/** "1 200 000 so'm / oy" yoki "Kelishilgan". */
-private fun Listing.rentLabel(): String {
-    if (isNegotiable) return "Kelishilgan"
-    val suffix = rentalDetails?.period?.priceUnit?.suffix
-    return listOfNotNull("${price.formatSum()} so'm", suffix).joinToString(" / ")
-}
-
-// ---------------------------------------------------------------------------
-// Chegirmalar
-// ---------------------------------------------------------------------------
-@Composable
-private fun DiscountsSection(categories: List<DiscountCategory>, featured: DiscountOffer?, palette: AppPalette, onSeeAll: () -> Unit) {
-    SectionHeader("Siz uchun", action = "Barchasi", palette = palette, onAction = onSeeAll)
-    Spacer(Modifier.height(12.dp))
-    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-        categories.take(4).forEach { CategoryChip(it, palette, onSeeAll) }
-        MoreChip(palette, onSeeAll)
-    }
-    if (featured != null) {
-        Spacer(Modifier.height(14.dp))
-        FeaturedOfferCard(featured, palette, onSeeAll)
-    }
-}
-
-@Composable
-private fun CategoryChip(category: DiscountCategory, palette: AppPalette, onClick: () -> Unit) {
-    Row(
-        Modifier.clip(RoundedCornerShape(999.dp)).background(palette.glass).border(1.dp, palette.border, RoundedCornerShape(999.dp)).clickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        Text(category.emoji, style = TextStyle(fontSize = 14.sp))
-        Text(category.name, style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = palette.ink))
-    }
-}
-
-@Composable
-private fun MoreChip(palette: AppPalette, onClick: () -> Unit) {
-    Box(
-        Modifier.clip(RoundedCornerShape(999.dp)).background(palette.primary.copy(alpha = 0.10f)).clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 8.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text("Yana", style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = palette.primary))
-    }
-}
-
-@Composable
-private fun FeaturedOfferCard(offer: DiscountOffer, palette: AppPalette, onClick: () -> Unit) {
-    val accent = Color(offer.bannerAccent)
-    Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(palette.glassStrong).border(1.dp, palette.border, RoundedCornerShape(18.dp)).clickable(onClick = onClick).padding(12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Box(
-            Modifier.size(52.dp).clip(RoundedCornerShape(14.dp)).background(accent.copy(alpha = 0.15f)),
-            contentAlignment = Alignment.Center,
-        ) { Text(offer.emoji, style = TextStyle(fontSize = 24.sp)) }
-        Column(Modifier.weight(1f)) {
-            Text(
-                "${offer.merchant} — ${offer.discountPercent}% chegirma",
-                style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.5f.sp, fontWeight = FontWeight.ExtraBold, color = palette.ink),
-                maxLines = 1, overflow = TextOverflow.Ellipsis,
-            )
-            Spacer(Modifier.height(3.dp))
-            val tagText = if (offer.tag == DiscountTag.STUDENT_ID) "Talaba ID bilan" else "Promokod"
-            val meta = listOfNotNull(tagText, offer.expiry).joinToString(" · ")
-            Text(meta, style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.sp, color = palette.inkFaint))
-        }
-        Box(
-            Modifier.clip(RoundedCornerShape(10.dp)).background(accent).padding(horizontal = 10.dp, vertical = 6.dp),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text("−${offer.discountPercent}%", style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.sp, fontWeight = FontWeight.Black, color = Color.White))
-        }
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Ishlar
-// ---------------------------------------------------------------------------
-@Composable
-private fun JobsSection(
-    jobs: List<Listing>,
-    palette: AppPalette,
-    onSeeAll: () -> Unit,
-    onOpenListing: (String) -> Unit,
-) {
-    SectionHeader("Ish e'lonlari", action = "Barchasi", subtitle = "Kunlik va doimiy ishlar", palette = palette, onAction = onSeeAll)
-    Spacer(Modifier.height(12.dp))
-    Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
-        jobs.take(3).forEach { JobRow(it, palette, onOpenListing) }
-    }
-}
-
-@Composable
-private fun JobRow(listing: Listing, palette: AppPalette, onOpenListing: (String) -> Unit) {
-    val job = listing.jobDetails
-    Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(palette.glass)
-            .border(1.dp, palette.border, RoundedCornerShape(16.dp))
-            .clickable { onOpenListing(listing.id) }
-            .padding(12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(11.dp),
-    ) {
-        Box(
-            Modifier.size(42.dp).clip(RoundedCornerShape(12.dp)).background(palette.primary.copy(alpha = 0.12f)),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(job?.companyName.monogram(), style = TextStyle(fontFamily = AppFontFamily, fontSize = 16.sp, fontWeight = FontWeight.ExtraBold, color = palette.primary))
-        }
-        Column(Modifier.weight(1f)) {
-            Text(listing.title, style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.5f.sp, fontWeight = FontWeight.ExtraBold, color = palette.ink), maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Spacer(Modifier.height(2.dp))
-            Text(
-                // Bo'sh bo'laklar tushib qoladi — aks holda "· ·" ko'rinishida chiqardi.
-                listOfNotNull(
-                    job?.companyName?.takeIf { it.isNotBlank() },
-                    listing.branches.firstOrNull()?.address,
-                    listing.categoryLabel,
-                ).joinToString(" · "),
-                style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.sp, color = palette.inkFaint),
-                maxLines = 1, overflow = TextOverflow.Ellipsis,
-            )
-            Spacer(Modifier.height(4.dp))
-            Text(listing.salaryLabel(), style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.5f.sp, fontWeight = FontWeight.Bold, color = palette.successDeep))
-        }
-        if (job?.isDaily == true) {
-            Box(
-                Modifier.clip(RoundedCornerShape(8.dp)).background(palette.primary.copy(alpha = 0.12f))
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
-            ) {
-                Text("Kunlik", style = TextStyle(fontFamily = AppFontFamily, fontSize = 10.5f.sp, fontWeight = FontWeight.ExtraBold, color = palette.primary))
-            }
-        }
-    }
-}
-
-/** "Korzinka" → "K". Logotip yo'q, shuning uchun nomning birinchi harfi ishlatiladi. */
-private fun String?.monogram(): String =
-    this?.trim()?.firstOrNull()?.uppercase() ?: "?"
-
-/** "300 000 so'm / kuniga" yoki "Kelishilgan". */
-private fun Listing.salaryLabel(): String {
-    if (isNegotiable) return "Kelishilgan"
-    val suffix = jobDetails?.payPeriod?.suffix
-    val amount = priceMax?.takeIf { it > price }
-        ?.let { "${price.formatSum()} — ${it.formatSum()}" }
-        ?: price.formatSum()
-    return listOfNotNull("$amount so'm", suffix).joinToString(" / ")
-}
-
-// ---------------------------------------------------------------------------
-// Studentlar
-// ---------------------------------------------------------------------------
-@Composable
-private fun StudentsSection(students: List<Student>, palette: AppPalette, onSeeAll: () -> Unit, onFriend: (Student) -> Unit) {
-    SectionHeader("Studentlar", action = "Ko'proq", subtitle = "Universitet bo'yicha do'st toping", palette = palette, onAction = onSeeAll)
-    Spacer(Modifier.height(12.dp))
-    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(11.dp)) {
-        students.take(6).forEach { StudentConnectCard(it, palette, onFriend) }
-    }
-}
-
-@Composable
-private fun StudentConnectCard(student: Student, palette: AppPalette, onFriend: (Student) -> Unit) {
-    Column(
-        Modifier.width(128.dp).clip(RoundedCornerShape(16.dp)).background(palette.glass).border(1.dp, palette.border, RoundedCornerShape(16.dp)).padding(12.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(7.dp),
-    ) {
-        Box(
-            Modifier.size(48.dp).clip(RoundedCornerShape(999.dp)).background(palette.primary.copy(alpha = 0.14f)),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(student.initial, style = TextStyle(fontFamily = AppFontFamily, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = palette.primary))
-        }
-        Text(student.firstName, style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = palette.ink), maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Text(student.universityMonogram, style = TextStyle(fontFamily = AppFontFamily, fontSize = 10.5f.sp, color = palette.inkFaint))
-        FriendButton(student, palette, onFriend)
-    }
-}
-
-@Composable
-private fun FriendButton(student: Student, palette: AppPalette, onFriend: (Student) -> Unit) {
-    val pending = student.friendStatus == FriendStatus.PENDING
-    val friends = student.friendStatus == FriendStatus.FRIENDS
-    val label = when {
-        friends -> "Do'st"
-        pending -> "Kutilmoqda"
-        else -> "+ Do'st"
-    }
-    val bg = if (pending || friends) palette.primary.copy(alpha = 0.12f) else palette.primary
-    val fg = if (pending || friends) palette.primary else Color.White
-    Box(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(bg).clickable { onFriend(student) }.padding(vertical = 7.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(label, style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, color = fg), maxLines = 1)
     }
 }
