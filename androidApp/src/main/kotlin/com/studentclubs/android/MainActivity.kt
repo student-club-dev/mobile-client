@@ -1,8 +1,12 @@
 package com.studentclubs.android
 
+import android.graphics.Color
+import android.os.Build
 import android.os.Bundle
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.fragment.app.FragmentActivity
 import dev.shared.StudentApp
 
@@ -15,8 +19,28 @@ import dev.shared.StudentApp
  */
 class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
+        // Tizim splash'i (Android 12+ SplashScreen API) — statik StudentClub logotipi.
+        // `super.onCreate()`dan OLDIN chaqirilishi shart. Ushlab turmaymiz: ilk Compose
+        // kadri chizilishi bilan yopiladi va `AnimatedSplashScreen` davom ettiradi.
+        installSplashScreen()
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
+        // Butun ilova edge-to-edge: tizim panellari shaffof, kontent ular ostidan ham
+        // chiziladi. Splash panelni YASHIRMAYDI — yashirilsa, tizim uni sirg'antirib
+        // olib qo'yadi va o'sha animatsiya splash ustida ko'rinib qolardi (bu animatsiyani
+        // ilova tomonidan o'chirib bo'lmaydi). Buning o'rniga splash panel ostidan ham
+        // chiziladi va faqat tugma belgilari ko'k fon ustida qoladi.
+        // `navigationBarStyle`ga shaffof scrim beramiz: standart sozlamada tizim panel
+        // ortiga qoraytiruvchi parda qo'yadi va splash gradienti pastda to'satdan to'qlashib
+        // ketardi. Belgilar rangini ekranning o'zi (`NavigationBarAppearance`) hal qiladi.
+        enableEdgeToEdge(
+            navigationBarStyle = SystemBarStyle.auto(Color.TRANSPARENT, Color.TRANSPARENT),
+        )
+        // Android 10+ da tizim 3 tugmali panel ortiga o'zi kontrast pardasini qo'yadi
+        // (Android 15+ da `navigationBarColor` umuman e'tiborsiz qoldiriladi, faqat shu
+        // bayroq qoladi). Busiz splash gradienti pastda to'satdan to'qlashib ketardi.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            window.isNavigationBarContrastEnforced = false
+        }
         setContent { StudentApp(onExit = ::recreate) }
     }
 }

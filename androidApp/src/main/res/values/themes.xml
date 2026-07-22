@@ -1,4 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <style name="Theme.StudentClubs" parent="@android:style/Theme.Material.Light.NoActionBar" />
+
+    <!--
+      Ilova ishga tushishidagi tizim splash ekrani (androidx.core:core-splashscreen).
+      Android 12+ da tizimning o'z SplashScreen API'si, undan oldingi versiyalarda esa
+      kutubxona shu ko'rinishni taqlid qiladi.
+
+      Bu ekran faqat Compose ilk kadr chizilguncha turadi — keyin darhol
+      `AnimatedSplashScreen` (WebP xarakter animatsiyasi) egallaydi.
+    -->
+    <style name="Theme.StudentClubs.Splash" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/splash_background</item>
+        <!-- Shaffof ikonka: tizim splash'i faqat ko'k fon bo'lib qoladi va
+             `AnimatedSplashScreen`ga bilinmay ulanadi (izoh: ic_splash_no_icon.xml). -->
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_splash_no_icon</item>
+        <!-- Splash yopilgach Activity shu mavzuga o'tadi. -->
+        <item name="postSplashScreenTheme">@style/Theme.StudentClubs</item>
+    </style>
 </resources>

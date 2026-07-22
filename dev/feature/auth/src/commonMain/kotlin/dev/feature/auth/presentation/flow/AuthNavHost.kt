@@ -3,9 +3,7 @@ import dev.feature.settings.presentation.SettingsScreen
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -16,13 +14,12 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import kotlinx.coroutines.launch
 import dev.feature.auth.biometric.BiometricOutcome
 import dev.feature.auth.biometric.rememberBiometricAuthenticator
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -39,11 +36,10 @@ import dev.core.navigation.PopEnter
 import dev.core.navigation.PopExit
 import dev.core.navigation.TabEnter
 import dev.core.navigation.TabExit
-import dev.core.designsystem.components.AppFontFamily
-import dev.core.designsystem.components.AppIcons
-import dev.core.designsystem.components.AppScreenScaffold
-import dev.core.designsystem.components.AuthTab
-import dev.core.designsystem.components.LogoTile
+import dev.core.uikit.components.AppFontFamily
+import dev.core.uikit.components.AnimatedSplashScreen
+import dev.core.uikit.components.AppIcons
+import dev.core.uikit.components.AuthTab
 import dev.feature.auth.presentation.screens.EmailLoginScreen
 import dev.feature.auth.presentation.screens.ForgotPasswordScreen
 import dev.feature.auth.presentation.screens.OnboardingScreen
@@ -61,7 +57,7 @@ import dev.feature.auth.presentation.screens.SignUpScreen
 import dev.feature.auth.presentation.screens.SuccessScreen
 import dev.feature.auth.presentation.screens.UniversityPickerScreen
 import dev.feature.auth.presentation.screens.WelcomeScreen
-import dev.core.designsystem.theme.appPalette
+import dev.core.uikit.theme.appPalette
 import dev.feature.auth.social.rememberSocialAuthController
 import org.koin.compose.viewmodel.koinViewModel
 
@@ -102,8 +98,12 @@ fun AuthNavHost(
 
     // Local keshdagi sessiyani tekshiramiz: kirgan bo'lsa to'g'ridan-to'g'ri HOME.
     val loggedIn by vm.loggedIn.collectAsStateWithLifecycle()
-    if (loggedIn == null) {
-        BootSplash() // kesh o'qilmagунча qisqa splash
+    // Splash animatsiyasi va sessiya keshini o'qish PARALLEL ketadi — grafga faqat ikkalasi
+    // tayyor bo'lganda o'tiladi. Kesh odatda tezroq bo'ladi (animatsiya uzilmaydi), sekin
+    // bo'lsa splash aylanishda davom etib kutadi.
+    var splashShown by rememberSaveable { mutableStateOf(false) }
+    if (!splashShown || loggedIn == null) {
+        AnimatedSplashScreen(onFinished = { splashShown = true })
         return
     }
     val startDestination = when {
@@ -345,16 +345,6 @@ fun AuthNavHost(
                 // iOS / bo'linmagan rejim — rolga qarab RootShell hal qiladi.
                 null -> dev.feature.auth.presentation.main.RootShell(onLoggedOut = loggedOut)
             }
-        }
-    }
-}
-
-/** Kesh o'qilguncha ko'rsatiladigan qisqa boshlang'ich ekran (session restore). */
-@Composable
-private fun BootSplash() {
-    AppScreenScaffold {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            LogoTile(size = 72, radius = 22, iconSize = 38)
         }
     }
 }

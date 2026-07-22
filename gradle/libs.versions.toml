@@ -11,6 +11,8 @@ targetSdk = "35"
 androidx-activityCompose = "1.9.3"
 androidx-coreKtx = "1.15.0"
 androidx-lifecycle = "2.8.7"
+# Android 12+ tizim splash ekrani (eski versiyalarda ham bir xil ko'rinish beradi).
+androidx-splashscreen = "1.2.0"
 
 # Kotlin libs
 coroutines = "1.9.0"
@@ -91,6 +93,7 @@ androidx-navigation-compose = { group = "org.jetbrains.androidx.navigation", nam
 # AndroidX (android app)
 androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "androidx-activityCompose" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "androidx-coreKtx" }
+androidx-core-splashscreen = { group = "androidx.core", name = "core-splashscreen", version.ref = "androidx-splashscreen" }
 
 # Firebase / Auth (Android target)
 firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.ref = "firebaseBom" }
