@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Qorong'i rejimdagi tizim splash foni.
+         `ScColors.DarkScColors.splashSolid` bilan AYNAN bir xil bo'lishi SHART —
+         aks holda tizim splash'idan `AnimatedSplashScreen`ga o'tishda rang sakraydi. -->
+    <color name="splash_background">#FF0F4C6B</color>
+</resources>

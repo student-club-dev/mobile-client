@@ -20,7 +20,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -31,23 +30,26 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import dev.feature.university.domain.model.University
+import dev.core.uikit.components.AppIcons
+import dev.core.uikit.components.GlassTextField
+import dev.core.uikit.components.ScCircleButton
+import dev.core.uikit.components.ScGradientButton
+import dev.core.uikit.components.ScHeader
+import dev.core.uikit.components.ScHeaderTitle
+import dev.core.uikit.components.ScIcons
+import dev.core.uikit.components.ScText
+import dev.core.uikit.components.scCard
+import dev.core.uikit.media.rememberImagePicker
+import dev.core.uikit.media.toImageBitmapOrNull
+import dev.core.uikit.theme.Sc
 import dev.feature.profile.domain.model.UserProfile
-import dev.core.designsystem.components.AppFontFamily
-import dev.core.designsystem.components.AppIcons
-import dev.core.designsystem.components.GlassTextField
-import dev.core.designsystem.components.PrimaryButton
-import dev.core.designsystem.theme.AppPalette
-import dev.core.designsystem.theme.appPalette
 import dev.feature.profile.presentation.components.ProfileAvatar
-import dev.core.designsystem.media.rememberImagePicker
-import dev.core.designsystem.media.toImageBitmapOrNull
+import dev.feature.university.domain.model.University
 import org.koin.compose.viewmodel.koinViewModel
 
 private data class CourseOption(val value: String, val label: String)
@@ -66,7 +68,6 @@ private val courseOptions = listOf(
  */
 @Composable
 fun EditProfileScreen(onBack: () -> Unit, vm: ProfileViewModel = koinViewModel()) {
-    val palette = appPalette
     val state by vm.state.collectAsStateWithLifecycle()
     val profile = state.profile
 
@@ -100,37 +101,38 @@ fun EditProfileScreen(onBack: () -> Unit, vm: ProfileViewModel = koinViewModel()
         }
     }
 
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-        // Header
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(top = 54.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(11.dp),
-        ) {
-            IconBoxLocal(AppIcons.ArrowLeft, palette, onBack)
-            Text("Profilni tahrirlash", style = TextStyle(fontFamily = AppFontFamily, fontSize = 20.sp, fontWeight = FontWeight.Black, color = palette.ink))
+    Column(Modifier.fillMaxSize().background(Sc.Bg).verticalScroll(rememberScrollState())) {
+        ScHeader(horizontalPadding = 18.dp) {
+            Row(
+                Modifier.fillMaxWidth().padding(top = 18.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(13.dp),
+            ) {
+                ScCircleButton(ScIcons.ChevronLeft, onBack, contentDescription = "Orqaga")
+                ScHeaderTitle("Profilni tahrirlash", size = 21f, modifier = Modifier.weight(1f))
+            }
         }
-        Spacer(Modifier.height(18.dp))
+        Spacer(Modifier.height(22.dp))
 
         // Avatar — bosilganda galereya ochiladi
         Column(
             Modifier.fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(9.dp),
         ) {
             Box(contentAlignment = Alignment.BottomEnd) {
                 ProfileAvatar(
                     name = state.name,
                     size = 96.dp,
                     fontSize = 36.sp,
-                    palette = palette,
                     avatarUrl = profile?.avatarUrl,
                     localPreview = avatarPreview,
                     modifier = Modifier.clickable(enabled = !avatarUploading) { imagePicker.pick() },
                 )
                 // Kamera nishoni
                 Box(
-                    Modifier.size(30.dp).clip(CircleShape).background(palette.primary)
+                    Modifier.size(31.dp).clip(CircleShape).background(Sc.Brand)
+                        .border(2.dp, Sc.Bg, CircleShape)
                         .clickable(enabled = !avatarUploading) { imagePicker.pick() },
                     contentAlignment = Alignment.Center,
                 ) {
@@ -139,31 +141,27 @@ fun EditProfileScreen(onBack: () -> Unit, vm: ProfileViewModel = koinViewModel()
             }
 
             when {
-                avatarUploading -> Text(
-                    "Rasm yuklanmoqda...",
-                    style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = palette.inkMuted),
-                )
-                avatarError != null -> Text(
-                    avatarError!!,
-                    style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFFDC2626)),
-                )
-                else -> Text(
-                    "Rasmni o'zgartirish",
-                    style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = palette.primary),
-                    modifier = Modifier.clickable { imagePicker.pick() },
+                avatarUploading -> ScText("Rasm yuklanmoqda...", 12.5f, FontWeight.SemiBold, Sc.Muted)
+                avatarError != null -> ScText(avatarError!!, 12.5f, FontWeight.SemiBold, Sc.Danger)
+                else -> ScText(
+                    "Rasmni o'zgartirish", 12.5f, FontWeight.Bold, Sc.Brand,
+                    Modifier.clickable { imagePicker.pick() },
                 )
             }
         }
-        Spacer(Modifier.height(20.dp))
+        Spacer(Modifier.height(22.dp))
 
-        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            FieldLabel("Ism", palette)
+        Column(
+            Modifier.fillMaxWidth().padding(horizontal = Sc.ScreenPadding),
+            verticalArrangement = Arrangement.spacedBy(13.dp),
+        ) {
+            FieldLabel("Ism")
             GlassTextField(firstName, { firstName = it }, "Ism", leading = AppIcons.Pencil)
 
-            FieldLabel("Familiya", palette)
+            FieldLabel("Familiya")
             GlassTextField(lastName, { lastName = it }, "Familiya", leading = AppIcons.Pencil)
 
-            FieldLabel("Telefon", palette)
+            FieldLabel("Telefon")
             GlassTextField(
                 phone, { phone = it }, "+998 90 123 45 67",
                 leading = AppIcons.Phone,
@@ -171,74 +169,89 @@ fun EditProfileScreen(onBack: () -> Unit, vm: ProfileViewModel = koinViewModel()
             )
 
             // Universitet tanlash
-            FieldLabel("Universitet", palette)
+            FieldLabel("Universitet")
             val selectedUni = state.universities.firstOrNull { it.id == universityId }
             Row(
-                Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(palette.fieldBg)
-                    .border(1.dp, palette.border, RoundedCornerShape(14.dp))
-                    .clickable { uniExpanded = !uniExpanded }.padding(horizontal = 12.dp, vertical = 15.dp),
+                Modifier.fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(Sc.FieldBg)
+                    .border(1.dp, Sc.Border, RoundedCornerShape(16.dp))
+                    .clickable { uniExpanded = !uniExpanded }
+                    .padding(horizontal = 13.dp, vertical = 15.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(AppIcons.GraduationCap, null, tint = palette.inkFaint, modifier = Modifier.size(17.dp))
+                Icon(ScIcons.Cap, null, tint = Sc.Muted, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(9.dp))
-                Text(
+                ScText(
                     selectedUni?.name ?: "Universitetni tanlang",
-                    style = TextStyle(fontFamily = AppFontFamily, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = if (selectedUni != null) palette.ink else palette.inkFaint),
-                    modifier = Modifier.weight(1f),
+                    14f, FontWeight.SemiBold,
+                    if (selectedUni != null) Sc.Ink else Sc.Muted,
+                    Modifier.weight(1f),
+                    maxLines = 1,
                 )
-                Icon(AppIcons.ChevronDown, null, tint = palette.inkFaint, modifier = Modifier.size(18.dp))
+                Icon(ScIcons.ChevronUpDown, null, tint = Sc.Muted, modifier = Modifier.size(17.dp))
             }
             if (uniExpanded) {
-                Column(
-                    Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(palette.glass).border(1.dp, palette.border, RoundedCornerShape(14.dp)).padding(8.dp),
-                ) {
+                Column(Modifier.fillMaxWidth().scCard(radius = 20.dp).padding(9.dp)) {
                     GlassTextField(uniQuery, { uniQuery = it }, "Universitet qidiring", leading = AppIcons.Search, height = 44)
                     Spacer(Modifier.height(8.dp))
                     // Ro'yxat katta (prof-emis, ~10000) — qidiruv bo'yicha cheklab ko'rsatamiz.
                     val filtered = remember(state.universities, uniQuery) {
-                        (if (uniQuery.isBlank()) state.universities
-                        else state.universities.filter { it.name.contains(uniQuery, ignoreCase = true) || it.city.contains(uniQuery, ignoreCase = true) })
-                            .take(40)
+                        (
+                            if (uniQuery.isBlank()) {
+                                state.universities
+                            } else {
+                                state.universities.filter {
+                                    it.name.contains(uniQuery, ignoreCase = true) ||
+                                        it.city.contains(uniQuery, ignoreCase = true)
+                                }
+                            }
+                            ).take(40)
                     }
                     filtered.forEach { uni ->
-                        UniversityRow(uni, selected = uni.id == universityId, palette) {
+                        UniversityRow(uni, selected = uni.id == universityId) {
                             universityId = uni.id
                             uniExpanded = false
                             uniQuery = ""
                         }
                     }
                     if (filtered.isEmpty()) {
-                        Text("Topilmadi", style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.sp, color = palette.inkFaint), modifier = Modifier.padding(8.dp))
+                        ScText("Topilmadi", 12.5f, FontWeight.Medium, Sc.Muted, Modifier.padding(8.dp))
                     }
                 }
             }
 
             // Kurs tanlash
-            FieldLabel("Kurs", palette)
+            FieldLabel("Kurs")
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 courseOptions.forEach { opt ->
                     val active = opt.value == courseYear
                     Box(
-                        Modifier.weight(1f).height(42.dp).clip(RoundedCornerShape(12.dp))
-                            .background(if (active) palette.primary.copy(alpha = 0.14f) else palette.glass)
-                            .border(1.dp, if (active) palette.primary else palette.border, RoundedCornerShape(12.dp))
+                        Modifier.weight(1f).height(42.dp)
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(if (active) Sc.TintBlue else Sc.Card)
+                            .border(1.dp, if (active) Sc.Brand else Sc.Border, RoundedCornerShape(14.dp))
                             .clickable { courseYear = opt.value },
                         contentAlignment = Alignment.Center,
                     ) {
-                        Text(opt.label, style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.5f.sp, fontWeight = FontWeight.Bold, color = if (active) palette.primary else palette.inkMuted))
+                        ScText(
+                            opt.label, 12f, FontWeight.Bold,
+                            if (active) Sc.Brand else Sc.InkSoft,
+                            maxLines = 1,
+                        )
                     }
                 }
             }
 
             if (error != null) {
-                Text(error!!, style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFFDC2626)))
+                ScText(error!!, 12.5f, FontWeight.SemiBold, Sc.Danger)
             }
 
             Spacer(Modifier.height(4.dp))
-            PrimaryButton(
+            ScGradientButton(
                 text = if (saving) "Saqlanmoqda..." else "Saqlash",
-                enabled = !saving,
                 onClick = {
+                    if (saving) return@ScGradientButton
                     error = null
                     saving = true
                     val updated = (profile ?: UserProfile()).copy(
@@ -260,29 +273,26 @@ fun EditProfileScreen(onBack: () -> Unit, vm: ProfileViewModel = koinViewModel()
 }
 
 @Composable
-private fun FieldLabel(text: String, palette: AppPalette) {
-    Text(text, style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.5f.sp, fontWeight = FontWeight.Bold, color = palette.inkMuted))
+private fun FieldLabel(text: String) {
+    ScText(text, 12.5f, FontWeight.Bold, Sc.InkSoft, maxLines = 1)
 }
 
 @Composable
-private fun UniversityRow(uni: University, selected: Boolean, palette: AppPalette, onClick: () -> Unit) {
+private fun UniversityRow(uni: University, selected: Boolean, onClick: () -> Unit) {
     Row(
-        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 13.dp),
+        Modifier.fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(uni.monogram, style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.sp, fontWeight = FontWeight.Black, color = palette.primary), modifier = Modifier.width(48.dp))
+        ScText(uni.monogram, 12.5f, FontWeight.ExtraBold, Sc.Brand, Modifier.width(50.dp), maxLines = 1)
         Column(Modifier.weight(1f)) {
-            Text(uni.name, style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = palette.ink))
-            Text(uni.city, style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.sp, color = palette.inkFaint))
+            ScText(uni.name, 13.5f, FontWeight.Bold, Sc.Ink, maxLines = 2)
+            ScText(uni.city, 11.5f, FontWeight.Medium, Sc.Muted, maxLines = 1)
         }
-        if (selected) Icon(AppIcons.ShieldCheck, null, tint = palette.primary, modifier = Modifier.size(17.dp))
+        if (selected) {
+            Icon(AppIcons.Check, null, tint = Sc.Brand, modifier = Modifier.size(17.dp))
+        }
     }
-}
-
-@Composable
-private fun IconBoxLocal(icon: androidx.compose.ui.graphics.vector.ImageVector, palette: AppPalette, onClick: () -> Unit) {
-    Box(
-        Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(palette.glass).border(1.dp, palette.border, RoundedCornerShape(12.dp)).clickable(onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) { Icon(icon, "Orqaga", tint = palette.ink, modifier = Modifier.size(18.dp)) }
 }

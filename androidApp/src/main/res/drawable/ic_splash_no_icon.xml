@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Ataylab BO'SH (to'liq shaffof) ikonka — tizim splash'i faqat brend ko'k fondan iborat
+  bo'lishi uchun.
+
+  Nega shunday? Android 12+ da tizim splash ekranini O'CHIRIB BO'LMAYDI — har bir sovuq
+  ishga tushishda u majburiy ko'rsatiladi. Agar `windowSplashScreenAnimatedIcon` berilmasa,
+  tizim launcher ikonkasini qo'yadi. Natijada foydalanuvchi ikkita alohida splash ko'radi:
+  avval logotipli tizim ekrani, keyin xarakterli `AnimatedSplashScreen`.
+
+  Shaffof ikonka bilan tizim splash'i bir tekis ko'k fon bo'lib qoladi va undan keyin xuddi
+  shu fonda xarakter yumshoq paydo bo'ladi — ikkalasi BITTA uzluksiz ekrandek ko'rinadi.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:pathData="M0,0h108v108h-108z"
+        android:fillColor="#00000000" />
+</vector>

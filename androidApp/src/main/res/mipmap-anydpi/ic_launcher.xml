@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android 8 dan oldingi qobiqlar uchun zaxira ikonka (loyihaning minSdk'si 24).
+  Bu yerda niqob qo'llanilmaydi, shuning uchun yumaloq burchakli kvadratni o'zimiz chizamiz.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path android:pathData="M28,6h52a22,22 0 0,1 22,22v52a22,22 0 0,1 -22,22h-52a22,22 0 0,1 -22,-22v-52a22,22 0 0,1 22,-22z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="6"
+                android:startY="6"
+                android:endX="102"
+                android:endY="102">
+                <item android:offset="0" android:color="#FF23C3F5" />
+                <item android:offset="0.5" android:color="#FF00ADEE" />
+                <item android:offset="1" android:color="#FF0091D8" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <group
+        android:translateX="34.8"
+        android:translateY="34.8"
+        android:scaleX="1.6"
+        android:scaleY="1.6">
+        <path
+            android:pathData="M12 4L2 9l10 5 8-4"
+            android:strokeColor="#FFFFFFFF"
+            android:strokeWidth="1.9"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round" />
+        <path
+            android:pathData="M6 12v4c0 1 2.7 3 6 3s6-2 6-3v-4"
+            android:strokeColor="#FFFFFFFF"
+            android:strokeWidth="1.9"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round" />
+    </group>
+</vector>

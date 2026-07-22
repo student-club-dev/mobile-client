@@ -32,21 +32,21 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import dev.core.designsystem.components.AppFontFamily
-import dev.core.designsystem.components.AppIcons
-import dev.core.designsystem.components.AppScreenScaffold
-import dev.core.designsystem.components.BackButton
-import dev.core.designsystem.components.ErrorText
-import dev.core.designsystem.components.FooterLink
-import dev.core.designsystem.components.LogoTile
-import dev.core.designsystem.components.OutlineButton
-import dev.core.designsystem.components.PrimaryButton
-import dev.core.designsystem.components.ScreenSubtitle
-import dev.core.designsystem.components.ScreenTitle
+import dev.core.uikit.components.AppFontFamily
+import dev.core.uikit.components.AppIcons
+import dev.core.uikit.components.AppScreenScaffold
+import dev.core.uikit.components.BackButton
+import dev.core.uikit.components.ErrorText
+import dev.core.uikit.components.FooterLink
+import dev.core.uikit.components.LogoTile
+import dev.core.uikit.components.OutlineButton
+import dev.core.uikit.components.PrimaryButton
+import dev.core.uikit.components.ScreenSubtitle
+import dev.core.uikit.components.ScreenTitle
 import dev.feature.auth.presentation.flow.AuthFlowState
 import dev.feature.auth.presentation.flow.AuthFlowViewModel
-import dev.core.designsystem.theme.AppPalette
-import dev.core.designsystem.theme.appPalette
+import dev.core.uikit.theme.AppPalette
+import dev.core.uikit.theme.appPalette
 
 // ===========================================================================
 // Ro'yxatdan o'tish — usul tanlash (Telefon / Email)

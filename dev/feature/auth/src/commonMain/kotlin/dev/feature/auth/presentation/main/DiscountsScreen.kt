@@ -1,9 +1,9 @@
 package dev.feature.auth.presentation.main
 
+import dev.core.uikit.components.scTopInset
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -45,18 +45,22 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.core.domain.model.DiscountOffer
 import dev.core.domain.model.DiscountTag
-import dev.core.designsystem.components.AppFontFamily
-import dev.core.designsystem.components.AppIcons
-import dev.core.designsystem.components.GlassTextField
-import dev.core.designsystem.theme.AppPalette
-import dev.core.designsystem.theme.appPalette
+import dev.core.uikit.components.AppFontFamily
+import dev.core.uikit.components.ScCircleButton
+import dev.core.uikit.components.ScHeader
+import dev.core.uikit.components.ScHeaderSubtitle
+import dev.core.uikit.components.ScHeaderTitle
+import dev.core.uikit.components.ScIcons
+import dev.core.uikit.theme.Sc
+import dev.core.uikit.components.AppIcons
+import dev.core.uikit.components.GlassTextField
+import dev.core.uikit.theme.AppPalette
+import dev.core.uikit.theme.appPalette
 import dev.feature.listings.presentation.NearbyDiscountsSection
-import dev.core.designsystem.map.MapPoint
-import dev.core.designsystem.map.OfferMarker
-import dev.core.designsystem.map.MapLinkButton
-import dev.core.designsystem.map.OffersMapOverlay
-import dev.core.designsystem.map.markersCenter
-import dev.core.designsystem.map.rememberUserLocation
+import dev.core.uikit.map.OfferMarker
+import dev.core.uikit.map.MapLinkButton
+import dev.core.uikit.map.OffersMapOverlay
+import dev.core.uikit.map.markersCenter
 import kotlinx.coroutines.delay
 import org.koin.compose.viewmodel.koinViewModel
 
@@ -104,22 +108,24 @@ private fun FeedContent(
     onOpenFilter: () -> Unit,
     onOpenMap: () -> Unit,
 ) {
-    Column(Modifier.fillMaxSize()) {
-        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(top = 54.dp)) {
-            if (onBack != null) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(11.dp)) {
-                    Box(
-                        Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(palette.glass).border(1.dp, palette.border, RoundedCornerShape(12.dp)).clickable(onClick = onBack),
-                        contentAlignment = Alignment.Center,
-                    ) { Icon(AppIcons.ArrowLeft, "Orqaga", tint = palette.ink, modifier = Modifier.size(18.dp)) }
+    Column(Modifier.fillMaxSize().background(Sc.Bg)) {
+        ScHeader {
+            Row(
+                Modifier.fillMaxWidth().padding(top = 18.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(13.dp),
+            ) {
+                if (onBack != null) {
+                    ScCircleButton(ScIcons.ChevronLeft, onBack, contentDescription = "Orqaga")
                 }
-                Spacer(Modifier.height(10.dp))
+                Column(Modifier.weight(1f)) {
+                    ScHeaderTitle("Siz uchun", size = 26f)
+                    Spacer(Modifier.height(3.dp))
+                    ScHeaderSubtitle("${state.totalCount} ta e'lon — chegirmali va oddiy takliflar.")
+                }
             }
-            Text("Siz uchun", style = TextStyle(fontFamily = AppFontFamily, fontSize = 24.sp, fontWeight = FontWeight.Black, color = palette.ink))
-            Spacer(Modifier.height(4.dp))
-            Text("${state.totalCount} ta e'lon — chegirmali va oddiy takliflar.", style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.5f.sp, color = palette.inkMuted))
-            Spacer(Modifier.height(12.dp))
-
+        }
+        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(top = 16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(9.dp)) {
                 Box(Modifier.weight(1f)) {
                     GlassTextField(state.query, vm::onQuery, "Do'kon yoki e'lon qidiring", leading = AppIcons.Search, height = 46)
@@ -313,7 +319,7 @@ private fun FilterScreen(
     Column(Modifier.fillMaxSize().background(palette.bgBrush)) {
         // Sarlavha
         Row(
-            Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(top = 54.dp, bottom = 8.dp),
+            Modifier.fillMaxWidth().padding(horizontal = 16.dp).scTopInset().padding(bottom = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(

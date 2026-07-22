@@ -41,7 +41,7 @@ include(":dev:api-client")
 
 // Core modules
 include(":dev:core:common")
-include(":dev:core:designsystem")
+include(":dev:core:uikit")
 // Xavfsiz navigatsiya primitivlari (navigateSafe/popSafe/encodeArg) — barcha shell'lar uchun.
 include(":dev:core:navigation")
 include(":dev:core:network")

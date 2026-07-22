@@ -12,10 +12,11 @@
     <application
         android:name=".StudentClubsApp"
         android:allowBackup="true"
-        android:icon="@android:drawable/sym_def_app_icon"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:supportsRtl="true"
-        android:theme="@style/Theme.StudentClubs">
+        android:theme="@style/Theme.StudentClubs.Splash">
 
         <!-- Yagona Activity — to'g'ridan-to'g'ri talaba oqimi (rol tanlash yo'q). -->
         <activity

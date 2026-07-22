@@ -1,7 +1,6 @@
 package dev.feature.listings.presentation
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -24,25 +23,30 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import dev.core.designsystem.components.AppFontFamily
-import dev.core.designsystem.components.AppIcons
-import dev.core.designsystem.components.PrimaryButton
-import dev.core.designsystem.theme.AppPalette
-import dev.core.designsystem.theme.appPalette
+import dev.core.uikit.components.AppIcons
+import dev.core.uikit.components.ScCircleButton
+import dev.core.uikit.components.ScGradientButton
+import dev.core.uikit.components.ScIconTile
+import dev.core.uikit.components.ScIcons
+import dev.core.uikit.components.ScText
+import dev.core.uikit.components.scBrandShadow
+import dev.core.uikit.components.scCard
+import dev.core.uikit.components.scStyle
+import dev.core.uikit.components.scTopInset
+import dev.core.uikit.theme.Sc
 import dev.feature.listings.domain.model.Listing
 import dev.feature.listings.domain.model.ListingStatus
 import dev.feature.listings.domain.model.formatSum
-import dev.feature.listings.presentation.components.IconSquareButton
 import dev.feature.listings.presentation.components.ListingImage
 import dev.feature.listings.presentation.components.StatusPill
 import org.koin.compose.viewmodel.koinViewModel
@@ -61,46 +65,53 @@ fun MyListingsScreen(
     filterDiscount: Boolean? = null,
     vm: MyListingsViewModel = koinViewModel(),
 ) {
-    val palette = appPalette
     val state by vm.state.collectAsStateWithLifecycle()
-    val listings = if (filterDiscount == null) state.listings
-    else state.listings.filter { it.isDiscount == filterDiscount }
+    val listings = if (filterDiscount == null) {
+        state.listings
+    } else {
+        state.listings.filter { it.isDiscount == filterDiscount }
+    }
 
-    Column(Modifier.fillMaxSize()) {
+    Column(Modifier.fillMaxSize().background(Sc.Bg)) {
         if (showHeader) {
             Row(
-                Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(top = 54.dp),
+                Modifier.fillMaxWidth().padding(horizontal = Sc.ScreenPadding).scTopInset(),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(11.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                if (onBack != null) IconSquareButton(onBack, AppIcons.ArrowLeft, palette)
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        "Mening chegirmalarim",
-                        style = TextStyle(fontFamily = AppFontFamily, fontSize = 18.sp, fontWeight = FontWeight.Black, color = palette.ink),
-                    )
-                    Text(
-                        "${listings.size} ta e'lon",
-                        style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.5f.sp, color = palette.inkFaint),
+                if (onBack != null) {
+                    ScCircleButton(
+                        ScIcons.ChevronLeft, onBack,
+                        background = Sc.Card, tint = Sc.Ink, contentDescription = "Orqaga",
                     )
                 }
-                if (showHeaderCreate) IconSquareButton(onCreate, AppIcons.Plus, palette)
+                Column(Modifier.weight(1f)) {
+                    ScText("Mening chegirmalarim", 19f, FontWeight.ExtraBold, Sc.Ink, letterSpacing = -0.3f, maxLines = 1)
+                    ScText("${listings.size} ta e'lon", 12.5f, FontWeight.Medium, Sc.Muted, maxLines = 1)
+                }
+                if (showHeaderCreate) {
+                    ScCircleButton(
+                        ScIcons.Plus, onCreate,
+                        background = Sc.Card, tint = Sc.Brand, contentDescription = "Qo'shish",
+                    )
+                }
             }
-            Spacer(Modifier.height(14.dp))
+            Spacer(Modifier.height(16.dp))
         }
 
         if (listings.isEmpty() && !state.loading) {
-            EmptyState(palette, onCreate, filterDiscount)
+            EmptyState(onCreate, filterDiscount)
         } else {
             LazyColumn(
                 Modifier.fillMaxWidth().weight(1f),
-                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 110.dp),
-                verticalArrangement = Arrangement.spacedBy(11.dp),
+                contentPadding = PaddingValues(
+                    start = Sc.ScreenPadding, end = Sc.ScreenPadding, top = 8.dp, bottom = 110.dp,
+                ),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 items(listings, key = { it.id }) { listing ->
                     MyListingCard(
                         listing = listing,
-                        palette = palette,
                         onEdit = { onEdit(listing.id) },
                         onTogglePaused = { vm.togglePaused(listing) },
                         onDelete = { vm.delete(listing) },
@@ -112,7 +123,7 @@ fun MyListingsScreen(
 }
 
 @Composable
-private fun EmptyState(palette: AppPalette, onCreate: () -> Unit, discount: Boolean?) {
+private fun EmptyState(onCreate: () -> Unit, discount: Boolean?) {
     // Tab bo'yicha farqli matn — Chegirma yoki E'lon.
     val isDiscount = discount != false
     Column(
@@ -120,43 +131,47 @@ private fun EmptyState(palette: AppPalette, onCreate: () -> Unit, discount: Bool
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        // Gradient doira ichida ikonka.
+        // Gradient plitka ichida ikonka.
         Box(
-            Modifier.size(84.dp)
-                .shadow(18.dp, RoundedCornerShape(26.dp), spotColor = palette.primary.copy(alpha = 0.5f))
-                .clip(RoundedCornerShape(26.dp)).background(palette.primaryBrush),
+            Modifier.size(86.dp)
+                .scBrandShadow(16.dp, RoundedCornerShape(28.dp))
+                .clip(RoundedCornerShape(28.dp))
+                .background(Sc.tileBrush),
             contentAlignment = Alignment.Center,
         ) {
             Icon(
-                if (isDiscount) AppIcons.Tag else AppIcons.FileText,
+                if (isDiscount) ScIcons.DiscountTag else ScIcons.FileText,
                 null,
                 tint = Color.White,
                 modifier = Modifier.size(38.dp),
             )
         }
         Spacer(Modifier.height(18.dp))
-        Text(
+        ScText(
             if (isDiscount) "Hali chegirma yo'q" else "Hali e'lon yo'q",
-            style = TextStyle(fontFamily = AppFontFamily, fontSize = 17.sp, fontWeight = FontWeight.Black, color = palette.ink),
+            19f, FontWeight.ExtraBold, Sc.Ink,
         )
         Spacer(Modifier.height(6.dp))
         Text(
-            if (isDiscount)
+            if (isDiscount) {
                 "Birinchi chegirmangizni joylang — talabalar uni Chegirmalar bo'limida ko'radi."
-            else
-                "Birinchi e'loningizni joylang — mahsulot yoki xizmatingizni talabalarga ko'rsating.",
-            style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.5f.sp, color = palette.inkMuted, lineHeight = 18.sp),
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            } else {
+                "Birinchi e'loningizni joylang — mahsulot yoki xizmatingizni talabalarga ko'rsating."
+            },
+            style = scStyle(13.5f, FontWeight.Medium, Sc.Muted, lineHeight = 20f)
+                .copy(textAlign = TextAlign.Center),
         )
-        Spacer(Modifier.height(20.dp))
-        PrimaryButton(if (isDiscount) "Chegirma qo'shish" else "E'lon qo'shish", onCreate)
+        Spacer(Modifier.height(22.dp))
+        ScGradientButton(
+            if (isDiscount) "Chegirma qo'shish" else "E'lon qo'shish",
+            onCreate,
+        )
     }
 }
 
 @Composable
 private fun MyListingCard(
     listing: Listing,
-    palette: AppPalette,
     onEdit: () -> Unit,
     onTogglePaused: () -> Unit,
     onDelete: () -> Unit,
@@ -166,17 +181,12 @@ private fun MyListingCard(
     val accent = Color(listing.accent)
     val isDiscount = listing.isDiscount
 
-    Column(
-        Modifier.fillMaxWidth()
-            .shadow(10.dp, RoundedCornerShape(22.dp), spotColor = accent.copy(alpha = 0.25f))
-            .clip(RoundedCornerShape(22.dp)).background(palette.glass)
-            .border(1.dp, palette.border, RoundedCornerShape(22.dp)),
-    ) {
-        Row(Modifier.fillMaxWidth().padding(13.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(Modifier.fillMaxWidth().scCard(radius = 22.dp)) {
+        Row(Modifier.fillMaxWidth().padding(14.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             // Muqova rasmi (yo'q bo'lsa — tur emoji'si). Chegirmada burchakda badge.
             Box(Modifier.size(72.dp)) {
                 Box(
-                    Modifier.fillMaxSize().clip(RoundedCornerShape(16.dp))
+                    Modifier.fillMaxSize().clip(RoundedCornerShape(18.dp))
                         .background(
                             Brush.linearGradient(listOf(accent.copy(alpha = 0.18f), accent.copy(alpha = 0.07f))),
                         ),
@@ -184,7 +194,7 @@ private fun MyListingCard(
                 ) {
                     val cover = listing.images.firstOrNull()
                     if (cover != null) {
-                        ListingImage(cover, Modifier.fillMaxSize().clip(RoundedCornerShape(16.dp)))
+                        ListingImage(cover, Modifier.fillMaxSize().clip(RoundedCornerShape(18.dp)))
                     } else {
                         Text(listing.emoji, style = TextStyle(fontSize = 28.sp))
                     }
@@ -197,108 +207,89 @@ private fun MyListingCard(
                             .clip(RoundedCornerShape(8.dp)).background(accent)
                             .padding(horizontal = 6.dp, vertical = 2.dp),
                     ) {
-                        Text(
-                            badge,
-                            style = TextStyle(fontFamily = AppFontFamily, fontSize = 9.5f.sp, fontWeight = FontWeight.Black, color = Color.White),
-                        )
+                        ScText(badge, 10f, FontWeight.ExtraBold, Color.White, maxLines = 1)
                     }
                 }
             }
 
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                Text(
-                    listing.title,
-                    style = TextStyle(fontFamily = AppFontFamily, fontSize = 14.sp, fontWeight = FontWeight.Black, color = palette.ink),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                ScText(listing.title, 14.5f, FontWeight.ExtraBold, Sc.Ink, maxLines = 1)
                 // Kategoriya chipi.
                 Box(
-                    Modifier.clip(RoundedCornerShape(7.dp)).background(accent.copy(alpha = 0.12f))
+                    Modifier.clip(RoundedCornerShape(8.dp)).background(accent.copy(alpha = 0.12f))
                         .padding(horizontal = 8.dp, vertical = 3.dp),
                 ) {
-                    Text(
-                        listing.categoryLabel,
-                        style = TextStyle(fontFamily = AppFontFamily, fontSize = 10.5f.sp, fontWeight = FontWeight.Bold, color = accent),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
+                    ScText(listing.categoryLabel, 11f, FontWeight.Bold, accent, maxLines = 1)
                 }
                 Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                    Text(
-                        "${listing.finalPrice.formatSum()} so'm",
-                        style = TextStyle(fontFamily = AppFontFamily, fontSize = 15.sp, fontWeight = FontWeight.Black, color = palette.ink),
-                    )
+                    ScText("${listing.finalPrice.formatSum()} so'm", 15.5f, FontWeight.ExtraBold, Sc.Ink, maxLines = 1)
                     // Chegirmada eski narx — chiziq bilan; oddiy e'londa yo'q.
                     if (isDiscount && listing.price != listing.finalPrice) {
                         Text(
                             listing.price.formatSum(),
-                            style = TextStyle(
-                                fontFamily = AppFontFamily,
-                                fontSize = 11.5f.sp,
-                                color = palette.inkFaint,
-                                textDecoration = TextDecoration.LineThrough,
-                            ),
+                            style = scStyle(11.5f, FontWeight.Medium, Sc.MutedLight)
+                                .copy(textDecoration = TextDecoration.LineThrough),
                             modifier = Modifier.padding(bottom = 1.dp),
                         )
                     }
                 }
             }
 
-            StatusPill(listing.status.label, listing.status.color(palette))
+            StatusPill(listing.status.label, listing.status.scColor())
         }
 
         Row(
-            Modifier.fillMaxWidth().padding(horizontal = 12.dp).padding(bottom = 11.dp),
+            Modifier.fillMaxWidth().padding(horizontal = 13.dp).padding(bottom = 12.dp),
             horizontalArrangement = Arrangement.spacedBy(7.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             val first = listing.branches.firstOrNull()
             if (first != null) {
                 val extra = listing.branches.size - 1
-                Text(
-                    // Bir nechta filial bo'lsa: "📍 Chilonzor filiali — ... +2 filial"
+                // Bir nechta filial bo'lsa: "📍 Chilonzor filiali — ... +2 filial"
+                ScText(
                     "📍 ${first.display()}" + if (extra > 0) "  +$extra filial" else "",
-                    style = TextStyle(fontFamily = AppFontFamily, fontSize = 10.5f.sp, color = palette.inkFaint),
+                    11f, FontWeight.Medium, Sc.MutedLight,
+                    Modifier.weight(1f),
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
                 )
             } else {
                 Spacer(Modifier.weight(1f))
             }
 
-            CardAction(AppIcons.Pencil, "Tahrirlash", palette, onEdit)
+            CardAction(AppIcons.Pencil, "Tahrirlash", Sc.TintBlue, Sc.Brand, onEdit)
             if (listing.status == ListingStatus.ACTIVE || listing.status == ListingStatus.PAUSED) {
                 CardAction(
                     if (listing.status == ListingStatus.ACTIVE) AppIcons.EyeOff else AppIcons.Eye,
                     if (listing.status == ListingStatus.ACTIVE) "To'xtatish" else "Yoqish",
-                    palette,
+                    Sc.Chip, Sc.ChipInk,
                     onTogglePaused,
                 )
             }
-            CardAction(AppIcons.Close, "O'chirish", palette, onDelete)
+            CardAction(ScIcons.Close, "O'chirish", Sc.TintPink, Sc.Danger, onDelete)
         }
     }
 }
 
 @Composable
 private fun CardAction(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    icon: ImageVector,
     description: String,
-    palette: AppPalette,
+    background: Color,
+    tint: Color,
     onClick: () -> Unit,
 ) {
-    Box(
-        Modifier.size(32.dp).clip(RoundedCornerShape(10.dp)).background(palette.fieldBg).clickable(onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) { Icon(icon, description, tint = palette.inkMuted, modifier = Modifier.size(15.dp)) }
+    ScIconTile(background, Modifier.clip(RoundedCornerShape(11.dp)).clickable(onClick = onClick), size = 33.dp, radius = 11.dp) {
+        Icon(icon, description, tint = tint, modifier = Modifier.size(15.dp))
+    }
 }
 
-private fun ListingStatus.color(palette: AppPalette): Color = when (this) {
-    ListingStatus.ACTIVE -> palette.successDeep
-    ListingStatus.DRAFT -> palette.inkFaint
-    ListingStatus.PENDING_REVIEW, ListingStatus.SCHEDULED -> palette.primary
-    ListingStatus.REJECTED, ListingStatus.EXPIRED, ListingStatus.SOLD_OUT -> Color(0xFFEF4444)
-    ListingStatus.PAUSED, ListingStatus.ARCHIVED -> palette.inkMuted
+/** Status → dizayn palitrasidagi rang. */
+@Composable
+private fun ListingStatus.scColor(): Color = when (this) {
+    ListingStatus.ACTIVE -> Sc.Success
+    ListingStatus.DRAFT -> Sc.MutedLight
+    ListingStatus.PENDING_REVIEW, ListingStatus.SCHEDULED -> Sc.Brand
+    ListingStatus.REJECTED, ListingStatus.EXPIRED, ListingStatus.SOLD_OUT -> Sc.Danger
+    ListingStatus.PAUSED, ListingStatus.ARCHIVED -> Sc.Muted
 }

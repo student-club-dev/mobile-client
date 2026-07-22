@@ -16,15 +16,15 @@ import coil3.ImageLoader
 import coil3.compose.setSingletonImageLoaderFactory
 import coil3.network.ktor3.KtorNetworkFetcherFactory
 import dev.core.data.seed.LocalDataSeeder
-import dev.core.designsystem.generated.resources.Res
-import dev.core.designsystem.theme.AppTheme
+import dev.core.uikit.generated.resources.Res
+import dev.core.uikit.theme.AppTheme
 import dev.feature.settings.domain.model.ThemeMode
 import dev.feature.settings.domain.repository.SettingsRepository
 import dev.feature.university.domain.repository.UniversityRepository
 import dev.feature.auth.presentation.flow.AuthNavHost
 import dev.feature.auth.presentation.flow.AuthUserFlow
 import dev.feature.auth.presentation.flow.RoleLauncher
-import dev.core.designsystem.theme.appPalette
+import dev.core.uikit.theme.appPalette
 import io.ktor.client.HttpClient
 import org.koin.compose.koinInject
 

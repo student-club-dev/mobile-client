@@ -1,5 +1,6 @@
 package dev.feature.jobs.presentation
 
+import dev.core.uikit.components.scTopInset
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -39,11 +40,11 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.feature.jobs.domain.model.Job
 import dev.feature.jobs.domain.model.JobFilter
-import dev.core.designsystem.components.AppFontFamily
-import dev.core.designsystem.components.AppIcons
-import dev.core.designsystem.components.PrimaryButton
-import dev.core.designsystem.theme.AppPalette
-import dev.core.designsystem.theme.appPalette
+import dev.core.uikit.components.AppFontFamily
+import dev.core.uikit.components.AppIcons
+import dev.core.uikit.components.PrimaryButton
+import dev.core.uikit.theme.AppPalette
+import dev.core.uikit.theme.appPalette
 import org.koin.compose.viewmodel.koinViewModel
 
 private val filterLabels = listOf(
@@ -66,7 +67,7 @@ fun JobsScreen(vm: JobsViewModel = koinViewModel()) {
     }
 
     Column(Modifier.fillMaxSize()) {
-        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(top = 54.dp)) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp).scTopInset()) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text("Ishlar", style = TextStyle(fontFamily = AppFontFamily, fontSize = 24.sp, fontWeight = FontWeight.Black, color = palette.ink), modifier = Modifier.weight(1f))
                 Box(
@@ -168,7 +169,7 @@ private fun TagPill(tag: String, palette: AppPalette) {
 private fun JobDetail(job: Job, palette: AppPalette, onBack: () -> Unit, onApply: () -> Unit, onBookmark: () -> Unit) {
     var applied by remember { mutableStateOf(false) }
     Column(Modifier.fillMaxSize()) {
-        Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).padding(top = 54.dp)) {
+        Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).scTopInset()) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(palette.glass).border(1.dp, palette.border, RoundedCornerShape(12.dp)).clickable(onClick = onBack), contentAlignment = Alignment.Center) {
                     Icon(AppIcons.ArrowLeft, "Orqaga", tint = palette.ink, modifier = Modifier.size(18.dp))

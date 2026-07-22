@@ -26,8 +26,10 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import dev.core.designsystem.components.AppFontFamily
-import dev.core.designsystem.theme.AppPalette
+import dev.core.uikit.components.AppFontFamily
+import dev.core.uikit.theme.AppPalette
+import dev.core.uikit.theme.Sc
+import androidx.compose.ui.draw.shadow
 import dev.feature.listings.domain.model.ExperienceLevel
 import dev.feature.listings.domain.model.JobCatalog
 import kotlinx.datetime.Clock
@@ -343,26 +345,28 @@ private fun DiscountBrowseCard(
 // Umumiy qismlar
 // ---------------------------------------------------------------------------
 
+@Composable
 private fun cardModifier(palette: AppPalette, onClick: () -> Unit): Modifier =
     Modifier.fillMaxWidth()
-        .clip(RoundedCornerShape(18.dp))
-        .background(palette.glass)
-        .border(1.dp, palette.border, RoundedCornerShape(18.dp))
+        .shadow(8.dp, RoundedCornerShape(24.dp), ambientColor = Sc.Ink.copy(alpha = 0.22f), spotColor = Sc.Ink.copy(alpha = 0.30f))
+        .clip(RoundedCornerShape(24.dp))
+        .background(Sc.Card)
+        .border(1.dp, Sc.Border, RoundedCornerShape(24.dp))
         .clickable(onClick = onClick)
-        .padding(12.dp)
+        .padding(15.dp)
 
 @Composable
 private fun Cover(listing: Listing) {
     Box(
-        Modifier.size(64.dp).clip(RoundedCornerShape(14.dp))
-            .background(Color(listing.accent).copy(alpha = 0.14f)),
+        Modifier.size(64.dp).clip(RoundedCornerShape(18.dp))
+            .background(Color(listing.accent).copy(alpha = 0.13f)),
         contentAlignment = Alignment.Center,
     ) {
         val cover = listing.images.firstOrNull()
         if (cover != null) {
-            ListingImage(cover, Modifier.fillMaxSize().clip(RoundedCornerShape(14.dp)))
+            ListingImage(cover, Modifier.fillMaxSize().clip(RoundedCornerShape(18.dp)))
         } else {
-            Text(listing.emoji, style = TextStyle(fontSize = 24.sp))
+            Text(listing.emoji, style = TextStyle(fontSize = 26.sp))
         }
     }
 }
@@ -371,7 +375,7 @@ private fun Cover(listing: Listing) {
 private fun CardTitle(text: String, palette: AppPalette) {
     Text(
         text,
-        style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.5f.sp, fontWeight = FontWeight.ExtraBold, color = palette.ink),
+        style = TextStyle(fontFamily = AppFontFamily, fontSize = 15.5f.sp, fontWeight = FontWeight.ExtraBold, color = Sc.Ink),
         maxLines = 2,
         overflow = TextOverflow.Ellipsis,
     )
@@ -381,7 +385,7 @@ private fun CardTitle(text: String, palette: AppPalette) {
 private fun PriceLine(text: String, palette: AppPalette) {
     Text(
         text,
-        style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.sp, fontWeight = FontWeight.Black, color = palette.successDeep),
+        style = TextStyle(fontFamily = AppFontFamily, fontSize = 14.5f.sp, fontWeight = FontWeight.ExtraBold, color = Sc.Success),
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
     )
@@ -391,7 +395,7 @@ private fun PriceLine(text: String, palette: AppPalette) {
 private fun FaintLine(text: String, palette: AppPalette) {
     Text(
         text,
-        style = TextStyle(fontFamily = AppFontFamily, fontSize = 10.5f.sp, color = palette.inkFaint),
+        style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.5f.sp, fontWeight = FontWeight.Medium, color = Sc.Muted),
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
     )
@@ -410,12 +414,12 @@ private fun MetaLine(distanceLabel: String?, branchLabel: String?, palette: AppP
 @Composable
 private fun StatPill(text: String, palette: AppPalette) {
     Box(
-        Modifier.clip(RoundedCornerShape(9.dp)).background(palette.fieldBg)
-            .padding(horizontal = 8.dp, vertical = 4.dp),
+        Modifier.clip(RoundedCornerShape(10.dp)).background(Sc.Chip)
+            .padding(horizontal = 9.dp, vertical = 4.dp),
     ) {
         Text(
             text,
-            style = TextStyle(fontFamily = AppFontFamily, fontSize = 10.5f.sp, fontWeight = FontWeight.Bold, color = palette.inkMuted),
+            style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Sc.ChipInk),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
@@ -426,12 +430,12 @@ private fun StatPill(text: String, palette: AppPalette) {
 @Composable
 private fun AccentPill(text: String, accent: Color) {
     Box(
-        Modifier.clip(RoundedCornerShape(9.dp)).background(accent.copy(alpha = 0.14f))
-            .padding(horizontal = 8.dp, vertical = 4.dp),
+        Modifier.clip(RoundedCornerShape(10.dp)).background(accent.copy(alpha = 0.13f))
+            .padding(horizontal = 9.dp, vertical = 4.dp),
     ) {
         Text(
             text,
-            style = TextStyle(fontFamily = AppFontFamily, fontSize = 10.5f.sp, fontWeight = FontWeight.Bold, color = accent),
+            style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = accent),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )

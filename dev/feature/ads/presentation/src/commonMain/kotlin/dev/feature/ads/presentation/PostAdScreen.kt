@@ -1,5 +1,6 @@
 package dev.feature.ads.presentation
 
+import dev.core.uikit.components.scTopInset
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -30,24 +31,37 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import dev.core.designsystem.components.AppFontFamily
-import dev.core.designsystem.components.AppIcons
-import dev.core.designsystem.components.GlassTextField
-import dev.core.designsystem.components.PrimaryButton
-import dev.core.designsystem.theme.AppPalette
-import dev.core.designsystem.theme.appPalette
+import dev.core.uikit.components.AppFontFamily
+import dev.core.uikit.components.AppIcons
+import dev.core.uikit.components.GlassTextField
+import dev.core.uikit.components.PrimaryButton
+import dev.core.uikit.theme.AppPalette
+import dev.core.uikit.theme.appPalette
 import dev.feature.ads.domain.model.AdType
 import org.koin.compose.viewmodel.koinViewModel
 
-private data class AdTypeInfo(val type: AdType, val title: String, val subtitle: String, val icon: ImageVector)
+private data class AdTypeInfo(val type: AdType, val title: String, val subtitle: String)
 
 private val adTypes = listOf(
-    AdTypeInfo(AdType.JOB, "Ish e'loni", "Xodim yoki part-time izlash", AppIcons.Briefcase),
-    AdTypeInfo(AdType.RENTAL, "Ijara / Turar joy", "Kvartira, hostel, room-mate", AppIcons.Home),
-    AdTypeInfo(AdType.SALE, "Sotuv (bozor)", "Kitob, texnika, buyum sotish", AppIcons.Store),
-    AdTypeInfo(AdType.SERVICE, "Xizmat / Repetitor", "Dars berish, dizayn, tarjima", AppIcons.GraduationCap),
-    AdTypeInfo(AdType.OTHER, "Boshqa e'lon", "Tadbir, jamoa, yo'qoldi-topildi", AppIcons.MessageSquare),
+    AdTypeInfo(AdType.JOB, "Ish e'loni", "Xodim yoki part-time izlash"),
+    AdTypeInfo(AdType.RENTAL, "Ijara / Turar joy", "Kvartira, hostel, room-mate"),
+    AdTypeInfo(AdType.SALE, "Sotuv (bozor)", "Kitob, texnika, buyum sotish"),
+    AdTypeInfo(AdType.SERVICE, "Xizmat / Repetitor", "Dars berish, dizayn, tarjima"),
+    AdTypeInfo(AdType.OTHER, "Boshqa e'lon", "Tadbir, jamoa, yo'qoldi-topildi"),
 )
+
+/**
+ * Ikona ro'yxatда emas, chizish paytida tanlanadi: ikonalar endi resurslardan
+ * o'qiladi va faqat kompozitsiya ichida mavjud bo'ladi.
+ */
+private val AdTypeInfo.icon: ImageVector
+    @Composable get() = when (type) {
+        AdType.JOB -> AppIcons.Briefcase
+        AdType.RENTAL -> AppIcons.Home
+        AdType.SALE -> AppIcons.Store
+        AdType.SERVICE -> AppIcons.GraduationCap
+        AdType.OTHER -> AppIcons.MessageSquare
+    }
 
 @Composable
 fun PostAdScreen(onClose: () -> Unit, editAdId: String? = null, vm: PostAdViewModel = koinViewModel()) {
@@ -68,7 +82,7 @@ fun PostAdScreen(onClose: () -> Unit, editAdId: String? = null, vm: PostAdViewMo
 // 1s — tur tanlash
 @Composable
 private fun AdTypePicker(palette: AppPalette, onClose: () -> Unit, onPick: (AdType) -> Unit) {
-    Column(Modifier.fillMaxSize().padding(horizontal = 16.dp).padding(top = 54.dp)) {
+    Column(Modifier.fillMaxSize().padding(horizontal = 16.dp).scTopInset()) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(11.dp)) {
             IconBtn(AppIcons.Close, palette, onClose)
             Text("Elon berish", style = TextStyle(fontFamily = AppFontFamily, fontSize = 20.sp, fontWeight = FontWeight.Black, color = palette.ink))
@@ -103,7 +117,7 @@ private fun AdTypePicker(palette: AppPalette, onClose: () -> Unit, onPick: (AdTy
 private fun AdForm(state: PostAdUiState, palette: AppPalette, onBack: () -> Unit, vm: PostAdViewModel) {
     val info = adTypes.first { it.type == state.type }
     Column(Modifier.fillMaxSize()) {
-        Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).padding(top = 54.dp)) {
+        Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).scTopInset()) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(11.dp)) {
                 IconBtn(AppIcons.ArrowLeft, palette, onBack)
                 Text(info.title, style = TextStyle(fontFamily = AppFontFamily, fontSize = 19.sp, fontWeight = FontWeight.Black, color = palette.ink))

@@ -34,23 +34,23 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import dev.core.designsystem.components.AppFontFamily
-import dev.core.designsystem.components.AppIcons
-import dev.core.designsystem.components.AppScreenScaffold
-import dev.core.designsystem.components.BackButton
-import dev.core.designsystem.components.ErrorText
-import dev.core.designsystem.components.FieldLabel
-import dev.core.designsystem.components.GlassTextField
-import dev.core.designsystem.components.HintText
-import dev.core.designsystem.components.PhoneVisualTransformation
-import dev.core.designsystem.components.PrimaryButton
-import dev.core.designsystem.components.ScreenSubtitle
-import dev.core.designsystem.components.ScreenTitle
+import dev.core.uikit.components.AppFontFamily
+import dev.core.uikit.components.AppIcons
+import dev.core.uikit.components.AppScreenScaffold
+import dev.core.uikit.components.BackButton
+import dev.core.uikit.components.ErrorText
+import dev.core.uikit.components.FieldLabel
+import dev.core.uikit.components.GlassTextField
+import dev.core.uikit.components.HintText
+import dev.core.uikit.components.PhoneVisualTransformation
+import dev.core.uikit.components.PrimaryButton
+import dev.core.uikit.components.ScreenSubtitle
+import dev.core.uikit.components.ScreenTitle
 import dev.feature.auth.presentation.flow.AuthFlowState
 import dev.feature.auth.presentation.flow.AuthFlowViewModel
 import dev.feature.auth.presentation.flow.Role
-import dev.core.designsystem.theme.AppPalette
-import dev.core.designsystem.theme.appPalette
+import dev.core.uikit.theme.AppPalette
+import dev.core.uikit.theme.appPalette
 
 // ===========================================================================
 // 1g — OTP
@@ -82,7 +82,7 @@ fun OtpScreen(
         Text(
             buildAnnotatedString {
                 withStyle(androidx.compose.ui.text.SpanStyle(color = palette.ink, fontWeight = FontWeight.Bold)) {
-                    append("+998 ${dev.core.designsystem.components.formatUzPhone(state.phone.ifEmpty { "901234567" })} ")
+                    append("+998 ${dev.core.uikit.components.formatUzPhone(state.phone.ifEmpty { "901234567" })} ")
                 }
                 withStyle(androidx.compose.ui.text.SpanStyle(color = palette.inkMuted)) {
                     append("raqamiga yuborilgan 6 xonali kodni kiriting.")

@@ -28,16 +28,16 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import dev.core.designsystem.components.AppFontFamily
-import dev.core.designsystem.components.AppIcons
-import dev.core.designsystem.components.AppScreenScaffold
-import dev.core.designsystem.components.BackButton
-import dev.core.designsystem.components.GlassTextField
-import dev.core.designsystem.components.HintText
-import dev.core.designsystem.components.PrimaryButton
-import dev.core.designsystem.components.ScreenTitle
-import dev.core.designsystem.theme.AppPalette
-import dev.core.designsystem.theme.appPalette
+import dev.core.uikit.components.AppFontFamily
+import dev.core.uikit.components.AppIcons
+import dev.core.uikit.components.AppScreenScaffold
+import dev.core.uikit.components.BackButton
+import dev.core.uikit.components.GlassTextField
+import dev.core.uikit.components.HintText
+import dev.core.uikit.components.PrimaryButton
+import dev.core.uikit.components.ScreenTitle
+import dev.core.uikit.theme.AppPalette
+import dev.core.uikit.theme.appPalette
 
 /**
  * Biznesmen uchun ALOHIDA kirish ekrani. Sof UI — holat/callbacklarni parametr sifatida oladi

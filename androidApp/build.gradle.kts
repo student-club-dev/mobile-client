@@ -42,13 +42,15 @@ kotlin {
 dependencies {
     implementation(projects.dev.shared)
     implementation(projects.dev.core.di)
-    implementation(projects.dev.core.designsystem)
+    implementation(projects.dev.core.uikit)
 
     // Firebase (Google + Phone auth) — google-services.json orqali sozlanadi
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.auth)
 
     implementation(libs.androidx.core.ktx)
+    // Android 12+ tizim splash ekrani (`installSplashScreen()` MainActivity'da).
+    implementation(libs.androidx.core.splashscreen)
     implementation(libs.androidx.activity.compose)
     // MainActivity FragmentActivity bo'lishi uchun (biometrik BiometricPrompt talab qiladi)
     implementation(libs.androidx.fragment)

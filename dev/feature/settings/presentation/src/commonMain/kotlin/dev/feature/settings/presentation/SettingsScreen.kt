@@ -2,7 +2,6 @@ package dev.feature.settings.presentation
 
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -30,25 +29,26 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import dev.feature.settings.domain.model.ThemeMode
-import dev.core.designsystem.components.AppFontFamily
-import dev.core.designsystem.components.AppIcons
-import dev.core.designsystem.theme.AppPalette
-import dev.core.designsystem.theme.appPalette
+import dev.core.uikit.components.AppIcons
+import dev.core.uikit.components.ScCircleButton
+import dev.core.uikit.components.ScHeader
+import dev.core.uikit.components.ScHeaderTitle
+import dev.core.uikit.components.ScIconTile
+import dev.core.uikit.components.ScIcons
+import dev.core.uikit.components.ScText
+import dev.core.uikit.components.scCard
+import dev.core.uikit.components.scStyle
+import dev.core.uikit.theme.Sc
 import dev.feature.profile.presentation.ProfileViewModel
+import dev.feature.settings.domain.model.ThemeMode
 import org.koin.compose.viewmodel.koinViewModel
 
 /**
- * Sozlamalar ekrani (A3/C3). Hisob, bildirishnoma va ilova ma'lumotlari.
- *
- * Eslatma: bildirishnoma toggle'lari hozircha faqat UI holatida (local `remember`).
- * Doimiy saqlash va mavzu/til almashtirish uchun alohida `SettingsStore` + theme
- * override kerak — bu IMPLEMENTATION_PLAN.md dagi "SettingsStore" bandida bajariladi.
+ * Sozlamalar ekrani (A3/C3). Hisob, mavzu, bildirishnoma va ilova ma'lumotlari —
+ * gradient topbar + oq kartalar (dizayn tizimi tokenlari).
  */
 @Composable
 fun SettingsScreen(
@@ -58,138 +58,179 @@ fun SettingsScreen(
     vm: ProfileViewModel = koinViewModel(),
     settingsVm: SettingsViewModel = koinViewModel(),
 ) {
-    val palette = appPalette
     val state by vm.state.collectAsStateWithLifecycle()
     val settings by settingsVm.state.collectAsStateWithLifecycle()
 
     var aboutExpanded by remember { mutableStateOf(false) }
 
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-        // Header
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(top = 54.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(11.dp),
-        ) {
-            Box(
-                Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(palette.glass)
-                    .border(1.dp, palette.border, RoundedCornerShape(12.dp)).clickable(onClick = onBack),
-                contentAlignment = Alignment.Center,
-            ) { Icon(AppIcons.ArrowLeft, "Orqaga", tint = palette.ink, modifier = Modifier.size(18.dp)) }
-            Text("Sozlamalar", style = TextStyle(fontFamily = AppFontFamily, fontSize = 20.sp, fontWeight = FontWeight.Black, color = palette.ink))
+    Column(Modifier.fillMaxSize().background(Sc.Bg).verticalScroll(rememberScrollState())) {
+        ScHeader(horizontalPadding = 18.dp) {
+            Row(
+                Modifier.fillMaxWidth().padding(top = 18.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(13.dp),
+            ) {
+                ScCircleButton(ScIcons.ChevronLeft, onBack, contentDescription = "Orqaga")
+                ScHeaderTitle("Sozlamalar", modifier = Modifier.weight(1f))
+            }
         }
-        Spacer(Modifier.height(18.dp))
+        Spacer(Modifier.height(20.dp))
 
-        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
-            SectionTitle("Hisob", palette)
-            SettingRow(AppIcons.Pencil, "Profilni tahrirlash", state.name, palette, onClick = onEditProfile)
+        Column(
+            Modifier.fillMaxWidth().padding(horizontal = Sc.ScreenPadding),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            SectionTitle("Hisob")
+            SettingRow(AppIcons.Pencil, Sc.TintBlue, Sc.Brand, "Profilni tahrirlash", state.name, onClick = onEditProfile)
 
-            Spacer(Modifier.height(6.dp))
-            SectionTitle("Mavzu", palette)
-            ThemeSelector(settings.themeMode, palette) { settingsVm.setThemeMode(it) }
+            Spacer(Modifier.height(4.dp))
+            SectionTitle("Mavzu")
+            ThemeSelector(settings.themeMode) { settingsVm.setThemeMode(it) }
 
-            Spacer(Modifier.height(6.dp))
-            SectionTitle("Bildirishnomalar", palette)
-            ToggleRow(AppIcons.Bell, "Push bildirishnomalar", settings.pushEnabled, palette) { settingsVm.setPush(it) }
-            ToggleRow(AppIcons.Mail, "Email xabarnomalar", settings.emailEnabled, palette) { settingsVm.setEmail(it) }
+            Spacer(Modifier.height(4.dp))
+            SectionTitle("Bildirishnomalar")
+            ToggleRow(AppIcons.Bell, Sc.TintPink, Sc.Pink, "Push bildirishnomalar", settings.pushEnabled) {
+                settingsVm.setPush(it)
+            }
+            ToggleRow(AppIcons.Mail, Sc.TintViolet, Sc.Violet, "Email xabarnomalar", settings.emailEnabled) {
+                settingsVm.setEmail(it)
+            }
 
-            Spacer(Modifier.height(6.dp))
-            SectionTitle("Umumiy", palette)
-            SettingRow(AppIcons.ShieldCheck, "Ilova haqida", if (aboutExpanded) "Versiya 1.0.0" else null, palette) { aboutExpanded = !aboutExpanded }
+            Spacer(Modifier.height(4.dp))
+            SectionTitle("Umumiy")
+            SettingRow(
+                AppIcons.ShieldCheck, Sc.TintGreenDeep, Sc.Success,
+                "Ilova haqida", if (aboutExpanded) "Versiya 1.0.0" else null,
+            ) { aboutExpanded = !aboutExpanded }
             if (aboutExpanded) {
                 Text(
-                    "StudentClubs — talabalar uchun super-app: chegirmalar, ishlar, e'lonlar va xabarlar.\nVersiya 1.0.0",
-                    style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.sp, color = palette.inkMuted),
+                    "StudentClubs — talabalar uchun super-app: chegirmalar, ishlar, " +
+                        "e'lonlar va xabarlar.\nVersiya 1.0.0",
+                    style = scStyle(12.5f, FontWeight.Medium, Sc.Muted, lineHeight = 19f),
                     modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                 )
             }
 
-            Spacer(Modifier.height(14.dp))
+            Spacer(Modifier.height(8.dp))
             Row(
-                Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Color(0xFFDC2626).copy(alpha = 0.10f)).clickable { vm.logout(onLoggedOut) }.padding(14.dp),
+                Modifier.fillMaxWidth()
+                    .clip(RoundedCornerShape(18.dp))
+                    .background(Sc.Danger.copy(alpha = 0.10f))
+                    .clickable { vm.logout(onLoggedOut) }
+                    .padding(15.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                Icon(AppIcons.LogOut, null, tint = Color(0xFFDC2626), modifier = Modifier.size(18.dp))
-                Text("Chiqish", style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.5f.sp, fontWeight = FontWeight.ExtraBold, color = Color(0xFFDC2626)))
+                Icon(AppIcons.LogOut, null, tint = Sc.Danger, modifier = Modifier.size(18.dp))
+                ScText("Chiqish", 14f, FontWeight.ExtraBold, Sc.Danger, maxLines = 1)
             }
             Spacer(Modifier.height(28.dp))
         }
     }
 }
 
+/** Uch holatli mavzu selektori — faol variant ko'k tint bilan ajratiladi. */
 @Composable
-private fun ThemeSelector(current: ThemeMode, palette: AppPalette, onSelect: (ThemeMode) -> Unit) {
+private fun ThemeSelector(current: ThemeMode, onSelect: (ThemeMode) -> Unit) {
     val options = listOf(
         ThemeMode.SYSTEM to "Tizim",
         ThemeMode.LIGHT to "Yorug'",
         ThemeMode.DARK to "Tungi",
     )
     Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(palette.glass).border(1.dp, palette.border, RoundedCornerShape(14.dp)).padding(4.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        Modifier.fillMaxWidth().scCard(radius = 18.dp).padding(5.dp),
+        horizontalArrangement = Arrangement.spacedBy(5.dp),
     ) {
         options.forEach { (mode, label) ->
             val active = mode == current
             Box(
-                Modifier.weight(1f).height(38.dp).clip(RoundedCornerShape(11.dp))
-                    .background(if (active) palette.primary.copy(alpha = 0.16f) else Color.Transparent)
+                Modifier.weight(1f).height(38.dp)
+                    .clip(RoundedCornerShape(13.dp))
+                    .background(if (active) Sc.TintBlue else Color.Transparent)
                     .clickable { onSelect(mode) },
                 contentAlignment = Alignment.Center,
             ) {
-                Text(label, style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.5f.sp, fontWeight = FontWeight.Bold, color = if (active) palette.primary else palette.inkMuted))
+                ScText(
+                    label, 13f, FontWeight.Bold,
+                    if (active) Sc.Brand else Sc.Muted,
+                    maxLines = 1,
+                )
             }
         }
     }
 }
 
 @Composable
-private fun SectionTitle(text: String, palette: AppPalette) {
-    Text(text, style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.5f.sp, fontWeight = FontWeight.Bold, color = palette.inkFaint), modifier = Modifier.padding(start = 4.dp, top = 2.dp, bottom = 2.dp))
+private fun SectionTitle(text: String) {
+    ScText(
+        text, 12.5f, FontWeight.Bold, Sc.Muted,
+        Modifier.padding(start = 4.dp, top = 2.dp, bottom = 2.dp),
+        letterSpacing = 0.2f,
+        maxLines = 1,
+    )
 }
 
 @Composable
-private fun SettingRow(icon: ImageVector, title: String, trailing: String?, palette: AppPalette, onClick: () -> Unit) {
+private fun SettingRow(
+    icon: ImageVector,
+    tileBackground: Color,
+    tint: Color,
+    title: String,
+    trailing: String?,
+    onClick: () -> Unit,
+) {
     Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(palette.glass).border(1.dp, palette.border, RoundedCornerShape(14.dp)).clickable(onClick = onClick).padding(14.dp),
+        Modifier.fillMaxWidth().scCard(radius = 20.dp, onClick = onClick).padding(14.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(11.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Box(Modifier.size(36.dp).clip(RoundedCornerShape(10.dp)).background(palette.primary.copy(alpha = 0.10f)), contentAlignment = Alignment.Center) {
-            Icon(icon, null, tint = palette.primary, modifier = Modifier.size(17.dp))
+        ScIconTile(tileBackground, size = 42.dp, radius = 14.dp) {
+            Icon(icon, null, tint = tint, modifier = Modifier.size(19.dp))
         }
-        Text(title, style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.5f.sp, fontWeight = FontWeight.Bold, color = palette.ink), modifier = Modifier.weight(1f))
+        ScText(title, 14.5f, FontWeight.Bold, Sc.Ink, Modifier.weight(1f), maxLines = 1)
         if (trailing != null) {
-            Text(trailing, style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = palette.inkFaint))
-            Spacer(Modifier.width(6.dp))
+            ScText(trailing, 13f, FontWeight.Bold, Sc.Muted, maxLines = 1)
+            Spacer(Modifier.width(4.dp))
         }
-        Icon(AppIcons.ChevronRight, null, tint = palette.inkFaint, modifier = Modifier.size(17.dp))
+        Icon(ScIcons.ChevronRight, null, tint = Sc.MutedLight, modifier = Modifier.size(16.dp))
     }
 }
 
 @Composable
-private fun ToggleRow(icon: ImageVector, title: String, checked: Boolean, palette: AppPalette, onToggle: (Boolean) -> Unit) {
+private fun ToggleRow(
+    icon: ImageVector,
+    tileBackground: Color,
+    tint: Color,
+    title: String,
+    checked: Boolean,
+    onToggle: (Boolean) -> Unit,
+) {
     Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(palette.glass).border(1.dp, palette.border, RoundedCornerShape(14.dp)).clickable { onToggle(!checked) }.padding(14.dp),
+        Modifier.fillMaxWidth().scCard(radius = 20.dp, onClick = { onToggle(!checked) }).padding(14.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(11.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Box(Modifier.size(36.dp).clip(RoundedCornerShape(10.dp)).background(palette.primary.copy(alpha = 0.10f)), contentAlignment = Alignment.Center) {
-            Icon(icon, null, tint = palette.primary, modifier = Modifier.size(17.dp))
+        ScIconTile(tileBackground, size = 42.dp, radius = 14.dp) {
+            Icon(icon, null, tint = tint, modifier = Modifier.size(19.dp))
         }
-        Text(title, style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.5f.sp, fontWeight = FontWeight.Bold, color = palette.ink), modifier = Modifier.weight(1f))
-        SwitchTrack(checked, palette)
+        ScText(title, 14.5f, FontWeight.Bold, Sc.Ink, Modifier.weight(1f), maxLines = 1)
+        SwitchTrack(checked)
     }
 }
 
 @Composable
-private fun SwitchTrack(checked: Boolean, palette: AppPalette) {
+private fun SwitchTrack(checked: Boolean) {
     val knobOffset by animateDpAsState(if (checked) 20.dp else 2.dp)
     Box(
-        Modifier.width(44.dp).height(26.dp).clip(RoundedCornerShape(999.dp))
-            .background(if (checked) palette.primary else palette.inkFaint.copy(alpha = 0.35f)),
+        Modifier.width(44.dp).height(26.dp)
+            .clip(RoundedCornerShape(percent = 50))
+            .background(if (checked) Sc.Brand else Sc.Handle),
         contentAlignment = Alignment.CenterStart,
     ) {
-        Box(Modifier.padding(start = knobOffset).size(22.dp).clip(RoundedCornerShape(999.dp)).background(Color.White))
+        Box(
+            Modifier.padding(start = knobOffset).size(22.dp)
+                .clip(RoundedCornerShape(percent = 50))
+                .background(Color.White),
+        )
     }
 }

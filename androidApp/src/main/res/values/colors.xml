@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Tizim splash foni — brend ko'k (`Color.kt`dagi Primary). `AnimatedSplashScreen`
+         gradienti aynan shu rangdan boshlanadi, shuning uchun ikki ekran orasida
+         rang "sakramaydi". Mavzuga bog'liq emas: splash har doim brend ko'k. -->
+    <color name="splash_background">#FF00ADEE</color>
+</resources>

@@ -1,5 +1,6 @@
 package dev.feature.listings.presentation
 
+import dev.core.uikit.components.scTopInset
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -34,22 +35,32 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import dev.core.designsystem.components.AppFontFamily
-import dev.core.designsystem.components.AppIcons
-import dev.core.designsystem.components.GlassTextField
-import dev.core.designsystem.components.PrimaryButton
-import dev.core.designsystem.theme.AppPalette
-import dev.core.designsystem.theme.appPalette
+import dev.core.uikit.components.AppFontFamily
+import dev.core.uikit.components.AppIcons
+import dev.core.uikit.components.GlassTextField
+import dev.core.uikit.components.PrimaryButton
+import dev.core.uikit.theme.AppPalette
+import dev.core.uikit.theme.appPalette
 import dev.feature.listings.domain.model.BusinessType
 import dev.feature.listings.domain.model.ListingField
 import dev.feature.listings.domain.model.ListingKind
 import dev.feature.listings.presentation.components.FormSection
 import dev.feature.listings.presentation.components.IconSquareButton
 import dev.feature.listings.presentation.form.KindListingForm
-import dev.core.designsystem.map.MapCenterRequest
-import dev.core.designsystem.map.MapPicker
-import dev.core.designsystem.map.MapPoint
-import dev.core.designsystem.map.rememberUserLocation
+import dev.core.uikit.map.MapCenterRequest
+import dev.core.uikit.components.ScCircleButton
+import dev.core.uikit.components.ScGlyph
+import dev.core.uikit.components.ScHeader
+import dev.core.uikit.components.ScHeaderSubtitle
+import dev.core.uikit.components.ScHeaderTitle
+import dev.core.uikit.components.ScIconTile
+import dev.core.uikit.components.ScIcons
+import dev.core.uikit.components.ScText
+import dev.core.uikit.components.scCard
+import dev.core.uikit.theme.Sc
+import dev.core.uikit.map.MapPicker
+import dev.core.uikit.map.MapPoint
+import dev.core.uikit.map.rememberUserLocation
 import org.koin.compose.viewmodel.koinViewModel
 
 /**
@@ -120,58 +131,65 @@ private fun ListingKindPicker(
     onClose: () -> Unit,
     onPick: (ListingKind) -> Unit,
 ) {
-    Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState())
-            .padding(horizontal = 16.dp).padding(top = 54.dp),
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(11.dp)) {
-            IconSquareButton(onClose, AppIcons.Close, palette)
-            Text(
-                "Yangi e'lon",
-                style = TextStyle(fontFamily = AppFontFamily, fontSize = 20.sp, fontWeight = FontWeight.Black, color = palette.ink),
-            )
+    Column(Modifier.fillMaxSize().background(Sc.Bg)) {
+        ScHeader(bottomPadding = 24.dp) {
+            Row(
+                Modifier.fillMaxWidth().padding(top = 18.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                // Dizaynda orqaga hamisha aylana `‹` — X emas.
+                ScCircleButton(ScIcons.ChevronLeft, onClose, size = 44.dp, contentDescription = "Orqaga")
+                ScHeaderTitle("Yangi e'lon")
+            }
+            Spacer(Modifier.height(12.dp))
+            ScHeaderSubtitle("Nima e'lon qilmoqchisiz? Keyingi ekran shunga moslashadi.")
         }
-        Spacer(Modifier.height(6.dp))
-        Text(
-            "Nima e'lon qilmoqchisiz? Keyingi ekran shunga moslashadi.",
-            style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.5f.sp, color = palette.inkMuted),
-        )
-        Spacer(Modifier.height(16.dp))
-
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            kinds.forEach { kind -> ListingKindCard(kind, palette, onPick) }
+        Column(
+            Modifier.fillMaxSize().verticalScroll(rememberScrollState())
+                .padding(horizontal = Sc.ScreenPadding).padding(top = 22.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            kinds.forEach { kind -> ListingKindCard(kind, onPick) }
+            Spacer(Modifier.height(110.dp))
         }
-        Spacer(Modifier.height(110.dp))
     }
 }
 
 @Composable
-private fun ListingKindCard(kind: ListingKind, palette: AppPalette, onPick: (ListingKind) -> Unit) {
-    val accent = Color(kind.accent)
+private fun ListingKindCard(kind: ListingKind, onPick: (ListingKind) -> Unit) {
     Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(palette.glass)
-            .border(1.dp, palette.border, RoundedCornerShape(18.dp))
-            .clickable { onPick(kind) }.padding(15.dp),
+        Modifier.fillMaxWidth().scCard(radius = 24.dp, onClick = { onPick(kind) }).padding(16.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(13.dp),
+        horizontalArrangement = Arrangement.spacedBy(15.dp),
     ) {
-        Box(
-            Modifier.size(50.dp).clip(RoundedCornerShape(15.dp)).background(accent.copy(alpha = 0.14f)),
-            contentAlignment = Alignment.Center,
-        ) { Text(kind.emoji, style = TextStyle(fontSize = 23.sp)) }
-
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-            Text(
-                kind.label,
-                style = TextStyle(fontFamily = AppFontFamily, fontSize = 14.5f.sp, fontWeight = FontWeight.Black, color = palette.ink),
-            )
-            Text(
-                kind.subtitle,
-                style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.5f.sp, color = palette.inkFaint),
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
+        ScIconTile(kind.tileTint(), size = 60.dp, radius = 20.dp) { KindTileGlyph(kind) }
+        Column(Modifier.weight(1f)) {
+            ScText(kind.label, 16.5f, FontWeight.ExtraBold, Sc.Ink, maxLines = 1)
+            Spacer(Modifier.height(4.dp))
+            ScText(kind.subtitle, 13f, FontWeight.Medium, Sc.Muted, lineHeight = 19f, maxLines = 2)
         }
+    }
+}
+
+/** Tanlov kartasining plitka foni — dizayn palitrasidan. */
+@Composable
+private fun ListingKind.tileTint(): Color = when (this) {
+    ListingKind.TASK -> Sc.TintPink
+    ListingKind.RENTAL -> Sc.TintGreen
+    ListingKind.SERVICE -> Sc.TintBlue
+    ListingKind.JOB -> Sc.TintAmber
+    ListingKind.DISCOUNT -> Sc.TintViolet
+}
+
+@Composable
+private fun KindTileGlyph(kind: ListingKind) {
+    when (kind) {
+        ListingKind.TASK -> ScGlyph(ScIcons.Book, 30.dp)
+        ListingKind.RENTAL -> ScGlyph(ScIcons.HouseFilledGreen, 30.dp)
+        ListingKind.SERVICE -> Icon(ScIcons.Wrench, null, tint = Sc.Brand, modifier = Modifier.size(30.dp))
+        ListingKind.JOB -> Icon(ScIcons.Briefcase, null, tint = Sc.Amber, modifier = Modifier.size(30.dp))
+        ListingKind.DISCOUNT -> Icon(ScIcons.DiscountTag, null, tint = Sc.Violet, modifier = Modifier.size(30.dp))
     }
 }
 
@@ -187,7 +205,7 @@ private fun BusinessTypePicker(
 ) {
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState())
-            .padding(horizontal = 16.dp).padding(top = 54.dp),
+            .padding(horizontal = 16.dp).scTopInset(),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(11.dp)) {
             IconSquareButton(onBack, AppIcons.ArrowLeft, palette)
@@ -353,7 +371,7 @@ private fun BranchMapScreen(state: PostListingUiState, palette: AppPalette, vm: 
 
     Column(Modifier.fillMaxSize()) {
         Row(
-            Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(top = 54.dp, bottom = 12.dp),
+            Modifier.fillMaxWidth().padding(horizontal = 16.dp).scTopInset().padding(bottom = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(11.dp),
         ) {

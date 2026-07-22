@@ -38,26 +38,26 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import dev.core.designsystem.theme.ModuleFood
-import dev.core.designsystem.theme.ModuleStudy
-import dev.core.designsystem.theme.Success
-import dev.core.designsystem.theme.SuccessDeep
-import dev.core.designsystem.components.AppFontFamily
-import dev.core.designsystem.components.AppIcons
-import dev.core.designsystem.components.AppScreenScaffold
-import dev.core.designsystem.components.BackButton
-import dev.core.designsystem.components.ErrorText
-import dev.core.designsystem.components.FieldLabel
-import dev.core.designsystem.components.GlassTextField
-import dev.core.designsystem.components.PrimaryButton
-import dev.core.designsystem.components.ScreenTitle
+import dev.core.uikit.theme.ModuleFood
+import dev.core.uikit.theme.ModuleStudy
+import dev.core.uikit.theme.Success
+import dev.core.uikit.theme.SuccessDeep
+import dev.core.uikit.components.AppFontFamily
+import dev.core.uikit.components.AppIcons
+import dev.core.uikit.components.AppScreenScaffold
+import dev.core.uikit.components.BackButton
+import dev.core.uikit.components.ErrorText
+import dev.core.uikit.components.FieldLabel
+import dev.core.uikit.components.GlassTextField
+import dev.core.uikit.components.PrimaryButton
+import dev.core.uikit.components.ScreenTitle
 import dev.feature.auth.presentation.flow.AuthFlowState
 import dev.feature.auth.presentation.flow.AuthFlowViewModel
 import dev.feature.auth.presentation.flow.CourseYear
 import dev.feature.auth.presentation.flow.Role
 import dev.feature.auth.presentation.flow.University
-import dev.core.designsystem.theme.AppPalette
-import dev.core.designsystem.theme.appPalette
+import dev.core.uikit.theme.AppPalette
+import dev.core.uikit.theme.appPalette
 
 // ===========================================================================
 // 1j — SUCCESS / ROLE PICKER
@@ -75,7 +75,7 @@ fun SuccessScreen(
     val cards = listOf(
         RoleCardInfo(Role.STUDENT, "Talaba", "8 modul, buyurtma, chat", AppIcons.GraduationCap, palette.primary),
         RoleCardInfo(Role.BUSINESS, "Biznes", "Menyu, buyurtma qabul", AppIcons.Store, ModuleFood),
-        RoleCardInfo(Role.EMPLOYER, "Ish beruvchi", "E‘lon, arizalar", AppIcons.Briefcase, dev.core.designsystem.theme.ModuleEmployer),
+        RoleCardInfo(Role.EMPLOYER, "Ish beruvchi", "E‘lon, arizalar", AppIcons.Briefcase, dev.core.uikit.theme.ModuleEmployer),
         RoleCardInfo(Role.UNIVERSITY, "Universitet", "Jadval, e‘lonlar", AppIcons.Building, ModuleStudy),
     )
     AppScreenScaffold(scroll = true, topPadding = 64) {
