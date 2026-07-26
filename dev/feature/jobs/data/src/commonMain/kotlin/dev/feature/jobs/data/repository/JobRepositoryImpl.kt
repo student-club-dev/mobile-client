@@ -4,7 +4,7 @@ import app.cash.sqldelight.coroutines.asFlow
 import app.cash.sqldelight.coroutines.mapToList
 import dev.core.common.AppDispatchers
 import dev.core.common.Resource
-import dev.core.database.sql.StudentClubsDatabase
+import dev.core.database.sql.StudentClubDatabase
 import dev.feature.jobs.data.mapper.joinDb
 import dev.feature.jobs.data.mapper.toBool
 import dev.feature.jobs.data.mapper.toDb
@@ -19,7 +19,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 
 class JobRepositoryImpl(
-    private val db: StudentClubsDatabase,
+    private val db: StudentClubDatabase,
     private val dispatchers: AppDispatchers,
     private val remote: JobRemoteDataSource,
     private val syncEnabled: Boolean,

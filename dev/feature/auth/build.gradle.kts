@@ -1,6 +1,6 @@
 // Auth — birlashgan feature moduli (UI + oqim). `sc.module-ui` Compose/Koin/Lifecycle/
 // uikit/common'ni beradi; serialization plugin qo'shimcha yoqiladi. Qolgan bog'liqliklar
-// (navigatsiya, sessiya keshi, Firebase, platforma auth) shu yerda.
+// (navigatsiya, sessiya keshi, backend klienti, platforma auth) shu yerda.
 plugins {
     id("sc.module-ui")
     alias(libs.plugins.kotlin.serialization)
@@ -11,6 +11,9 @@ kotlin {
         commonMain.dependencies {
             api(projects.dev.core.domain)
             implementation(projects.dev.core.database)
+            // Backend auth (`/v1/auth/student/*`) — generatsiya qilingan klient `:dev:core:network`
+            // orqali keladi (u `:dev:api-client` ni `api(...)` bilan eksport qiladi).
+            implementation(projects.dev.core.network)
 
             // Ro'yxatdan o'tish oqimi profilni saqlaydi; MainShell Profil/e'lon ekranlarini ochadi.
             api(projects.dev.feature.profile.domain)
@@ -47,26 +50,25 @@ kotlin {
             implementation(libs.androidx.navigation.compose)
             implementation(projects.dev.core.navigation)
             implementation(libs.kotlinx.datetime)
+            implementation(libs.ktor.client.core)
+            // JWT payload'ini o'qish (JwtClaims) uchun
+            implementation(libs.kotlinx.serialization.json)
 
-            // GitLive Firebase — email/parol, parolni tiklash, Firestore profil (backendsiz)
+            // GitLive Firebase — faqat CHAT real-time (Firestore) uchun.
+            // Autentifikatsiya Firebase'da EMAS: u backend tokenlariga tayanadi.
             implementation(libs.gitlive.firebase.auth)
             implementation(libs.gitlive.firebase.firestore)
-            implementation(libs.gitlive.firebase.functions)
         }
 
         androidMain.dependencies {
-            // Firebase Auth (Google credential exchange + Phone OTP)
+            // GitLive Firestore Android tomonda Firebase SDK'sini talab qiladi (chat).
             implementation(project.dependencies.platform(libs.firebase.bom))
             implementation(libs.firebase.auth)
-            // Google Sign-In orqali ID token olish uchun Credential Manager
+            // Google Sign-In — Credential Manager + Google ID (backendga ID token beradi)
             implementation(libs.androidx.credentials)
             implementation(libs.androidx.credentials.playServicesAuth)
             implementation(libs.googleid)
-            // Task<T>.await() uchun
-            implementation(libs.kotlinx.coroutines.playServices)
             implementation(libs.androidx.activity.compose)
-            // Telegram login — Custom Tabs (web oqim)
-            implementation(libs.androidx.browser)
             // Biometrik login (F1) — Face ID / barmoq izi
             implementation(libs.androidx.biometric)
             implementation(libs.androidx.fragment)

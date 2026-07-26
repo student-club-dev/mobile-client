@@ -36,19 +36,27 @@ val sampleUniversities: List<University> = listOf(
     University("adu", "Andijon Davlat Universiteti", "Andijon", "AD", 0xFFBE185D),
 )
 
+/**
+ * SMS kod nima uchun so'ralgan — "qayta yuborish" tugmasi qaysi endpointga borishini shu
+ * hal qiladi (`otp/request` yoki `password/forgot`).
+ */
+enum class OtpPurpose { VERIFY_PHONE, RESET_PASSWORD }
+
 /** Butun auth oqimining forma holati. */
 data class AuthFlowState(
     // Aloqa
     val phone: String = "",
     val email: String = "",
+    /** Kirish ekranidagi tanlangan tab: `true` — email, `false` — telefon. */
+    val loginWithEmail: Boolean = false,
     val password: String = "",
     val confirmPassword: String = "",
     val passwordVisible: Boolean = false,
     val rememberMe: Boolean = true,
-    // OTP (telefon) va email kod
+    // SMS kod
     val otp: String = "",
-    val emailCode: String = "",
-    val resendSeconds: Int = 60,
+    val otpPurpose: OtpPurpose = OtpPurpose.VERIFY_PHONE,
+    val resendSeconds: Int = 0,
     // Ro'yxat
     val firstName: String = "",
     val lastName: String = "",
@@ -71,7 +79,15 @@ data class AuthFlowState(
     val phoneDigits: String get() = phone.filter { it.isDigit() }.take(9)
     val phoneValid: Boolean get() = phoneDigits.length == 9
     val otpValid: Boolean get() = otp.length == 6
-    val emailCodeValid: Boolean get() = emailCode.length == 6
+    val emailValid: Boolean get() = email.contains('@') && email.substringAfter('@').contains('.')
+
+    /** Kirish tugmasi faolmi — tanlangan tabga qarab telefon yoki email + parol. */
+    val loginReady: Boolean
+        get() = password.isNotBlank() && if (loginWithEmail) emailValid else phoneValid
+
+    /** E.164 formatdagi raqam (`+998901234567`) yoki bo'sh matn. */
+    val phoneE164: String get() = if (phoneValid) "+998$phoneDigits" else ""
+
     val selectedUniversity: University? get() = sampleUniversities.firstOrNull { it.id == universityId }
 
     val filteredUniversities: List<University>

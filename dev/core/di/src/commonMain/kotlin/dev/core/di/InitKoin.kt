@@ -19,12 +19,13 @@ import org.koin.dsl.KoinAppDeclaration
 /**
  * Ilovaning barcha Koin modullari. Har yangi feature o'z modulini shu yerga qo'shadi.
  *
- * `profileModule` va `listingsModule` masofaviy manbani [REMOTE_SYNC_ENABLED] ga qarab
- * tanlaydi: REST (backend bor) yoki local/Firestore (backendsiz).
+ * Har modul masofaviy manbani bayroqqa qarab tanlaydi: profil REST'dan
+ * ([PROFILE_REMOTE_ENABLED] — `/v1/profile/me` mavjud), qolganlari esa hozircha local
+ * bazadan ([REMOTE_SYNC_ENABLED] — ular uchun endpoint hali yo'q).
  */
 fun appModules() = coreModules() +
     authFeatureModule +
-    profileModule(REMOTE_SYNC_ENABLED) +
+    profileModule(PROFILE_REMOTE_ENABLED) +
     listingsModule(REMOTE_SYNC_ENABLED) +
     jobsModule(REMOTE_SYNC_ENABLED) +
     studentsModule(REMOTE_SYNC_ENABLED) +

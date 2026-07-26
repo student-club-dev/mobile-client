@@ -1,4 +1,4 @@
-# StudentClubs — To'liq Yakunlash Rejasi (Master Promt)
+# Student Club — To'liq Yakunlash Rejasi (Master Promt)
 
 > Bu fayl — Claude uchun ishchi promt/checklist. Maqsad: **har bir button ishlaydigan** bo'lishi,
 > ilova **real API** bilan ishlashga tayyor bo'lishi, va **local DB** (Android + iOS) to'liq ishlashi.

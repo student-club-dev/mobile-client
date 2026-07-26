@@ -3,7 +3,7 @@ package dev.feature.settings.data.repository
 import app.cash.sqldelight.coroutines.asFlow
 import app.cash.sqldelight.coroutines.mapToOneOrNull
 import dev.core.common.AppDispatchers
-import dev.core.database.sql.StudentClubsDatabase
+import dev.core.database.sql.StudentClubDatabase
 import dev.feature.settings.domain.model.ThemeMode
 import dev.feature.settings.domain.repository.SettingsRepository
 import kotlinx.coroutines.flow.Flow
@@ -13,7 +13,7 @@ import kotlinx.coroutines.withContext
 private const val KEY_THEME_MODE = "theme_mode"
 
 class SettingsRepositoryImpl(
-    private val db: StudentClubsDatabase,
+    private val db: StudentClubDatabase,
     private val dispatchers: AppDispatchers,
 ) : SettingsRepository {
 

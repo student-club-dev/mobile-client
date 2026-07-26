@@ -6,7 +6,7 @@ import dev.core.common.AppDispatchers
 import dev.core.common.Resource
 import dev.core.data.remote.DiscountRemoteDataSource
 import dev.core.data.mapper.toDomain
-import dev.core.database.sql.StudentClubsDatabase
+import dev.core.database.sql.StudentClubDatabase
 import dev.core.domain.model.DiscountCategory
 import dev.core.domain.model.DiscountOffer
 import dev.core.domain.repository.DiscountRepository
@@ -18,7 +18,7 @@ import kotlinx.coroutines.withContext
 // Chegirmalar
 // ===========================================================================
 class DiscountRepositoryImpl(
-    private val db: StudentClubsDatabase,
+    private val db: StudentClubDatabase,
     private val dispatchers: AppDispatchers,
     // --- B4 offline-first shabloni: tarmoq manbasi + sinxronlash bayrog'i ---
     private val remote: DiscountRemoteDataSource,

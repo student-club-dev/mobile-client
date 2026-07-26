@@ -2,6 +2,7 @@ package dev.feature.profile.presentation.di
 
 import dev.core.network.NetworkConfig
 import dev.core.network.generated.api.ProfileApi
+import dev.core.network.media.MediaUploader
 import dev.feature.profile.data.remote.ApiProfileRemoteDataSource
 import dev.feature.profile.data.remote.FirestoreProfileRemoteDataSource
 import dev.feature.profile.data.remote.ProfileRemoteDataSource
@@ -30,11 +31,15 @@ import org.koin.dsl.module
 fun profileModule(useRemoteApi: Boolean) = module {
 
     // Generatsiya qilingan klientga ilovaning umumiy Ktor klienti uzatiladi —
-    // shunda Firebase ID token (Bearer) har so'rovga avtomatik qo'shiladi.
+    // shunda sessiya tokeni (Bearer) har so'rovga avtomatik qo'shiladi.
     single { ProfileApi(baseUrl = get<NetworkConfig>().baseUrl, httpClient = get<HttpClient>()) }
 
+    // Rasm yuklash — generatsiya qilingan `MediaApi` multipart qismiga `filename` qo'ymagani
+    // uchun qo'lda yozilgan (qarang: MediaUploader izohi).
+    single { MediaUploader(client = get(), config = get()) }
+
     single<ProfileRemoteDataSource> {
-        if (useRemoteApi) ApiProfileRemoteDataSource(get()) else FirestoreProfileRemoteDataSource()
+        if (useRemoteApi) ApiProfileRemoteDataSource(get(), get()) else FirestoreProfileRemoteDataSource()
     }
 
     single<ProfileRepository> { ProfileRepositoryImpl(get(), get(), get()) }

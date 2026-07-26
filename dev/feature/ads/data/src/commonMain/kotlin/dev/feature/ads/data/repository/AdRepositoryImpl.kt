@@ -4,7 +4,7 @@ import app.cash.sqldelight.coroutines.asFlow
 import app.cash.sqldelight.coroutines.mapToList
 import dev.core.common.AppDispatchers
 import dev.core.common.Resource
-import dev.core.database.sql.StudentClubsDatabase
+import dev.core.database.sql.StudentClubDatabase
 import dev.feature.ads.data.mapper.joinDb
 import dev.feature.ads.data.mapper.toDomain
 import dev.feature.ads.data.remote.AdRemoteDataSource
@@ -15,7 +15,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 
 class AdRepositoryImpl(
-    private val db: StudentClubsDatabase,
+    private val db: StudentClubDatabase,
     private val dispatchers: AppDispatchers,
     private val remote: AdRemoteDataSource,
     private val syncEnabled: Boolean,

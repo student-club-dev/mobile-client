@@ -1,6 +1,6 @@
 # Chegirmalar — Biznes egalari uchun e'lon yuklash (Backend spetsifikatsiyasi)
 
-Bu hujjat Student Clubs super-app'ining **Chegirmalar** bo'limida biznes egalari
+Bu hujjat Student Club super-app'ining **Chegirmalar** bo'limida biznes egalari
 (`BUSINESS` roli) e'lon (offer) yuklashi uchun kerak bo'lgan backend modellari,
 oqimlari va endpoint'larini tavsiflaydi.
 
@@ -836,7 +836,7 @@ Joylashuvga ruxsat berilmasa masofa ko'rsatilmaydi, lekin ro'yxat baribir ishlay
   "categoryKey": "PIZZA",
   "title": "Pepperoni pitsa",
   "description": "Mozzarella, pepperoni kolbasa, firma sousi. O'tin pechida pishiriladi.",
-  "images": ["https://cdn.studentclubs.dev/l/abc1.webp"],
+  "images": ["https://cdn.studentclub.uz/l/abc1.webp"],
   "priceUnit": "PER_ITEM",
   "originalPrice": 55000,
   "currency": "UZS",

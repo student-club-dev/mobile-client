@@ -33,12 +33,9 @@ import dev.core.uikit.components.AppFontFamily
 import dev.core.uikit.components.AppIcons
 import dev.core.uikit.components.AppScreenScaffold
 import dev.core.uikit.components.AuthTab
-import dev.core.uikit.components.BackButton
-import dev.core.uikit.components.ErrorText
 import dev.core.uikit.components.FieldLabel
 import dev.core.uikit.components.FooterLink
 import dev.core.uikit.components.GlassTextField
-import dev.core.uikit.components.HintText
 import dev.core.uikit.components.LogoTile
 import dev.core.uikit.components.OrDivider
 import dev.core.uikit.components.PhoneVisualTransformation
@@ -219,17 +216,27 @@ private fun FloatingChip(emoji: String, label: String?, modifier: Modifier, pale
 // 1a — WELCOME (to'liq forma, tab bilan)
 // ===========================================================================
 
+/**
+ * Kirish ekrani — **telefon yoki email + parol** (`POST /v1/auth/student/login`) yoki Google.
+ *
+ * Tab faqat identifikator turini tanlaydi: backend `LoginDto` da `email` va `phoneNumber`
+ * alohida maydonlar, parol esa ikkalasida ham bir xil.
+ *
+ * SMS kod bu yerda YO'Q — u kirish usuli emas: `otp/request` sessiya (Bearer) talab qiladi va
+ * faqat raqamni tasdiqlaydi. Shuning uchun kod ro'yxatdan o'tgandan keyin so'raladi.
+ */
 @Composable
 fun WelcomeScreen(
     state: AuthFlowState,
     vm: AuthFlowViewModel,
     tab: AuthTab,
     onTab: (AuthTab) -> Unit,
-    onContinue: () -> Unit,
+    onLogin: () -> Unit,
+    onForgot: () -> Unit,
     onSignUp: () -> Unit,
     onGoogle: () -> Unit,
-    onApple: () -> Unit,
-    onTelegram: () -> Unit,
+    /** Face ID / barmoq izi — local sessiya keshi bo'lganda kirishning tez yo'li. */
+    onBiometric: (() -> Unit)? = null,
     palette: AppPalette = appPalette,
 ) {
     AppScreenScaffold(scroll = true, topPadding = 60) {
@@ -255,8 +262,6 @@ fun WelcomeScreen(
                 visualTransformation = PhoneVisualTransformation(),
                 textLetterSpacing = 0.5f,
             )
-            Spacer(Modifier.height(8.dp))
-            HintText("Ushbu raqamga tasdiqlash uchun SMS kod yuboramiz.")
         } else {
             FieldLabel("Email manzil")
             Spacer(Modifier.height(7.dp))
@@ -267,133 +272,8 @@ fun WelcomeScreen(
                 leading = AppIcons.Mail,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
             )
-            Spacer(Modifier.height(8.dp))
-            HintText("Kirish yoki ro‘yxatdan o‘tish uchun email kiriting.")
         }
 
-        Spacer(Modifier.height(16.dp))
-        PrimaryButton("Davom etish", onContinue, trailingIcon = AppIcons.ArrowRight)
-
-        state.error?.let {
-            Spacer(Modifier.height(10.dp))
-            Text(
-                it, style = TextStyle(
-                    fontFamily = AppFontFamily,
-                    fontSize = 12.sp,
-                    color = androidx.compose.ui.graphics.Color(0xFFDC2626)
-                )
-            )
-        }
-
-        Spacer(Modifier.height(18.dp))
-        OrDivider()
-        Spacer(Modifier.height(14.dp))
-        SocialRow(onGoogle, onApple, onTelegram)
-
-        Spacer(Modifier.height(20.dp))
-        FooterLink("Hisobingiz yo‘qmi?", "Ro‘yxatdan o‘tish", onSignUp)
-    }
-}
-
-// ===========================================================================
-// 1e — PHONE ENTRY
-// ===========================================================================
-
-@Composable
-fun PhoneScreen(
-    state: AuthFlowState,
-    vm: AuthFlowViewModel,
-    onBack: () -> Unit,
-    onSwitchEmail: () -> Unit,
-    onGetCode: () -> Unit,
-    onSignIn: () -> Unit,
-    onGoogle: () -> Unit,
-    onApple: () -> Unit,
-    onTelegram: () -> Unit,
-    palette: AppPalette = appPalette,
-) {
-    AppScreenScaffold(scroll = false) {
-        BackButton(onBack)
-        Spacer(Modifier.height(20.dp))
-        ScreenTitle("Telefon raqamingiz")
-        Spacer(Modifier.height(6.dp))
-        ScreenSubtitle("Kirish uchun raqamingizni kiriting — SMS orqali 6 xonali kod yuboramiz.")
-        Spacer(Modifier.height(18.dp))
-
-        SegmentedTabs(AuthTab.PHONE, { if (it == AuthTab.EMAIL) onSwitchEmail() })
-        Spacer(Modifier.height(16.dp))
-
-        GlassTextField(
-            value = state.phone,
-            onValueChange = vm::onPhoneChange,
-            placeholder = "90 123 45 67",
-            leadingContent = { PhonePrefix(palette) },
-            focused = true,
-            height = 56,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-            visualTransformation = PhoneVisualTransformation(),
-            textLetterSpacing = 0.5f,
-        )
-        Spacer(Modifier.height(9.dp))
-        HintText("Faqat O‘zbekiston raqamlari qabul qilinadi.")
-
-        Spacer(Modifier.height(18.dp))
-        PrimaryButton(
-            "Kod olish",
-            onGetCode,
-            enabled = state.phoneValid && !state.isLoading,
-            trailingIcon = AppIcons.ArrowRight
-        )
-
-        ErrorText(state.error)
-
-        Spacer(Modifier.height(18.dp))
-        OrDivider()
-        Spacer(Modifier.height(14.dp))
-        SocialRow(onGoogle, onApple, onTelegram)
-
-        Spacer(Modifier.weight(1f))
-        Spacer(Modifier.height(14.dp))
-        FooterLink("Hisobingiz bormi?", "Kirish", onSignIn)
-    }
-}
-
-// ===========================================================================
-// 1f — EMAIL LOGIN
-// ===========================================================================
-
-@Composable
-fun EmailLoginScreen(
-    state: AuthFlowState,
-    vm: AuthFlowViewModel,
-    onBack: () -> Unit,
-    onSwitchPhone: () -> Unit,
-    onLogin: () -> Unit,
-    onForgot: () -> Unit,
-    onBiometric: () -> Unit,
-    onSignUp: () -> Unit,
-    palette: AppPalette = appPalette,
-) {
-    AppScreenScaffold(scroll = false) {
-        BackButton(onBack)
-        Spacer(Modifier.height(18.dp))
-        ScreenTitle("Xush kelibsiz")
-        Spacer(Modifier.height(6.dp))
-        ScreenSubtitle("Email va parolingiz bilan hisobingizga kiring.")
-        Spacer(Modifier.height(16.dp))
-
-        SegmentedTabs(AuthTab.EMAIL, { if (it == AuthTab.PHONE) onSwitchPhone() })
-        Spacer(Modifier.height(16.dp))
-
-        FieldLabel("Email manzil")
-        Spacer(Modifier.height(7.dp))
-        GlassTextField(
-            value = state.email,
-            onValueChange = vm::onEmailChange,
-            placeholder = "aziz.karimov@edu.uz",
-            leading = AppIcons.Mail,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-        )
         Spacer(Modifier.height(13.dp))
         FieldLabel("Parol")
         Spacer(Modifier.height(7.dp))
@@ -412,52 +292,57 @@ fun EmailLoginScreen(
                 )
             },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-            visualTransformation = if (state.passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+            visualTransformation = if (state.passwordVisible) VisualTransformation.None
+            else PasswordVisualTransformation(),
         )
 
-        Spacer(Modifier.height(14.dp))
-        Row(
-            Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.clickableNoRipple { vm.toggleRememberMe() }) {
-                CheckBoxSmall(state.rememberMe, palette)
-                Text(
-                    "Meni eslab qol", style = TextStyle(
-                        fontFamily = AppFontFamily,
-                        fontSize = 12.5f.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = palette.label
-                    )
-                )
-            }
+        Spacer(Modifier.height(12.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
             Text(
                 "Parolni unutdingizmi?",
                 style = TextStyle(
                     fontFamily = AppFontFamily,
                     fontSize = 12.5f.sp,
                     fontWeight = FontWeight.Bold,
-                    color = palette.primary
+                    color = palette.primary,
                 ),
                 modifier = Modifier.clickableNoRipple(onForgot),
             )
         }
 
-        Spacer(Modifier.height(18.dp))
-        PrimaryButton("Kirish", onLogin, enabled = !state.isLoading)
-        Spacer(Modifier.height(11.dp))
-        dev.core.uikit.components.OutlineButton(
-            "Face ID bilan kirish", onBiometric, leadingIcon = AppIcons.ScanFace
+        Spacer(Modifier.height(14.dp))
+        PrimaryButton(
+            "Kirish",
+            onLogin,
+            enabled = state.loginReady && !state.isLoading,
+            trailingIcon = AppIcons.ArrowRight,
         )
 
-        ErrorText(state.error)
+        if (onBiometric != null) {
+            Spacer(Modifier.height(11.dp))
+            dev.core.uikit.components.OutlineButton(
+                "Face ID bilan kirish", onBiometric, leadingIcon = AppIcons.ScanFace,
+            )
+        }
 
-        Spacer(Modifier.weight(1f))
+        state.error?.let {
+            Spacer(Modifier.height(10.dp))
+            Text(
+                it, style = TextStyle(
+                    fontFamily = AppFontFamily,
+                    fontSize = 12.sp,
+                    color = androidx.compose.ui.graphics.Color(0xFFDC2626)
+                )
+            )
+        }
+
+        Spacer(Modifier.height(18.dp))
+        OrDivider()
         Spacer(Modifier.height(14.dp))
+        // Apple/Telegram tugmalari yo'q: backend hozircha faqat Google ID tokenini tekshiradi.
+        SocialRow(onGoogle)
+
+        Spacer(Modifier.height(20.dp))
         FooterLink("Hisobingiz yo‘qmi?", "Ro‘yxatdan o‘tish", onSignUp)
     }
 }

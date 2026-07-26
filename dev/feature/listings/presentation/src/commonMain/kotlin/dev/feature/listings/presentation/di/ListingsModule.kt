@@ -1,10 +1,6 @@
 package dev.feature.listings.presentation.di
 
-import dev.core.network.NetworkConfig
 import dev.core.network.createPublicHttpClient
-import dev.core.network.generated.api.ListingsApi
-import dev.core.network.generated.api.MediaApi
-import dev.feature.listings.data.remote.ApiListingRemoteDataSource
 import dev.feature.listings.data.remote.ListingRemoteDataSource
 import dev.feature.listings.data.remote.LocalListingRemoteDataSource
 import dev.feature.listings.data.remote.NominatimGeoRepository
@@ -27,28 +23,21 @@ import dev.feature.listings.domain.usecase.UploadListingImageUseCase
 import dev.feature.listings.presentation.MyListingsViewModel
 import dev.feature.listings.presentation.NearbyDiscountsViewModel
 import dev.feature.listings.presentation.PostListingViewModel
-import io.ktor.client.HttpClient
 import org.koin.core.module.dsl.viewModelOf
 import org.koin.dsl.module
 
 /**
- * Chegirmalar feature'ining barcha qatlamlarini bog'laydi (domain / data / presentation).
+ * E'lonlar feature'ining barcha qatlamlarini bog'laydi (domain / data / presentation).
  *
- * [useRemoteApi] — masofaviy manba tanlovi:
- * - `true`  → real backend: `POST /v1/business/{id}/listings` + `/submit`, rasm `/media/upload`
- *   (OpenAPI'dan generatsiya qilingan [ListingsApi] / [MediaApi]),
- * - `false` → backendsiz rejim: e'lon local bazada, rasm `data:` URI sifatida saqlanadi.
- *
- * Bayroq `CoreModules.REMOTE_SYNC_ENABLED` dan keladi — profil moduli bilan bir xil naqsh.
+ * [useRemoteApi] — masofaviy manba tanlovi. **Hozircha har ikkala holatda ham local**:
+ * talaba API'sida (`student-club.json`) e'lon yozish/o'qish endpoint'i yo'q — e'lon qo'yish
+ * biznes tomonining (ElonUz) shartnomasiga tegishli, talaba feed'i esa `STUDENT_FEED.md`
+ * bo'yicha alohida quriladi (`POST /v1/discounts/search`). Shu endpoint'lar chiqqanda
+ * bu yerga API manbasi qo'shiladi.
  */
 fun listingsModule(useRemoteApi: Boolean) = module {
 
-    single { ListingsApi(baseUrl = get<NetworkConfig>().baseUrl, httpClient = get<HttpClient>()) }
-    single { MediaApi(baseUrl = get<NetworkConfig>().baseUrl, httpClient = get<HttpClient>()) }
-
-    single<ListingRemoteDataSource> {
-        if (useRemoteApi) ApiListingRemoteDataSource(get(), get()) else LocalListingRemoteDataSource()
-    }
+    single<ListingRemoteDataSource> { LocalListingRemoteDataSource() }
 
     single<ListingRepository> { ListingRepositoryImpl(get(), get(), get()) }
 

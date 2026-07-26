@@ -48,7 +48,7 @@ android {
 
 sqldelight {
     databases {
-        create("StudentClubsDatabase") {
+        create("StudentClubDatabase") {
             packageName.set("dev.core.database.sql")
         }
     }

@@ -1,0 +1,21 @@
+-- v16 — sessiya Firebase'dan backend tokenlariga ko'chdi (`/v1/auth/student/…`).
+--
+-- `uid` endi access-token (JWT) ning `sub` maydoni, ya'ni backendning foydalanuvchi id'si.
+-- Eski `userId` ustuni (Firebase uid'idan hosil qilingan son) keraksiz — SQLite'da
+-- DROP COLUMN yo'q, shuning uchun jadval "table rebuild" usuli bilan qayta quriladi.
+--
+-- Eski qatorlar KO'CHIRILMAYDI: ular Firebase sessiyasiga tegishli, yangi backendda
+-- yaroqsiz. Ko'chirilsa ilova "kirgan" ko'rinardi-yu, tokeni bo'lmagani uchun har so'rov
+-- 401 bilan qaytardi. Foydalanuvchi bir marta qaytadan kiradi.
+CREATE TABLE UserEntityNew (
+    uid TEXT NOT NULL PRIMARY KEY,
+    fullName TEXT NOT NULL,
+    email TEXT NOT NULL,
+    role TEXT NOT NULL,
+    phoneNumber TEXT,
+    photoUrl TEXT
+);
+
+-- `IF EXISTS` — test fikstura'larida (va qisman migratsiyalarda) jadval bo'lmasligi mumkin.
+DROP TABLE IF EXISTS UserEntity;
+ALTER TABLE UserEntityNew RENAME TO UserEntity;
