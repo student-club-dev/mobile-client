@@ -3,7 +3,7 @@ package dev.feature.profile.data.mapper
 import dev.core.database.sql.ProfileEntity
 import dev.core.network.generated.model.CourseYearDto
 import dev.core.network.generated.model.ProfileRoleDto
-import dev.core.network.generated.model.UpdateProfileRequestDto
+import dev.core.network.generated.model.UpdateProfileDto
 import dev.core.network.generated.model.UserProfileDto
 import dev.feature.profile.data.dto.ProfileFirestoreDto
 import dev.feature.profile.domain.model.UserProfile
@@ -77,7 +77,7 @@ fun UserProfileDto.toDomain(): UserProfile = UserProfile(
     avatarUrl = avatarUrl,
 )
 
-fun UserProfile.toUpdateRequest(): UpdateProfileRequestDto = UpdateProfileRequestDto(
+fun UserProfile.toUpdateRequest(): UpdateProfileDto = UpdateProfileDto(
     firstName = firstName,
     lastName = lastName,
     phoneNumber = phoneNumber,

@@ -41,7 +41,7 @@ expect fun MapPicker(
 )
 
 /** Xarita surilganda JS shu ko'prik orqali koordinatani Kotlin'ga uzatadi. */
-internal const val MAP_BRIDGE = "StudentClubsMap"
+internal const val MAP_BRIDGE = "StudentClubMap"
 
 /** Kotlin tomondan chaqiriladi: xaritani (va u bilan belgini) boshqa joyga olib boradi. */
 internal fun jsSetCenter(point: MapPoint): String = "setCenter(${point.lat}, ${point.lng})"

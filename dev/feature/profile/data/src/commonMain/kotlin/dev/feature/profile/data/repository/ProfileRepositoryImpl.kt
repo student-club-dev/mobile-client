@@ -4,7 +4,7 @@ import app.cash.sqldelight.coroutines.asFlow
 import app.cash.sqldelight.coroutines.mapToOneOrNull
 import dev.core.common.AppDispatchers
 import dev.core.common.Resource
-import dev.core.database.sql.StudentClubsDatabase
+import dev.core.database.sql.StudentClubDatabase
 import dev.feature.profile.data.mapper.toDomain
 import dev.feature.profile.data.remote.ProfileRemoteDataSource
 import dev.feature.profile.domain.model.UserProfile
@@ -23,7 +23,7 @@ import kotlinx.coroutines.withContext
  * Masofaviy manba REST'mi yoki Firestore'mi — bu klass bilmaydi ([ProfileRemoteDataSource]).
  */
 class ProfileRepositoryImpl(
-    private val db: StudentClubsDatabase,
+    private val db: StudentClubDatabase,
     private val dispatchers: AppDispatchers,
     private val remote: ProfileRemoteDataSource,
 ) : ProfileRepository {

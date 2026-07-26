@@ -7,7 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		15007287DB1762045E4B5A11 /* SocialAuthBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 169241A91C17E3BCEFCBA961 /* SocialAuthBridge.swift */; };
+		15007287DB1762045E4B5A11 /* GoogleSignInBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 169241A91C17E3BCEFCBA961 /* GoogleSignInBridge.swift */; };
 		52FD598FB6DF9D99690C5353 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = 23514DD41D13E01B251CA6B4 /* FirebaseAuth */; };
 		61A391B212E90B428C166F95 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = CE52E7D31007494AD896CFFD /* GoogleService-Info.plist */; };
 		6F1569763BAE35932746206B /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = 9C6231E1181F19C4BBAAA533 /* GoogleSignIn */; };
@@ -19,7 +19,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		169241A91C17E3BCEFCBA961 /* SocialAuthBridge.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SocialAuthBridge.swift; sourceTree = "<group>"; };
+		169241A91C17E3BCEFCBA961 /* GoogleSignInBridge.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GoogleSignInBridge.swift; sourceTree = "<group>"; };
 		A1000000 /* iosApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = iosApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A1000001 /* iOSApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = iOSApp.swift; sourceTree = "<group>"; };
 		A1000003 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -59,7 +59,7 @@
 				A1000005 /* Assets.xcassets */,
 				A1000007 /* Info.plist */,
 				CE52E7D31007494AD896CFFD /* GoogleService-Info.plist */,
-				169241A91C17E3BCEFCBA961 /* SocialAuthBridge.swift */,
+				169241A91C17E3BCEFCBA961 /* GoogleSignInBridge.swift */,
 			);
 			path = iosApp;
 			sourceTree = "<group>";
@@ -173,7 +173,7 @@
 			files = (
 				A1000004 /* ContentView.swift in Sources */,
 				A1000002 /* iOSApp.swift in Sources */,
-				15007287DB1762045E4B5A11 /* SocialAuthBridge.swift in Sources */,
+				15007287DB1762045E4B5A11 /* GoogleSignInBridge.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -245,7 +245,7 @@
 					"$(inherited)",
 					"-lsqlite3",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.studentclubs.ios;
+				PRODUCT_BUNDLE_IDENTIFIER = uz.studentclub.ios;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -278,7 +278,7 @@
 					"$(inherited)",
 					"-lsqlite3",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.studentclubs.ios;
+				PRODUCT_BUNDLE_IDENTIFIER = uz.studentclub.ios;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
 				SWIFT_EMIT_LOC_STRINGS = YES;

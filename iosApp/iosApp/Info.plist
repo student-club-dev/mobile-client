@@ -16,6 +16,12 @@
 	<string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
 	<key>CFBundleShortVersionString</key>
 	<string>1.0</string>
+	<!-- Google Sign-In — Google Cloud'dagi **iOS** turidagi OAuth client ID.
+	     Pastdagi CFBundleURLSchemes esa uning teskarisi (com.googleusercontent.apps.<ID>).
+	     Backend `oauth/google` da shu ID ni ham qabul qilinadigan audience'lar ro'yxatiga
+	     qo'shishi kerak. -->
+	<key>GIDClientID</key>
+	<string>570659158152-nlqaqp9cst5723rncndei8nhtd7o4s5d.apps.googleusercontent.com</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>

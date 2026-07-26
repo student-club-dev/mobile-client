@@ -4,7 +4,7 @@ import app.cash.sqldelight.coroutines.asFlow
 import app.cash.sqldelight.coroutines.mapToList
 import dev.core.common.AppDispatchers
 import dev.core.common.Resource
-import dev.core.database.sql.StudentClubsDatabase
+import dev.core.database.sql.StudentClubDatabase
 import dev.feature.university.data.dto.ProfEmisUniversityDto
 import dev.feature.university.data.dto.toUniversity
 import dev.feature.university.data.mapper.toDomain
@@ -24,7 +24,7 @@ private const val UNI_SOURCE_KEY = "universities_source"
 private const val UNI_SOURCE_VERSION = "prof-emis-1"
 
 class UniversityRepositoryImpl(
-    private val db: StudentClubsDatabase,
+    private val db: StudentClubDatabase,
     private val dispatchers: AppDispatchers,
     private val remote: UniversityRemoteDataSource,
     private val syncEnabled: Boolean,

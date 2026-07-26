@@ -4,7 +4,7 @@ import app.cash.sqldelight.coroutines.asFlow
 import app.cash.sqldelight.coroutines.mapToList
 import dev.core.common.AppDispatchers
 import dev.core.common.Resource
-import dev.core.database.sql.StudentClubsDatabase
+import dev.core.database.sql.StudentClubDatabase
 import dev.feature.listings.data.mapper.toDomain
 import dev.feature.listings.data.mapper.toEntity
 import dev.feature.listings.data.remote.ListingRemoteDataSource
@@ -25,7 +25,7 @@ import kotlinx.datetime.Clock
  * natijani (server bergan id va status) keshga yozadi.
  */
 class ListingRepositoryImpl(
-    private val db: StudentClubsDatabase,
+    private val db: StudentClubDatabase,
     private val dispatchers: AppDispatchers,
     private val remote: ListingRemoteDataSource,
 ) : ListingRepository {

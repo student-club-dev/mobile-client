@@ -56,6 +56,12 @@ import dev.core.uikit.theme.appPalette
 // 1g — OTP
 // ===========================================================================
 
+/**
+ * SMS kod ekrani — ikki oqimda ishlatiladi:
+ * - ro'yxatdan keyin **raqamni tasdiqlash** (`otp/verify`) — [onSkip] bilan o'tkazib yuborsa
+ *   ham bo'ladi, hisob allaqachon ochilgan;
+ * - parolni tiklashda kodni kiritish (kod yangi parol bilan birga yuboriladi).
+ */
 @Composable
 fun OtpScreen(
     state: AuthFlowState,
@@ -63,7 +69,10 @@ fun OtpScreen(
     onBack: () -> Unit,
     onVerify: () -> Unit,
     onResend: () -> Unit,
-    onTelegram: () -> Unit,
+    /** `null` — o'tkazib yuborish taklif qilinmaydi (masalan parolni tiklash oqimida). */
+    onSkip: (() -> Unit)? = null,
+    title: String = "Tasdiqlash kodi",
+    confirmLabel: String = "Tasdiqlash",
     palette: AppPalette = appPalette,
 ) {
     AppScreenScaffold(scroll = false) {
@@ -77,7 +86,7 @@ fun OtpScreen(
             Icon(AppIcons.MessageSquare, null, tint = palette.primary, modifier = Modifier.size(30.dp))
         }
         Spacer(Modifier.height(16.dp))
-        ScreenTitle("Tasdiqlash kodi")
+        ScreenTitle(title)
         Spacer(Modifier.height(6.dp))
         Text(
             buildAnnotatedString {
@@ -117,14 +126,21 @@ fun OtpScreen(
         }
 
         Spacer(Modifier.height(22.dp))
-        PrimaryButton("Tasdiqlash", onVerify, enabled = state.otpValid && !state.isLoading, trailingIcon = AppIcons.Check)
+        PrimaryButton(confirmLabel, onVerify, enabled = state.otpValid && !state.isLoading, trailingIcon = AppIcons.Check)
 
         ErrorText(state.error)
 
         Spacer(Modifier.weight(1f))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-            Text("Kod SMS orqali kelmadimi? ", style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.5f.sp, color = palette.inkFaint))
-            Text("Telegram orqali oling", style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.5f.sp, fontWeight = FontWeight.Bold, color = palette.primary), modifier = Modifier.clickableNoRipple(onTelegram))
+        if (onSkip != null) {
+            // Hisob allaqachon ochilgan — tasdiqlashni keyinga qoldirish mumkin.
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+                Text("Kod kelmadimi? ", style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.5f.sp, color = palette.inkFaint))
+                Text(
+                    "Keyinroq tasdiqlayman",
+                    style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.5f.sp, fontWeight = FontWeight.Bold, color = palette.primary),
+                    modifier = Modifier.clickableNoRipple(onSkip),
+                )
+            }
         }
     }
 }
@@ -353,25 +369,27 @@ fun ForgotPasswordScreen(
             ScreenTitle("Parolni tiklash", size = 23)
             Spacer(Modifier.height(8.dp))
             Text(
-                "Email manzilingizni kiriting — parolni tiklash havolasini yuboramiz.",
+                "Telefon raqamingizni kiriting — SMS orqali 6 xonali kod yuboramiz.",
                 style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.sp, color = palette.inkMuted, textAlign = androidx.compose.ui.text.style.TextAlign.Center, lineHeight = 19.sp),
                 modifier = Modifier.padding(horizontal = 6.dp),
             )
         }
 
         Spacer(Modifier.height(26.dp))
-        FieldLabel("Email manzil")
+        FieldLabel("Telefon raqamingiz")
         Spacer(Modifier.height(7.dp))
         GlassTextField(
-            value = state.email,
-            onValueChange = vm::onEmailChange,
-            placeholder = "aziz.karimov@edu.uz",
-            leading = AppIcons.Mail,
+            value = state.phone,
+            onValueChange = vm::onPhoneChange,
+            placeholder = "90 123 45 67",
+            leadingContent = { PhonePrefix(palette) },
             focused = true,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+            visualTransformation = PhoneVisualTransformation(),
+            textLetterSpacing = 0.5f,
         )
         Spacer(Modifier.height(18.dp))
-        PrimaryButton("Tiklash havolasini yuborish", onSend, enabled = !state.isLoading)
+        PrimaryButton("Kod yuborish", onSend, enabled = state.phoneValid && !state.isLoading)
 
         state.info?.let {
             Spacer(Modifier.height(12.dp))
@@ -388,5 +406,75 @@ fun ForgotPasswordScreen(
             Spacer(Modifier.width(7.dp))
             Text("Kirishga qaytish", style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = palette.primary))
         }
+    }
+}
+
+// ===========================================================================
+// 1j — YANGI PAROL (parolni tiklashning 2-qadami)
+// ===========================================================================
+
+/**
+ * Yangi parol ekrani — `POST /v1/auth/student/password/reset` uchalasini (raqam, SMS kod,
+ * yangi parol) bitta so'rovda kutadi, shuning uchun kod avvalgi ekranda holatda saqlanadi
+ * va serverga aynan shu yerda yuboriladi.
+ */
+@Composable
+fun NewPasswordScreen(
+    state: AuthFlowState,
+    vm: AuthFlowViewModel,
+    onBack: () -> Unit,
+    onSubmit: () -> Unit,
+    palette: AppPalette = appPalette,
+) {
+    AppScreenScaffold(scroll = false) {
+        BackButton(onBack)
+        Spacer(Modifier.height(24.dp))
+        ScreenTitle("Yangi parol")
+        Spacer(Modifier.height(6.dp))
+        ScreenSubtitle("Kamida 8 belgidan iborat yangi parol o‘ylab toping.")
+        Spacer(Modifier.height(22.dp))
+
+        FieldLabel("Yangi parol")
+        Spacer(Modifier.height(7.dp))
+        GlassTextField(
+            value = state.password,
+            onValueChange = vm::onPasswordChange,
+            placeholder = "••••••••",
+            leading = AppIcons.Lock,
+            trailing = {
+                Icon(
+                    if (state.passwordVisible) AppIcons.EyeOff else AppIcons.Eye,
+                    null, tint = palette.inkFaint,
+                    modifier = Modifier.size(18.dp).clickableNoRipple { vm.togglePasswordVisible() },
+                )
+            },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+            visualTransformation = if (state.passwordVisible) VisualTransformation.None
+            else PasswordVisualTransformation(),
+        )
+
+        Spacer(Modifier.height(13.dp))
+        FieldLabel("Parolni takrorlang")
+        Spacer(Modifier.height(7.dp))
+        GlassTextField(
+            value = state.confirmPassword,
+            onValueChange = vm::onConfirmPasswordChange,
+            placeholder = "••••••••",
+            leading = AppIcons.Lock,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+            visualTransformation = if (state.passwordVisible) VisualTransformation.None
+            else PasswordVisualTransformation(),
+        )
+
+        Spacer(Modifier.height(20.dp))
+        PrimaryButton(
+            "Parolni saqlash",
+            onSubmit,
+            enabled = state.password.length >= 8 && !state.isLoading,
+            trailingIcon = AppIcons.Check,
+        )
+
+        ErrorText(state.error)
+        Spacer(Modifier.weight(1f))
     }
 }

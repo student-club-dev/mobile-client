@@ -1,3 +1,8 @@
+> ⚠️ **ESKIRGAN — ilovada ishlatilmaydi.**
+> Autentifikatsiya backendga (`/v1/auth/student/*`) ko'chirildi, bu oqim va uni chaqiruvchi
+> kod (`FirebaseAuthRepository`, `SocialAuthController`) olib tashlandi. Fayl `functions/`
+> dagi Cloud Function'lar tarixi uchun qoldirilgan. Joriy sozlash — `AUTH_SETUP.md`.
+
 # Email 6 xonali kod — sozlash
 
 Email ro'yxatdan o'tishда 6 xonali kod **Cloud Function** orqali yuboriladi va tekshiriladi

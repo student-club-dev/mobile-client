@@ -4,7 +4,7 @@ import app.cash.sqldelight.coroutines.asFlow
 import app.cash.sqldelight.coroutines.mapToList
 import dev.core.common.AppDispatchers
 import dev.core.common.Resource
-import dev.core.database.sql.StudentClubsDatabase
+import dev.core.database.sql.StudentClubDatabase
 import dev.feature.clubs.data.dto.ClubDto
 import dev.feature.clubs.data.mapper.toDomain
 import dev.feature.clubs.domain.model.Club
@@ -18,7 +18,7 @@ import kotlinx.coroutines.withContext
 
 class ClubRepositoryImpl(
     private val client: HttpClient,
-    private val database: StudentClubsDatabase,
+    private val database: StudentClubDatabase,
     private val dispatchers: AppDispatchers,
 ) : ClubRepository {
 

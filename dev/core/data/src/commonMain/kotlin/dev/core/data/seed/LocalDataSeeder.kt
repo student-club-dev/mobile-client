@@ -3,7 +3,7 @@ package dev.core.data.seed
 import dev.core.common.AppDispatchers
 import dev.core.data.mapper.joinDb
 import dev.core.data.mapper.toDb
-import dev.core.database.sql.StudentClubsDatabase
+import dev.core.database.sql.StudentClubDatabase
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -13,7 +13,7 @@ import kotlinx.serialization.json.Json
  * Backend ulanганда bu seed o'rniga API'dan sinxronlash keladi — tuzilma bir xil.
  */
 class LocalDataSeeder(
-    private val db: StudentClubsDatabase,
+    private val db: StudentClubDatabase,
     private val dispatchers: AppDispatchers,
 ) {
     /**
@@ -155,7 +155,7 @@ class LocalDataSeeder(
             q.insert("nt-2", "Chegirma tugayapti", "Chorsu Cafe'dagi 25% chegirma bugun tugaydi.", "DISCOUNT", "2 soat oldin", 2, 0)
             q.insert("nt-3", "Yangi xabar", "Dilnoza Rahimova sizga xabar yozdi.", "CHAT", "3 soat oldin", 3, 0)
             q.insert("nt-4", "E'loningiz ko'rildi", "\"MacBook Air M1\" e'loningizni 12 kishi ko'rdi.", "AD", "kecha", 4, 1)
-            q.insert("nt-5", "Xush kelibsiz! 🎉", "StudentClubs'ga xush kelibsiz. Profilingizni to'ldiring.", "SYSTEM", "2 kun oldin", 5, 1)
+            q.insert("nt-5", "Xush kelibsiz! 🎉", "Student Club'ga xush kelibsiz. Profilingizni to'ldiring.", "SYSTEM", "2 kun oldin", 5, 1)
         }
     }
 

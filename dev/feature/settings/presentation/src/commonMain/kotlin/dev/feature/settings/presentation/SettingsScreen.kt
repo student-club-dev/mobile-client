@@ -104,7 +104,7 @@ fun SettingsScreen(
             ) { aboutExpanded = !aboutExpanded }
             if (aboutExpanded) {
                 Text(
-                    "StudentClubs — talabalar uchun super-app: chegirmalar, ishlar, " +
+                    "Student Club — talabalar uchun super-app: chegirmalar, ishlar, " +
                         "e'lonlar va xabarlar.\nVersiya 1.0.0",
                     style = scStyle(12.5f, FontWeight.Medium, Sc.Muted, lineHeight = 19f),
                     modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),

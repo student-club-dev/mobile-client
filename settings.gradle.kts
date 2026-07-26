@@ -1,4 +1,4 @@
-rootProject.name = "StudentClubs"
+rootProject.name = "StudentClub"
 
 enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
 

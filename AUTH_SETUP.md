@@ -1,69 +1,84 @@
-# Google + Telefon (OTP) autentifikatsiyasi — sozlash
+# Autentifikatsiya — backend (`/v1/auth/student/*`) + Google
 
-Ilovaga Firebase Auth orqali **Google Sign-In** va **Telefon raqami (SMS OTP)** ro'yxatdan
-o'tish qo'shildi. Kod (UI + domain + data + platforma qatlamlari) tayyor va kompilyatsiya
-bo'ladi, lekin **haqiqiy ishlashi uchun** o'zingizning Firebase loyihangiz kalitlari kerak.
-Hozir repo'da faqat *placeholder* konfiguratsiya fayllari bor.
+Ilova sessiyasi **backend tokenlariga** tayanadi (Firebase Auth EMAS). Shartnoma —
+`dev/api-client-generator/student-club.json` (ElonUz — Student API), server:
+`https://api.studentclub.uz/v1/`.
 
-## 1. Firebase loyihasini yaratish
+## Oqim
 
-1. https://console.firebase.google.com → yangi loyiha.
-2. **Authentication → Sign-in method** da yoqing:
-   - **Google**
-   - **Phone** (test raqamlari ham shu yerda qo'shiladi).
+| Qadam | Endpoint | Izoh |
+|---|---|---|
+| Kirish | `POST /auth/student/login` | telefon **yoki** email + parol |
+| Google | `POST /auth/student/oauth/google` | klient Google ID tokenini yuboradi |
+| Ro'yxat | `POST /auth/student/register` | telefon + parol (min 8 belgi) → sessiya darrov ochiladi |
+| Raqamni tasdiqlash | `POST /auth/student/otp/request` → `otp/verify` | **sessiya talab qiladi** (Bearer) |
+| Parolni tiklash | `POST /auth/student/password/forgot` → `password/reset` | SMS kod + yangi parol |
+| Token yangilash | `POST /auth/student/refresh` | avtomatik, tarmoq qatlamida |
+| Chiqish | `POST /auth/student/logout` | refresh token bekor qilinadi |
 
-## 2. Android
+> **SMS kod — kirish usuli EMAS.** `otp/request` va `otp/verify` `Authorization: Bearer` talab
+> qiladi va javobi faqat `{verified}` — token bermaydi. Shuning uchun kod ro'yxatdan
+> o'tgandan **keyin** so'raladi va uni o'tkazib yuborish mumkin (hisob allaqachon ochilgan).
 
-1. Firebase'ga Android ilova qo'shing, package name: `com.studentclubs.android`.
-2. Debug **SHA-1** ni qo'shing (Google Sign-In va Phone auth uchun majburiy):
-   ```bash
-   ./gradlew :androidApp:signingReport
+## Arxitektura
+
+```
+AuthNavHost (Compose, commonMain)
+  → AuthFlowViewModel
+      • telefon/email + parol → LoginUseCase / RegisterUseCase
+      • Google              → GoogleSignIn (expect/actual) → ID token → LoginWithGoogleUseCase
+      • SMS kod             → RequestPhoneOtpUseCase / VerifyPhoneOtpUseCase
+      • parolni tiklash     → ForgotPasswordUseCase / ResetPasswordUseCase
+          → AuthRepository (ApiAuthRepository)
+              → AuthStudentApi (OpenAPI'dan generatsiya)
+              → TokenStore (SecureTokenStore: Android EncryptedSharedPreferences / iOS Keychain)
+              → ProfileRepository.refresh()  → GET /profile/me
+              → local sessiya keshi (SQLDelight `UserEntity`, `uid` = JWT `sub`)
+```
+
+- **Token yangilash** — `createHttpClient` ichida: 401 kelganda `auth/student/refresh` bilan
+  yangi juftlik olinadi va so'rov takrorlanadi; refresh ham rad etilsa sessiya tozalanadi.
+- **Xatolar** — `BaseResponse` konverti `EnvelopeUnwrapPlugin` bilan shaffof ochiladi, 422 dagi
+  `error.fields` esa `AppException.Validation.fields` ga tushadi (forma maydon ostida ko'rsatadi).
+
+## Google Sign-In sozlash
+
+### Android
+
+1. Google Cloud Console → **Credentials**:
+   - **Web application** turidagi OAuth client ID — ilova ID token uchun aynan shuni ishlatadi;
+   - **Android** turidagi client ID — package `uz.studentclub.app` + SHA-1
+     (`./gradlew :androidApp:signingReport`, debug va release uchun alohida).
+2. Web client ID ni `local.properties` ga yozing (fayl `.gitignore` da):
    ```
-3. Haqiqiy `google-services.json` ni yuklab olib,
-   `androidApp/google-services.json` (placeholder) o'rniga qo'ying.
-   > `default_web_client_id` shu fayldan avtomatik generatsiya bo'ladi —
-   > `SocialAuthController.android.kt` uni resurs sifatida o'qiydi.
+   GOOGLE_WEB_CLIENT_ID=...apps.googleusercontent.com
+   ```
+   Namuna — `local.properties.example`. CI'da xuddi shu nomdagi muhit o'zgaruvchisi o'qiladi.
+   `androidApp/build.gradle.kts` uni `resValue` orqali `google_web_client_id` resursiga
+   aylantiradi, `GoogleSignIn.android.kt` esa shu resursni o'qiydi.
+3. Backend `oauth/google` da tokenni **aynan shu** client ID bo'yicha tekshirishi shart.
 
-Boshqa hech narsa shart emas — Android tomoni to'liq ishlaydi:
-- Google: **Credential Manager + Google ID** → Firebase `signInWithCredential`.
-- Telefon: Firebase `PhoneAuthProvider.verifyPhoneNumber` (avtomatik SMS o'qish ham bor).
+Bo'sh qoldirilsa tugma aniq xato beradi (jimgina ishlamay qolmaydi).
 
-## 3. iOS
+### iOS
 
-1. Firebase'ga iOS ilova qo'shing, bundle ID: `com.studentclubs.ios`
-   (yoki o'zingiznikini — `GoogleService-Info.plist` va Info.plist'da moslang).
-2. Haqiqiy `GoogleService-Info.plist` ni yuklab, `iosApp/iosApp/GoogleService-Info.plist`
-   (placeholder) o'rniga qo'ying va Xcode target'iga qo'shilганini tekshiring.
-3. `iosApp/iosApp/Info.plist` dagi `CFBundleURLTypes` → URL scheme'ni haqiqiy
-   **REVERSED_CLIENT_ID** bilan almashtiring (GoogleService-Info.plist ichida bor).
-4. Xcode'da **Firebase** va **GoogleSignIn** SDK'larini qo'shing (Swift Package Manager):
-   - `https://github.com/firebase/firebase-ios-sdk` → `FirebaseAuth`
-   - `https://github.com/google/GoogleSignIn-iOS` → `GoogleSignIn`
-5. `SocialAuthBridge.swift` va o'zgargan `iOSApp.swift` allaqachon qo'shilgan —
-   ular `IosSocialAuthBridge.shared.delegate` ni o'rnatadi.
-6. Telefon auth uchun **APNs** (Push) sozlanishi kerak (Firebase Console → Cloud Messaging).
+1. `iosApp/iosApp/Info.plist`:
+   - `GIDClientID` — Google Cloud'dagi **iOS** turidagi OAuth client ID;
+   - `CFBundleURLSchemes` — o'sha ID ning teskarisi (`com.googleusercontent.apps.<ID>`).
+2. Xcode'da **GoogleSignIn** SDK (Swift Package Manager:
+   `https://github.com/google/GoogleSignIn-iOS`).
+3. `iosApp/iosApp/GoogleSignInBridge.swift` Kotlin `IosGoogleSignInDelegate` ni amalga oshiradi
+   va ID tokenni qaytaradi; `iOSApp.swift` uni `IosGoogleSignInBridge.shared.delegate` ga ulaydi.
+4. Backend iOS client ID ni ham qabul qilinadigan `audience` ro'yxatiga qo'shishi kerak.
 
-## Arxitektura (qanday ulangan)
+## Firebase
 
-```
-AuthScreen (Compose, common)
-  → AuthViewModel (common)
-      • email/parol  → LoginUseCase → AuthRepository
-      • Google/telefon → SocialAuthController (expect/actual)
-                         → ExternalAuthUser
-                         → SyncExternalUserUseCase → AuthRepository.syncExternalUser
-```
+Firebase endi **faqat chat** (Firestore) uchun qoladi — `FirestoreChatRealtimeSource`,
+bayroq `AuthModule.CHAT_REALTIME_ENABLED`. Autentifikatsiyada Firebase ishlatilmaydi,
+`google-services.json` faqat chat uchun kerak.
 
-- `SocialAuthController` — `expect` (commonMain), `actual`:
-  - **Android**: `SocialAuthController.android.kt` (Firebase + Credential Manager).
-  - **iOS**: `SocialAuthController.ios.kt` → `IosSocialAuthBridge` → Swift `SocialAuthBridge`.
-- Backend haqiqiy bo'lganda: `AuthRepositoryImpl.syncExternalUser` ичida Firebase ID token'ni
-  backendga yuborib, ilova sessiyasini oching (TODO qo'yilgan).
+## Baza migratsiyasi
 
-## Placeholder fayllar (almashtirilishi shart)
-
-| Fayl | Holat |
-|------|-------|
-| `androidApp/google-services.json` | placeholder — Firebase'dan haqiqiysi bilan almashtiring |
-| `iosApp/iosApp/GoogleService-Info.plist` | placeholder — almashtiring |
-| `iosApp/iosApp/Info.plist` (URL scheme) | placeholder REVERSED_CLIENT_ID — almashtiring |
+`15.sqm` (sxema v16): `UserEntity.userId` olib tashlandi, `uid` endi JWT `sub`. Eski
+(Firebase) sessiya qatorlari o'chiriladi — yangi backendda ular yaroqsiz, foydalanuvchi
+bir marta qaytadan kiradi. Profil keshi saqlanib qoladi.

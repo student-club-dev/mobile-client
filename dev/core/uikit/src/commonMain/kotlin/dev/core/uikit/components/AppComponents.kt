@@ -430,11 +430,16 @@ fun OrDivider(text: String = "yoki", modifier: Modifier = Modifier, palette: App
 // Social row (Google / Apple / Telegram)
 // ---------------------------------------------------------------------------
 
+/**
+ * Ijtimoiy kirish tugmalari. [onApple] / [onTelegram] `null` bo'lsa o'sha tugma **chizilmaydi** —
+ * ishlamaydigan tugmani ko'rsatishdan ko'ra yo'q qilgan tuzuk. Hozir backend faqat Google'ni
+ * qo'llab-quvvatlaydi (`POST /v1/auth/student/oauth/google`).
+ */
 @Composable
 fun SocialRow(
     onGoogle: () -> Unit,
-    onApple: () -> Unit,
-    onTelegram: () -> Unit,
+    onApple: (() -> Unit)? = null,
+    onTelegram: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
     palette: AppPalette = appPalette,
 ) {
@@ -442,11 +447,15 @@ fun SocialRow(
         SocialButton(Modifier.weight(1f), onGoogle, palette) {
             androidx.compose.foundation.Image(AppIcons.Google, null, modifier = Modifier.size(21.dp))
         }
-        SocialButton(Modifier.weight(1f), onApple, palette) {
-            Icon(AppIcons.Apple, null, tint = palette.ink, modifier = Modifier.size(19.dp))
+        if (onApple != null) {
+            SocialButton(Modifier.weight(1f), onApple, palette) {
+                Icon(AppIcons.Apple, null, tint = palette.ink, modifier = Modifier.size(19.dp))
+            }
         }
-        SocialButton(Modifier.weight(1f), onTelegram, palette) {
-            androidx.compose.foundation.Image(AppIcons.Telegram, null, modifier = Modifier.size(22.dp))
+        if (onTelegram != null) {
+            SocialButton(Modifier.weight(1f), onTelegram, palette) {
+                androidx.compose.foundation.Image(AppIcons.Telegram, null, modifier = Modifier.size(22.dp))
+            }
         }
     }
 }

@@ -6,14 +6,14 @@ import GoogleSignIn
 @main
 struct iOSApp: App {
     init() {
-        // Firebase (GoogleService-Info.plist orqali)
+        // Firebase — faqat chat (Firestore) uchun; autentifikatsiya backendда.
         FirebaseApp.configure()
 
         // Koin DI ni iOS tomonida ishga tushirish
         KoinIosKt.doInitKoin()
 
-        // Kotlin social auth bridge'ni Swift implementatsiyaga ulash
-        IosSocialAuthBridge.shared.delegate = SocialAuthBridge()
+        // Google Sign-In ko'prigi: Kotlin `GoogleSignIn` shu delegate orqali ID token oladi.
+        IosGoogleSignInBridge.shared.delegate = GoogleSignInBridge()
     }
 
     var body: some Scene {

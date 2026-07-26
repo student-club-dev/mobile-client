@@ -1,7 +1,7 @@
 package dev.core.database
 
 import app.cash.sqldelight.driver.jdbc.sqlite.JdbcSqliteDriver
-import dev.core.database.sql.StudentClubsDatabase
+import dev.core.database.sql.StudentClubDatabase
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -128,15 +128,16 @@ class DatabaseSchemaTest {
         // 10.sqm — profil email, 11.sqm — "Siz uchun" e'lonlari (chegirmasiz + sub-kategoriya + narx),
         // 12.sqm — e'lon jinsi (kiyim uchun Erkak/Ayol), 13.sqm — e'lon koordinatasi (xarita),
         // 14.sqm — e'lonning to'rt turi (chegirma/ijara/xizmat/ish): ListingEntity qayta qurildi,
-        // turga xos maydonlar detailsJson ga ko'chdi.
-        assertEquals(15L, StudentClubsDatabase.Schema.version)
+        // turga xos maydonlar detailsJson ga ko'chdi, 15.sqm — sessiya backend tokenlariga
+        // ko'chdi: UserEntity.userId olib tashlandi, `uid` = JWT `sub`.
+        assertEquals(16L, StudentClubDatabase.Schema.version)
     }
 
     @Test
     fun freshSchemaCreatesAllTablesAndCrudWorks() {
         val driver = freshDriver()
-        StudentClubsDatabase.Schema.create(driver)
-        val db = StudentClubsDatabase(driver)
+        StudentClubDatabase.Schema.create(driver)
+        val db = StudentClubDatabase(driver)
 
         // AppSetting (C5)
         db.appSettingQueries.upsert("theme_mode", "DARK")
@@ -166,7 +167,7 @@ class DatabaseSchemaTest {
             universityEmail = null,
             birthYear = 2004L,
             courseYear = "3",
-            avatarUrl = "https://cdn.studentclubs.dev/avatars/uid-1.jpg",
+            avatarUrl = "https://cdn.studentclub.uz/avatars/uid-1.jpg",
             businessName = null,
             businessType = null,
             email = null,
@@ -175,7 +176,7 @@ class DatabaseSchemaTest {
         assertEquals("Quvonchbek", profile.firstName)
         assertEquals("tuit", profile.universityId)
         assertEquals(2004L, profile.birthYear)
-        assertEquals("https://cdn.studentclubs.dev/avatars/uid-1.jpg", profile.avatarUrl)
+        assertEquals("https://cdn.studentclub.uz/avatars/uid-1.jpg", profile.avatarUrl)
 
         db.profileQueries.clear()
         assertNull(db.profileQueries.selectCurrent().executeAsOneOrNull())
@@ -204,8 +205,8 @@ class DatabaseSchemaTest {
 
         // 1.sqm (AppSetting), 2.sqm (Notification), 3.sqm (Club.joined),
         // 4.sqm (Chat.archived), 5.sqm (ProfileEntity ajratish), 6.sqm (avatarUrl) — hammasi ishga tushadi.
-        StudentClubsDatabase.Schema.migrate(driver, 1L, StudentClubsDatabase.Schema.version)
-        val db = StudentClubsDatabase(driver)
+        StudentClubDatabase.Schema.migrate(driver, 1L, StudentClubDatabase.Schema.version)
+        val db = StudentClubDatabase(driver)
 
         // Migratsiyadan keyin yangi jadvallar mavjud bo'lishi kerak.
         db.appSettingQueries.upsert("k", "v")
@@ -228,11 +229,16 @@ class DatabaseSchemaTest {
         assertEquals(2004L, profile.birthYear)
         assertNull(profile.avatarUrl) // v7 da qo'shilgan ustun — eski yozuvlarda bo'sh
 
-        // ...sessiya esa UserEntity'da saqlanib qolgan (profil ustunlarisiz).
+        // ...eski Firebase sessiyasi esa 15.sqm da o'chirilgan: `uid` endi backend JWT'sining
+        // `sub` maydoni, eski qiymat yangi API'da yaroqsiz. Foydalanuvchi qaytadan kiradi,
+        // profil keshi esa (yuqorida) saqlanib qoladi.
+        assertNull(db.userQueries.selectCurrent().executeAsOneOrNull())
+
+        // Yangi shakl: `userId` ustuni yo'q, `uid` — yagona identifikator.
+        db.userQueries.upsert("usr_01H8X", "Yangi Talaba", "a@b.uz", "STUDENT", "+998901234567", null)
         val user = db.userQueries.selectCurrent().executeAsOne()
-        assertEquals("uid-1", user.uid)
-        assertEquals("Eski Foydalanuvchi", user.fullName)
-        assertEquals(7L, user.userId)
+        assertEquals("usr_01H8X", user.uid)
+        assertEquals("Yangi Talaba", user.fullName)
 
         // v8/v9 (7.sqm + 8.sqm): chegirma e'lonlari jadvali migratsiyadan keyin mavjud
         // va ko'p filialli (branchesJson) ustunga ega bo'lishi kerak.
@@ -374,8 +380,8 @@ class DatabaseSchemaTest {
             0,
         )
 
-        StudentClubsDatabase.Schema.migrate(driver, 8L, StudentClubsDatabase.Schema.version)
-        val db = StudentClubsDatabase(driver)
+        StudentClubDatabase.Schema.migrate(driver, 8L, StudentClubDatabase.Schema.version)
+        val db = StudentClubDatabase(driver)
 
         // 14.sqm — chegirma ustunlari detailsJson ga ko'chdi, umumiylari ustun bo'lib qoldi.
         val migrated = db.listingQueries.selectById("l-1").executeAsOne()
@@ -416,8 +422,8 @@ class DatabaseSchemaTest {
     @Test
     fun listingCrudAndActiveFilterWork() {
         val driver = freshDriver()
-        StudentClubsDatabase.Schema.create(driver)
-        val db = StudentClubsDatabase(driver)
+        StudentClubDatabase.Schema.create(driver)
+        val db = StudentClubDatabase(driver)
         val q = db.listingQueries
 
         fun insert(
@@ -510,11 +516,12 @@ class DatabaseSchemaTest {
             0,
         )
 
-        StudentClubsDatabase.Schema.migrate(driver, 1L, StudentClubsDatabase.Schema.version)
-        val db = StudentClubsDatabase(driver)
+        StudentClubDatabase.Schema.migrate(driver, 1L, StudentClubDatabase.Schema.version)
+        val db = StudentClubDatabase(driver)
 
         assertNull(db.profileQueries.selectCurrent().executeAsOneOrNull())
-        assertEquals("Profilsiz", db.userQueries.selectCurrent().executeAsOne().fullName)
+        // 15.sqm eski (Firebase) sessiyani o'chiradi — yangi backendда u yaroqsiz.
+        assertNull(db.userQueries.selectCurrent().executeAsOneOrNull())
 
         driver.close()
     }
@@ -522,8 +529,8 @@ class DatabaseSchemaTest {
     @Test
     fun seedInsertIsIdempotentByPrimaryKey() {
         val driver = freshDriver()
-        StudentClubsDatabase.Schema.create(driver)
-        val db = StudentClubsDatabase(driver)
+        StudentClubDatabase.Schema.create(driver)
+        val db = StudentClubDatabase(driver)
 
         // Bir xil id bilan ikki marta — INSERT OR REPLACE dublikat yaratmasligi kerak.
         db.clubQueries.upsert(1L, "IT", "desc", 5L, null)

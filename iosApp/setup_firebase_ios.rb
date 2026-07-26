@@ -5,9 +5,9 @@ require 'json'
 puts "🔧 iOS Firebase Setup Automating..."
 puts ""
 
-PROJECT_PATH = 'StudentClubs.xcodeproj'
-INFO_PLIST = 'StudentClubs/Info.plist'
-PLIST_FILE = 'StudentClubs/GoogleService-Info.plist'
+PROJECT_PATH = 'iosApp.xcodeproj'
+INFO_PLIST = 'iosApp/Info.plist'
+PLIST_FILE = 'iosApp/GoogleService-Info.plist'
 APP_ID = '1:570659158152:ios:86c6d422fb25ed88ac873d'
 REVERSED_CLIENT_ID = 'com.googleusercontent.apps.570659158152-86c6d422fb25ed88ac873d'
 

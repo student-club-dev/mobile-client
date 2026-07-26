@@ -5,7 +5,7 @@ import app.cash.sqldelight.coroutines.mapToList
 import app.cash.sqldelight.coroutines.mapToOne
 import dev.core.common.AppDispatchers
 import dev.core.database.sql.NotificationEntity
-import dev.core.database.sql.StudentClubsDatabase
+import dev.core.database.sql.StudentClubDatabase
 import dev.feature.notifications.domain.model.AppNotification
 import dev.feature.notifications.domain.model.NotificationType
 import dev.feature.notifications.domain.repository.NotificationRepository
@@ -15,7 +15,7 @@ import kotlinx.coroutines.withContext
 
 /** [NotificationRepository] — SQLDelight `NotificationEntity` ustidagi implementatsiya. */
 class NotificationRepositoryImpl(
-    private val db: StudentClubsDatabase,
+    private val db: StudentClubDatabase,
     private val dispatchers: AppDispatchers,
 ) : NotificationRepository {
 

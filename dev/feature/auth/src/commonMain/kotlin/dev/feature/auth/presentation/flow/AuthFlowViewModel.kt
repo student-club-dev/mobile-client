@@ -3,21 +3,18 @@ package dev.feature.auth.presentation.flow
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.core.common.Resource
-import dev.core.domain.model.ExternalAuthUser
 import dev.core.domain.model.User
-import dev.feature.profile.domain.model.UserProfile
-import dev.core.domain.usecase.ConfirmEmailSignupUseCase
-import dev.feature.profile.domain.usecase.HasProfileUseCase
+import dev.core.domain.usecase.ForgotPasswordUseCase
 import dev.core.domain.usecase.LoginUseCase
+import dev.core.domain.usecase.LoginWithGoogleUseCase
 import dev.core.domain.usecase.ObserveCurrentUserUseCase
 import dev.core.domain.usecase.RegisterUseCase
-import dev.core.domain.usecase.RequestEmailSignupUseCase
+import dev.core.domain.usecase.RequestPhoneOtpUseCase
+import dev.core.domain.usecase.ResetPasswordUseCase
+import dev.core.domain.usecase.VerifyPhoneOtpUseCase
+import dev.feature.profile.domain.model.UserProfile
 import dev.feature.profile.domain.usecase.SaveProfileUseCase
-import dev.core.domain.usecase.SendPasswordResetUseCase
-import dev.core.domain.usecase.SyncExternalUserUseCase
-import dev.feature.auth.social.OtpSendResult
-import dev.feature.auth.social.SocialAuthController
-import dev.feature.auth.social.SocialAuthResult
+import dev.feature.settings.domain.repository.SettingsRepository
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
@@ -28,7 +25,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -36,42 +32,49 @@ import kotlinx.coroutines.launch
 
 /** UI navigatsiyasini boshqaradigan bir martalik hodisalar. */
 sealed interface AuthEvent {
-    /** SMS kod yuborildi — OTP ekraniga o'tish. */
+    /** Hisob yaratildi va raqamga SMS kod ketdi — tasdiqlash ekraniga. */
     data object OtpSent : AuthEvent
 
-    /** OTP tasdiqlandi — ro'yxatni yakunlash (SignUp) ekraniga o'tish. */
-    data object OtpVerified : AuthEvent
-
-    /** Email hisob yaratildi, tasdiqlash havolasi yuborildi — verify ekraniga. */
-    data object EmailVerificationSent : AuthEvent
-
-    /** Ro'yxat yakunlandi — muvaffaqiyat ekraniga o'tish. */
+    /** Ro'yxat yakunlandi (raqam tasdiqlandi yoki o'tkazib yuborildi) — muvaffaqiyat ekraniga. */
     data object Registered : AuthEvent
+
+    /** Parolni tiklash kodi yuborildi — kod + yangi parol ekraniga. */
+    data object ResetCodeSent : AuthEvent
+
+    /** Parol yangilandi — kirish ekraniga qaytamiz. */
+    data object PasswordReset : AuthEvent
 
     /** Profil saqlandi — bosh sahifaga o'tish. */
     data object ProfileSaved : AuthEvent
 
-    /** To'liq kirildi (email/Google/avto-OTP) — bosh sahifaga o'tish. */
+    /** To'liq kirildi (parol yoki Google) — bosh sahifaga o'tish. */
     data class Authenticated(val user: User) : AuthEvent
 }
 
 /**
- * Auth oqimining forma holatini va biznes-amallarni boshqaradi.
- * Email login va tashqi (Google/Telefon) auth domen use-case'lariga ulangan;
- * platformaga bog'liq [SocialAuthController] composable'dan uzatiladi.
+ * Auth oqimining forma holatini va biznes-amallarini boshqaradi.
+ *
+ * Backend oqimi (`/v1/auth/student/…`):
+ * - **kirish** — telefon yoki email + parol, yoki Google (`oauth/google`);
+ * - **ro'yxat** — telefon (yoki email) + parol; hisob darhol ochiladi, so'ng SMS kod bilan
+ *   raqam tasdiqlanadi (`otp/request` + `otp/verify` — ikkalasi ham **sessiya** talab qiladi,
+ *   shuning uchun ular ro'yxatdan KEYIN keladi va o'tkazib yuborilishi mumkin);
+ * - **parolni tiklash** — raqamga SMS kod (`password/forgot`) → kod + yangi parol
+ *   (`password/reset`).
+ *
+ * Token yangilash bu yerda emas — u tarmoq qatlamida avtomatik (`createHttpClient`).
  */
 class AuthFlowViewModel(
     private val loginUseCase: LoginUseCase,
+    private val loginWithGoogleUseCase: LoginWithGoogleUseCase,
     private val registerUseCase: RegisterUseCase,
-    private val sendPasswordResetUseCase: SendPasswordResetUseCase,
-    private val requestEmailSignupUseCase: RequestEmailSignupUseCase,
-    private val confirmEmailSignupUseCase: ConfirmEmailSignupUseCase,
-    private val saveProfileUseCase: SaveProfileUseCase,
-    private val syncExternalUserUseCase: SyncExternalUserUseCase,
-    private val hasProfileUseCase: HasProfileUseCase,
+    private val requestPhoneOtpUseCase: RequestPhoneOtpUseCase,
+    private val verifyPhoneOtpUseCase: VerifyPhoneOtpUseCase,
+    private val forgotPasswordUseCase: ForgotPasswordUseCase,
+    private val resetPasswordUseCase: ResetPasswordUseCase,
     private val observeCurrentUserUseCase: ObserveCurrentUserUseCase,
-    /** true → email kodi (Cloud Function) ishlatiladi; false → native (deploy'siz). */
-    private val useEmailCode: Boolean = false,
+    private val saveProfileUseCase: SaveProfileUseCase,
+    private val settingsRepository: SettingsRepository,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(AuthFlowState())
@@ -81,27 +84,36 @@ class AuthFlowViewModel(
     val events: Flow<AuthEvent> = _events.receiveAsFlow()
 
     /**
-     * Ilova ochilishida avtomatik kirish holati (local keshdan):
-     * `null` — hali tekshirilmoqda (splash), `true` — kirgan (HOME), `false` — kirmagan (onboarding).
+     * Ilova ochilishida avtomatik kirish holati (local sessiya keshidan):
+     * `null` — hali tekshirilmoqda (splash), `true` — kirgan (HOME), `false` — kirmagan.
      */
     val loggedIn: StateFlow<Boolean?> = observeCurrentUserUseCase()
         .map { it != null }
         .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
-    /** OTP orqali tasdiqlangan foydalanuvchi — ro'yxatni yakunlashda ishlatiladi. */
-    private var verifiedExternal: ExternalAuthUser? = null
-
     private var timerJob: Job? = null
 
-    // --- Forma yangilanishlari ---
-    fun onPhoneChange(v: String) = _state.update { it.copy(phone = v.filter { c -> c.isDigit() }.take(9), error = null) }
+    // ------------------------------------------------------------------
+    // Forma yangilanishlari
+    // ------------------------------------------------------------------
+
+    fun onPhoneChange(v: String) = _state.update {
+        it.copy(phone = v.filter { c -> c.isDigit() }.take(9), error = null)
+    }
+
     fun onEmailChange(v: String) = _state.update { it.copy(email = v, error = null, info = null) }
     fun onPasswordChange(v: String) = _state.update { it.copy(password = v, error = null) }
     fun onConfirmPasswordChange(v: String) = _state.update { it.copy(confirmPassword = v, error = null) }
     fun togglePasswordVisible() = _state.update { it.copy(passwordVisible = !it.passwordVisible) }
     fun toggleRememberMe() = _state.update { it.copy(rememberMe = !it.rememberMe) }
-    fun onOtpChange(v: String) = _state.update { it.copy(otp = v.filter { c -> c.isDigit() }.take(6), error = null) }
-    fun onEmailCodeChange(v: String) = _state.update { it.copy(emailCode = v.filter { c -> c.isDigit() }.take(6), error = null) }
+    fun onOtpChange(v: String) = _state.update {
+        it.copy(otp = v.filter { c -> c.isDigit() }.take(OTP_CODE_LENGTH), error = null)
+    }
+
+    /** Kirish ekranidagi tab (telefon ↔ email) — qaysi identifikator yuborilishini belgilaydi. */
+    fun onLoginWithEmailChange(useEmail: Boolean) = _state.update {
+        it.copy(loginWithEmail = useEmail, error = null)
+    }
 
     fun onFirstNameChange(v: String) = _state.update { it.copy(firstName = v) }
     fun onLastNameChange(v: String) = _state.update { it.copy(lastName = v) }
@@ -109,22 +121,39 @@ class AuthFlowViewModel(
     fun onUniversityEmailChange(v: String) = _state.update { it.copy(universityEmail = v) }
     fun onBusinessNameChange(v: String) = _state.update { it.copy(businessName = v, error = null) }
     fun onBusinessTypeChange(v: String) = _state.update { it.copy(businessType = v) }
-    fun toggleTerms() = _state.update { it.copy(termsAccepted = !it.termsAccepted) }
+    fun toggleTerms() = _state.update { it.copy(termsAccepted = !it.termsAccepted, error = null) }
 
     fun onBirthYearChange(y: Int) = _state.update { it.copy(birthYear = y) }
     fun onCourseYearChange(c: CourseYear) = _state.update { it.copy(courseYear = c) }
     fun onUniversityQueryChange(v: String) = _state.update { it.copy(universityQuery = v) }
     fun onUniversitySelected(id: String) = _state.update { it.copy(universityId = id) }
 
+    fun clearError() = _state.update { it.copy(error = null, info = null) }
+
+    /** Tashqi (platforma) oqim xatosini ekranga chiqaradi — masalan Google mavjud emas. */
+    fun showAuthError(message: String) = _state.update { it.copy(isLoading = false, error = message) }
+
     // ------------------------------------------------------------------
-    // Email + parol bilan kirish
+    // Kirish
     // ------------------------------------------------------------------
+
+    /** Telefon yoki email + parol bilan kirish (tanlangan tabga qarab). */
     fun login() {
         val s = _state.value
         if (s.isLoading) return
+        val identifier = if (s.loginWithEmail) s.email.trim() else s.phoneE164
+        if (identifier.isBlank()) {
+            _state.update {
+                it.copy(
+                    error = if (s.loginWithEmail) "Email manzilini kiriting."
+                    else "To‘liq 9 xonali raqam kiriting.",
+                )
+            }
+            return
+        }
         _state.update { it.copy(isLoading = true, error = null) }
         viewModelScope.launch {
-            when (val result = loginUseCase(s.email.trim(), s.password)) {
+            when (val result = loginUseCase(identifier, s.password)) {
                 is Resource.Success -> finishAuthenticated(result.data)
                 is Resource.Error -> _state.update { it.copy(isLoading = false, error = result.message) }
                 Resource.Loading -> Unit
@@ -132,155 +161,33 @@ class AuthFlowViewModel(
         }
     }
 
-    // ------------------------------------------------------------------
-    // Telefon (OTP)
-    // ------------------------------------------------------------------
-    fun sendOtp(controller: SocialAuthController) {
-        val s = _state.value
-        if (s.isLoading) return
-        if (!s.phoneValid) {
-            _state.update { it.copy(error = "To‘liq 9 xonali raqam kiriting.") }
-            return
-        }
-        val e164 = "+998${s.phoneDigits}"
+    /** Google ID token bilan kirish — backend tokenni tekshirib sessiya ochadi. */
+    fun signInWithGoogle(idToken: String) {
+        if (_state.value.isLoading) return
         _state.update { it.copy(isLoading = true, error = null) }
         viewModelScope.launch {
-            when (val result = controller.sendOtp(e164)) {
-                OtpSendResult.Sent -> {
-                    _state.update { it.copy(isLoading = false) }
-                    startResendTimer()
-                    _events.send(AuthEvent.OtpSent)
-                }
-                is OtpSendResult.AutoVerified -> onPhoneVerified(result.user)
-                is OtpSendResult.Error -> _state.update { it.copy(isLoading = false, error = result.message) }
-            }
-        }
-    }
-
-    fun confirmOtp(controller: SocialAuthController) {
-        val s = _state.value
-        if (s.isLoading) return
-        if (!s.otpValid) {
-            _state.update { it.copy(error = "6 xonali kodni kiriting.") }
-            return
-        }
-        _state.update { it.copy(isLoading = true, error = null) }
-        viewModelScope.launch {
-            when (val result = controller.confirmOtp(s.otp)) {
-                is SocialAuthResult.Success -> onPhoneVerified(result.user)
-                SocialAuthResult.Cancelled -> _state.update { it.copy(isLoading = false) }
-                is SocialAuthResult.Error -> _state.update { it.copy(isLoading = false, error = result.message) }
-            }
-        }
-    }
-
-    /** OTP yuborilgach 60 soniyalik qayta yuborish taymerini ishga tushiradi. */
-    fun startResendTimer() {
-        timerJob?.cancel()
-        _state.update { it.copy(resendSeconds = 60) }
-        timerJob = viewModelScope.launch {
-            while (_state.value.resendSeconds > 0) {
-                delay(1000)
-                _state.update { it.copy(resendSeconds = (it.resendSeconds - 1).coerceAtLeast(0)) }
-            }
-        }
-    }
-
-    fun resend(controller: SocialAuthController) {
-        if (_state.value.resendSeconds > 0) return
-        sendOtp(controller)
-    }
-
-    // ------------------------------------------------------------------
-    // Email + parol bilan ro'yxatdan o'tish (yangi hisob)
-    // ------------------------------------------------------------------
-    fun registerWithEmail() {
-        val s = _state.value
-        if (s.isLoading) return
-        val email = s.email.trim()
-        if (email.isBlank() || !email.contains("@") || !email.contains(".")) {
-            _state.update { it.copy(error = "To‘g‘ri email manzil kiriting.") }
-            return
-        }
-        if (s.password.length < 6) {
-            _state.update { it.copy(error = "Parol kamida 6 belgidan iborat bo‘lsin.") }
-            return
-        }
-        if (s.password != s.confirmPassword) {
-            _state.update { it.copy(error = "Parollar mos kelmadi.") }
-            return
-        }
-        _state.update { it.copy(isLoading = true, error = null) }
-        viewModelScope.launch {
-            if (useEmailCode) {
-                // Cloud Function bilan: akkaunt faqat kod tasdiqlangач yaratiladi
-                when (val result = requestEmailSignupUseCase(email)) {
-                    is Resource.Success -> {
-                        _state.update { it.copy(isLoading = false, emailCode = "") }
-                        startResendTimer()
-                        _events.send(AuthEvent.EmailVerificationSent)
-                    }
-                    is Resource.Error -> _state.update { it.copy(isLoading = false, error = result.message) }
-                    Resource.Loading -> Unit
-                }
-            } else {
-                // Native (deploy'siz): akkaunt darrov yaratiladi
-                when (val result = registerUseCase(email, s.password)) {
-                    is Resource.Success -> {
-                        _state.update { it.copy(isLoading = false) }
-                        _events.send(AuthEvent.Registered)
-                    }
-                    is Resource.Error -> _state.update { it.copy(isLoading = false, error = result.message) }
-                    Resource.Loading -> Unit
-                }
-            }
-        }
-    }
-
-    /** Kod ekrani — kod to'g'ri bo'lsa akkaunt yaratiladi va tizimga kiriladi. */
-    fun verifyEmailCode() {
-        val s = _state.value
-        if (s.isLoading) return
-        if (!s.emailCodeValid) {
-            _state.update { it.copy(error = "6 xonali kodni kiriting.") }
-            return
-        }
-        _state.update { it.copy(isLoading = true, error = null, info = null) }
-        viewModelScope.launch {
-            when (val result = confirmEmailSignupUseCase(s.email.trim(), s.emailCode, s.password)) {
-                is Resource.Success -> {
-                    _state.update { it.copy(isLoading = false) }
-                    _events.send(AuthEvent.Registered) // → rol tanlash (Success)
-                }
+            when (val result = loginWithGoogleUseCase(idToken)) {
+                is Resource.Success -> finishAuthenticated(result.data)
                 is Resource.Error -> _state.update { it.copy(isLoading = false, error = result.message) }
                 Resource.Loading -> Unit
             }
         }
     }
 
-    /** Email kodini qayta yuboradi. */
-    fun resendEmailCode() {
-        val s = _state.value
-        if (s.isLoading || s.resendSeconds > 0) return
-        viewModelScope.launch {
-            when (val result = requestEmailSignupUseCase(s.email.trim())) {
-                is Resource.Success -> {
-                    _state.update { it.copy(info = "Kod qayta yuborildi.", error = null) }
-                    startResendTimer()
-                }
-                is Resource.Error -> _state.update { it.copy(error = result.message) }
-                Resource.Loading -> Unit
-            }
-        }
-    }
+    /** Google oqimi boshlanishi bilan spinner yoqiladi (tugma bosildi). */
+    fun startExternalAuth() = _state.update { it.copy(isLoading = true, error = null) }
+
+    /** Foydalanuvchi tashqi oqimni bekor qildi — xato ko'rsatilmaydi. */
+    fun cancelExternalAuth() = _state.update { it.copy(isLoading = false) }
 
     // ------------------------------------------------------------------
-    // Ro'yxatni yakunlash
+    // Ro'yxatdan o'tish
     // ------------------------------------------------------------------
+
     /**
-     * Telefon (OTP) orqali kelgan bo'lsa — joriy sessiya profilini saqlaydi.
-     * To'g'ridan-to'g'ri kelgan bo'lsa — universitet emaili + parol bilan yangi
-     * Firebase hisob yaratadi, so'ng profilni saqlaydi.
+     * Hisob yaratadi (telefon + parol) va profilni saqlaydi. Hisob darhol ochiladi; keyin
+     * raqamni tasdiqlash uchun SMS kod so'raladi — foydalanuvchi uni o'tkazib yuborsa ham
+     * ilovaga kirgan bo'ladi.
      */
     fun register() {
         val s = _state.value
@@ -289,23 +196,158 @@ class AuthFlowViewModel(
             _state.update { it.copy(error = "Shartlarga rozilik bering.") }
             return
         }
-        if (verifiedExternal == null) {
-            // Bu ekranga telefon (OTP) orqali kelinadi — sessiya bo'lishi shart
-            _state.update { it.copy(error = "Avval telefon raqamini tasdiqlang.") }
+        if (!s.phoneValid) {
+            _state.update { it.copy(error = "To‘liq 9 xonali raqam kiriting.") }
             return
         }
         _state.update { it.copy(isLoading = true, error = null) }
         viewModelScope.launch {
-            when (val saved = saveProfileUseCase(profileFromState(_state.value))) {
+            when (val result = registerUseCase(s.phoneE164, s.password)) {
+                is Resource.Error -> _state.update { it.copy(isLoading = false, error = result.message) }
+                Resource.Loading -> Unit
                 is Resource.Success -> {
-                    _state.update { it.copy(isLoading = false) }
-                    _events.send(AuthEvent.Registered)
+                    // Sessiya ochildi — ism/rol/universitet emaili profilga yoziladi.
+                    // Profil saqlanmasa ham ro'yxat davom etadi: uni keyin to'ldirish mumkin.
+                    runCatching { saveProfileUseCase(profileFromState(_state.value)) }
+                    _state.update { it.copy(otp = "", otpPurpose = OtpPurpose.VERIFY_PHONE) }
+                    requestPhoneOtp(onFailure = { finishRegistered() })
                 }
-                is Resource.Error -> _state.update { it.copy(isLoading = false, error = saved.message) }
+            }
+        }
+    }
+
+    /**
+     * Raqamni tasdiqlash uchun SMS kod so'raydi. Kod ketmasa (masalan SMS xizmati javob
+     * bermasa) [onFailure] chaqiriladi — hisob baribir ochilgani uchun foydalanuvchini
+     * ushlab qolmaymiz.
+     */
+    private suspend fun requestPhoneOtp(onFailure: suspend () -> Unit) {
+        when (val sent = requestPhoneOtpUseCase(_state.value.phoneE164)) {
+            is Resource.Success -> {
+                _state.update { it.copy(isLoading = false) }
+                startResendTimer(sent.data.resendCooldownSeconds)
+                _events.send(AuthEvent.OtpSent)
+            }
+            is Resource.Error -> onFailure()
+            Resource.Loading -> Unit
+        }
+    }
+
+    /** Tasdiqlash ekrani — kodni tekshiradi va ro'yxatni yakunlaydi. */
+    fun verifyPhone() {
+        val s = _state.value
+        if (s.isLoading) return
+        _state.update { it.copy(isLoading = true, error = null) }
+        viewModelScope.launch {
+            when (val result = verifyPhoneOtpUseCase(s.phoneE164, s.otp)) {
+                is Resource.Success -> finishRegistered()
+                is Resource.Error -> _state.update { it.copy(isLoading = false, error = result.message) }
                 Resource.Loading -> Unit
             }
         }
     }
+
+    /** Tasdiqlashni o'tkazib yuborish — hisob allaqachon ochilgan. */
+    fun skipPhoneVerification() {
+        viewModelScope.launch { finishRegistered() }
+    }
+
+    // ------------------------------------------------------------------
+    // Parolni tiklash
+    // ------------------------------------------------------------------
+
+    /** 1-qadam — raqamga SMS kod. */
+    fun requestPasswordReset() {
+        val s = _state.value
+        if (s.isLoading) return
+        if (!s.phoneValid) {
+            _state.update { it.copy(error = "To‘liq 9 xonali raqam kiriting.") }
+            return
+        }
+        _state.update { it.copy(isLoading = true, error = null, info = null) }
+        viewModelScope.launch {
+            when (val result = forgotPasswordUseCase(s.phoneE164)) {
+                is Resource.Success -> {
+                    _state.update {
+                        it.copy(
+                            isLoading = false,
+                            otp = "",
+                            password = "",
+                            confirmPassword = "",
+                            otpPurpose = OtpPurpose.RESET_PASSWORD,
+                        )
+                    }
+                    startResendTimer(DEFAULT_RESEND_SECONDS)
+                    _events.send(AuthEvent.ResetCodeSent)
+                }
+                is Resource.Error -> _state.update { it.copy(isLoading = false, error = result.message) }
+                Resource.Loading -> Unit
+            }
+        }
+    }
+
+    /** 2-qadam — kod + yangi parol. */
+    fun resetPassword() {
+        val s = _state.value
+        if (s.isLoading) return
+        if (s.password != s.confirmPassword) {
+            _state.update { it.copy(error = "Parollar mos kelmadi.") }
+            return
+        }
+        _state.update { it.copy(isLoading = true, error = null) }
+        viewModelScope.launch {
+            when (val result = resetPasswordUseCase(s.phoneE164, s.otp, s.password)) {
+                is Resource.Success -> {
+                    _state.update {
+                        it.copy(isLoading = false, otp = "", password = "", confirmPassword = "")
+                    }
+                    _events.send(AuthEvent.PasswordReset)
+                }
+                is Resource.Error -> _state.update { it.copy(isLoading = false, error = result.message) }
+                Resource.Loading -> Unit
+            }
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Kodni qayta yuborish
+    // ------------------------------------------------------------------
+
+    fun resendCode() {
+        val s = _state.value
+        if (s.isLoading || s.resendSeconds > 0) return
+        when (s.otpPurpose) {
+            OtpPurpose.RESET_PASSWORD -> requestPasswordReset()
+            OtpPurpose.VERIFY_PHONE -> {
+                _state.update { it.copy(isLoading = true, error = null) }
+                viewModelScope.launch {
+                    requestPhoneOtp(
+                        onFailure = {
+                            _state.update {
+                                it.copy(isLoading = false, error = "Kodni yuborib bo‘lmadi. Qayta urining.")
+                            }
+                        },
+                    )
+                }
+            }
+        }
+    }
+
+    /** Backend bergan kutish oralig'i bo'yicha taymer. */
+    private fun startResendTimer(seconds: Int) {
+        timerJob?.cancel()
+        _state.update { it.copy(resendSeconds = seconds.coerceAtLeast(0)) }
+        timerJob = viewModelScope.launch {
+            while (_state.value.resendSeconds > 0) {
+                delay(1000)
+                _state.update { it.copy(resendSeconds = (it.resendSeconds - 1).coerceAtLeast(0)) }
+            }
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Profil
+    // ------------------------------------------------------------------
 
     /** Profilni to'ldirish ekrani (1n) — universitet/yil/kursni saqlab, bosh sahifaga o'tadi. */
     fun completeProfile() {
@@ -315,6 +357,7 @@ class AuthFlowViewModel(
             when (val saved = saveProfileUseCase(profileFromState(_state.value))) {
                 is Resource.Success -> {
                     _state.update { it.copy(isLoading = false) }
+                    persistRole()
                     _events.send(AuthEvent.ProfileSaved)
                 }
                 is Resource.Error -> _state.update { it.copy(isLoading = false, error = saved.message) }
@@ -326,7 +369,7 @@ class AuthFlowViewModel(
     private fun profileFromState(s: AuthFlowState) = UserProfile(
         firstName = s.firstName.ifBlank { null },
         lastName = s.lastName.ifBlank { null },
-        phoneNumber = if (s.phoneDigits.isNotBlank()) "+998${s.phoneDigits}" else null,
+        phoneNumber = s.phoneE164.ifBlank { null },
         role = s.role.name,
         universityId = if (s.role == Role.BUSINESS) null else s.universityId,
         universityEmail = s.universityEmail.ifBlank { null },
@@ -337,131 +380,50 @@ class AuthFlowViewModel(
     )
 
     // ------------------------------------------------------------------
-    // Google Sign-In
+    // Biometrika
     // ------------------------------------------------------------------
-    fun signInWithGoogle(controller: SocialAuthController) {
-        if (_state.value.isLoading) return
-        _state.update { it.copy(isLoading = true, error = null) }
-        viewModelScope.launch {
-            when (val result = controller.signInWithGoogle()) {
-                is SocialAuthResult.Success -> syncAndFinish(result.user)
-                SocialAuthResult.Cancelled -> _state.update { it.copy(isLoading = false) }
-                is SocialAuthResult.Error -> _state.update { it.copy(isLoading = false, error = result.message) }
-            }
-        }
-    }
-
-    // ------------------------------------------------------------------
-    // Apple Sign-In
-    // ------------------------------------------------------------------
-    fun signInWithApple(controller: SocialAuthController) {
-        if (_state.value.isLoading) return
-        _state.update { it.copy(isLoading = true, error = null) }
-        viewModelScope.launch {
-            when (val result = controller.signInWithApple()) {
-                is SocialAuthResult.Success -> syncAndFinish(result.user)
-                SocialAuthResult.Cancelled -> _state.update { it.copy(isLoading = false) }
-                is SocialAuthResult.Error -> _state.update { it.copy(isLoading = false, error = result.message) }
-            }
-        }
-    }
-
-    // ------------------------------------------------------------------
-    // Telegram (Cloud Function → custom token)
-    // ------------------------------------------------------------------
-    fun signInWithTelegram(controller: SocialAuthController) {
-        if (_state.value.isLoading) return
-        _state.update { it.copy(isLoading = true, error = null) }
-        viewModelScope.launch {
-            when (val result = controller.signInWithTelegram()) {
-                is SocialAuthResult.Success -> syncAndFinish(result.user)
-                SocialAuthResult.Cancelled -> _state.update { it.copy(isLoading = false) }
-                is SocialAuthResult.Error -> _state.update { it.copy(isLoading = false, error = result.message) }
-            }
-        }
-    }
 
     /**
-     * Biometrik tasdiqdan (Face ID / barmoq izi) so'ng chaqiriladi — local keshda sessiya bo'lsa
-     * to'g'ridan-to'g'ri HOME'ga, aks holda xato xabari (avval oddiy kirish kerak).
+     * Biometrik tasdiqdan (Face ID / barmoq izi) so'ng chaqiriladi — local keshda sessiya
+     * bo'lsa to'g'ridan-to'g'ri HOME'ga, aks holda xato (avval oddiy kirish kerak).
      */
     fun onBiometricAuthenticated() {
         viewModelScope.launch {
             val user = observeCurrentUserUseCase().first()
             if (user != null) finishAuthenticated(user)
-            else _state.update { it.copy(error = "Saqlangan hisob topilmadi. Avval email/parol bilan kiring.") }
+            else _state.update { it.copy(error = "Saqlangan hisob topilmadi. Avval parol bilan kiring.") }
         }
     }
 
     /** Biometrik oqim xatosi (mavjud emas / tanilmadi) uchun xabar. */
     fun biometricError(message: String) = _state.update { it.copy(error = message) }
 
-    /** Parolni tiklash havolasini yuboradi (Firebase). */
-    fun requestPasswordReset() {
-        val email = _state.value.email.trim()
-        if (_state.value.isLoading) return
-        if (email.isBlank()) {
-            _state.update { it.copy(error = "Email manzilini kiriting.") }
-            return
-        }
-        _state.update { it.copy(isLoading = true, error = null, info = null) }
-        viewModelScope.launch {
-            when (val result = sendPasswordResetUseCase(email)) {
-                is Resource.Success ->
-                    _state.update { it.copy(isLoading = false, info = "Tiklash havolasi $email manziliga yuborildi.") }
-                is Resource.Error -> _state.update { it.copy(isLoading = false, error = result.message) }
-                Resource.Loading -> Unit
-            }
-        }
-    }
-
-    fun clearError() = _state.update { it.copy(error = null, info = null) }
-
     // ------------------------------------------------------------------
-    /**
-     * Telefon OTP tasdiqlangач (qo'lda yoki avto): Firebase sessiyasi tayyor.
-     * Profil bor bo'lsa — mavjud foydalanuvchi → HOME.
-     * Profil yo'q bo'lsa — yangi foydalanuvchi → SignUp (rol/ism to'ldirish).
-     */
-    private suspend fun onPhoneVerified(external: ExternalAuthUser) {
-        verifiedExternal = external
-        // MUHIM: hasProfileUseCase() Firestore `get()` ga boradi va tarmoqsiz holatda istisno
-        // TASHLAMASDAN cheksiz kutishi mumkin. Bu chaqiruv `isLoading = true` ostida bo'lgani
-        // uchun osilib qolsa OTP ekrani abadiy spinnerda qoladi va qayta urinish ham bloklanadi.
-        // Timeout'da "profil yo'q" deb hisoblaymiz — foydalanuvchi SignUp'ga o'tadi (xavfsiz yo'l).
-        val hasProfile = try {
-            withTimeoutOrNull(PROFILE_CHECK_TIMEOUT_MS) { hasProfileUseCase() } ?: false
-        } catch (_: Exception) {
-            false
-        }
-        if (hasProfile) {
-            syncAndFinish(external) // mavjud foydalanuvchi → HOME
-        } else {
-            _state.update { it.copy(isLoading = false) }
-            _events.send(AuthEvent.OtpVerified) // yangi foydalanuvchi → SignUp
-        }
-    }
 
-    private suspend fun syncAndFinish(external: ExternalAuthUser) {
-        when (val synced = syncExternalUserUseCase(external)) {
-            is Resource.Success -> finishAuthenticated(synced.data)
-            is Resource.Error -> _state.update { it.copy(isLoading = false, error = synced.message) }
-            Resource.Loading -> Unit
-        }
+    private suspend fun finishRegistered() {
+        _state.update { it.copy(isLoading = false) }
+        _events.send(AuthEvent.Registered)
     }
 
     private suspend fun finishAuthenticated(user: User) {
-        _state.update { it.copy(isLoading = false) }
+        persistRole()
+        _state.update { it.copy(isLoading = false, password = "", confirmPassword = "") }
         _events.send(AuthEvent.Authenticated(user))
+    }
+
+    /** Rolni local saqlaymiz — ildiz router keyingi ochilishda shu bo'yicha yo'naltiradi. */
+    private suspend fun persistRole() {
+        settingsRepository.setValue(SettingsRepository.KEY_SELECTED_ROLE, _state.value.role.name)
     }
 
     override fun onCleared() {
         timerJob?.cancel()
         super.onCleared()
     }
-
-    private companion object {
-        /** Profil mavjudligini tekshirishni eng ko'pi shuncha kutamiz (aks holda spinner qotadi). */
-        const val PROFILE_CHECK_TIMEOUT_MS = 5_000L
-    }
 }
+
+/** SMS kodning uzunligi — backend 6 xonali kod yuboradi. */
+const val OTP_CODE_LENGTH = 6
+
+/** Backend cheklovi noma'lum bo'lganda ishlatiladigan standart kutish oralig'i. */
+private const val DEFAULT_RESEND_SECONDS = 60

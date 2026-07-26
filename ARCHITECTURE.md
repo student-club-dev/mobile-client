@@ -1,4 +1,4 @@
-# Student Clubs — KMP Arxitektura
+# Student Club — KMP Arxitektura
 
 Kotlin Multiplatform (Android + iOS), Compose Multiplatform UI, modulli "feature + core" arxitektura.
 Modullar `dev/` papkasi ostida joylashgan.
@@ -6,7 +6,7 @@ Modullar `dev/` papkasi ostida joylashgan.
 ## Modullar daraxti
 
 ```
-StudentClubs/
+StudentClub/
 ├── androidApp/                 # Android entry point (MainActivity, Application)
 ├── iosApp/                     # iOS entry point (SwiftUI + Shared.framework)
 └── dev/

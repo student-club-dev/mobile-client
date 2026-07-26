@@ -1,3 +1,8 @@
+> ⚠️ **ESKIRGAN — ilovada ishlatilmaydi.**
+> Autentifikatsiya backendga (`/v1/auth/student/*`) ko'chirildi, bu oqim va uni chaqiruvchi
+> kod (`FirebaseAuthRepository`, `SocialAuthController`) olib tashlandi. Fayl `functions/`
+> dagi Cloud Function'lar tarixi uchun qoldirilgan. Joriy sozlash — `AUTH_SETUP.md`.
+
 # Telegram Login — sozlash (backendsiz, Cloud Function bilan)
 
 Telegram Firebase'ning tayyor provideri emas, shuning uchun oqim quyidagicha:

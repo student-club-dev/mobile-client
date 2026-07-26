@@ -1,0 +1,18 @@
+# Namuna — buni `local.properties` ga ko'chiring va qiymatlarni to'ldiring.
+# `local.properties` .gitignore da, shuning uchun maxfiy qiymatlar repoga tushmaydi.
+# CI'da fayl bo'lmaydi — o'sha nomdagi muhit o'zgaruvchilari o'qiladi.
+
+# Android SDK yo'li (Android Studio o'zi yozadi)
+sdk.dir=/Users/<foydalanuvchi>/Library/Android/sdk
+
+# Google Sign-In — Google Cloud Console'dagi **Web application** turidagi OAuth client ID.
+# Android turidagi client ID EMAS: Android client faqat imzoni (SHA-1) ro'yxatdan o'tkazadi,
+# ilova esa serverga yuboriladigan ID token uchun WEB client ID ni ishlatadi.
+#
+# Google Cloud → APIs & Services → Credentials → Create credentials → OAuth client ID
+#   1) Application type: Web application  → ID ni shu yerga qo'ying
+#   2) Application type: Android          → package `com.studentclubs.android` + SHA-1
+#      (debug va release uchun alohida; `./gradlew :androidApp:signingReport`)
+#
+# Backend ham tokenni AYNAN shu Web client ID bilan tekshirishi shart.
+GOOGLE_WEB_CLIENT_ID=1234567890-abcdefghijklmnop.apps.googleusercontent.com
