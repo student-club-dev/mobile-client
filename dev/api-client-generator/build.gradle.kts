@@ -90,6 +90,10 @@ val cleanSwagger = tasks.register("cleanSwagger") {
                 c.startsWith("AuthStudent") -> "AuthStudent"
                 c.startsWith("AuthBusiness") -> "AuthBusiness"
                 c == "Profiles" -> "Profile"
+                // "Catalog (student feed)" / "Discounts (student feed)" — qavs ichidagi izoh
+                // klass nomiga qo'shilmasin: `CatalogApi`, `DiscountsApi`.
+                c.startsWith("Catalog") -> "Catalog"
+                c.startsWith("Discounts") -> "Discounts"
                 else -> c
             }
         }
@@ -99,6 +103,17 @@ val cleanSwagger = tasks.register("cleanSwagger") {
         // tipsiz `object` deb yozadi).
         val booleanProps = setOf("multiple", "requiresCustomName")
 
+        // Kasrli maydonlar: koordinatalar/reyting misolsiz kelsa ham `Double` bo'lishi shart —
+        // `Int` bo'lsa `41.352` deserializatsiyada yiqiladi.
+        val doubleProps = setOf("lat", "lng", "minLat", "maxLat", "minLng", "maxLng", "rating")
+
+        // Butun sonli, ammo misolsiz (va shu sabab "string" deb topiladigan) maydonlar.
+        val integerProps = setOf("totalLimit")
+
+        /** Misol kasrmi (`41.352`, `4.6`) — shunda maydon `Double` bo'lishi kerak. */
+        fun isFractional(example: Any?): Boolean =
+            example is Number && example.toDouble() % 1.0 != 0.0
+
         fun retype(node: MutableMap<String, Any?>, propName: String?) {
             val format = node["format"] as? String
             val example = node["example"]
@@ -106,6 +121,14 @@ val cleanSwagger = tasks.register("cleanSwagger") {
                 format == "int32" || format == "int64" -> node["type"] = "integer"
                 format == "double" || format == "float" -> node["type"] = "number"
                 propName != null && propName in booleanProps -> node["type"] = "boolean"
+                propName != null && propName in integerProps -> {
+                    node["type"] = "integer"
+                    node["format"] = "int32"
+                }
+                propName in doubleProps || isFractional(example) -> {
+                    node["type"] = "number"
+                    node["format"] = "double"
+                }
                 example is Number -> {
                     node["type"] = "integer"
                     node["format"] = "int32"
@@ -138,13 +161,18 @@ val cleanSwagger = tasks.register("cleanSwagger") {
                         retype(map, propName)
                     }
 
-                    // (5) `number` → `integer`. Kasrli maydonlarda doim `format: double` bor,
-                    // shuning uchun formatsiz `number` — har doim butun son.
+                    // (5) `number` → `integer`. NestJS hamma sonni formatsiz `number` deb yozadi,
+                    // shuning uchun butun/kasr farqi faqat maydon nomi va `example` dan bilinadi:
+                    // `lat: 41.352` — Double, `viewsCount: 412` — Int.
                     if (map["type"] == "number") {
                         val format = map["format"] as? String
                         if (format == null) {
-                            map["type"] = "integer"
-                            map["format"] = "int32"
+                            if (propName in doubleProps || isFractional(map["example"])) {
+                                map["format"] = "double" // tip `number` bo'lib qoladi → Double
+                            } else {
+                                map["type"] = "integer"
+                                map["format"] = "int32"
+                            }
                         } else if (format == "int32" || format == "int64") {
                             map["type"] = "integer"
                         }

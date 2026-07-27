@@ -2,32 +2,34 @@ package dev.core.data.remote
 
 import dev.core.common.Resource
 import dev.core.data.dto.DiscountsResponseDto
-import io.ktor.client.HttpClient
-import io.ktor.client.call.body
-import io.ktor.client.request.get
+import dev.core.domain.model.OfferDetail
+import dev.core.domain.model.OfferFilterSchema
+import dev.core.domain.model.OfferSuggestion
 
 /**
- * Chegirmalar uchun masofaviy (backend) manba — B4 offline-first shablonining tarmoq qismi.
+ * "Siz uchun" feed'ining masofaviy (backend) manbasi — B4 offline-first shablonining tarmoq qismi.
  *
- * Repository shu interfeys orqali serverdan oladi va local DB'ga yozadi. Ktor klientiga
- * Firebase ID token allaqachon avtomatik qo'shiladi (B3). Boshqa domenlar (Jobs, Students...)
- * aynan shu shakldan nusxa oladi.
+ * Repository shu interfeys orqali serverdan oladi va local DB'ga yozadi. Ktor klientiga sessiya
+ * tokeni avtomatik qo'shiladi. Haqiqiy implementatsiya — [ApiDiscountRemoteDataSource]
+ * (`catalog` + `discounts` endpoint'lari). Boshqa domenlar (Jobs, Students...) aynan shu
+ * shakldan nusxa oladi.
  */
 interface DiscountRemoteDataSource {
     suspend fun fetchDiscounts(): Resource<DiscountsResponseDto>
-}
 
-/** Ktor implementatsiyasi. Endpoint real API kelганда `student-clubs.json` ga moslanadi. */
-class KtorDiscountRemoteDataSource(
-    private val client: HttpClient,
-) : DiscountRemoteDataSource {
+    /**
+     * Saqlanganlar ro'yxatini serverda ham yangilaydi
+     * (`POST /v1/discounts/favorites/toggle`). Local yozuv baribir birinchi bo'ladi —
+     * bu faqat sinxronlash; qaytgan qiymat — serverdagi yakuniy holat.
+     */
+    suspend fun setFavorite(listingId: String, saved: Boolean): Resource<Boolean>
 
-    override suspend fun fetchDiscounts(): Resource<DiscountsResponseDto> = try {
-        // Bitta endpoint kategoriyalar + takliflarni qaytaradi. Agar API alohida bo'lsa,
-        // shu yerda ikkita `get(...)` chaqirib birlashtiring.
-        val body: DiscountsResponseDto = client.get("discounts").body()
-        Resource.Success(body)
-    } catch (e: Exception) {
-        Resource.Error(e.message ?: "Chegirmalarni yuklab bo'lmadi", e)
-    }
+    /** Bitta e'lon to'liq holda (`POST /v1/discounts/detail`). */
+    suspend fun fetchDetail(listingId: String): Resource<OfferDetail>
+
+    /** Qidiruv avtoto'ldirishi (`POST /v1/discounts/suggest`). */
+    suspend fun suggest(query: String): Resource<List<OfferSuggestion>>
+
+    /** Filtr ekrani sxemasi (`POST /v1/catalog/filter-schema`). */
+    suspend fun fetchFilterSchema(typeKeys: List<String>): Resource<OfferFilterSchema>
 }

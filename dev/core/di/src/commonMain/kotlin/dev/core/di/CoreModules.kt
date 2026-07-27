@@ -6,8 +6,8 @@ import dev.core.common.auth.TokenStore
 import dev.core.data.auth.SecureTokenStore
 import dev.core.data.auth.SqlDelightTokenStore
 import dev.core.data.repository.DiscountRepositoryImpl
+import dev.core.data.remote.ApiDiscountRemoteDataSource
 import dev.core.data.remote.DiscountRemoteDataSource
-import dev.core.data.remote.KtorDiscountRemoteDataSource
 import dev.core.data.seed.LocalDataSeeder
 import dev.core.database.DatabaseFactory
 import dev.core.database.DriverFactory
@@ -28,6 +28,8 @@ import dev.core.domain.usecase.SetPasswordUseCase
 import dev.core.domain.usecase.VerifyPhoneOtpUseCase
 import dev.core.network.NetworkConfig
 import dev.core.network.createHttpClient
+import dev.core.network.generated.api.CatalogApi
+import dev.core.network.generated.api.DiscountsApi
 import io.ktor.client.HttpClient
 import org.koin.core.module.Module
 import org.koin.dsl.module
@@ -52,10 +54,10 @@ const val DEFAULT_BASE_URL = DEV_BASE_URL
 /**
  * Offline-first sinxronlash yoqilganmi (B4).
  *
- * `student-club.json` (talaba API'si) hozircha faqat **auth**, **profil**, **geo** va **media**
- * endpoint'larini beradi. E'lonlar/ishlar/talabalar/universitetlar uchun endpoint yo'q —
- * ular local bazadan (seed) ishlaydi. Feed API (`STUDENT_FEED.md`) tayyor bo'lganda shu
- * bayroq `true` qilinadi.
+ * `student-club.json` (talaba API'si) **auth**, **profil**, **geo**, **media** va "Siz uchun"
+ * feed'ini (**catalog** + **discounts**) beradi. Ishlar/talabalar/universitetlar/klublar uchun
+ * endpoint hali yo'q — ular local bazadan (seed) ishlaydi, shuning uchun bu umumiy bayroq
+ * `false` bo'lib qoladi; feed o'zining [DISCOUNTS_REMOTE_ENABLED] bayrog'idan yuradi.
  */
 const val REMOTE_SYNC_ENABLED = false
 
@@ -64,6 +66,15 @@ const val REMOTE_SYNC_ENABLED = false
  * (`GET/PUT /v1/profile/me`) — `ApiAuthRepository` kirishdan keyin aynan shuni tortadi.
  */
 const val PROFILE_REMOTE_ENABLED = true
+
+/**
+ * "Siz uchun" bo'limi backend'dan keladimi — `POST /v1/catalog/groups` + `/v1/catalog/types`
+ * (ElonUz katalogining 27 ta biznes turi) va `POST /v1/discounts/search`.
+ *
+ * `false` qilinsa ekran faqat local seed (`listings.json`) bilan ishlaydi. Tarmoq xatosi
+ * bo'lganda ham kesh saqlanadi — refresh DB'ni faqat muvaffaqiyatli javobda almashtiradi.
+ */
+const val DISCOUNTS_REMOTE_ENABLED = true
 
 val networkModule = module {
     single { NetworkConfig(baseUrl = if (USE_PROD_API) PROD_BASE_URL else DEV_BASE_URL) }
@@ -89,11 +100,15 @@ val repositoryModule = module {
     // AuthRepository (backend) auth feature modulida bog'lanadi (authFeatureModule).
 
     // Barcha domenlar — local DB (SQLDelight) ustidagi repository'lar.
-    // --- B4 offline-first: masofaviy manbalar (Ktor) ---
-    single<DiscountRemoteDataSource> { KtorDiscountRemoteDataSource(get()) }
+    // --- B4 offline-first: masofaviy manbalar ---
+    // Generatsiya qilingan klientlarga ilovaning umumiy Ktor klienti uzatiladi — shunda sessiya
+    // tokeni (Bearer) har so'rovga avtomatik qo'shiladi va muddati tugasa yangilanadi.
+    single { CatalogApi(baseUrl = get<NetworkConfig>().baseUrl, httpClient = get<HttpClient>()) }
+    single { DiscountsApi(baseUrl = get<NetworkConfig>().baseUrl, httpClient = get<HttpClient>()) }
+    single<DiscountRemoteDataSource> { ApiDiscountRemoteDataSource(get(), get()) }
 
     // --- Repository'lar (offline-first: DB + refresh) ---
-    single<DiscountRepository> { DiscountRepositoryImpl(get(), get(), get(), REMOTE_SYNC_ENABLED) }
+    single<DiscountRepository> { DiscountRepositoryImpl(get(), get(), get(), DISCOUNTS_REMOTE_ENABLED) }
 
     // Dizayndagi namuna ma'lumot bilan bazani to'ldiruvchi (bo'sh bo'lsa).
     single { LocalDataSeeder(get(), get()) }

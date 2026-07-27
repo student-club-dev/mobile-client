@@ -39,6 +39,8 @@ data class DiscountOfferDto(
     val featured: Boolean = false,
     val lat: Double = 0.0,
     val lng: Double = 0.0,
+    /** Foydalanuvchi shu e'lonni saqlaganmi (serverdagi holat). */
+    val saved: Boolean = false,
 )
 
 /** Bitta so'rovda ikkalasini olish uchun konteyner (yoki alohida endpoint'lar). */

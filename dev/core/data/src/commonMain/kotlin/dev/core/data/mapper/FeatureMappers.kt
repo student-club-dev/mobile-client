@@ -5,6 +5,8 @@ import dev.core.database.sql.DiscountOfferEntity
 import dev.core.domain.model.DiscountCategory
 import dev.core.domain.model.DiscountOffer
 import dev.core.domain.model.DiscountTag
+import dev.core.domain.model.OfferBranch
+import dev.core.domain.model.OfferDetail
 
 // --- List <-> TEXT ("|" bilan) ---
 internal fun List<String>.joinDb(): String = joinToString("|")
@@ -21,6 +23,35 @@ private inline fun <reified T : Enum<T>> parseEnum(value: String, default: T): T
 
 fun DiscountCategoryEntity.toDomain(): DiscountCategory = DiscountCategory(
     id = id, name = name, emoji = emoji, offerCount = offerCount.toInt(), accent = accent,
+)
+
+/**
+ * Keshdagi kartadan yig'ilgan tafsilot — tarmoq yo'q bo'lganda ekran bo'sh qolmasin uchun.
+ * Promo-kod, filiallar va shartlar faqat `POST /v1/discounts/detail` da bo'lgani uchun bu
+ * yerda yo'q; UI buni [OfferDetail.fromNetwork] orqali biladi.
+ */
+fun DiscountOffer.toOfflineDetail(saved: Boolean): OfferDetail = OfferDetail(
+    id = id,
+    categoryId = categoryId,
+    subcategory = subcategory,
+    merchant = merchant,
+    title = title,
+    emoji = emoji,
+    bannerAccent = bannerAccent,
+    isDiscount = isDiscount,
+    discountPercent = discountPercent,
+    originalPrice = originalPrice,
+    finalPrice = finalPrice,
+    savedAmount = savedAmount,
+    priceUnit = priceUnit,
+    tag = tag,
+    promoCode = promoCode,
+    validTo = expiry,
+    saved = saved,
+    branches = listOfNotNull(
+        location?.let { OfferBranch(id = "$id-branch", name = it, address = "", lat = lat, lng = lng) },
+    ),
+    fromNetwork = false,
 )
 
 fun DiscountOfferEntity.toDomain(): DiscountOffer = DiscountOffer(

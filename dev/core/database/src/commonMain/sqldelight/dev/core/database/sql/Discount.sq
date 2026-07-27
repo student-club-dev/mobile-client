@@ -39,6 +39,9 @@ SELECT * FROM DiscountCategoryEntity;
 selectAllOffers:
 SELECT * FROM DiscountOfferEntity;
 
+selectOfferById:
+SELECT * FROM DiscountOfferEntity WHERE id = ?;
+
 selectOffersByCategory:
 SELECT * FROM DiscountOfferEntity WHERE categoryId = ?;
 

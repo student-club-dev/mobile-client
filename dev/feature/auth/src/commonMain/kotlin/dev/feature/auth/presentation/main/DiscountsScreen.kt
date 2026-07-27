@@ -45,6 +45,8 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.core.domain.model.DiscountOffer
 import dev.core.domain.model.DiscountTag
+import dev.core.domain.model.OfferSuggestion
+import dev.core.domain.model.SuggestionKind
 import dev.core.uikit.components.AppFontFamily
 import dev.core.uikit.components.ScCircleButton
 import dev.core.uikit.components.ScHeader
@@ -69,12 +71,14 @@ fun DiscountsScreen(vm: DiscountsViewModel = koinViewModel(), onBack: (() -> Uni
     val palette = appPalette
     val state by vm.state.collectAsStateWithLifecycle()
     val filterState by vm.filterState.collectAsStateWithLifecycle()
+    val suggestions by vm.suggestions.collectAsStateWithLifecycle()
+    val detail by vm.detail.collectAsStateWithLifecycle()
     var showFilter by remember { mutableStateOf(false) }
     var showMap by remember { mutableStateOf(false) }
 
     Box(Modifier.fillMaxSize()) {
         FeedContent(
-            state, palette, vm,
+            state, suggestions, palette, vm,
             onBack = onBack,
             onOpenFilter = { vm.openFilter(); showFilter = true },
             onOpenMap = { showMap = true },
@@ -93,6 +97,16 @@ fun DiscountsScreen(vm: DiscountsViewModel = koinViewModel(), onBack: (() -> Uni
                 onClose = { showFilter = false },
             )
         }
+        // Tafsilot hammasining ustida — xarita/filtr ochiq bo'lsa ham ko'rinadi.
+        detail?.let { d ->
+            OfferDetailSheet(
+                state = d,
+                saved = d.detail?.id?.let { state.savedIds.contains(it) } ?: false,
+                palette = palette,
+                onToggleSaved = vm::toggleSaved,
+                onClose = vm::closeOffer,
+            )
+        }
     }
 }
 
@@ -102,6 +116,7 @@ fun DiscountsScreen(vm: DiscountsViewModel = koinViewModel(), onBack: (() -> Uni
 @Composable
 private fun FeedContent(
     state: DiscountsUiState,
+    suggestions: List<OfferSuggestion>,
     palette: AppPalette,
     vm: DiscountsViewModel,
     onBack: (() -> Unit)?,
@@ -132,6 +147,11 @@ private fun FeedContent(
                 }
                 FilterButton(state.activeFilterCount, palette, onOpenFilter)
             }
+            // Server takliflari — yozayotganda qatorning tagida chiqadi (`/v1/discounts/suggest`).
+            if (suggestions.isNotEmpty()) {
+                Spacer(Modifier.height(8.dp))
+                SuggestionList(suggestions, palette, vm::onSuggestionPicked)
+            }
             Spacer(Modifier.height(9.dp))
             MapLinkButton(palette, onOpenMap)
         }
@@ -147,8 +167,9 @@ private fun FeedContent(
 
             items(state.offers, key = { it.id }) { offer ->
                 val saved = state.savedIds.contains(offer.id)
-                if (offer.isDiscount) DiscountOfferCard(offer, saved, palette, vm::toggleSaved)
-                else RegularOfferCard(offer, saved, palette, vm::toggleSaved)
+                val openDetail = { vm.openOffer(offer.id) }
+                if (offer.isDiscount) DiscountOfferCard(offer, saved, palette, vm::toggleSaved, openDetail)
+                else RegularOfferCard(offer, saved, palette, vm::toggleSaved, openDetail)
             }
 
             if (state.offers.isEmpty()) {
@@ -181,6 +202,50 @@ private fun FilterButton(activeCount: Int, palette: AppPalette, onClick: () -> U
             }
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+// Qidiruv takliflari (`POST /v1/discounts/suggest`)
+// ---------------------------------------------------------------------------
+@Composable
+private fun SuggestionList(
+    suggestions: List<OfferSuggestion>,
+    palette: AppPalette,
+    onPick: (OfferSuggestion) -> Unit,
+) {
+    Column(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(13.dp)).background(palette.glassStrong)
+            .border(1.dp, palette.border, RoundedCornerShape(13.dp)),
+    ) {
+        suggestions.forEach { s ->
+            Row(
+                Modifier.fillMaxWidth().clickable { onPick(s) }.padding(horizontal = 12.dp, vertical = 9.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(s.kind.icon(), style = TextStyle(fontSize = 13.sp))
+                Text(
+                    s.label,
+                    style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = palette.ink),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                Text(
+                    "${s.count}",
+                    style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.5f.sp, color = palette.inkFaint),
+                )
+            }
+        }
+    }
+}
+
+/** Taklif turi — bir qarashda ajratish uchun kichik belgi. */
+private fun SuggestionKind.icon(): String = when (this) {
+    SuggestionKind.TYPE -> "🏷"
+    SuggestionKind.CATEGORY -> "📂"
+    SuggestionKind.BUSINESS -> "🏪"
+    SuggestionKind.LISTING -> "🔎"
 }
 
 // ---------------------------------------------------------------------------
@@ -332,18 +397,19 @@ private fun FilterScreen(
         }
 
         Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
-            // Chegirma holati
+            // Chegirma holati — sonlar server sxemasidan (`filter-schema`), bo'lsa.
             FilterSection("Chegirma holati", palette) {
-                FilterPill("Hammasi", d.discountFilter == DiscountFilter.ALL, palette) { vm.onDraftDiscountFilter(DiscountFilter.ALL) }
-                FilterPill("Chegirmali", d.discountFilter == DiscountFilter.DISCOUNT, palette) { vm.onDraftDiscountFilter(DiscountFilter.DISCOUNT) }
-                FilterPill("Chegirmasiz", d.discountFilter == DiscountFilter.REGULAR, palette) { vm.onDraftDiscountFilter(DiscountFilter.REGULAR) }
+                FilterPill("Hammasi".withCount(fs.kindCounts["ALL"]), d.discountFilter == DiscountFilter.ALL, palette) { vm.onDraftDiscountFilter(DiscountFilter.ALL) }
+                FilterPill("Chegirmali".withCount(fs.kindCounts["DISCOUNT"]), d.discountFilter == DiscountFilter.DISCOUNT, palette) { vm.onDraftDiscountFilter(DiscountFilter.DISCOUNT) }
+                FilterPill("Chegirmasiz".withCount(fs.kindCounts["REGULAR"]), d.discountFilter == DiscountFilter.REGULAR, palette) { vm.onDraftDiscountFilter(DiscountFilter.REGULAR) }
             }
 
             // Biznes turi
             FilterSection("Biznes turi", palette) {
                 CategoryPill("Barchasi", null, d.categoryId == null, palette) { vm.onDraftCategory(null) }
                 fs.categories.forEach { cat ->
-                    CategoryPill("${cat.emoji} ${cat.name}", cat.accent, d.categoryId == cat.id, palette) { vm.onDraftCategory(cat.id) }
+                    val label = "${cat.emoji} ${cat.name}".withCount(fs.typeCounts[cat.id])
+                    CategoryPill(label, cat.accent, d.categoryId == cat.id, palette) { vm.onDraftCategory(cat.id) }
                 }
             }
 
@@ -356,11 +422,13 @@ private fun FilterScreen(
                 }
             }
 
-            // Bo'lim (tanlangan tur ichidagi sub-kategoriyalar — dinamik, ko'p tanlash)
+            // Bo'lim — server sxemasi kelgan bo'lsa undan (sonlari bilan), aks holda keshdan.
             if (fs.availableSubcategories.isNotEmpty()) {
                 FilterSection("Bo'lim", palette) {
                     fs.availableSubcategories.forEach { sub ->
-                        FilterPill(sub, sub in d.subcategories, palette) { vm.toggleDraftSubcategory(sub) }
+                        FilterPill(sub.withCount(fs.subcategoryCounts[sub]), sub in d.subcategories, palette) {
+                            vm.toggleDraftSubcategory(sub)
+                        }
                     }
                 }
             }
@@ -371,6 +439,16 @@ private fun FilterScreen(
                 FilterPill("Chegirma %", d.sort == OfferSort.DISCOUNT_DESC, palette) { vm.onDraftSort(OfferSort.DISCOUNT_DESC) }
                 FilterPill("Arzon", d.sort == OfferSort.PRICE_ASC, palette) { vm.onDraftSort(OfferSort.PRICE_ASC) }
                 FilterPill("Qimmat", d.sort == OfferSort.PRICE_DESC, palette) { vm.onDraftSort(OfferSort.PRICE_DESC) }
+            }
+
+            // Sxemadagi ma'lumot — serverda nechta e'lon bor va narxlar oralig'i qanday.
+            val schemaInfo = listOfNotNull(
+                fs.schemaTotal?.let { "Serverda $it ta e'lon" },
+                fs.priceRange?.let { "${it.first.sum()} – ${it.last.sum()} so'm" },
+            ).joinToString(" · ")
+            if (schemaInfo.isNotBlank()) {
+                Spacer(Modifier.height(12.dp))
+                Text(schemaInfo, style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.5f.sp, color = palette.inkFaint))
             }
 
             Spacer(Modifier.height(16.dp))
@@ -435,13 +513,19 @@ private fun CategoryPill(label: String, accent: Long?, selected: Boolean, palett
 // Chegirmali e'lon kartasi — rangli banner + eski/yangi narx
 // ---------------------------------------------------------------------------
 @Composable
-private fun DiscountOfferCard(offer: DiscountOffer, saved: Boolean, palette: AppPalette, onToggleSaved: (DiscountOffer, Boolean) -> Unit) {
+private fun DiscountOfferCard(
+    offer: DiscountOffer,
+    saved: Boolean,
+    palette: AppPalette,
+    onToggleSaved: (DiscountOffer, Boolean) -> Unit,
+    onOpen: () -> Unit,
+) {
     val accent = Color(offer.bannerAccent)
     val clipboard = LocalClipboardManager.current
     var copied by remember(offer.id) { mutableStateOf(false) }
     LaunchedEffect(copied) { if (copied) { delay(1500); copied = false } }
 
-    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(palette.glass).border(1.dp, palette.border, RoundedCornerShape(18.dp))) {
+    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(palette.glass).border(1.dp, palette.border, RoundedCornerShape(18.dp)).clickable(onClick = onOpen)) {
         Box(Modifier.fillMaxWidth().height(64.dp).background(accent.copy(alpha = 0.16f)).padding(horizontal = 14.dp), contentAlignment = Alignment.CenterStart) {
             Text(offer.emoji, style = TextStyle(fontSize = 30.sp))
             if (offer.subcategory.isNotBlank()) {
@@ -479,10 +563,16 @@ private fun DiscountOfferCard(offer: DiscountOffer, saved: Boolean, palette: App
 // Chegirmasiz oddiy e'lon kartasi — ixcham gorizontal, bannersiz
 // ---------------------------------------------------------------------------
 @Composable
-private fun RegularOfferCard(offer: DiscountOffer, saved: Boolean, palette: AppPalette, onToggleSaved: (DiscountOffer, Boolean) -> Unit) {
+private fun RegularOfferCard(
+    offer: DiscountOffer,
+    saved: Boolean,
+    palette: AppPalette,
+    onToggleSaved: (DiscountOffer, Boolean) -> Unit,
+    onOpen: () -> Unit,
+) {
     val accent = Color(offer.bannerAccent)
     Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(palette.glass).border(1.dp, palette.border, RoundedCornerShape(16.dp)).padding(11.dp),
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(palette.glass).border(1.dp, palette.border, RoundedCornerShape(16.dp)).clickable(onClick = onOpen).padding(11.dp),
         horizontalArrangement = Arrangement.spacedBy(11.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -554,3 +644,6 @@ private fun OfferTagRow(
 
 // "55000" → "55 000"
 private fun Long.sum(): String = toString().reversed().chunked(3).joinToString(" ").reversed()
+
+/** Filtr chipiga server bergan sonni qo'shadi: "Pitsa" → "Pitsa · 54". Son yo'q bo'lsa — o'zi. */
+private fun String.withCount(count: Int?): String = if (count == null) this else "$this · $count"

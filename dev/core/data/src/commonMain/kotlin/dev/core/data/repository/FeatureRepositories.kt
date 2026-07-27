@@ -4,11 +4,17 @@ import app.cash.sqldelight.coroutines.asFlow
 import app.cash.sqldelight.coroutines.mapToList
 import dev.core.common.AppDispatchers
 import dev.core.common.Resource
+import dev.core.common.errorOf
+import dev.core.common.error.AppException
 import dev.core.data.remote.DiscountRemoteDataSource
 import dev.core.data.mapper.toDomain
+import dev.core.data.mapper.toOfflineDetail
 import dev.core.database.sql.StudentClubDatabase
 import dev.core.domain.model.DiscountCategory
 import dev.core.domain.model.DiscountOffer
+import dev.core.domain.model.OfferDetail
+import dev.core.domain.model.OfferFilterSchema
+import dev.core.domain.model.OfferSuggestion
 import dev.core.domain.repository.DiscountRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -42,8 +48,43 @@ class DiscountRepositoryImpl(
     override fun observeSaved(): Flow<List<DiscountOffer>> =
         q.selectSavedOffers().asFlow().mapToList(dispatchers.io).map { r -> r.map { it.toDomain() } }
 
+    /**
+     * Avval local (UI darrov yangilanadi va oflaynda ham ishlaydi), keyin — serverga.
+     * Tarmoq xatosi jimgina yutiladi: keyingi [refresh] serverdagi holatni qaytaradi.
+     */
     override suspend fun setSaved(offerId: String, saved: Boolean) = withContext(dispatchers.io) {
         if (saved) q.saveOffer(offerId) else q.unsaveOffer(offerId)
+        if (syncEnabled) remote.setFavorite(offerId, saved)
+        Unit
+    }
+
+    /**
+     * Tafsilot faqat serverda bor (promo-kod, filiallar, shartlar). Tarmoq yo'q yoki sinxronlash
+     * o'chirilgan bo'lsa — keshdagi kartadan minimal variant yig'iladi, shunda ekran baribir
+     * ochiladi (`fromNetwork = false`).
+     */
+    override suspend fun getDetail(offerId: String): Resource<OfferDetail> {
+        if (syncEnabled) {
+            val res = remote.fetchDetail(offerId)
+            if (res is Resource.Success) return res
+        }
+        val cached = withContext(dispatchers.io) { q.selectOfferById(offerId).executeAsOneOrNull() }
+            ?: return errorOf(AppException.NotFound())
+        return Resource.Success(cached.toDomain().toOfflineDetail(isSaved(offerId)))
+    }
+
+    override suspend fun suggest(query: String): Resource<List<OfferSuggestion>> {
+        if (!syncEnabled || query.isBlank()) return Resource.Success(emptyList())
+        return remote.suggest(query)
+    }
+
+    override suspend fun getFilterSchema(typeKeys: List<String>): Resource<OfferFilterSchema> {
+        if (!syncEnabled) return Resource.Success(OfferFilterSchema())
+        return remote.fetchFilterSchema(typeKeys)
+    }
+
+    private suspend fun isSaved(offerId: String): Boolean = withContext(dispatchers.io) {
+        q.selectSavedOffers().executeAsList().any { it.id == offerId }
     }
 
     /**
@@ -55,6 +96,11 @@ class DiscountRepositoryImpl(
         if (!syncEnabled) return Resource.Success(Unit) // Backend hali yo'q — no-op.
         return when (val res = remote.fetchDiscounts()) {
             is Resource.Success -> {
+                // Bo'sh javob (masalan feed hali to'ldirilmagan) keshni o'chirmasin — aks holda
+                // ekran bo'm-bo'sh qolardi. Bor ma'lumot faqat bor ma'lumot bilan almashtiriladi.
+                if (res.data.categories.isEmpty() && res.data.offers.isEmpty()) {
+                    return Resource.Success(Unit)
+                }
                 withContext(dispatchers.io) {
                     q.transaction {
                         q.clearCategories()
@@ -70,6 +116,9 @@ class DiscountRepositoryImpl(
                                 o.tag, o.promoCode, o.location, o.expiry, o.emoji, o.bannerAccent,
                                 if (o.featured) 1L else 0L, o.lat, o.lng,
                             )
+                            // Saqlanganlar server holatiga tenglashtiriladi (boshqa qurilmada
+                            // saqlangan/olib tashlangan e'lon shu yerda ko'rinadi).
+                            if (o.saved) q.saveOffer(o.id) else q.unsaveOffer(o.id)
                         }
                     }
                 }
