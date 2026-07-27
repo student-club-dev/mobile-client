@@ -40,8 +40,6 @@ kotlin {
             implementation(projects.dev.feature.chat.presentation)
             // Home agregator ekrani — StudentShell HomeScreen'ni ochadi.
             implementation(projects.dev.feature.home.presentation)
-            // Biznesmen ekranlari alohida modulda (sof UI) — auth uni ishlatadi.
-            implementation(projects.dev.feature.business)
 
             // Local sessiya keshi (offline + avtomatik kirish)
             implementation(libs.sqldelight.runtime)
@@ -56,21 +54,17 @@ kotlin {
 
             // GitLive Firebase — faqat CHAT real-time (Firestore) uchun.
             // Autentifikatsiya Firebase'da EMAS: u backend tokenlariga tayanadi.
-            implementation(libs.gitlive.firebase.auth)
             implementation(libs.gitlive.firebase.firestore)
         }
 
         androidMain.dependencies {
             // GitLive Firestore Android tomonda Firebase SDK'sini talab qiladi (chat).
             implementation(project.dependencies.platform(libs.firebase.bom))
-            implementation(libs.firebase.auth)
             // Google Sign-In — Credential Manager + Google ID (backendga ID token beradi)
             implementation(libs.androidx.credentials)
             implementation(libs.androidx.credentials.playServicesAuth)
             implementation(libs.googleid)
             implementation(libs.androidx.activity.compose)
-            // Biometrik login (F1) — Face ID / barmoq izi
-            implementation(libs.androidx.biometric)
             implementation(libs.androidx.fragment)
         }
     }

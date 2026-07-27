@@ -22,6 +22,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -404,6 +405,10 @@ private fun FilterScreen(
                 FilterPill("Chegirmasiz".withCount(fs.kindCounts["REGULAR"]), d.discountFilter == DiscountFilter.REGULAR, palette) { vm.onDraftDiscountFilter(DiscountFilter.REGULAR) }
             }
 
+            // Joylashuv — boshqa filtrlardan farqli: tanlangan zahoti so'rovga ketadi
+            // (`filter.geo.regionIds`) va feed qayta tortiladi.
+            RegionSelect(vm, palette)
+
             // Biznes turi
             FilterSection("Biznes turi", palette) {
                 CategoryPill("Barchasi", null, d.categoryId == null, palette) { vm.onDraftCategory(null) }
@@ -464,6 +469,99 @@ private fun FilterScreen(
                 Text("Qo'llash · ${fs.previewCount} ta e'lon", style = TextStyle(fontFamily = AppFontFamily, fontSize = 14.sp, fontWeight = FontWeight.Black, color = Color.White))
             }
         }
+    }
+}
+
+/**
+ * "Joylashuv" — bosilganda viloyatlar ro'yxatini ochib beradigan select.
+ * Ro'yxat shu yerda, filtrning ichida ochiladi (alohida oyna emas) — filtr o'zi to'liq
+ * ekranli qoplama bo'lgani uchun ustiga yana bir oyna qo'yish shart emas.
+ */
+@Composable
+private fun RegionSelect(vm: DiscountsViewModel, palette: AppPalette) {
+    val picker by vm.regionPicker.collectAsStateWithLifecycle()
+    val selected by vm.selectedRegion.collectAsStateWithLifecycle()
+    var expanded by remember { mutableStateOf(false) }
+
+    LaunchedEffect(expanded) { if (expanded) vm.loadRegions() }
+
+    Column(Modifier.fillMaxWidth().padding(top = 14.dp)) {
+        Text(
+            "Joylashuv",
+            style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = palette.ink),
+        )
+        Spacer(Modifier.size(9.dp))
+        Row(
+            Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp))
+                .background(palette.glass)
+                .border(1.dp, if (expanded) palette.primary else palette.border, RoundedCornerShape(14.dp))
+                .clickable { expanded = !expanded }
+                .padding(horizontal = 13.dp, vertical = 13.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Icon(ScIcons.MapPin, null, tint = palette.primary, modifier = Modifier.size(17.dp))
+            Text(
+                selected?.name ?: "Butun O‘zbekiston",
+                style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.5f.sp, fontWeight = FontWeight.Bold, color = palette.ink),
+                modifier = Modifier.weight(1f),
+                maxLines = 1,
+            )
+            Icon(AppIcons.ChevronDown, null, tint = palette.inkFaint, modifier = Modifier.size(17.dp))
+        }
+
+        if (expanded) {
+            Spacer(Modifier.size(8.dp))
+            when {
+                picker.loading -> Box(
+                    Modifier.fillMaxWidth().padding(vertical = 16.dp),
+                    contentAlignment = Alignment.Center,
+                ) { CircularProgressIndicator(color = palette.primary, modifier = Modifier.size(26.dp)) }
+
+                picker.error != null -> Text(
+                    picker.error.orEmpty(),
+                    style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.5f.sp, color = Color(0xFFDC2626)),
+                )
+
+                else -> Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    RegionOption("Butun O‘zbekiston", selected == null, palette) {
+                        vm.selectRegion(null)
+                        expanded = false
+                    }
+                    picker.regions.forEach { region ->
+                        RegionOption(region.name, region.id == selected?.id, palette) {
+                            vm.selectRegion(region)
+                            expanded = false
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RegionOption(label: String, active: Boolean, palette: AppPalette, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
+            .background(if (active) palette.primary.copy(alpha = 0.10f) else palette.glass)
+            .border(1.dp, if (active) palette.primary else palette.border, RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 13.dp, vertical = 11.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            label,
+            style = TextStyle(
+                fontFamily = AppFontFamily, fontSize = 13.sp,
+                fontWeight = if (active) FontWeight.ExtraBold else FontWeight.Medium,
+                color = if (active) palette.primary else palette.ink,
+            ),
+            modifier = Modifier.weight(1f),
+            maxLines = 1,
+        )
+        if (active) Icon(AppIcons.Check, null, tint = palette.primary, modifier = Modifier.size(16.dp))
     }
 }
 

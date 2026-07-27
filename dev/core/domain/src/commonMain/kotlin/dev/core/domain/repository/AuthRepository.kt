@@ -24,8 +24,27 @@ interface AuthRepository {
     /** Telefon yoki email + parol bilan kirish (`POST /auth/student/login`). */
     suspend fun login(identifier: AuthIdentifier, password: String): Resource<User>
 
-    /** Yangi talaba hisobi (`POST /auth/student/register`). */
+    /**
+     * Yangi talaba hisobi (`POST /auth/student/register`).
+     *
+     * Sessiya **kutilmoqda** holatida ochiladi: tokenlar saqlanadi (ularsiz `otp/request` va
+     * `otp/verify` ishlamaydi — ular Bearer talab qiladi), lekin local foydalanuvchi qatori
+     * YOZILMAYDI. Ya'ni ilova hali kirgan deb hisoblamaydi va ilova o'chib qayta ochilsa
+     * kirish ekraniga tushadi. Raqam tasdiqlangach [completeRegistration] chaqiriladi.
+     */
     suspend fun register(identifier: AuthIdentifier, password: String): Resource<User>
+
+    /**
+     * Ro'yxatni yakunlaydi — SMS kod muvaffaqiyatli tekshirilgandan KEYIN chaqiriladi:
+     * profil tortiladi va local sessiya qatori yoziladi (endi foydalanuvchi kirgan hisoblanadi).
+     */
+    suspend fun completeRegistration(): Resource<User>
+
+    /**
+     * Tasdiqlanmagan ro'yxatni bekor qiladi (foydalanuvchi kod ekranidan chiqib ketdi) —
+     * tokenlar bekor qilinadi va o'chiriladi, ilovaga kirish bo'lmaydi.
+     */
+    suspend fun cancelPendingRegistration()
 
     /**
      * Google bilan kirish (`POST /auth/student/oauth/google`). [idToken] — Google Sign-In

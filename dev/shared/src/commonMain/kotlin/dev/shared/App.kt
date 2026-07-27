@@ -5,7 +5,9 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -22,34 +24,11 @@ import dev.feature.settings.domain.model.ThemeMode
 import dev.feature.settings.domain.repository.SettingsRepository
 import dev.feature.university.domain.repository.UniversityRepository
 import dev.feature.auth.presentation.flow.AuthNavHost
-import dev.feature.auth.presentation.flow.AuthUserFlow
-import dev.feature.auth.presentation.flow.RoleLauncher
 import dev.core.uikit.theme.appPalette
 import io.ktor.client.HttpClient
 import org.koin.compose.koinInject
 
-/**
- * Ildiz router (Android MainActivity) — sessiya/rolga qarab StudentActivity yoki
- * BusinessActivity ochadi, aks holda rol tanlash ekranini ko'rsatadi.
- */
-@Composable
-fun RoleLauncherApp(onStudent: () -> Unit, onBusiness: () -> Unit) {
-    AppScaffold { RoleLauncher(onStudent = onStudent, onBusiness = onBusiness) }
-}
-
-/** Talaba Activity kirish nuqtasi — talaba login oqimi + StudentShell. */
-@Composable
-fun StudentApp(onExit: () -> Unit) {
-    AppScaffold { AuthNavHost(flow = AuthUserFlow.STUDENT, onExit = onExit) }
-}
-
-/** Biznesmen Activity kirish nuqtasi — biznes login oqimi + BusinessShell. */
-@Composable
-fun BusinessApp(onExit: () -> Unit) {
-    AppScaffold { AuthNavHost(flow = AuthUserFlow.BUSINESS, onExit = onExit) }
-}
-
-/** Ilovaning ildiz Composable'i — iOS shuni ishlatadi (rol tanlash ichkarida). */
+/** Ilovaning ildiz Composable'i — Android MainActivity ham, iOS ham shuni ishlatadi. */
 @Composable
 fun App() {
     AppScaffold { AuthNavHost() }
@@ -91,8 +70,19 @@ private fun AppScaffold(content: @Composable () -> Unit) {
     AppTheme(darkTheme = isDark) {
         // Butun ilova pastki tizim navigatsiya paneli (3 tugma) / iOS home indikatori
         // ortida qolmasligi uchun global inset. Fon gradienti panel ostida ham to'liq chiziladi.
+        //
+        // `union(ime)` — klaviatura ochilganda kontent uning USTIGA ko'tariladi, ya'ni matn
+        // maydonlari (qidiruv, forma, izoh...) klaviatura ostida qolib ketmaydi. `union` —
+        // ikkalasining KATTAsi olinadi, aks holda klaviatura ustiga yana navigatsiya paneli
+        // balandligi qo'shilib, ortiqcha bo'shliq paydo bo'lardi.
+        //
+        // Bu global: ichkarida `imePadding()` chaqirgan ekranlar (chat, e'lonlar) ikki marta
+        // surilib ketmaydi — Compose qo'llanilgan insetni "iste'mol qilingan" deb belgilaydi.
         Box(Modifier.fillMaxSize().background(appPalette.bgBrush)) {
-            Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.navigationBars)) {
+            Box(
+                Modifier.fillMaxSize()
+                    .windowInsetsPadding(WindowInsets.navigationBars.union(WindowInsets.ime)),
+            ) {
                 content()
             }
         }

@@ -1,11 +1,11 @@
 package dev.feature.auth.data
 
+import dev.core.common.auth.TokenStore
 import dev.feature.chat.domain.model.Conversation
 import dev.feature.chat.domain.model.ConversationType
 import dev.feature.chat.domain.model.Message
 import dev.feature.chat.domain.repository.ChatRealtimeSource
 import dev.gitlive.firebase.Firebase
-import dev.gitlive.firebase.auth.auth
 import dev.gitlive.firebase.firestore.Direction
 import dev.gitlive.firebase.firestore.firestore
 import kotlinx.coroutines.flow.Flow
@@ -20,13 +20,17 @@ import kotlinx.serialization.Serializable
  * `.snapshots` — real-time Flow (Firestore o'zi offline cache beradi → real-time + offline-first).
  *
  * [enabled] `false` bo'lsa hech qachon chaqirilmaydi (ChatRepository local DB'dan ishlaydi).
+ *
+ * Diqqat: Firebase bu yerda **faqat ma'lumot ombori** (Firestore). Kim kirgani backend
+ * sessiyasidan aniqlanadi ([TokenStore] dagi JWT `sub`) — Firebase Auth ishlatilmaydi.
  */
 class FirestoreChatRealtimeSource(
     override val enabled: Boolean,
+    private val tokenStore: TokenStore,
 ) : ChatRealtimeSource {
 
     private val db get() = Firebase.firestore
-    private val currentUid: String? get() = Firebase.auth.currentUser?.uid
+    private val currentUid: String? get() = tokenStore.userId()
 
     override fun conversations(): Flow<List<Conversation>> = conversationsFlow(archived = false)
 

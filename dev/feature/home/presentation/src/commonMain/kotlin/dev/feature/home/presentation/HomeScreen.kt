@@ -32,6 +32,8 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import coil3.compose.AsyncImage
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
@@ -54,7 +56,6 @@ import dev.core.uikit.components.scCard
 import dev.core.uikit.components.scSoftShadow
 import dev.core.uikit.components.scStyle
 import dev.core.uikit.theme.Sc
-import dev.core.domain.model.DiscountCategory
 import dev.core.domain.model.DiscountOffer
 import dev.core.domain.model.DiscountTag
 import dev.feature.clubs.domain.model.Club
@@ -105,7 +106,9 @@ fun HomeScreen(
             Modifier.fillMaxWidth().weight(1f).verticalScroll(scroll).padding(top = 22.dp),
             verticalArrangement = Arrangement.spacedBy(26.dp),
         ) {
-            ForYouSection(state.categories, state.featured, onOpenDiscounts)
+            OfferSection("Ovqatlar", "Kafe, restoran va oziq-ovqat", state.foodOffers, onOpenDiscounts)
+            OfferSection("Kiyim-kechak", "Talabalar uchun chegirmalar", state.clothingOffers, onOpenDiscounts)
+            OfferSection("Dam olish", "Barcha o'yin klublari va kino", state.leisureOffers, onOpenDiscounts)
             TasksSection(state.tasks, onOpenTasks, onOpenListing)
             ClubsSection(state.clubs, onOpenClubs)
             RentalsSection(state.rentals, onOpenRentals, onOpenListing)
@@ -150,12 +153,22 @@ private fun HomeHeader(
                     .background(Color.White.copy(alpha = 0.22f)).clickable(onClick = onOpenProfile),
                 contentAlignment = Alignment.Center,
             ) {
-                ScText(
-                    state.userName.take(1).uppercase(),
-                    size = 22f - 5f * p,
-                    weight = FontWeight.ExtraBold,
-                    color = Color.White,
-                )
+                // Profil rasmi bo'lsa — o'sha; bo'lmasa ismning bosh harfi.
+                if (!state.avatarUrl.isNullOrBlank()) {
+                    AsyncImage(
+                        model = state.avatarUrl,
+                        contentDescription = "Profil rasmi",
+                        modifier = Modifier.size(avatarSize),
+                        contentScale = ContentScale.Crop,
+                    )
+                } else {
+                    ScText(
+                        state.userName.take(1).uppercase(),
+                        size = 22f - 5f * p,
+                        weight = FontWeight.ExtraBold,
+                        color = Color.White,
+                    )
+                }
             }
             Column(Modifier.weight(1f)) {
                 // "Assalomu alaykum 👋" — siqilganda balandligi 0 ga tushadi.
@@ -288,109 +301,75 @@ private fun PaddedHeader(
 }
 
 // ---------------------------------------------------------------------------
-// Siz uchun — kategoriya chiplari + promo karta
+// Chegirma bo'limlari — Ovqatlar / Kiyim-kechak / Dam olish
 // ---------------------------------------------------------------------------
 
-/** Kategoriya ikonasi va uning tint foni. */
 private data class CategoryVisual(val icon: ImageVector, val tint: Color, val accent: Color)
 
+/** Biznes turi id'siga qarab ikonka va rang (`listings.json` dagi `categoryId`). */
 @Composable
-private fun categoryVisual(category: DiscountCategory): CategoryVisual {
-    val key = (category.id + " " + category.name).lowercase()
-    return when {
-        "game" in key || "oyin" in key -> CategoryVisual(ScIcons.Gamepad, Sc.TintBlue, Sc.Brand)
-        "kafe" in key || "restoran" in key || "cafe" in key -> CategoryVisual(
-            ScIcons.Coffee, Sc.TintOrange, Sc.Orange
-        )
-
-        "oziq" in key || "ovqat" in key || "food" in key -> CategoryVisual(
-            ScIcons.Cart, Sc.TintGreen, Sc.Success
-        )
-
-        "kiyim" in key -> CategoryVisual(ScIcons.Cart, Sc.TintViolet, Sc.Violet)
-        "kitob" in key || "ta'lim" in key || "talim" in key -> CategoryVisual(
-            ScIcons.FileText, Sc.TintPink, Sc.Pink
-        )
-
-        else -> CategoryVisual(ScIcons.Cart, Sc.TintAmber, Sc.Amber)
-    }
+private fun categoryVisual(categoryId: String): CategoryVisual = when (categoryId) {
+    "game" -> CategoryVisual(ScIcons.Gamepad, Sc.TintBlue, Sc.Brand)
+    "kino" -> CategoryVisual(ScIcons.Gamepad, Sc.TintViolet, Sc.Violet)
+    "ovqat" -> CategoryVisual(ScIcons.Coffee, Sc.TintOrange, Sc.Orange)
+    "market" -> CategoryVisual(ScIcons.Cart, Sc.TintGreen, Sc.Success)
+    "kiyim" -> CategoryVisual(ScIcons.Cart, Sc.TintViolet, Sc.Violet)
+    "kurslar" -> CategoryVisual(ScIcons.FileText, Sc.TintPink, Sc.Pink)
+    else -> CategoryVisual(ScIcons.Cart, Sc.TintAmber, Sc.Amber)
 }
 
+/**
+ * Bitta chegirma bo'limi — sarlavha + gorizontal lenta. Bo'limda e'lon bo'lmasa
+ * umuman chizilmaydi (bo'sh sarlavha osilib qolmasin).
+ */
 @Composable
-private fun ForYouSection(
-    categories: List<DiscountCategory>,
-    featured: DiscountOffer?,
+private fun OfferSection(
+    title: String,
+    subtitle: String,
+    offers: List<DiscountOffer>,
     onSeeAll: () -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        PaddedHeader("Siz uchun", onAction = onSeeAll)
-        if (categories.isNotEmpty()) {
-            EdgeRow(categories, spacing = 11.dp) { _, category -> CategoryChip(category, onSeeAll) }
-        }
-        if (featured != null) {
-            Box(Modifier.padding(horizontal = Sc.ScreenPadding)) { PromoCard(featured, onSeeAll) }
-        }
+    if (offers.isEmpty()) return
+    Column(verticalArrangement = Arrangement.spacedBy(13.dp)) {
+        PaddedHeader(title, subtitle, onAction = onSeeAll)
+        EdgeRow(offers.take(8), spacing = 11.dp) { _, offer -> OfferCard(offer, onSeeAll) }
     }
 }
 
 @Composable
-private fun CategoryChip(category: DiscountCategory, onClick: () -> Unit) {
-    val visual = categoryVisual(category)
-    Row(
-        Modifier.scCard(radius = 20.dp, elevation = 4.dp, onClick = onClick)
-            .padding(horizontal = 15.dp, vertical = 11.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(9.dp),
+private fun OfferCard(offer: DiscountOffer, onClick: () -> Unit) {
+    val visual = categoryVisual(offer.categoryId)
+    Column(
+        Modifier.width(212.dp).scCard(radius = 22.dp, elevation = 6.dp, onClick = onClick)
+            .padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        ScIconTile(visual.tint, size = 30.dp, radius = 12.dp) {
-            Icon(visual.icon, null, tint = visual.accent, modifier = Modifier.size(17.dp))
-        }
-        ScText(category.name, 14f, FontWeight.Bold, Sc.Ink, maxLines = 1)
-    }
-}
-
-@Composable
-private fun PromoCard(offer: DiscountOffer, onClick: () -> Unit) {
-    Row(
-        Modifier.fillMaxWidth().scCard(radius = 26.dp, elevation = 10.dp, onClick = onClick)
-            .padding(16.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(14.dp),
-    ) {
-        Box(
-            Modifier.size(62.dp).clip(RoundedCornerShape(22.dp)).background(Sc.tileBrush),
-            contentAlignment = Alignment.Center,
+        Row(
+            Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Icon(ScIcons.Gamepad, null, tint = Color.White, modifier = Modifier.size(32.dp))
-        }
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-            val title =
-                if (offer.isDiscount) "${offer.merchant} — ${offer.discountPercent}% chegirma" else offer.merchant
-            ScText(title, 15.5f, FontWeight.ExtraBold, Sc.Ink, letterSpacing = -0.2f, maxLines = 1)
-            val tag = if (offer.tag == DiscountTag.STUDENT_ID) "Talaba ID bilan" else "Promokod"
-            ScText(
-                listOfNotNull(tag, offer.expiry).joinToString(" · "),
-                12.5f,
-                FontWeight.Medium,
-                Sc.Muted,
-                maxLines = 1
-            )
-        }
-        if (offer.isDiscount && offer.discountPercent > 0) {
-            Box(
-                Modifier.clip(RoundedCornerShape(16.dp)).background(Sc.buttonBrush)
-                    .padding(horizontal = 13.dp, vertical = 9.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                ScText(
-                    "−${offer.discountPercent}%",
-                    14f,
-                    FontWeight.ExtraBold,
-                    Color.White,
-                    maxLines = 1
-                )
+            ScIconTile(visual.tint, size = 42.dp, radius = 15.dp) {
+                Icon(visual.icon, null, tint = visual.accent, modifier = Modifier.size(22.dp))
+            }
+            if (offer.isDiscount && offer.discountPercent > 0) {
+                Box(
+                    Modifier.clip(RoundedCornerShape(13.dp)).background(Sc.buttonBrush)
+                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                ) {
+                    ScText("−${offer.discountPercent}%", 12.5f, FontWeight.ExtraBold, Color.White, maxLines = 1)
+                }
             }
         }
+        Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            ScText(offer.merchant, 15f, FontWeight.ExtraBold, Sc.Ink, letterSpacing = -0.2f, maxLines = 1)
+            ScText(offer.title, 12.5f, FontWeight.Medium, Sc.Muted, maxLines = 2)
+        }
+        val tag = if (offer.tag == DiscountTag.STUDENT_ID) "Talaba ID bilan" else "Promokod"
+        ScText(
+            listOfNotNull(tag, offer.expiry).joinToString(" · "),
+            11.5f, FontWeight.SemiBold, visual.accent, maxLines = 1,
+        )
     }
 }
 

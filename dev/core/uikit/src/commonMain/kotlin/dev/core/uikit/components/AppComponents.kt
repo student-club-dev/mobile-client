@@ -43,6 +43,9 @@ import androidx.compose.ui.unit.sp
 import dev.core.uikit.theme.AppPalette
 import dev.core.uikit.theme.LocalScFontFamily
 import dev.core.uikit.theme.appPalette
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ime
+import androidx.compose.ui.platform.LocalDensity
 
 /**
  * Ilovaning yagona shrift oilasi — Plus Jakarta Sans (dizayn spetsifikatsiyasi).
@@ -282,65 +285,6 @@ fun OutlineButton(
                 color = (if (palette.dark) palette.ink else Color(0xFF4A3F86)).copy(alpha = contentAlpha),
             ),
         )
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Segmented tabs (Telefon | Email)
-// ---------------------------------------------------------------------------
-
-enum class AuthTab { PHONE, EMAIL }
-
-@Composable
-fun SegmentedTabs(
-    selected: AuthTab,
-    onSelect: (AuthTab) -> Unit,
-    modifier: Modifier = Modifier,
-    palette: AppPalette = appPalette,
-) {
-    Row(
-        modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
-            .background(palette.tabTrack)
-            .padding(4.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        TabPill(AppIcons.Phone, "Telefon", selected == AuthTab.PHONE, { onSelect(AuthTab.PHONE) }, Modifier.weight(1f), palette)
-        TabPill(AppIcons.Mail, "Email", selected == AuthTab.EMAIL, { onSelect(AuthTab.EMAIL) }, Modifier.weight(1f), palette)
-    }
-}
-
-@Composable
-private fun TabPill(
-    icon: ImageVector,
-    label: String,
-    active: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier,
-    palette: AppPalette,
-) {
-    val shape = RoundedCornerShape(10.dp)
-    val bg = when {
-        active && palette.dark -> Modifier.background(palette.primaryBrush, shape)
-        active -> Modifier
-            .shadow(6.dp, shape, spotColor = palette.primary.copy(alpha = 0.4f))
-            .background(Color.White, shape)
-        else -> Modifier
-    }
-    val content = if (active) (if (palette.dark) Color.White else palette.primary) else palette.inkFaint
-    Row(
-        modifier
-            .height(38.dp)
-            .clip(shape)
-            .then(bg)
-            .clickable(onClick = onClick),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.Center,
-    ) {
-        Icon(icon, null, tint = content, modifier = Modifier.size(15.dp))
-        Spacer(Modifier.width(6.dp))
-        Text(label, style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = content))
     }
 }
 

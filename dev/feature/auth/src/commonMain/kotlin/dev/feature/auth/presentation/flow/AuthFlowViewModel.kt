@@ -4,6 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.core.common.Resource
 import dev.core.domain.model.User
+import dev.core.domain.usecase.CancelRegistrationUseCase
+import dev.core.domain.usecase.CompleteRegistrationUseCase
 import dev.core.domain.usecase.ForgotPasswordUseCase
 import dev.core.domain.usecase.LoginUseCase
 import dev.core.domain.usecase.LoginWithGoogleUseCase
@@ -15,6 +17,8 @@ import dev.core.domain.usecase.VerifyPhoneOtpUseCase
 import dev.feature.profile.domain.model.UserProfile
 import dev.feature.profile.domain.usecase.SaveProfileUseCase
 import dev.feature.settings.domain.repository.SettingsRepository
+import dev.feature.university.domain.model.University
+import dev.feature.university.domain.repository.UniversityRepository
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
@@ -68,6 +72,8 @@ class AuthFlowViewModel(
     private val loginUseCase: LoginUseCase,
     private val loginWithGoogleUseCase: LoginWithGoogleUseCase,
     private val registerUseCase: RegisterUseCase,
+    private val completeRegistrationUseCase: CompleteRegistrationUseCase,
+    private val cancelRegistrationUseCase: CancelRegistrationUseCase,
     private val requestPhoneOtpUseCase: RequestPhoneOtpUseCase,
     private val verifyPhoneOtpUseCase: VerifyPhoneOtpUseCase,
     private val forgotPasswordUseCase: ForgotPasswordUseCase,
@@ -75,6 +81,7 @@ class AuthFlowViewModel(
     private val observeCurrentUserUseCase: ObserveCurrentUserUseCase,
     private val saveProfileUseCase: SaveProfileUseCase,
     private val settingsRepository: SettingsRepository,
+    private val universityRepository: UniversityRepository,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(AuthFlowState())
@@ -91,6 +98,22 @@ class AuthFlowViewModel(
         .map { it != null }
         .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
+    /**
+     * Tanishtiruv ekranlari avval ko'rilganmi: `null` — hali o'qilmoqda, `true` — ko'rilgan.
+     * Chiqishdan (logout) keyin bayroq saqlanib qoladi, shuning uchun foydalanuvchi
+     * tanishtiruvga qaytmay, to'g'ridan-to'g'ri kirish ekranidan boshlaydi.
+     */
+    val onboardingSeen: StateFlow<Boolean?> =
+        settingsRepository.observeFlag(SettingsRepository.KEY_ONBOARDING_SEEN, default = false)
+            .stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
+    /** Tanishtiruv tugadi (yoki o'tkazib yuborildi) — boshqa ko'rsatilmaydi. */
+    fun markOnboardingSeen() {
+        viewModelScope.launch {
+            settingsRepository.setFlag(SettingsRepository.KEY_ONBOARDING_SEEN, true)
+        }
+    }
+
     private var timerJob: Job? = null
 
     // ------------------------------------------------------------------
@@ -101,32 +124,64 @@ class AuthFlowViewModel(
         it.copy(phone = v.filter { c -> c.isDigit() }.take(9), error = null)
     }
 
-    fun onEmailChange(v: String) = _state.update { it.copy(email = v, error = null, info = null) }
     fun onPasswordChange(v: String) = _state.update { it.copy(password = v, error = null) }
-    fun onConfirmPasswordChange(v: String) = _state.update { it.copy(confirmPassword = v, error = null) }
     fun togglePasswordVisible() = _state.update { it.copy(passwordVisible = !it.passwordVisible) }
     fun toggleRememberMe() = _state.update { it.copy(rememberMe = !it.rememberMe) }
     fun onOtpChange(v: String) = _state.update {
         it.copy(otp = v.filter { c -> c.isDigit() }.take(OTP_CODE_LENGTH), error = null)
     }
 
-    /** Kirish ekranidagi tab (telefon ↔ email) — qaysi identifikator yuborilishini belgilaydi. */
-    fun onLoginWithEmailChange(useEmail: Boolean) = _state.update {
-        it.copy(loginWithEmail = useEmail, error = null)
-    }
-
     fun onFirstNameChange(v: String) = _state.update { it.copy(firstName = v) }
     fun onLastNameChange(v: String) = _state.update { it.copy(lastName = v) }
-    fun onRoleChange(r: Role) = _state.update { it.copy(role = r) }
     fun onUniversityEmailChange(v: String) = _state.update { it.copy(universityEmail = v) }
-    fun onBusinessNameChange(v: String) = _state.update { it.copy(businessName = v, error = null) }
-    fun onBusinessTypeChange(v: String) = _state.update { it.copy(businessType = v) }
     fun toggleTerms() = _state.update { it.copy(termsAccepted = !it.termsAccepted, error = null) }
 
     fun onBirthYearChange(y: Int) = _state.update { it.copy(birthYear = y) }
     fun onCourseYearChange(c: CourseYear) = _state.update { it.copy(courseYear = c) }
-    fun onUniversityQueryChange(v: String) = _state.update { it.copy(universityQuery = v) }
-    fun onUniversitySelected(id: String) = _state.update { it.copy(universityId = id) }
+
+    // ------------------------------------------------------------------
+    // Universitet tanlash — ro'yxat prof-emis API'sidan
+    // ------------------------------------------------------------------
+
+    /** Yuklab olingan to'liq ro'yxat (qidiruv shu ustida ishlaydi, tarmoqqa qayta bormaydi). */
+    private val allUniversities = MutableStateFlow<List<University>>(emptyList())
+
+    private val _universityPicker = MutableStateFlow(UniversityPickerUiState())
+    val universityPicker: StateFlow<UniversityPickerUiState> = _universityPicker.asStateFlow()
+
+    /** Tanlash ekrani ochilganda chaqiriladi — ro'yxat allaqachon bo'lsa qayta so'ramaydi. */
+    fun loadUniversities() {
+        if (allUniversities.value.isNotEmpty() || _universityPicker.value.loading) return
+        _universityPicker.update { it.copy(loading = true, error = null) }
+        viewModelScope.launch {
+            when (val res = universityRepository.fetchSelectableUniversities()) {
+                is Resource.Success -> {
+                    allUniversities.value = res.data
+                    _universityPicker.update {
+                        it.copy(loading = false, results = filterUniversities(res.data, it.query))
+                    }
+                }
+                is Resource.Error ->
+                    _universityPicker.update { it.copy(loading = false, error = res.message) }
+                Resource.Loading -> Unit
+            }
+        }
+    }
+
+    fun onUniversityQueryChange(v: String) = _universityPicker.update {
+        it.copy(query = v, results = filterUniversities(allUniversities.value, v))
+    }
+
+    fun onUniversitySelected(university: University) = _state.update {
+        it.copy(universityId = university.id, selectedUniversity = university)
+    }
+
+    /** Ro'yxat uzun (butun O'zbekiston) — ko'rsatishni 200 taga cheklaymiz. */
+    private fun filterUniversities(list: List<University>, query: String): List<University> =
+        if (query.isBlank()) list.take(UNIVERSITY_RESULT_LIMIT)
+        else list.filter {
+            it.name.contains(query, ignoreCase = true) || it.city.contains(query, ignoreCase = true)
+        }.take(UNIVERSITY_RESULT_LIMIT)
 
     fun clearError() = _state.update { it.copy(error = null, info = null) }
 
@@ -137,18 +192,13 @@ class AuthFlowViewModel(
     // Kirish
     // ------------------------------------------------------------------
 
-    /** Telefon yoki email + parol bilan kirish (tanlangan tabga qarab). */
+    /** Telefon raqami + parol bilan kirish. */
     fun login() {
         val s = _state.value
         if (s.isLoading) return
-        val identifier = if (s.loginWithEmail) s.email.trim() else s.phoneE164
+        val identifier = s.phoneE164
         if (identifier.isBlank()) {
-            _state.update {
-                it.copy(
-                    error = if (s.loginWithEmail) "Email manzilini kiriting."
-                    else "To‘liq 9 xonali raqam kiriting.",
-                )
-            }
+            _state.update { it.copy(error = "To‘liq 9 xonali raqam kiriting.") }
             return
         }
         _state.update { it.copy(isLoading = true, error = null) }
@@ -188,9 +238,11 @@ class AuthFlowViewModel(
     // ------------------------------------------------------------------
 
     /**
-     * Hisob yaratadi (telefon + parol) va profilni saqlaydi. Hisob darhol ochiladi; keyin
-     * raqamni tasdiqlash uchun SMS kod so'raladi — foydalanuvchi uni o'tkazib yuborsa ham
-     * ilovaga kirgan bo'ladi.
+     * Hisob yaratadi (telefon + parol) va DARHOL SMS kod so'raydi.
+     *
+     * MUHIM: bu qadamda ilovaga kirish YO'Q va profil ham SAQLANMAYDI — sessiya
+     * "kutilmoqda" holatida turadi. Ikkalasi ham faqat [verifyPhone] muvaffaqiyatli
+     * bo'lgandan keyin bajariladi, ya'ni tasdiqlanmagan raqam bilan ilovaga kirib bo'lmaydi.
      */
     fun register() {
         val s = _state.value
@@ -209,57 +261,75 @@ class AuthFlowViewModel(
                 is Resource.Error -> _state.update { it.copy(isLoading = false, error = result.message) }
                 Resource.Loading -> Unit
                 is Resource.Success -> {
-                    // Sessiya ochildi — ism/rol/universitet emaili profilga yoziladi.
-                    // Profil saqlanmasa ham ro'yxat davom etadi: uni keyin to'ldirish mumkin.
-                    runCatching { saveProfileUseCase(profileFromState(_state.value)) }
                     _state.update { it.copy(otp = "", otpPurpose = OtpPurpose.VERIFY_PHONE) }
-                    requestPhoneOtp(onFailure = { finishRegistered() })
+                    requestPhoneOtp(navigateToOtp = true)
                 }
             }
         }
     }
 
     /**
-     * Raqamni tasdiqlash uchun SMS kod so'raydi. Kod ketmasa (masalan SMS xizmati javob
-     * bermasa) [onFailure] chaqiriladi — hisob baribir ochilgani uchun foydalanuvchini
-     * ushlab qolmaymiz.
+     * Raqamni tasdiqlash uchun SMS kod so'raydi. Kod ketmasa (SMS xizmati javob bermasa)
+     * ham foydalanuvchi tasdiqlash ekraniga o'tadi — u yerda xatoni ko'radi va "Kodni qayta
+     * yuborish" bilan urinib ko'radi. Tasdiqlamasdan ilovaga o'ta olmaydi.
      */
-    private suspend fun requestPhoneOtp(onFailure: suspend () -> Unit) {
+    private suspend fun requestPhoneOtp(navigateToOtp: Boolean) {
         when (val sent = requestPhoneOtpUseCase(_state.value.phoneE164)) {
             is Resource.Success -> {
                 _state.update { it.copy(isLoading = false) }
                 startResendTimer(sent.data.resendCooldownSeconds)
-                _events.send(AuthEvent.OtpSent)
             }
-            is Resource.Error -> onFailure()
+            is Resource.Error -> _state.update { it.copy(isLoading = false, error = sent.message) }
             Resource.Loading -> Unit
         }
+        if (navigateToOtp) _events.send(AuthEvent.OtpSent)
     }
 
-    /** Tasdiqlash ekrani — kodni tekshiradi va ro'yxatni yakunlaydi. */
+    /**
+     * Tasdiqlash ekrani — kodni tekshiradi va FAQAT shundan keyin ro'yxatni yakunlaydi:
+     * profil saqlanadi, so'ng local sessiya ochiladi. Kod noto'g'ri bo'lsa hech nima
+     * o'zgarmaydi — foydalanuvchi shu ekranda qoladi.
+     */
     fun verifyPhone() {
         val s = _state.value
         if (s.isLoading) return
         _state.update { it.copy(isLoading = true, error = null) }
         viewModelScope.launch {
             when (val result = verifyPhoneOtpUseCase(s.phoneE164, s.otp)) {
-                is Resource.Success -> finishRegistered()
                 is Resource.Error -> _state.update { it.copy(isLoading = false, error = result.message) }
                 Resource.Loading -> Unit
+                is Resource.Success -> {
+                    // Raqam tasdiqlandi: avval profil (ism/universitet), keyin sessiya —
+                    // shunda sessiya qatoriga to'ldirilgan profil bilan yoziladi.
+                    runCatching { saveProfileUseCase(profileFromState(_state.value)) }
+                    when (val done = completeRegistrationUseCase()) {
+                        is Resource.Error ->
+                            _state.update { it.copy(isLoading = false, error = done.message) }
+                        else -> finishRegistered()
+                    }
+                }
             }
         }
     }
 
-    /** Tasdiqlashni o'tkazib yuborish — hisob allaqachon ochilgan. */
-    fun skipPhoneVerification() {
-        viewModelScope.launch { finishRegistered() }
+    /**
+     * Tasdiqlash ekranidan chiqish — tasdiqlanmagan ro'yxat bekor qilinadi (tokenlar
+     * o'chiriladi), shuning uchun yarim qolgan hisob bilan ilovaga kirib bo'lmaydi.
+     */
+    fun cancelRegistration() {
+        viewModelScope.launch { cancelRegistrationUseCase() }
     }
 
     // ------------------------------------------------------------------
     // Parolni tiklash
     // ------------------------------------------------------------------
 
-    /** 1-qadam — raqamga SMS kod. */
+    /**
+     * 1-qadam — raqam va YANGI PAROL kiritilgach SMS kod so'raladi.
+     *
+     * Parol shu qadamda olinadi va holatda saqlanadi: `password/reset` raqam + kod + yangi
+     * parolni bitta so'rovda kutadi, u esa kod tasdiqlangan zahoti yuboriladi.
+     */
     fun requestPasswordReset() {
         val s = _state.value
         if (s.isLoading) return
@@ -267,18 +337,17 @@ class AuthFlowViewModel(
             _state.update { it.copy(error = "To‘liq 9 xonali raqam kiriting.") }
             return
         }
+        if (s.password.length < MIN_PASSWORD_LENGTH) {
+            _state.update { it.copy(error = "Parol kamida $MIN_PASSWORD_LENGTH belgidan iborat bo‘lsin.") }
+            return
+        }
         _state.update { it.copy(isLoading = true, error = null, info = null) }
         viewModelScope.launch {
             when (val result = forgotPasswordUseCase(s.phoneE164)) {
                 is Resource.Success -> {
+                    // Parol TOZALANMAYDI — u keyingi qadamda kod bilan birga yuboriladi.
                     _state.update {
-                        it.copy(
-                            isLoading = false,
-                            otp = "",
-                            password = "",
-                            confirmPassword = "",
-                            otpPurpose = OtpPurpose.RESET_PASSWORD,
-                        )
+                        it.copy(isLoading = false, otp = "", otpPurpose = OtpPurpose.RESET_PASSWORD)
                     }
                     startResendTimer(DEFAULT_RESEND_SECONDS)
                     _events.send(AuthEvent.ResetCodeSent)
@@ -289,20 +358,16 @@ class AuthFlowViewModel(
         }
     }
 
-    /** 2-qadam — kod + yangi parol. */
+    /** 2-qadam — kod tasdiqlanadi va parol shu yerda o'rnatiladi (`password/reset`). */
     fun resetPassword() {
         val s = _state.value
         if (s.isLoading) return
-        if (s.password != s.confirmPassword) {
-            _state.update { it.copy(error = "Parollar mos kelmadi.") }
-            return
-        }
         _state.update { it.copy(isLoading = true, error = null) }
         viewModelScope.launch {
             when (val result = resetPasswordUseCase(s.phoneE164, s.otp, s.password)) {
                 is Resource.Success -> {
                     _state.update {
-                        it.copy(isLoading = false, otp = "", password = "", confirmPassword = "")
+                        it.copy(isLoading = false, otp = "", password = "")
                     }
                     _events.send(AuthEvent.PasswordReset)
                 }
@@ -323,15 +388,7 @@ class AuthFlowViewModel(
             OtpPurpose.RESET_PASSWORD -> requestPasswordReset()
             OtpPurpose.VERIFY_PHONE -> {
                 _state.update { it.copy(isLoading = true, error = null) }
-                viewModelScope.launch {
-                    requestPhoneOtp(
-                        onFailure = {
-                            _state.update {
-                                it.copy(isLoading = false, error = "Kodni yuborib bo‘lmadi. Qayta urining.")
-                            }
-                        },
-                    )
-                }
+                viewModelScope.launch { requestPhoneOtp(navigateToOtp = false) }
             }
         }
     }
@@ -360,7 +417,6 @@ class AuthFlowViewModel(
             when (val saved = saveProfileUseCase(profileFromState(_state.value))) {
                 is Resource.Success -> {
                     _state.update { it.copy(isLoading = false) }
-                    persistRole()
                     _events.send(AuthEvent.ProfileSaved)
                 }
                 is Resource.Error -> _state.update { it.copy(isLoading = false, error = saved.message) }
@@ -369,37 +425,17 @@ class AuthFlowViewModel(
         }
     }
 
+    /** Ilova faqat talabalar uchun — rol doim `STUDENT` (biznes tomoni alohida ElonUz ilovasida). */
     private fun profileFromState(s: AuthFlowState) = UserProfile(
         firstName = s.firstName.ifBlank { null },
         lastName = s.lastName.ifBlank { null },
         phoneNumber = s.phoneE164.ifBlank { null },
-        role = s.role.name,
-        universityId = if (s.role == Role.BUSINESS) null else s.universityId,
+        role = ROLE_STUDENT,
+        universityId = s.universityId,
         universityEmail = s.universityEmail.ifBlank { null },
         birthYear = s.birthYear,
-        courseYear = if (s.role == Role.BUSINESS) null else s.courseYear.name,
-        businessName = s.businessName.ifBlank { null },
-        businessType = s.businessType.ifBlank { null },
+        courseYear = s.courseYear.name,
     )
-
-    // ------------------------------------------------------------------
-    // Biometrika
-    // ------------------------------------------------------------------
-
-    /**
-     * Biometrik tasdiqdan (Face ID / barmoq izi) so'ng chaqiriladi — local keshda sessiya
-     * bo'lsa to'g'ridan-to'g'ri HOME'ga, aks holda xato (avval oddiy kirish kerak).
-     */
-    fun onBiometricAuthenticated() {
-        viewModelScope.launch {
-            val user = observeCurrentUserUseCase().first()
-            if (user != null) finishAuthenticated(user)
-            else _state.update { it.copy(error = "Saqlangan hisob topilmadi. Avval parol bilan kiring.") }
-        }
-    }
-
-    /** Biometrik oqim xatosi (mavjud emas / tanilmadi) uchun xabar. */
-    fun biometricError(message: String) = _state.update { it.copy(error = message) }
 
     // ------------------------------------------------------------------
 
@@ -409,19 +445,23 @@ class AuthFlowViewModel(
     }
 
     private suspend fun finishAuthenticated(user: User) {
-        persistRole()
-        _state.update { it.copy(isLoading = false, password = "", confirmPassword = "") }
+        _state.update { it.copy(isLoading = false, password = "") }
         _events.send(AuthEvent.Authenticated(user))
-    }
-
-    /** Rolni local saqlaymiz — ildiz router keyingi ochilishda shu bo'yicha yo'naltiradi. */
-    private suspend fun persistRole() {
-        settingsRepository.setValue(SettingsRepository.KEY_SELECTED_ROLE, _state.value.role.name)
     }
 
     override fun onCleared() {
         timerJob?.cancel()
         super.onCleared()
+    }
+
+    private companion object {
+        /** Backend profilidagi rol qiymati — bu ilovada boshqa rol yo'q. */
+        const val ROLE_STUDENT = "STUDENT"
+
+        const val UNIVERSITY_RESULT_LIMIT = 200
+
+        /** Backend qoidasi: parol kamida 8 belgi. */
+        const val MIN_PASSWORD_LENGTH = 8
     }
 }
 

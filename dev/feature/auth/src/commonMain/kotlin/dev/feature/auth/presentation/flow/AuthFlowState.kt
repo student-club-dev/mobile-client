@@ -1,40 +1,11 @@
 package dev.feature.auth.presentation.flow
 
-/** Ro'yxatdan o'tuvchi roli. */
-enum class Role { STUDENT, BUSINESS, EMPLOYER, UNIVERSITY }
+import dev.feature.university.domain.model.University
 
 /** Kurs bosqichi. */
 enum class CourseYear(val label: String) {
     ONE("1"), TWO("2"), THREE("3"), FOUR("4"), MASTER("Mag")
 }
-
-/** Universitet ma'lumoti (placeholder — keyin API/JSON bilan almashtiriladi). */
-data class University(
-    val id: String,
-    val name: String,
-    val city: String,
-    val monogram: String,
-    val accent: Long,
-)
-
-/** Statik namunaviy universitetlar ro'yxati. */
-val sampleUniversities: List<University> = listOf(
-    University("tatu", "TATU — al-Xorazmiy nomidagi", "Toshkent shahri", "TA", 0xFF6C47FF),
-    University("nuu", "O‘zbekiston Milliy Universiteti", "Toshkent shahri", "NU", 0xFF2563EB),
-    University("tdiu", "Toshkent Davlat Iqtisodiyot U.", "Toshkent shahri", "TD", 0xFF059669),
-    University("tpi", "Toshkent Politexnika Instituti", "Toshkent shahri", "TP", 0xFFD97706),
-    University("tta", "Toshkent Tibbiyot Akademiyasi", "Toshkent shahri", "TT", 0xFFBE185D),
-    University("samdu", "Samarqand Davlat Universiteti", "Samarqand", "SD", 0xFF6C47FF),
-    University("buxdu", "Buxoro Davlat Universiteti", "Buxoro", "BD", 0xFF2563EB),
-    University("qarshi", "Qarshi Davlat Universiteti", "Qarshi", "QD", 0xFF059669),
-    University("namdu", "Namangan Davlat Universiteti", "Namangan", "ND", 0xFFD97706),
-    University("ferpi", "Farg‘ona Politexnika Instituti", "Farg‘ona", "FP", 0xFFBE185D),
-    University("inha", "Inha University in Tashkent", "Toshkent shahri", "IU", 0xFF6C47FF),
-    University("wiut", "Westminster University", "Toshkent shahri", "WU", 0xFF2563EB),
-    University("turin", "Turin Politexnika Universiteti", "Toshkent shahri", "TU", 0xFF059669),
-    University("tatuff", "TATU Farg‘ona filiali", "Farg‘ona", "TF", 0xFFD97706),
-    University("adu", "Andijon Davlat Universiteti", "Andijon", "AD", 0xFFBE185D),
-)
 
 /**
  * SMS kod nima uchun so'ralgan — "qayta yuborish" tugmasi qaysi endpointga borishini shu
@@ -46,11 +17,7 @@ enum class OtpPurpose { VERIFY_PHONE, RESET_PASSWORD }
 data class AuthFlowState(
     // Aloqa
     val phone: String = "",
-    val email: String = "",
-    /** Kirish ekranidagi tanlangan tab: `true` — email, `false` — telefon. */
-    val loginWithEmail: Boolean = false,
     val password: String = "",
-    val confirmPassword: String = "",
     val passwordVisible: Boolean = false,
     val rememberMe: Boolean = true,
     // SMS kod
@@ -60,17 +27,14 @@ data class AuthFlowState(
     // Ro'yxat
     val firstName: String = "",
     val lastName: String = "",
-    val role: Role = Role.STUDENT,
     val universityEmail: String = "",
     val termsAccepted: Boolean = false,
-    // Profil (talaba)
+    // Profil
     val universityId: String? = null,
+    /** Tanlangan universitet (prof-emis ro'yxatidan) — nomi/shahri shundan ko'rsatiladi. */
+    val selectedUniversity: University? = null,
     val birthYear: Int = 2004,
     val courseYear: CourseYear = CourseYear.TWO,
-    val universityQuery: String = "",
-    // Profil (biznes egasi) — rol BUSINESS bo'lganda
-    val businessName: String = "",
-    val businessType: String = "",
     // Umumiy
     val isLoading: Boolean = false,
     val error: String? = null,
@@ -79,21 +43,31 @@ data class AuthFlowState(
     val phoneDigits: String get() = phone.filter { it.isDigit() }.take(9)
     val phoneValid: Boolean get() = phoneDigits.length == 9
     val otpValid: Boolean get() = otp.length == 6
-    val emailValid: Boolean get() = email.contains('@') && email.substringAfter('@').contains('.')
 
-    /** Kirish tugmasi faolmi — tanlangan tabga qarab telefon yoki email + parol. */
-    val loginReady: Boolean
-        get() = password.isNotBlank() && if (loginWithEmail) emailValid else phoneValid
+    /** Kirish tugmasi faolmi — telefon + parol. */
+    val loginReady: Boolean get() = password.isNotBlank() && phoneValid
 
     /** E.164 formatdagi raqam (`+998901234567`) yoki bo'sh matn. */
     val phoneE164: String get() = if (phoneValid) "+998$phoneDigits" else ""
 
-    val selectedUniversity: University? get() = sampleUniversities.firstOrNull { it.id == universityId }
-
-    val filteredUniversities: List<University>
-        get() = if (universityQuery.isBlank()) sampleUniversities
-        else sampleUniversities.filter {
-            it.name.contains(universityQuery, ignoreCase = true) ||
-                it.city.contains(universityQuery, ignoreCase = true)
-        }
+    /**
+     * Parolni tiklashning 1-qadami to'ldirilganmi — raqam va yangi parol.
+     * Kod so'rashdan OLDIN tekshiriladi: `password/reset` uchalasini (raqam, kod, parol)
+     * bitta so'rovda kutadi, shuning uchun parolni oldindan olib qo'yamiz.
+     */
+    val resetReady: Boolean get() = phoneValid && password.length >= MIN_PASSWORD_LENGTH
 }
+
+/** Backend qoidasi: `RegisterDto.password.minLength = 8`. */
+private const val MIN_PASSWORD_LENGTH = 8
+
+/**
+ * Universitet tanlash ekranining holati. Ro'yxat **prof-emis API**'sidan keladi
+ * (`UniversityRepository.fetchSelectableUniversities`) — statik namunaviy ro'yxat emas.
+ */
+data class UniversityPickerUiState(
+    val loading: Boolean = false,
+    val error: String? = null,
+    val query: String = "",
+    val results: List<University> = emptyList(),
+)

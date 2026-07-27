@@ -5,4 +5,6 @@ kotlin { sourceSets { commonMain.dependencies {
     // Sozlamalar ekrani profil kartasi + chiqish uchun ProfileViewModel'ni ishlatadi.
     implementation(projects.dev.feature.profile.presentation)
     implementation(projects.dev.core.database)
+    // Viloyat filtri (feed geo) — RegionRepository core:domain'da.
+    implementation(projects.dev.core.domain)
 } } }

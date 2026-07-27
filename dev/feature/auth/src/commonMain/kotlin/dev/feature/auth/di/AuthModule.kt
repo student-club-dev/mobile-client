@@ -6,9 +6,7 @@ import dev.core.network.generated.api.AuthStudentApi
 import dev.feature.auth.data.ApiAuthRepository
 import dev.feature.auth.data.FirestoreChatRealtimeSource
 import dev.feature.auth.presentation.flow.AuthFlowViewModel
-import dev.feature.auth.presentation.flow.RoleLauncherViewModel
 import dev.feature.auth.presentation.main.DiscountsViewModel
-import dev.feature.auth.presentation.main.RootShellViewModel
 import dev.feature.chat.domain.repository.ChatRealtimeSource
 import io.ktor.client.HttpClient
 import org.koin.core.module.dsl.viewModel
@@ -42,13 +40,15 @@ val authFeatureModule = module {
     }
 
     // Chat real-time manbasi (Firestore) — ChatRepository shuni ishlatadi (B7).
-    single<ChatRealtimeSource> { FirestoreChatRealtimeSource(CHAT_REALTIME_ENABLED) }
+    single<ChatRealtimeSource> { FirestoreChatRealtimeSource(CHAT_REALTIME_ENABLED, tokenStore = get()) }
 
     viewModel {
         AuthFlowViewModel(
             loginUseCase = get(),
             loginWithGoogleUseCase = get(),
             registerUseCase = get(),
+            completeRegistrationUseCase = get(),
+            cancelRegistrationUseCase = get(),
             requestPhoneOtpUseCase = get(),
             verifyPhoneOtpUseCase = get(),
             forgotPasswordUseCase = get(),
@@ -56,9 +56,8 @@ val authFeatureModule = module {
             observeCurrentUserUseCase = get(),
             saveProfileUseCase = get(),
             settingsRepository = get(),
+            universityRepository = get(),
         )
     }
-    viewModelOf(::RootShellViewModel)
-    viewModelOf(::RoleLauncherViewModel)
     viewModelOf(::DiscountsViewModel)
 }

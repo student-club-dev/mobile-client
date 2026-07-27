@@ -8,14 +8,14 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.fragment.app.FragmentActivity
-import dev.shared.StudentApp
+import dev.shared.App
 
 /**
- * Yagona Activity — to'g'ridan-to'g'ri talaba login oqimi + StudentShell'ni ochadi.
+ * Yagona Activity — to'g'ridan-to'g'ri login oqimi + StudentShell'ni ochadi.
  * Rol tanlash yo'q (bu faqat talaba ilovasi; biznes tomoni alohida ElonUz ilovasida).
- * Logout'da Activity qayta ishga tushadi va login ekraniga qaytadi.
  *
- * FragmentActivity — biometrik BiometricPrompt shuni talab qiladi (F1).
+ * Chiqish Activity'ni QAYTA ISHGA TUSHIRMAYDI — navigatsiya grafining o'zida kirish
+ * ekraniga qaytiladi (qarang: `AuthNavHost` HOME marshruti).
  */
 class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -41,6 +41,6 @@ class MainActivity : FragmentActivity() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             window.isNavigationBarContrastEnforced = false
         }
-        setContent { StudentApp(onExit = ::recreate) }
+        setContent { App() }
     }
 }

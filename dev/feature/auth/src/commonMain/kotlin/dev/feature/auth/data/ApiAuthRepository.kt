@@ -33,7 +33,6 @@ import dev.core.network.generated.model.SetPasswordDto
 import dev.core.network.resetAuthTokenCache
 import dev.core.network.response.safeCall
 import dev.feature.profile.domain.repository.ProfileRepository
-import dev.feature.settings.domain.repository.SettingsRepository
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import kotlinx.coroutines.Dispatchers
@@ -65,6 +64,12 @@ class ApiAuthRepository(
 
     private val userQueries get() = database.userQueries
 
+    /**
+     * Ro'yxatdan o'tish boshlangan, lekin raqam hali tasdiqlanmagan foydalanuvchi
+     * identifikatori. `completeRegistration()` uni sessiya qatoriga yozishda ishlatadi.
+     */
+    private var pendingIdentifier: AuthIdentifier? = null
+
     // ------------------------------------------------------------------
     // Kirish / ro'yxatdan o'tish
     // ------------------------------------------------------------------
@@ -82,8 +87,14 @@ class ApiAuthRepository(
             ).body()
         }
 
+    /**
+     * Hisob backendда darhol ochiladi (spec shunday), lekin ILOVA uchun sessiya hali
+     * ochilmaydi: [authenticate] ga `persistSession = false` beramiz — tokenlar saqlanadi
+     * (OTP so'rovlari uchun), local `UserEntity` esa YOZILMAYDI. Shuning uchun tasdiqlanmagan
+     * foydalanuvchi ilovaga kira olmaydi ([completeRegistration] ni kuting).
+     */
     override suspend fun register(identifier: AuthIdentifier, password: String): Resource<User> =
-        authenticate(identifier) {
+        authenticate(identifier, persistSession = false) {
             api.register(
                 RegisterDto(
                     password = password,
@@ -94,6 +105,19 @@ class ApiAuthRepository(
                 ),
             ).body()
         }
+
+    override suspend fun completeRegistration(): Resource<User> {
+        val uid = tokenStore.userId()
+            ?: return errorOf(AppException.Server(cause = IllegalStateException("Kutilayotgan sessiya yo'q")))
+        val user = cacheSession(uid, pendingIdentifier ?: AuthIdentifier.Phone(""))
+        pendingIdentifier = null
+        return Resource.Success(user)
+    }
+
+    override suspend fun cancelPendingRegistration() {
+        pendingIdentifier = null
+        logout()
+    }
 
     override suspend fun loginWithGoogle(idToken: String): Resource<User> =
         // Identifikator Google'dan emas, backenddan (token → profil) keladi; shuning uchun
@@ -108,9 +132,15 @@ class ApiAuthRepository(
             ).body()
         }
 
-    /** Umumiy qism: tokenlarni saqlash → profil → local sessiya. */
+    /**
+     * Umumiy qism: tokenlarni saqlash → profil → local sessiya.
+     *
+     * [persistSession] `false` bo'lsa oxirgi qadam (local `UserEntity`) BAJARILMAYDI —
+     * ro'yxatdan o'tish oqimida sessiya SMS kod tasdiqlangunча "kutilmoqda" holatida turadi.
+     */
     private suspend fun authenticate(
         identifier: AuthIdentifier,
+        persistSession: Boolean = true,
         call: suspend () -> AuthTokensDto,
     ): Resource<User> = when (val tokens = safeCall(connectivity) { call() }) {
         is Resource.Error -> tokens
@@ -125,10 +155,27 @@ class ApiAuthRepository(
                     userId = uid,
                 )
                 httpClient.resetAuthTokenCache()
-                Resource.Success(cacheSession(uid, identifier))
+                if (persistSession) {
+                    Resource.Success(cacheSession(uid, identifier))
+                } else {
+                    // Kutilayotgan ro'yxat — identifikatorni eslab qolamiz, local sessiya
+                    // faqat `completeRegistration()` da yoziladi.
+                    pendingIdentifier = identifier
+                    Resource.Success(pendingUser(uid, identifier))
+                }
             }
         }
     }
+
+    /** Hali keshga yozilmagan (tasdiqlanmagan) foydalanuvchi — faqat oqim davomida ishlatiladi. */
+    private fun pendingUser(uid: String, identifier: AuthIdentifier) = User(
+        id = uid,
+        fullName = "",
+        email = (identifier as? AuthIdentifier.Email)?.value.orEmpty(),
+        role = UserRole.STUDENT,
+        phoneNumber = (identifier as? AuthIdentifier.Phone)?.value,
+        photoUrl = null,
+    )
 
     /**
      * Profilni backenddan tortib local sessiya qatorini yozadi. Profil kelmasa (yangi hisob
@@ -176,12 +223,16 @@ class ApiAuthRepository(
         clearLocalSession()
     }
 
+    /**
+     * Sessiyaga tegishli hamma narsani o'chiradi. Ilova sozlamalari (mavzu, tanishtiruv
+     * ko'rilgani) SAQLANADI — chiqishdan keyin foydalanuvchi tanishtiruvga emas, kirish
+     * ekraniga tushishi kerak.
+     */
     private fun clearLocalSession() {
         tokenStore.clear()
         httpClient.resetAuthTokenCache()
         userQueries.clear()
         database.profileQueries.clear()
-        database.appSettingQueries.deleteByKey(SettingsRepository.KEY_SELECTED_ROLE)
     }
 
     override suspend fun currentUser(): User? =

@@ -4,7 +4,6 @@ import dev.core.network.NetworkConfig
 import dev.core.network.generated.api.ProfileApi
 import dev.core.network.media.MediaUploader
 import dev.feature.profile.data.remote.ApiProfileRemoteDataSource
-import dev.feature.profile.data.remote.FirestoreProfileRemoteDataSource
 import dev.feature.profile.data.remote.ProfileRemoteDataSource
 import dev.feature.profile.data.repository.ProfileRepositoryImpl
 import dev.feature.profile.domain.repository.ProfileRepository
@@ -21,14 +20,11 @@ import org.koin.dsl.module
 /**
  * Profil feature'ining barcha qatlamlarini bog'laydi (domain / data / presentation).
  *
- * [useRemoteApi] — masofaviy manba tanlovi:
- * - `true`  → real backend: `/v1/profile/me` (OpenAPI'dan generatsiya qilingan [ProfileApi]),
- * - `false` → backendsiz rejim: Firestore `users/{uid}`.
- *
- * Bayroq `CoreModules.REMOTE_SYNC_ENABLED` dan keladi — backend tayyor bo'lganda
- * o'sha bitta joyni `true` qilasiz va profil avtomatik REST'ga o'tadi.
+ * Masofaviy manba — real backend: `GET/PUT /v1/profile/me` (OpenAPI'dan generatsiya qilingan
+ * [ProfileApi]). Sessiya uid'i (JWT `sub`) `TokenStore` dan keladi — auth backendda, shuning
+ * uchun profil qatlami Firebase'ga umuman bog'lanmaydi.
  */
-fun profileModule(useRemoteApi: Boolean) = module {
+fun profileModule() = module {
 
     // Generatsiya qilingan klientga ilovaning umumiy Ktor klienti uzatiladi —
     // shunda sessiya tokeni (Bearer) har so'rovga avtomatik qo'shiladi.
@@ -38,11 +34,9 @@ fun profileModule(useRemoteApi: Boolean) = module {
     // uchun qo'lda yozilgan (qarang: MediaUploader izohi).
     single { MediaUploader(client = get(), config = get()) }
 
-    single<ProfileRemoteDataSource> {
-        if (useRemoteApi) ApiProfileRemoteDataSource(get(), get()) else FirestoreProfileRemoteDataSource()
-    }
+    single<ProfileRemoteDataSource> { ApiProfileRemoteDataSource(get(), get()) }
 
-    single<ProfileRepository> { ProfileRepositoryImpl(get(), get(), get()) }
+    single<ProfileRepository> { ProfileRepositoryImpl(get(), get(), get(), get()) }
 
     factory { ObserveProfileUseCase(get()) }
     factory { SaveProfileUseCase(get()) }

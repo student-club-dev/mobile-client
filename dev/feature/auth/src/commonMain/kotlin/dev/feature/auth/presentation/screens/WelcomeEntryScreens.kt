@@ -32,7 +32,6 @@ import androidx.compose.ui.unit.sp
 import dev.core.uikit.components.AppFontFamily
 import dev.core.uikit.components.AppIcons
 import dev.core.uikit.components.AppScreenScaffold
-import dev.core.uikit.components.AuthTab
 import dev.core.uikit.components.FieldLabel
 import dev.core.uikit.components.FooterLink
 import dev.core.uikit.components.GlassTextField
@@ -42,7 +41,6 @@ import dev.core.uikit.components.PhoneVisualTransformation
 import dev.core.uikit.components.PrimaryButton
 import dev.core.uikit.components.ScreenSubtitle
 import dev.core.uikit.components.ScreenTitle
-import dev.core.uikit.components.SegmentedTabs
 import dev.core.uikit.components.SocialRow
 import dev.feature.auth.presentation.flow.AuthFlowState
 import dev.feature.auth.presentation.flow.AuthFlowViewModel
@@ -217,10 +215,7 @@ private fun FloatingChip(emoji: String, label: String?, modifier: Modifier, pale
 // ===========================================================================
 
 /**
- * Kirish ekrani — **telefon yoki email + parol** (`POST /v1/auth/student/login`) yoki Google.
- *
- * Tab faqat identifikator turini tanlaydi: backend `LoginDto` da `email` va `phoneNumber`
- * alohida maydonlar, parol esa ikkalasida ham bir xil.
+ * Kirish ekrani — **telefon + parol** (`POST /v1/auth/student/login`) yoki Google.
  *
  * SMS kod bu yerda YO'Q — u kirish usuli emas: `otp/request` sessiya (Bearer) talab qiladi va
  * faqat raqamni tasdiqlaydi. Shuning uchun kod ro'yxatdan o'tgandan keyin so'raladi.
@@ -229,14 +224,10 @@ private fun FloatingChip(emoji: String, label: String?, modifier: Modifier, pale
 fun WelcomeScreen(
     state: AuthFlowState,
     vm: AuthFlowViewModel,
-    tab: AuthTab,
-    onTab: (AuthTab) -> Unit,
     onLogin: () -> Unit,
     onForgot: () -> Unit,
     onSignUp: () -> Unit,
     onGoogle: () -> Unit,
-    /** Face ID / barmoq izi — local sessiya keshi bo'lganda kirishning tez yo'li. */
-    onBiometric: (() -> Unit)? = null,
     palette: AppPalette = appPalette,
 ) {
     AppScreenScaffold(scroll = true, topPadding = 60) {
@@ -247,32 +238,17 @@ fun WelcomeScreen(
         ScreenSubtitle("Hisobingizga kiring yoki bir daqiqada ro‘yxatdan o‘ting.")
         Spacer(Modifier.height(18.dp))
 
-        SegmentedTabs(tab, onTab)
-        Spacer(Modifier.height(14.dp))
-
-        if (tab == AuthTab.PHONE) {
-            FieldLabel("Telefon raqamingiz")
-            Spacer(Modifier.height(7.dp))
-            GlassTextField(
-                value = state.phone,
-                onValueChange = vm::onPhoneChange,
-                placeholder = "90 123 45 67",
-                leadingContent = { PhonePrefix(palette) },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                visualTransformation = PhoneVisualTransformation(),
-                textLetterSpacing = 0.5f,
-            )
-        } else {
-            FieldLabel("Email manzil")
-            Spacer(Modifier.height(7.dp))
-            GlassTextField(
-                value = state.email,
-                onValueChange = vm::onEmailChange,
-                placeholder = "aziz.karimov@edu.uz",
-                leading = AppIcons.Mail,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-            )
-        }
+        FieldLabel("Telefon raqamingiz")
+        Spacer(Modifier.height(7.dp))
+        GlassTextField(
+            value = state.phone,
+            onValueChange = vm::onPhoneChange,
+            placeholder = "90 123 45 67",
+            leadingContent = { PhonePrefix(palette) },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+            visualTransformation = PhoneVisualTransformation(),
+            textLetterSpacing = 0.5f,
+        )
 
         Spacer(Modifier.height(13.dp))
         FieldLabel("Parol")
@@ -317,13 +293,6 @@ fun WelcomeScreen(
             enabled = state.loginReady && !state.isLoading,
             trailingIcon = AppIcons.ArrowRight,
         )
-
-        if (onBiometric != null) {
-            Spacer(Modifier.height(11.dp))
-            dev.core.uikit.components.OutlineButton(
-                "Face ID bilan kirish", onBiometric, leadingIcon = AppIcons.ScanFace,
-            )
-        }
 
         state.error?.let {
             Spacer(Modifier.height(10.dp))

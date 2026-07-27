@@ -54,7 +54,6 @@ include(":dev:core:di")
 include(":dev:feature:auth")
 
 // Biznesmen tomoni — alohida modul (sof UI). Auth shuni ishlatadi.
-include(":dev:feature:business")
 
 // Profil feature'i — qatlamlarga ajratilgan (domain / data / presentation).
 // Keyingi feature'lar (Jobs, Chat, Discounts...) aynan shu shakldan nusxa oladi.

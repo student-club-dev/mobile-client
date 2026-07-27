@@ -14,4 +14,6 @@ kotlin { sourceSets { commonMain.dependencies {
     implementation(projects.dev.core.domain)
     // Yordam e'lonlari kartochkasidagi muddat yorlig'i ("Ertaga 12:00").
     implementation(libs.kotlinx.datetime)
+    // Sarlavhadagi profil rasmi (avatarUrl) — Coil ilovaning umumiy Ktor klientidan yuklaydi.
+    implementation(libs.coil.compose)
 } } }

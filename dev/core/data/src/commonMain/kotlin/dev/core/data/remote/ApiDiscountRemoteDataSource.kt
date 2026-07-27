@@ -14,6 +14,7 @@ import dev.core.domain.model.SchemaAttributeOption
 import dev.core.domain.model.SchemaCategoryOption
 import dev.core.domain.model.SchemaOption
 import dev.core.domain.model.SuggestionKind
+import dev.core.domain.repository.RegionRepository
 import dev.core.network.generated.api.CatalogApi
 import dev.core.network.generated.api.DiscountsApi
 import dev.core.network.generated.model.CatalogGroupsRequestDto
@@ -28,6 +29,7 @@ import dev.core.network.generated.model.FilterSchemaRequestDto
 import dev.core.network.generated.model.ListingDetailDto
 import dev.core.network.generated.model.RedemptionMethodDto
 import dev.core.network.generated.model.SearchFilterDto
+import dev.core.network.generated.model.SearchGeoDto
 import dev.core.network.generated.model.SearchPageDto
 import dev.core.network.generated.model.SearchRequestDto
 import dev.core.network.generated.model.SearchSortDto
@@ -64,7 +66,18 @@ import kotlinx.coroutines.coroutineScope
 class ApiDiscountRemoteDataSource(
     private val catalog: CatalogApi,
     private val discounts: DiscountsApi,
+    private val regions: RegionRepository,
 ) : DiscountRemoteDataSource {
+
+    /**
+     * Feed geo filtri — tanlangan viloyat. `null` bo'lsa butun mamlakat bo'yicha qidiriladi.
+     *
+     * `radiusMeters` ATAYLAB `null`: DTO'da uning standart qiymati 5000 va `encodeDefaults`
+     * yoqilgani uchun u so'rovga tushib ketardi; lat/lng bo'lmagan holda radius ma'nosiz.
+     */
+    private fun geoFilter(): SearchGeoDto? = regions.selectedId()?.let {
+        SearchGeoDto(regionIds = listOf(it), radiusMeters = null)
+    }
 
     /**
      * Guruh kalitlari va turlar bir marta tortiladi: `filter-schema` `groupKeys` ni majburiy
@@ -99,6 +112,7 @@ class ApiDiscountRemoteDataSource(
                             filter = SearchFilterDto(
                                 groupKeys = keys,
                                 listingKind = SearchFilterDto.ListingKind.ALL,
+                                geo = geoFilter(),
                             ),
                             sort = SearchSortDto(by = SearchSortDto.By.NEWEST),
                             page = SearchPageDto(number = 0, propertySize = perChunk),

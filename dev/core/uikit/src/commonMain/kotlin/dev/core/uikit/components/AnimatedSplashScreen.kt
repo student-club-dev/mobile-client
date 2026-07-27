@@ -58,8 +58,12 @@ import kotlin.math.min
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
-/** Splash ko'rinib turadigan vaqt (spetsifikatsiya: kamida 2.5-3.0s). */
-val SplashAnimationDuration: Duration = 3_000.milliseconds
+/**
+ * Splash ko'rinib turadigan vaqt. Ilova tez ochilishi uchun qisqartirilgan: butun kirish
+ * animatsiyasi (nishon → wordmark → chiziqcha → subtitle) ~1.05s da tugaydi, qolgani —
+ * kichik nafas oladigan pauza.
+ */
+val SplashAnimationDuration: Duration = 1_400.milliseconds
 
 /** Popuk tebranishining yarim davri (to'liq davr — 2.2s). */
 private const val TasselHalfPeriodMillis = 1_100
@@ -117,7 +121,7 @@ fun AnimatedSplashScreen(
     // t=0.0s — nishon: 90%->100%, +10px->0, shaffoflik 0->1 (overshoot bilan).
     val enter by animateFloatAsState(
         targetValue = if (entered) 1f else 0f,
-        animationSpec = tween(durationMillis = 800, easing = EntranceEasing),
+        animationSpec = tween(durationMillis = 550, easing = EntranceEasing),
         label = "splashEnter",
     )
     // Fon tizim splash'idagi tekis rangdan gradientga o'tadi — chegara sezilmasin.
@@ -126,20 +130,20 @@ fun AnimatedSplashScreen(
         animationSpec = tween(durationMillis = 300, easing = SplashEasing),
         label = "splashBackground",
     )
-    // t=1.4s — wordmark; t=1.5s — chiziqcha; t=1.6s — subtitle.
+    // t=0.50s — wordmark; t=0.60s — chiziqcha; t=0.70s — subtitle.
     val titleEnter by animateFloatAsState(
         targetValue = if (entered) 1f else 0f,
-        animationSpec = tween(durationMillis = 900, delayMillis = 1_400, easing = SplashEasing),
+        animationSpec = tween(durationMillis = 450, delayMillis = 500, easing = SplashEasing),
         label = "splashTitleEnter",
     )
     val underlineEnter by animateFloatAsState(
         targetValue = if (entered) 1f else 0f,
-        animationSpec = tween(durationMillis = 600, delayMillis = 1_500, easing = SplashEasing),
+        animationSpec = tween(durationMillis = 350, delayMillis = 600, easing = SplashEasing),
         label = "splashUnderlineEnter",
     )
     val subtitleEnter by animateFloatAsState(
         targetValue = if (entered) 1f else 0f,
-        animationSpec = tween(durationMillis = 600, delayMillis = 1_600, easing = SplashEasing),
+        animationSpec = tween(durationMillis = 350, delayMillis = 700, easing = SplashEasing),
         label = "splashSubtitleEnter",
     )
 

@@ -93,9 +93,9 @@ dependencies {
     debugImplementation(libs.chucker)
     releaseImplementation(libs.chucker.noop)
 
-    // Firebase (Google + Phone auth) — google-services.json orqali sozlanadi
+    // Firebase — google-services.json orqali sozlanadi. Auth uchun EMAS (u backendda):
+    // BOM faqat chat Firestore'i uchun umumiy versiyalarni beradi.
     implementation(platform(libs.firebase.bom))
-    implementation(libs.firebase.auth)
 
     implementation(libs.androidx.core.ktx)
     // Android 12+ tizim splash ekrani (`installSplashScreen()` MainActivity'da).

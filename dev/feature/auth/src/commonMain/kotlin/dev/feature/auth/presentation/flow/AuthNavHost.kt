@@ -4,7 +4,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -17,30 +16,22 @@ import dev.core.navigation.PopExit
 import dev.core.navigation.PushEnter
 import dev.core.navigation.PushExit
 import dev.core.uikit.components.AnimatedSplashScreen
-import dev.core.uikit.components.AuthTab
-import dev.feature.auth.biometric.BiometricOutcome
-import dev.feature.auth.biometric.rememberBiometricAuthenticator
 import dev.feature.auth.oauth.GoogleSignInResult
 import dev.feature.auth.oauth.rememberGoogleSignIn
 import dev.feature.auth.presentation.screens.ForgotPasswordScreen
-import dev.feature.auth.presentation.screens.NewPasswordScreen
 import dev.feature.auth.presentation.screens.OnboardingScreen
 import dev.feature.auth.presentation.screens.OtpScreen
 import dev.feature.auth.presentation.screens.ProfileScreen
-import dev.feature.auth.presentation.screens.RoleChoiceScreen
 import dev.feature.auth.presentation.screens.SignUpScreen
 import dev.feature.auth.presentation.screens.SuccessScreen
 import dev.feature.auth.presentation.screens.UniversityPickerScreen
+import dev.feature.auth.presentation.main.StudentShell
 import dev.feature.auth.presentation.screens.WelcomeScreen
-import dev.feature.business.BusinessProfileScreen
-import dev.feature.business.BusinessShell
-import dev.feature.settings.presentation.SettingsScreen
 import kotlinx.coroutines.launch
 import org.koin.compose.viewmodel.koinViewModel
 
 private object Route {
     const val ONBOARDING = "onboarding"
-    const val ROLE = "role"
 
     /** Kirish — telefon/email + parol yoki Google (oqimning asosiy ekrani). */
     const val WELCOME = "welcome"
@@ -54,14 +45,8 @@ private object Route {
     /** Parolni tiklash: raqam kiritish. */
     const val FORGOT = "forgot"
 
-    /** Parolni tiklash: SMS kodni kiritish. */
+    /** Parolni tiklash: SMS kodni kiritish (yangi parol allaqachon holatda). */
     const val RESET_CODE = "reset_code"
-
-    /** Parolni tiklash: yangi parol (kod allaqachon holatda). */
-    const val NEW_PASSWORD = "new_password"
-
-    /** Biznesmen uchun alohida profil ekrani. */
-    const val BUSINESS_PROFILE = "business_profile"
 
     const val SUCCESS = "success"
     const val PROFILE = "profile"
@@ -81,33 +66,27 @@ private object Route {
  * commonMain'da yashaydi, shu bois Android va iOS'da bir xil ishlaydi.
  */
 @Composable
-fun AuthNavHost(
-    flow: AuthUserFlow? = null,
-    onExit: (() -> Unit)? = null,
-    vm: AuthFlowViewModel = koinViewModel(),
-) {
-    // Rol-scoped oqim (Android'dagi StudentActivity/BusinessActivity) — rolni darrov o'rnatamiz,
-    // shunda ro'yxatdan o'tishda to'g'ri rol saqlanadi va rol tanlash ekrani o'tkazib yuboriladi.
-    LaunchedEffect(flow) { if (flow != null) vm.onRoleChange(flow.role) }
-
+fun AuthNavHost(vm: AuthFlowViewModel = koinViewModel()) {
     // Local keshdagi sessiyani tekshiramiz: kirgan bo'lsa to'g'ridan-to'g'ri HOME.
     val loggedIn by vm.loggedIn.collectAsStateWithLifecycle()
-    // Splash animatsiyasi va sessiya keshini o'qish PARALLEL ketadi — grafga faqat ikkalasi
+    // Tanishtiruv avval ko'rilganmi — chiqishdan keyin unga qaytmaslik uchun.
+    val onboardingSeen by vm.onboardingSeen.collectAsStateWithLifecycle()
+    // Splash animatsiyasi va local bayroqlarni o'qish PARALLEL ketadi — grafga faqat hammasi
     // tayyor bo'lganda o'tiladi.
     var splashShown by rememberSaveable { mutableStateOf(false) }
-    if (!splashShown || loggedIn == null) {
+    if (!splashShown || loggedIn == null || onboardingSeen == null) {
         AnimatedSplashScreen(onFinished = { splashShown = true })
         return
     }
+    // Chiqishdan keyin "0 dan" kirish ekrani: tanishtiruv faqat ilk ochilishda ko'rsatiladi.
     val startDestination = when {
         loggedIn == true -> Route.HOME
-        flow != null -> Route.WELCOME
+        onboardingSeen == true -> Route.WELCOME
         else -> Route.ONBOARDING
     }
 
     val nav = rememberNavController()
     val state by vm.state.collectAsStateWithLifecycle()
-    var welcomeTab by remember { mutableStateOf(AuthTab.PHONE) }
 
     // Google Sign-In — platformaga xos (Android: Credential Manager). Natija — backend
     // tekshiradigan ID token.
@@ -133,13 +112,8 @@ fun AuthNavHost(
             when (event) {
                 // Kod ketdi — tasdiqlash ekraniga.
                 AuthEvent.OtpSent -> nav.navigate(Route.VERIFY_PHONE) { launchSingleTop = true }
-                // Ro'yxat yakunlandi — biznesmen biznes profiliga, talaba Success/Profile'ga.
-                AuthEvent.Registered ->
-                    if (vm.state.value.role == Role.BUSINESS) {
-                        nav.navigate(Route.BUSINESS_PROFILE) { popUpTo(Route.SIGNUP) }
-                    } else {
-                        nav.navigate(Route.SUCCESS) { popUpTo(Route.WELCOME) }
-                    }
+                // Ro'yxat yakunlandi — tabrik ekrani, so'ng profilni to'ldirish.
+                AuthEvent.Registered -> nav.navigate(Route.SUCCESS) { popUpTo(Route.WELCOME) }
                 AuthEvent.ResetCodeSent -> nav.navigate(Route.RESET_CODE) { launchSingleTop = true }
                 // Parol yangilandi — kirish ekraniga qaytamiz (yangi parol bilan kiradi).
                 AuthEvent.PasswordReset -> nav.navigate(Route.WELCOME) {
@@ -167,50 +141,21 @@ fun AuthNavHost(
         popExitTransition = PopExit,
     ) {
         composable(Route.ONBOARDING) {
-            val afterOnboarding = { if (flow == null) nav.navigate(Route.ROLE) else nav.navigate(Route.WELCOME) }
+            val afterOnboarding = {
+                vm.markOnboardingSeen()
+                nav.navigate(Route.WELCOME) { popUpTo(Route.ONBOARDING) { inclusive = true } }
+            }
             OnboardingScreen(onNext = afterOnboarding, onSkip = afterOnboarding)
         }
 
-        composable(Route.ROLE) {
-            // Login'dan oldin rol tanlash — rol profilga yoziladi va ildiz router shundan o'qiydi.
-            RoleChoiceScreen(
-                onPick = { role ->
-                    vm.onRoleChange(role)
-                    nav.navigate(Route.WELCOME)
-                },
-                onBack = { nav.popBackStack() },
-            )
-        }
-
         composable(Route.WELCOME) {
-            val biometric = rememberBiometricAuthenticator()
-            val bioScope = rememberCoroutineScope()
             WelcomeScreen(
                 state = state,
                 vm = vm,
-                tab = welcomeTab,
-                onTab = {
-                    welcomeTab = it
-                    vm.onLoginWithEmailChange(it == AuthTab.EMAIL)
-                },
                 onLogin = vm::login,
                 onForgot = { nav.navigate(Route.FORGOT) { launchSingleTop = true } },
                 onSignUp = { nav.navigate(Route.SIGNUP) { launchSingleTop = true } },
                 onGoogle = onGoogle,
-                onBiometric = {
-                    if (!biometric.canAuthenticate()) {
-                        vm.biometricError("Qurilmada biometrika sozlanmagan (Face ID / barmoq izi).")
-                    } else {
-                        bioScope.launch {
-                            when (biometric.authenticate("Kirish", "Face ID bilan tasdiqlang", "Bekor qilish")) {
-                                BiometricOutcome.SUCCESS -> vm.onBiometricAuthenticated()
-                                BiometricOutcome.FAILED -> vm.biometricError("Biometrika tanilmadi. Qayta urinib ko'ring.")
-                                BiometricOutcome.UNAVAILABLE -> vm.biometricError("Biometrika mavjud emas.")
-                                BiometricOutcome.CANCELLED -> Unit
-                            }
-                        }
-                    }
-                },
             )
         }
 
@@ -218,6 +163,7 @@ fun AuthNavHost(
             SignUpScreen(
                 state = state, vm = vm,
                 onBack = { nav.popBackStack() },
+                onPickUniversity = { nav.navigate(Route.UNIVERSITY) },
                 onCreate = vm::register,
             )
         }
@@ -225,10 +171,13 @@ fun AuthNavHost(
         composable(Route.VERIFY_PHONE) {
             OtpScreen(
                 state = state, vm = vm,
-                onBack = { nav.popBackStack() },
+                // Orqaga qaytish = tasdiqlanmagan ro'yxatni bekor qilish (tokenlar o'chadi).
+                onBack = {
+                    vm.cancelRegistration()
+                    nav.popBackStack()
+                },
                 onVerify = vm::verifyPhone,
                 onResend = vm::resendCode,
-                onSkip = vm::skipPhoneVerification,
             )
         }
 
@@ -241,47 +190,21 @@ fun AuthNavHost(
             )
         }
 
-        // Tiklash ikki qadamga bo'lingan: avval kod, keyin parol — aks holda bitta ekranda
-        // 6 raqam va ikki marta parol yozguncha kod eskirib qolardi.
+        // Yangi parol AVVALGI ekranda olinadi — bu yerda kod tasdiqlanishi bilan
+        // `password/reset` (raqam + kod + yangi parol) bitta so'rovda yuboriladi.
         composable(Route.RESET_CODE) {
             OtpScreen(
                 state = state, vm = vm,
                 onBack = { nav.popBackStack() },
                 title = "Tiklash kodi",
-                confirmLabel = "Davom etish",
-                onVerify = {
-                    // Kod hali serverga yuborilmaydi — u yangi parol bilan birga ketadi
-                    // (`password/reset` uchalasini bitta so'rovda kutadi).
-                    vm.clearError()
-                    nav.navigate(Route.NEW_PASSWORD) { launchSingleTop = true }
-                },
+                confirmLabel = "Parolni saqlash",
+                onVerify = vm::resetPassword,
                 onResend = vm::resendCode,
             )
         }
 
-        composable(Route.NEW_PASSWORD) {
-            NewPasswordScreen(
-                state = state, vm = vm,
-                onBack = { nav.popBackStack() },
-                onSubmit = vm::resetPassword,
-            )
-        }
-
-        composable(Route.BUSINESS_PROFILE) {
-            BusinessProfileScreen(
-                businessName = state.businessName,
-                businessType = state.businessType,
-                error = state.error,
-                isLoading = state.isLoading,
-                onNameChange = vm::onBusinessNameChange,
-                onTypeChange = vm::onBusinessTypeChange,
-                onBack = { nav.popBackStack() },
-                onStart = vm::completeProfile,
-            )
-        }
-
         composable(Route.SUCCESS) {
-            SuccessScreen(state = state, vm = vm, onContinue = { nav.navigate(Route.PROFILE) })
+            SuccessScreen(onContinue = { nav.navigate(Route.PROFILE) })
         }
 
         composable(Route.PROFILE) {
@@ -302,25 +225,19 @@ fun AuthNavHost(
         }
 
         composable(Route.HOME) {
-            // Chiqish: Activity oqimida — ildiz router'ga qaytamiz (onExit); aks holda (iOS)
-            // kirish ekraniga.
-            val loggedOut: () -> Unit = onExit ?: {
+            // Chiqish — grafning O'ZIDA kirish ekraniga qaytamiz va butun stack'ni tozalaymiz.
+            //
+            // MUHIM: bu yerda Activity'ni `recreate()` qilish MUMKIN EMAS. `rememberNavController()`
+            // back stack'ni saqlab qo'yadi va recreate'дан keyin uni TIKLAYDI — ustida hamon HOME
+            // turadi, ya'ni `startDestination` (WELCOME) e'tiborga olinmaydi va foydalanuvchi
+            // chiqqan bo'lsa ham bosh ekranда qolib ketardi.
+            val loggedOut: () -> Unit = {
                 nav.navigate(Route.WELCOME) {
-                    popUpTo(Route.HOME) { inclusive = true }
+                    popUpTo(0) { inclusive = true }
                     launchSingleTop = true
                 }
             }
-            when (flow) {
-                AuthUserFlow.BUSINESS -> BusinessShell(
-                    onLoggedOut = loggedOut,
-                    settingsContent = { onBack ->
-                        SettingsScreen(onBack = onBack, onEditProfile = {}, onLoggedOut = loggedOut)
-                    },
-                )
-                AuthUserFlow.STUDENT -> dev.feature.auth.presentation.main.StudentShell(onLoggedOut = loggedOut)
-                // iOS / bo'linmagan rejim — rolga qarab RootShell hal qiladi.
-                null -> dev.feature.auth.presentation.main.RootShell(onLoggedOut = loggedOut)
-            }
+            StudentShell(onLoggedOut = loggedOut)
         }
     }
 }

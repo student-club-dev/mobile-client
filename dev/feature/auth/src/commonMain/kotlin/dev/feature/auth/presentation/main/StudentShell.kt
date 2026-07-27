@@ -73,6 +73,9 @@ import dev.feature.chat.presentation.ChatScreen
 import dev.feature.home.presentation.HomeScreen
 import dev.feature.profile.presentation.EditProfileScreen
 import dev.feature.profile.presentation.ProfileScreen
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ime
+import androidx.compose.ui.platform.LocalDensity
 
 private enum class StudentTab(val route: String, val label: String) {
     HOME("home", "Home"),
@@ -286,7 +289,10 @@ fun StudentShell(onLoggedOut: () -> Unit) {
             }
         }
 
-        if (current in tabRoutes) {
+        // Klaviatura ochilganda pastki panel ko'rsatilmaydi: kontent klaviatura ustiga
+        // ko'tarilgani uchun panel matn maydonining tagida osilib qolardi va joy egallardi.
+        val keyboardOpen = WindowInsets.ime.getBottom(LocalDensity.current) > 0
+        if (current in tabRoutes && !keyboardOpen) {
             BottomBar(
                 current = current,
                 onSelect = selectTab,

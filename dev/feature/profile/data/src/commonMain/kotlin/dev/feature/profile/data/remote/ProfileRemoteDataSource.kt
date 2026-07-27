@@ -4,11 +4,8 @@ import dev.core.common.Resource
 import dev.feature.profile.domain.model.UserProfile
 
 /**
- * Profilning masofaviy manbasi. Ikkita implementatsiyasi bor va DI qaysi birini
- * ulashni `REMOTE_SYNC_ENABLED` bayrog'iga qarab hal qiladi:
- *
- * - [ApiProfileRemoteDataSource] — real backend (`/v1/profile/me`, OpenAPI'dan generatsiya qilingan klient),
- * - [FirestoreProfileRemoteDataSource] — backendsiz rejim (Firestore `users/{uid}`).
+ * Profilning masofaviy manbasi. Yagona implementatsiyasi — [ApiProfileRemoteDataSource]
+ * (real backend `/v1/profile/me`, OpenAPI'dan generatsiya qilingan klient).
  *
  * Repository qaysi manba ulanganini bilmaydi — u faqat shu interfeys bilan ishlaydi.
  */
@@ -23,9 +20,6 @@ interface ProfileRemoteDataSource {
     /** Masofaviy manbada profil mavjudmi (tarmoq xatosida `false`). */
     suspend fun exists(): Boolean
 
-    /**
-     * Rasm faylini yuklab, uning ochiq URL manzilini qaytaradi.
-     * Rasm saqlash serverni talab qiladi — backendsiz rejimda qo'llab-quvvatlanmaydi.
-     */
+    /** Rasm faylini yuklab, uning ochiq URL manzilini qaytaradi (`POST /v1/media/upload`). */
     suspend fun uploadAvatar(bytes: ByteArray, fileName: String): Resource<String>
 }

@@ -18,28 +18,28 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import dev.core.uikit.theme.ModuleFood
-import dev.core.uikit.theme.ModuleStudy
 import dev.core.uikit.theme.Success
 import dev.core.uikit.theme.SuccessDeep
 import dev.core.uikit.components.AppFontFamily
@@ -54,8 +54,7 @@ import dev.core.uikit.components.ScreenTitle
 import dev.feature.auth.presentation.flow.AuthFlowState
 import dev.feature.auth.presentation.flow.AuthFlowViewModel
 import dev.feature.auth.presentation.flow.CourseYear
-import dev.feature.auth.presentation.flow.Role
-import dev.feature.auth.presentation.flow.University
+import dev.feature.university.domain.model.University
 import dev.core.uikit.theme.AppPalette
 import dev.core.uikit.theme.appPalette
 
@@ -63,21 +62,11 @@ import dev.core.uikit.theme.appPalette
 // 1j — SUCCESS / ROLE PICKER
 // ===========================================================================
 
-private data class RoleCardInfo(val role: Role, val title: String, val desc: String, val icon: ImageVector, val accent: Color)
-
 @Composable
 fun SuccessScreen(
-    state: AuthFlowState,
-    vm: AuthFlowViewModel,
     onContinue: () -> Unit,
     palette: AppPalette = appPalette,
 ) {
-    val cards = listOf(
-        RoleCardInfo(Role.STUDENT, "Talaba", "8 modul, buyurtma, chat", AppIcons.GraduationCap, palette.primary),
-        RoleCardInfo(Role.BUSINESS, "Biznes", "Menyu, buyurtma qabul", AppIcons.Store, ModuleFood),
-        RoleCardInfo(Role.EMPLOYER, "Ish beruvchi", "E‘lon, arizalar", AppIcons.Briefcase, dev.core.uikit.theme.ModuleEmployer),
-        RoleCardInfo(Role.UNIVERSITY, "Universitet", "Jadval, e‘lonlar", AppIcons.Building, ModuleStudy),
-    )
     AppScreenScaffold(scroll = true, topPadding = 64) {
         Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
             Box(
@@ -91,45 +80,14 @@ fun SuccessScreen(
             ScreenTitle("Tabriklaymiz! 🎉")
             Spacer(Modifier.height(6.dp))
             Text(
-                "Hisobingiz tayyor. Boshlash uchun rolingizni tasdiqlang.",
+                "Hisobingiz tayyor. Endi profilingizni to'ldiramiz.",
                 style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.sp, color = palette.inkMuted, textAlign = TextAlign.Center, lineHeight = 19.sp),
                 modifier = Modifier.padding(horizontal = 8.dp),
             )
         }
-        Spacer(Modifier.height(22.dp))
 
-        Column(verticalArrangement = Arrangement.spacedBy(11.dp)) {
-            cards.chunked(2).forEach { rowCards ->
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(11.dp)) {
-                    rowCards.forEach { c ->
-                        RoleCard(c, state.role == c.role, { vm.onRoleChange(c.role) }, Modifier.weight(1f), palette)
-                    }
-                }
-            }
-        }
-
-        Spacer(Modifier.height(22.dp))
+        Spacer(Modifier.height(26.dp))
         PrimaryButton("Davom etish", onContinue, trailingIcon = AppIcons.ArrowRight)
-    }
-}
-
-@Composable
-private fun RoleCard(info: RoleCardInfo, selected: Boolean, onClick: () -> Unit, modifier: Modifier, palette: AppPalette) {
-    val shape = RoundedCornerShape(16.dp)
-    Column(
-        modifier
-            .clip(shape)
-            .background(if (selected) palette.glassStrong else palette.glass)
-            .border(if (selected) 2.dp else 1.dp, if (selected) palette.primary else palette.border, shape)
-            .clickableNoRipple(onClick)
-            .padding(horizontal = 12.dp, vertical = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Box(Modifier.size(38.dp).background(info.accent.copy(alpha = 0.12f), RoundedCornerShape(11.dp)), contentAlignment = Alignment.Center) {
-            Icon(info.icon, null, tint = info.accent, modifier = Modifier.size(20.dp))
-        }
-        Text(info.title, style = TextStyle(fontFamily = AppFontFamily, fontSize = 14.sp, fontWeight = FontWeight.ExtraBold, color = palette.ink))
-        Text(info.desc, style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.sp, color = palette.inkFaint, lineHeight = 15.sp))
     }
 }
 
@@ -146,7 +104,7 @@ fun ProfileScreen(
     onStart: () -> Unit,
     palette: AppPalette = appPalette,
 ) {
-    AppScreenScaffold(scroll = false, horizontalPadding = 20, topPadding = 54) {
+    AppScreenScaffold(scroll = true, horizontalPadding = 20, topPadding = 54) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(11.dp)) {
             BackButton(onBack)
             Column {
@@ -191,14 +149,15 @@ fun ProfileScreen(
 
         ErrorText(state.error)
 
-        Spacer(Modifier.weight(1f))
+        Spacer(Modifier.height(20.dp))
         Spacer(Modifier.height(16.dp))
         PrimaryButton("Boshlash", onStart, enabled = !state.isLoading, trailingIcon = AppIcons.ArrowRight)
     }
 }
 
+/** Universitet tanlash qatori — ham ro'yxatdan o'tishda, ham profil qadamida ishlatiladi. */
 @Composable
-private fun UniversitySelectorRow(university: University?, onClick: () -> Unit, palette: AppPalette) {
+internal fun UniversitySelectorRow(university: University?, onClick: () -> Unit, palette: AppPalette) {
     val shape = RoundedCornerShape(13.dp)
     Row(
         Modifier.fillMaxWidth().height(52.dp).clip(shape)
@@ -285,7 +244,10 @@ fun UniversityPickerScreen(
     onSelectDone: () -> Unit,
     palette: AppPalette = appPalette,
 ) {
-    val results = state.filteredUniversities
+    // Ro'yxat prof-emis API'sidan yuklanadi (ekran ochilganda bir marta).
+    val picker by vm.universityPicker.collectAsStateWithLifecycle()
+    LaunchedEffect(Unit) { vm.loadUniversities() }
+
     AppScreenScaffold(horizontalPadding = 18, topPadding = 54) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(11.dp)) {
             BackButton(onClose, icon = AppIcons.Close)
@@ -293,7 +255,7 @@ fun UniversityPickerScreen(
         }
         Spacer(Modifier.height(14.dp))
         GlassTextField(
-            value = state.universityQuery,
+            value = picker.query,
             onValueChange = vm::onUniversityQueryChange,
             placeholder = "Toshkent",
             leading = AppIcons.Search,
@@ -302,16 +264,27 @@ fun UniversityPickerScreen(
         )
         Spacer(Modifier.height(16.dp))
         Text(
-            "${results.size} TA NATIJA",
+            when {
+                picker.loading -> "YUKLANMOQDA…"
+                picker.error != null -> "RO‘YXATNI YUKLAB BO‘LMADI"
+                else -> "${picker.results.size} TA NATIJA"
+            },
             style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp, color = palette.inkFaint),
         )
         Spacer(Modifier.height(8.dp))
 
-        LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            items(results, key = { it.id }) { uni ->
-                UniversityRow(uni, state.universityId == uni.id, { vm.onUniversitySelected(uni.id) }, palette)
+        if (picker.loading) {
+            Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = palette.primary)
+            }
+        } else {
+            LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                items(picker.results, key = { it.id }) { uni ->
+                    UniversityRow(uni, state.universityId == uni.id, { vm.onUniversitySelected(uni) }, palette)
+                }
             }
         }
+        picker.error?.let { ErrorText(it) }
 
         Spacer(Modifier.height(12.dp))
         PrimaryButton("Tanlash", onSelectDone, enabled = state.universityId != null)

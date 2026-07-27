@@ -46,6 +46,19 @@ class RegisterUseCase(private val repository: AuthRepository) {
     }
 }
 
+/**
+ * Ro'yxatni yakunlaydi — SMS kod tasdiqlangandan KEYIN sessiyani haqiqatan ochadi.
+ * Shu chaqiruvgacha foydalanuvchi ilovaga kirgan hisoblanmaydi.
+ */
+class CompleteRegistrationUseCase(private val repository: AuthRepository) {
+    suspend operator fun invoke(): Resource<User> = repository.completeRegistration()
+}
+
+/** Tasdiqlanmagan ro'yxatni bekor qiladi (kod ekranidan orqaga qaytilganda). */
+class CancelRegistrationUseCase(private val repository: AuthRepository) {
+    suspend operator fun invoke() = repository.cancelPendingRegistration()
+}
+
 /** Tizimdan chiqish — refresh token bekor qilinadi, local kesh tozalanadi. */
 class LogoutUseCase(private val repository: AuthRepository) {
     suspend operator fun invoke() = repository.logout()

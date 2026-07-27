@@ -6,6 +6,7 @@ import dev.core.common.auth.TokenStore
 import dev.core.data.auth.SecureTokenStore
 import dev.core.data.auth.SqlDelightTokenStore
 import dev.core.data.repository.DiscountRepositoryImpl
+import dev.core.data.repository.RegionRepositoryImpl
 import dev.core.data.remote.ApiDiscountRemoteDataSource
 import dev.core.data.remote.DiscountRemoteDataSource
 import dev.core.data.seed.LocalDataSeeder
@@ -13,6 +14,9 @@ import dev.core.database.DatabaseFactory
 import dev.core.database.DriverFactory
 import dev.core.database.sql.StudentClubDatabase
 import dev.core.domain.repository.DiscountRepository
+import dev.core.domain.repository.RegionRepository
+import dev.core.domain.usecase.CancelRegistrationUseCase
+import dev.core.domain.usecase.CompleteRegistrationUseCase
 import dev.core.domain.usecase.ForgotPasswordUseCase
 import dev.core.domain.usecase.GetDeviceSessionsUseCase
 import dev.core.domain.usecase.LoginUseCase
@@ -29,6 +33,7 @@ import dev.core.domain.usecase.VerifyPhoneOtpUseCase
 import dev.core.network.NetworkConfig
 import dev.core.network.createHttpClient
 import dev.core.network.generated.api.CatalogApi
+import dev.core.network.generated.api.GeoApi
 import dev.core.network.generated.api.DiscountsApi
 import io.ktor.client.HttpClient
 import org.koin.core.module.Module
@@ -60,12 +65,6 @@ const val DEFAULT_BASE_URL = DEV_BASE_URL
  * `false` bo'lib qoladi; feed o'zining [DISCOUNTS_REMOTE_ENABLED] bayrog'idan yuradi.
  */
 const val REMOTE_SYNC_ENABLED = false
-
-/**
- * Profil masofaviy manbasi. Auth backendga ulangani uchun profil ham REST'dan keladi
- * (`GET/PUT /v1/profile/me`) — `ApiAuthRepository` kirishdan keyin aynan shuni tortadi.
- */
-const val PROFILE_REMOTE_ENABLED = true
 
 /**
  * "Siz uchun" bo'limi backend'dan keladimi — `POST /v1/catalog/groups` + `/v1/catalog/types`
@@ -105,7 +104,11 @@ val repositoryModule = module {
     // tokeni (Bearer) har so'rovga avtomatik qo'shiladi va muddati tugasa yangilanadi.
     single { CatalogApi(baseUrl = get<NetworkConfig>().baseUrl, httpClient = get<HttpClient>()) }
     single { DiscountsApi(baseUrl = get<NetworkConfig>().baseUrl, httpClient = get<HttpClient>()) }
-    single<DiscountRemoteDataSource> { ApiDiscountRemoteDataSource(get(), get()) }
+    single { GeoApi(baseUrl = get<NetworkConfig>().baseUrl, httpClient = get<HttpClient>()) }
+
+    // Feed geo filtri: tanlangan viloyat (`filter.geo.regionIds`).
+    single<RegionRepository> { RegionRepositoryImpl(get(), get(), get()) }
+    single<DiscountRemoteDataSource> { ApiDiscountRemoteDataSource(get(), get(), get()) }
 
     // --- Repository'lar (offline-first: DB + refresh) ---
     single<DiscountRepository> { DiscountRepositoryImpl(get(), get(), get(), DISCOUNTS_REMOTE_ENABLED) }
@@ -118,6 +121,8 @@ val domainModule = module {
     factory { LoginUseCase(get()) }
     factory { LoginWithGoogleUseCase(get()) }
     factory { RegisterUseCase(get()) }
+    factory { CompleteRegistrationUseCase(get()) }
+    factory { CancelRegistrationUseCase(get()) }
     factory { LogoutUseCase(get()) }
     factory { ObserveCurrentUserUseCase(get()) }
     factory { RequestPhoneOtpUseCase(get()) }

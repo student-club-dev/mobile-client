@@ -9,7 +9,9 @@ import dev.core.domain.model.OfferDetail
 import dev.core.domain.model.OfferFilterSchema
 import dev.core.domain.model.OfferSuggestion
 import dev.core.domain.model.SuggestionKind
+import dev.core.domain.model.Region
 import dev.core.domain.repository.DiscountRepository
+import dev.core.domain.repository.RegionRepository
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -48,6 +50,13 @@ data class FilterValues(
             sort != OfferSort.RELEVANCE,
         ).count { it }
 }
+
+/** Filter ekranidagi viloyat ro'yxati holati. */
+data class RegionPickerState(
+    val loading: Boolean = false,
+    val error: String? = null,
+    val regions: List<Region> = emptyList(),
+)
 
 /** "Siz uchun" feed holati (qo'llangan filtrlar bilan). */
 data class DiscountsUiState(
@@ -91,7 +100,40 @@ data class OfferDetailState(
 
 class DiscountsViewModel(
     private val discountRepository: DiscountRepository,
+    private val regionRepository: RegionRepository,
 ) : ViewModel() {
+
+    // --- Joylashuv (viloyat) filtri -------------------------------------------------
+    // Bu filtr boshqalaridan FARQ QILADI: u so'rovga (`filter.geo.regionIds`) ketadi, ya'ni
+    // tanlangan zahoti feed qayta tortiladi. Shu bois qoralamada emas, darrov qo'llanadi.
+
+    private val _regionPicker = MutableStateFlow(RegionPickerState())
+    val regionPicker: StateFlow<RegionPickerState> = _regionPicker
+
+    /** Tanlangan viloyat (`null` — butun O'zbekiston). */
+    val selectedRegion: StateFlow<Region?> = regionRepository.observeSelected()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
+    /** Ro'yxat birinchi ochilishda tortiladi. */
+    fun loadRegions() {
+        if (_regionPicker.value.regions.isNotEmpty() || _regionPicker.value.loading) return
+        _regionPicker.value = _regionPicker.value.copy(loading = true, error = null)
+        viewModelScope.launch {
+            when (val res = regionRepository.regions()) {
+                is Resource.Success -> _regionPicker.value = RegionPickerState(regions = res.data)
+                is Resource.Error -> _regionPicker.value = RegionPickerState(error = res.message)
+                Resource.Loading -> Unit
+            }
+        }
+    }
+
+    /** Viloyatni saqlaydi va feed'ni yangi geo filtri bilan qayta tortadi. */
+    fun selectRegion(region: Region?) {
+        viewModelScope.launch {
+            regionRepository.select(region)
+            discountRepository.refresh()
+        }
+    }
 
     private val query = MutableStateFlow("")
 
