@@ -45,10 +45,21 @@ AuthNavHost (Compose, commonMain)
 
 ### Android
 
-1. Google Cloud Console → **Credentials**:
+1. Google Cloud Console → proyekt **`studentclub-503706`** → **Credentials**:
    - **Web application** turidagi OAuth client ID — ilova ID token uchun aynan shuni ishlatadi;
    - **Android** turidagi client ID — package `uz.studentclub.app` + SHA-1
      (`./gradlew :androidApp:signingReport`, debug va release uchun alohida).
+
+     Debug imzo loyihaning o'z kalitidan keladi — `androidApp/debug.keystore` (repoda),
+     SHA-1 `DC:18:55:73:19:58:73:89:F7:89:D1:79:3E:E6:16:4A:B9:39:63:30`. Shuning uchun
+     har bir ishlab chiquvchi uchun alohida client kerak emas.
+
+   Ikkala client bir proyektda bo'lishi shart: Credential Manager chaqiruvchi ilovani
+   package + SHA-1 bo'yicha Web client turgan proyektda qidiradi, topmasa so'rovni
+   Google'ga umuman yubormaydi.
+
+   OAuth uchun proyekt — `studentclub-503706`; Firebase proyekti (`studentclubs-d2905`)
+   bundan alohida va faqat chat uchun. Auth backendда bo'lgani uchun ular bog'lanmaydi.
 2. Web client ID ni `local.properties` ga yozing (fayl `.gitignore` da):
    ```
    GOOGLE_WEB_CLIENT_ID=...apps.googleusercontent.com

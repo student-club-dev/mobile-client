@@ -163,7 +163,10 @@ class AuthFlowViewModel(
 
     /** Google ID token bilan kirish — backend tokenni tekshirib sessiya ochadi. */
     fun signInWithGoogle(idToken: String) {
-        if (_state.value.isLoading) return
+        // Bu yerda "isLoading bo'lsa qaytish" tekshiruvi BO'LMASLIGI kerak: oqim
+        // `startExternalAuth()` dan boshlanadi va u allaqachon isLoading = true qilib
+        // qo'yadi, ya'ni tekshiruv har safar ishlab, backendga so'rov umuman ketmaydi.
+        // Takroriy bosishdan Credential Manager oynasining o'zi himoya qiladi.
         _state.update { it.copy(isLoading = true, error = null) }
         viewModelScope.launch {
             when (val result = loginWithGoogleUseCase(idToken)) {

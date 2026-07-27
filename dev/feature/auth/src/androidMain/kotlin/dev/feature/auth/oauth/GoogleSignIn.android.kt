@@ -16,11 +16,13 @@ import androidx.credentials.exceptions.NoCredentialException
 import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 
+private const val TAG = "ScGoogleSignIn"
+
 /**
  * Android Google Sign-In — Credential Manager orqali.
  *
  * [webClientId] — Google Cloud'даgi **Web** (server) OAuth client ID. Ilova strings.xml da
- * `google_web_client_id` sifatida beriladi (elonUzApp moduli).
+ * `google_web_client_id` sifatida beriladi (androidApp moduli).
  * Ishlashi uchun Google Cloud Console'да ilova imzosining **SHA-1**i ham ro'yxatдан
  * o'tishi shart (debug va release uchun alohida).
  *
@@ -66,7 +68,10 @@ actual class GoogleSignIn(
             GoogleSignInResult.Failed("Qurilmада Google hisob topilmadi. Sozlamalarда hisob qo'shing.")
         } catch (e: GetCredentialException) {
             // Bu yerга ko'pincha noto'g'ri client ID yoki ro'yxatdан o'tmagan SHA-1 tushadi —
-            // asl xabar saqlanadi, chunki sababni faqat shundan bilish mumkin.
+            // asl xabar saqlanadi, chunki sababni faqat shundan bilish mumkin. Ekranда
+            // ko'rinadigan matn qisqartirilishi mumkin, shuning uchun logga ham yozamiz
+            // (`adb logcat -s ScGoogleSignIn`) — `e.type` sozlama xatosini aniq ko'rsatadi.
+            android.util.Log.w(TAG, "GetCredential xatosi: ${e.type} — ${e.message}", e)
             GoogleSignInResult.Failed(e.message ?: "Google kirish amalga oshmadi")
         }
     }
@@ -76,7 +81,7 @@ actual class GoogleSignIn(
 actual fun rememberGoogleSignIn(): GoogleSignIn {
     val context = LocalContext.current
     val activity = remember(context) { context.findActivity() }
-    // Client ID ilova (elonUzApp) strings.xml da; modulдан R'siz o'qiymiz.
+    // Client ID ilova (androidApp) strings.xml da; modulдан R'siz o'qiymiz.
     val clientId = remember(context) {
         val resId = context.resources.getIdentifier("google_web_client_id", "string", context.packageName)
         if (resId != 0) context.getString(resId) else ""
