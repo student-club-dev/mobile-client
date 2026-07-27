@@ -2,6 +2,7 @@
 <project version="4">
   <component name="CompilerConfiguration">
     <bytecodeTargetLevel target="17">
+      <module name="StudentClub.dev.feature.business" target="21" />
       <module name="StudentClubs.dev.api-client" target="21" />
       <module name="StudentClubs.dev.core.common" target="21" />
       <module name="StudentClubs.dev.core.data" target="21" />

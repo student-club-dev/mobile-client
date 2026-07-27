@@ -25,10 +25,15 @@ kotlin {
                 implementation(libs.ktor.serialization.json)
                 implementation(libs.ktor.client.logging)
                 implementation(libs.ktor.client.auth)
+                // Chat real-time: `dev.core.network.ws` dagi Socket.IO klienti.
+                api(libs.ktor.client.websockets)
                 implementation(libs.kotlinx.serialization.json)
                 implementation(libs.kotlinx.coroutines.core)
                 implementation(libs.kotlinx.datetime)
             }
+        }
+        commonTest.dependencies {
+            implementation(kotlin("test"))
         }
         androidMain.dependencies {
             implementation(libs.ktor.client.okhttp)

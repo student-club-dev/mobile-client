@@ -10,8 +10,11 @@ import dev.feature.settings.presentation.di.settingsModule
 import dev.feature.university.presentation.di.universityModule
 import dev.feature.ads.presentation.di.adsModule
 import dev.feature.chat.presentation.di.chatModule
+import dev.feature.connections.presentation.di.connectionsModule
 import dev.feature.home.presentation.di.homeModule
 import dev.feature.profile.presentation.di.profileModule
+import io.github.aakira.napier.DebugAntilog
+import io.github.aakira.napier.Napier
 import org.koin.core.KoinApplication
 import org.koin.core.context.startKoin
 import org.koin.dsl.KoinAppDeclaration
@@ -34,12 +37,24 @@ fun appModules() = coreModules() +
     settingsModule() +
     universityModule(REMOTE_SYNC_ENABLED) +
     adsModule(REMOTE_SYNC_ENABLED) +
-    chatModule(REMOTE_SYNC_ENABLED) +
+    // Bog'lanishlar va chat — to'liq backendда (bayroqsiz): `Connections` + `Chat` bo'limlari.
+    connectionsModule() +
+    chatModule() +
     homeModule()
 
-/** Umumiy Koin start (androidApp shu yerga androidContext qo'shadi). */
-fun initKoin(appDeclaration: KoinAppDeclaration = {}): KoinApplication =
-    startKoin {
+/**
+ * Umumiy Koin start (androidApp shu yerga androidContext qo'shadi).
+ *
+ * Bu yerda Napier ham yoqiladi. Busiz ilovaning HAMMA `Napier.*` chaqiruvi jimgina yo'qolardi
+ * (Napier antilog o'rnatilmasa hech qayerga yozmaydi) — ya'ni logcat'da diagnostika yo'q edi.
+ */
+fun initKoin(appDeclaration: KoinAppDeclaration = {}): KoinApplication {
+    // `takeLogarithm` — avvalgi antilog'larni tozalaydi, shunda qayta chaqirilsa (test,
+    // process restart) har satr ikki marta chiqmaydi.
+    Napier.takeLogarithm()
+    Napier.base(DebugAntilog())
+    return startKoin {
         appDeclaration()
         modules(appModules())
     }
+}

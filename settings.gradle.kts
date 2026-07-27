@@ -87,6 +87,12 @@ include(":dev:feature:university:presentation")
 include(":dev:feature:ads:domain")
 include(":dev:feature:ads:data")
 include(":dev:feature:ads:presentation")
+// Bog'lanishlar (Connections) — talaba qidirish, so'rov, blok, shikoyat.
+// Chat'ning "eshigi": bog'lanmaganlar yozisha olmaydi. Handoff: handoff/connections.md.
+include(":dev:feature:connections:domain")
+include(":dev:feature:connections:data")
+include(":dev:feature:connections:presentation")
+// Chat — REST (`/v1/conversations…`) + Socket.IO (`/chat`). Handoff: handoff/chat.md.
 include(":dev:feature:chat:domain")
 include(":dev:feature:chat:data")
 include(":dev:feature:chat:presentation")

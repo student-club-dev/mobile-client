@@ -6,6 +6,7 @@ import dev.core.di.initKoin
 import dev.core.network.OkHttpInterceptors
 import org.koin.android.ext.koin.androidContext
 import org.koin.android.ext.koin.androidLogger
+import uz.studentclub.app.push.PushNotifications
 
 class StudentClubApp : Application() {
     override fun onCreate() {
@@ -16,6 +17,10 @@ class StudentClubApp : Application() {
         // Debug'da: har API so'rovi bildirishnomada ko'rinadi, bosganda alohida ekran ochadi.
         // Release'da: chucker-noop tufayli hech narsa qilmaydi.
         OkHttpInterceptors.interceptors += ChuckerInterceptor.Builder(this).build()
+
+        // Bildirishnoma kanali — servisdan OLDIN yaratiladi: fonda kelgan push tizim
+        // tomonidan chiziladi va Android 8+ da kanalsiz umuman ko'rinmaydi.
+        PushNotifications.ensureChannel(this)
 
         initKoin {
             androidLogger()

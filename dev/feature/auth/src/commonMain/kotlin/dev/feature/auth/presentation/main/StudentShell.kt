@@ -32,7 +32,11 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -45,7 +49,10 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import dev.core.common.push.PushRegistrar
+import dev.core.common.push.PushRoute
 import dev.core.uikit.components.ScIcons
+import org.koin.compose.koinInject
 import dev.core.uikit.components.scSoftShadow
 import dev.core.uikit.components.scBrandShadow
 import dev.core.uikit.theme.Sc
@@ -63,7 +70,8 @@ import dev.feature.listings.presentation.browse.ListingsBrowseScreen
 import dev.feature.listings.presentation.PostListingScreen
 import dev.feature.listings.presentation.detail.ListingDetailScreen
 import dev.feature.listings.presentation.platform.rememberPhoneCaller
-import dev.feature.students.presentation.StudentsScreen
+import dev.feature.connections.presentation.ConnectionsScreen
+import dev.feature.connections.presentation.ConnectionsTab
 import dev.feature.notifications.presentation.NotificationsScreen
 import dev.feature.clubs.presentation.ClubsScreen
 import dev.feature.settings.presentation.SettingsScreen
@@ -117,8 +125,11 @@ private val studentListingKinds = listOf(
 )
 private const val POST_AD = "post_ad"
 private const val PROFILE = "profile"
-/** Endi tab emas — Home'dagi "Studentlar / Barchasi" dan ochiladi. */
-private const val STUDENTS = "students"
+/**
+ * "Do'stlar" — `Connections` bo'limi (qidiruv / so'rovlar / bog'langanlar).
+ * Tab emas: Home'dagi "Studentlar → Barchasi" dan ochiladi.
+ */
+private const val CONNECTIONS = "connections"
 private const val NOTIFICATIONS = "notifications"
 private const val EDIT_PROFILE = "edit_profile"
 private const val SETTINGS = "settings"
@@ -149,6 +160,10 @@ fun StudentShell(onLoggedOut: () -> Unit) {
     val backStack by nav.currentBackStackEntryAsState()
     val current = backStack?.destination?.route?.toTabRoute() ?: StudentTab.HOME.route
 
+    // "Xabarlar" tab'ida suhbat ochiqmi. Suhbat alohida route EMAS (ChatScreen'ning ichki
+    // holati), shuning uchun route'dan bilib bo'lmaydi — ekranning o'zi xabar beradi.
+    var chatThreadOpen by remember { mutableStateOf(false) }
+
     // Tab almashish — holat saqlanadi/tiklanadi, dublikat yaratmaydi (navigateSafe).
     val selectTab: (String) -> Unit = { route ->
         nav.navigateSafe(route) {
@@ -167,6 +182,44 @@ fun StudentShell(onLoggedOut: () -> Unit) {
      */
     val openListingsKind: (ListingKind) -> Unit = { kind ->
         nav.navigateSafe("${StudentTab.LISTINGS.route}?kind=${kind.name}") {
+            popUpTo(StudentTab.HOME.route) { saveState = true }
+        }
+    }
+
+    /**
+     * Chat tab'ini konkret talaba bilan ochadi ("Do'stlar" → "Xabar").
+     *
+     * [openListingsKind] dagi kabi `restoreState` YO'Q: saqlangan holat tiklanganda
+     * Navigation eski argumentlarni qaytaradi va yangi `?studentId=` bekor bo'lardi.
+     */
+    /** `Connections` ekranini konkret bo'lim ochilgan holda ochadi (Home'dagi tugmalar). */
+    val openConnectionsTab: (ConnectionsTab) -> Unit = { tab ->
+        nav.navigateSafe("$CONNECTIONS?tab=${tab.name}")
+    }
+
+    val openChatWith: (String) -> Unit = { studentId ->
+        nav.navigateSafe("${StudentTab.CHAT.route}?studentId=${encodeArg(studentId)}") {
+            popUpTo(StudentTab.HOME.route) { saveState = true }
+        }
+    }
+
+    // --- Push -----------------------------------------------------------------------------
+    //
+    // Bu ekran faqat sessiya ochiq bo'lganda ko'rinadi, ya'ni qurilma tokenini backendga
+    // yozish uchun to'g'ri joy. `ApiAuthRepository` buni KIRISH paytida qiladi; bu yerdagisi
+    // **avtomatik kirish** holati uchun (saqlangan sessiya bilan ochilgan ilova).
+    val pushRegistrar = koinInject<PushRegistrar>()
+    LaunchedEffect(Unit) { runCatching { pushRegistrar.onSessionStarted() } }
+
+    // Bildirishnoma bosilgan bo'lsa — o'sha suhbatni ochamiz. Qiymat ilova ishga tushishidan
+    // oldin ham qo'yilgan bo'lishi mumkin, shuning uchun oqim sifatida kuzatiladi.
+    val pendingConversationId by PushRoute.pendingConversationId.collectAsState()
+    LaunchedEffect(pendingConversationId) {
+        val conversationId = pendingConversationId ?: return@LaunchedEffect
+        PushRoute.consume()
+        nav.navigateSafe(
+            "${StudentTab.CHAT.route}?conversationId=${encodeArg(conversationId)}",
+        ) {
             popUpTo(StudentTab.HOME.route) { saveState = true }
         }
     }
@@ -199,7 +252,10 @@ fun StudentShell(onLoggedOut: () -> Unit) {
                     onOpenRentals = { openListingsKind(ListingKind.RENTAL) },
                     onOpenTasks = { openListingsKind(ListingKind.TASK) },
                     onOpenListing = { id -> nav.navigateSafe("$LISTING_DETAIL/${encodeArg(id)}") },
-                    onOpenStudents = { nav.navigateSafe(STUDENTS) },
+                    onOpenStudents = { nav.navigateSafe(CONNECTIONS) },
+                    onOpenStudentSearch = { openConnectionsTab(ConnectionsTab.SEARCH) },
+                    onOpenStudentRequests = { openConnectionsTab(ConnectionsTab.REQUESTS) },
+                    onOpenChatWith = openChatWith,
                 )
             }
             composable(
@@ -239,10 +295,23 @@ fun StudentShell(onLoggedOut: () -> Unit) {
                 )
             }
             composable(
-                StudentTab.CHAT.route,
+                // `?studentId=` — "Do'stlar" ekranidan "Xabar" bosilganda;
+                // `?conversationId=` — push bosilganda. Argumentsiz — oddiy tab (ro'yxat).
+                route = "${StudentTab.CHAT.route}?studentId={studentId}&conversationId={conversationId}",
                 enterTransition = TabEnter, exitTransition = TabExit,
                 popEnterTransition = TabEnter, popExitTransition = TabExit,
-            ) { ChatScreen() } // tab — orqaga tugmasisiz
+                arguments = listOf(
+                    navArgument("studentId") { type = NavType.StringType; nullable = true; defaultValue = null },
+                    navArgument("conversationId") { type = NavType.StringType; nullable = true; defaultValue = null },
+                ),
+            ) { entry ->
+                // tab — orqaga tugmasisiz
+                ChatScreen(
+                    openStudentId = entry.arguments?.getString("studentId"),
+                    openConversationId = entry.arguments?.getString("conversationId"),
+                    onThreadOpenChange = { chatThreadOpen = it },
+                )
+            }
             composable(
                 route = "$POST_AD?adId={adId}",
                 arguments = listOf(navArgument("adId") { type = NavType.StringType; nullable = true; defaultValue = null }),
@@ -276,7 +345,22 @@ fun StudentShell(onLoggedOut: () -> Unit) {
                     showMyBusiness = false,
                 )
             }
-            composable(STUDENTS) { StudentsScreen(onBack = { nav.popSafe() }) }
+            composable(
+                route = "$CONNECTIONS?tab={tab}",
+                arguments = listOf(
+                    navArgument("tab") { type = NavType.StringType; nullable = true; defaultValue = null },
+                ),
+            ) { entry ->
+                ConnectionsScreen(
+                    onBack = { nav.popSafe() },
+                    // Chat tab'i suhbatni o'zi ochadi (`POST /v1/conversations` idempotent).
+                    onOpenChat = { studentId, _ -> openChatWith(studentId) },
+                    // Home'dagi tugmalar kerakli bo'limni darrov ochadi. Nomi noto'g'ri
+                    // kelsa — sukut bo'yicha "Do'stlar" (ekranning o'z boshlang'ich holati).
+                    initialTab = entry.arguments?.getString("tab")
+                        ?.let { name -> ConnectionsTab.entries.firstOrNull { it.name == name } },
+                )
+            }
             composable(NOTIFICATIONS) { NotificationsScreen(onBack = { nav.popSafe() }) }
             composable(CLUBS) { ClubsScreen(onBack = { nav.popSafe() }) }
             composable(EDIT_PROFILE) { EditProfileScreen(onBack = { nav.popSafe() }) }
@@ -292,7 +376,10 @@ fun StudentShell(onLoggedOut: () -> Unit) {
         // Klaviatura ochilganda pastki panel ko'rsatilmaydi: kontent klaviatura ustiga
         // ko'tarilgani uchun panel matn maydonining tagida osilib qolardi va joy egallardi.
         val keyboardOpen = WindowInsets.ime.getBottom(LocalDensity.current) > 0
-        if (current in tabRoutes && !keyboardOpen) {
+        // Ochilgan suhbat — to'liq ekran: panel yozish maydonining ustida turib joy egallardi.
+        // `current` sharti bayroq boshqa ekranga o'tilganda osilib qolmasligi uchun.
+        val inChatThread = chatThreadOpen && current == StudentTab.CHAT.route
+        if (current in tabRoutes && !keyboardOpen && !inChatThread) {
             BottomBar(
                 current = current,
                 onSelect = selectTab,

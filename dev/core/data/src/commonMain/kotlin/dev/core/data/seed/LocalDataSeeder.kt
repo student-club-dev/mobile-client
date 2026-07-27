@@ -26,7 +26,6 @@ class LocalDataSeeder(
         seedJobs()
         seedStudents()
         seedAds()
-        seedChat()
         seedNotifications()
         seedClubs()
     }
@@ -128,22 +127,6 @@ class LocalDataSeeder(
                 "2 xonali, metroga yaqin, student uchun qulay.", "", "seed-user", "3 soat oldin")
             q.upsert("ad-2", "SALE", "MacBook Air M1 sotiladi", "Texnika", "9.5 mln",
                 "Holati a'lo, 100% batareya sikli past.", "", "seed-user", "kecha")
-        }
-    }
-
-    private fun seedChat() {
-        val q = db.chatQueries
-        if (q.countConversations().executeAsOne() > 0) return
-        q.transaction {
-            q.upsertConversation("c-dilnoza", "Dilnoza Rahimova", "D", "PEER", true.toDb(), "Konspekt bormi? 😊", "14:22", 2)
-            q.upsertConversation("c-sardor", "Sardor Aliyev", "S", "PEER", false.toDb(), "Rahmat, ko‘rishguncha!", "12:05", 0)
-            q.upsertConversation("c-uzumhr", "Uzum Market · HR", "U", "HR", false.toDb(), "Suhbatga taklif qilamiz", "Kecha", 1)
-
-            // Dilnoza suhbati xabarlari
-            q.insertMessage("c-dilnoza-1", "c-dilnoza", "Salom! Diskret matematikadan konspekt bormi? 😊", false.toDb(), "14:20", 1000)
-            q.insertMessage("c-dilnoza-2", "c-dilnoza", "Ha, bor! Hozir yuboraman 👍", true.toDb(), "14:21", 2000)
-            q.insertMessage("c-dilnoza-3", "c-dilnoza", "Ertaga kutubxonada uchrashamizmi?", false.toDb(), "14:22", 3000)
-            q.insertMessage("c-dilnoza-4", "c-dilnoza", "Albatta, soat 10 da 👌", true.toDb(), "14:22", 4000)
         }
     }
 

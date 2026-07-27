@@ -3,8 +3,10 @@ package dev.feature.chat.presentation
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,7 +26,9 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.AlertDialog
@@ -33,6 +37,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.ReadOnlyComposable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -47,6 +53,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.core.uikit.components.AppIcons
 import dev.core.uikit.components.ScCircleButton
 import dev.core.uikit.components.ScHeader
 import dev.core.uikit.components.ScHeaderTitle
@@ -57,50 +64,102 @@ import dev.core.uikit.components.StatusBarAppearance
 import dev.core.uikit.components.scCard
 import dev.core.uikit.components.scStyle
 import dev.core.uikit.theme.Sc
-import dev.feature.chat.domain.model.Conversation
-import dev.feature.chat.domain.model.Message
+import dev.feature.chat.domain.model.ConversationItem
+import dev.feature.chat.domain.model.MessageStatus
+import dev.feature.connections.domain.model.ReportReason
+import kotlinx.coroutines.delay
 import org.koin.compose.viewmodel.koinViewModel
-import androidx.compose.runtime.ReadOnlyComposable
 
 /**
  * Suhbatlar. Ikki rejimda ishlaydi:
  *
  * - **Tab** (`onBack == null`) — pastki navigatsiyaning "Xabarlar" tab'i.
  * - **Ochilgan ekran** (`onBack != null`) — stack'ka qo'yilganda, sarlavhada orqaga tugmasi.
+ *
+ * [openStudentId] berilsa (Do'stlar ekranidan "Xabar" bosilganda) suhbat darhol ochiladi:
+ * `POST /v1/conversations` idempotent, shuning uchun mavjudini qidirish shart emas.
+ * [openConversationId] — push bosilganda keladi (`data.conversationId`, `chat.md` §10).
  */
 @Composable
-fun ChatScreen(onBack: (() -> Unit)? = null, vm: ChatViewModel = koinViewModel()) {
+fun ChatScreen(
+    onBack: (() -> Unit)? = null,
+    openStudentId: String? = null,
+    openConversationId: String? = null,
+    /**
+     * Suhbat ochildi/yopildi. Suhbatga kirish **navigatsiya emas** — u shu ekranning ichki
+     * holati (`state.selected`), route o'zgarmaydi. Shuning uchun karkas (`StudentShell`)
+     * o'zi bila olmaydi va pastki panelni yashirish uchun shu xabar kerak.
+     */
+    onThreadOpenChange: (Boolean) -> Unit = {},
+    vm: ChatViewModel = koinViewModel(),
+) {
     val state by vm.state.collectAsStateWithLifecycle()
 
-    if (state.selected == null) {
-        ConversationList(
-            conversations = state.conversations,
-            archivedConversations = state.archivedConversations,
-            onBack = onBack,
-            onOpen = vm::open,
-            onDelete = { vm.deleteConversation(it.id) },
-            onArchive = { vm.setArchived(it.id, true) },
-            onUnarchive = { vm.setArchived(it.id, false) },
-        )
-    } else {
-        ChatThread(
-            state.selected!!, state.messages, state.draft,
-            onBack = vm::close,
-            onDraft = vm::onDraft,
-            onSend = vm::send,
-            onDeleteMessage = vm::deleteMessage,
-            onClearMessages = vm::clearMessages,
-        )
+    val threadOpen = state.selected != null
+    LaunchedEffect(threadOpen) { onThreadOpenChange(threadOpen) }
+
+    LaunchedEffect(openStudentId) {
+        if (openStudentId != null) vm.openWithStudent(openStudentId)
+    }
+    LaunchedEffect(openConversationId) {
+        if (openConversationId != null) vm.openConversation(openConversationId)
+    }
+
+    Box(Modifier.fillMaxSize()) {
+        if (state.selected == null) {
+            ConversationList(
+                conversations = state.conversations,
+                archivedConversations = state.archivedConversations,
+                onBack = onBack,
+                onOpen = vm::open,
+                onArchive = { vm.setArchived(it.id, true) },
+                onUnarchive = { vm.setArchived(it.id, false) },
+                onBlock = { vm.block(it.other.id) },
+                onReport = { c, reason, note -> vm.reportStudent(c.other.id, reason, note) },
+            )
+        } else {
+            ChatThread(
+                conversation = state.selected!!,
+                state = state,
+                onBack = vm::close,
+                onDraft = vm::onDraft,
+                onSend = vm::send,
+                onRetry = vm::retry,
+                onLoadOlder = vm::loadOlder,
+                onMarkRead = vm::markRead,
+                onDisconnect = { vm.disconnect(it) },
+                onBlock = { vm.block(it) },
+                onReportStudent = { id, reason, note -> vm.reportStudent(id, reason, note) },
+                onReportMessage = { id, reason, note -> vm.reportMessage(id, reason, note) },
+            )
+        }
+
+        // Bir martalik xabar — 2.5 s dan keyin o'zi yo'qoladi.
+        val message = state.message
+        if (message != null) {
+            LaunchedEffect(message) {
+                delay(2_500)
+                vm.messageShown()
+            }
+            Box(
+                Modifier.align(Alignment.BottomCenter)
+                    .navigationBarsPadding()
+                    .padding(horizontal = Sc.ScreenPadding, vertical = 90.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(Sc.Ink.copy(alpha = 0.92f))
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+            ) { ScText(message, 13.5f, FontWeight.SemiBold, Color.White) }
+        }
     }
 }
 
 /** Suhbat avatarlari navbat bilan uch tint ranggida. */
 private val avatarVisuals: List<Pair<Color, Color>>
     @Composable @ReadOnlyComposable get() = listOf(
-    Sc.TintViolet to Sc.Violet,
-    Sc.TintBlue to Sc.Brand,
-    Sc.TintGreenDeep to Sc.Success,
-)
+        Sc.TintViolet to Sc.Violet,
+        Sc.TintBlue to Sc.Brand,
+        Sc.TintGreenDeep to Sc.Success,
+    )
 
 // ---------------------------------------------------------------------------
 // Suhbatlar ro'yxati
@@ -108,17 +167,19 @@ private val avatarVisuals: List<Pair<Color, Color>>
 
 @Composable
 private fun ConversationList(
-    conversations: List<Conversation>,
-    archivedConversations: List<Conversation>,
+    conversations: List<ConversationItem>,
+    archivedConversations: List<ConversationItem>,
     onBack: (() -> Unit)?,
-    onOpen: (Conversation) -> Unit,
-    onDelete: (Conversation) -> Unit,
-    onArchive: (Conversation) -> Unit,
-    onUnarchive: (Conversation) -> Unit,
+    onOpen: (ConversationItem) -> Unit,
+    onArchive: (ConversationItem) -> Unit,
+    onUnarchive: (ConversationItem) -> Unit,
+    onBlock: (ConversationItem) -> Unit,
+    onReport: (ConversationItem, ReportReason, String?) -> Unit,
 ) {
     var showArchived by remember { mutableStateOf(false) }
-    var conversationForAction by remember { mutableStateOf<Conversation?>(null) }
-    var conversationToDelete by remember { mutableStateOf<Conversation?>(null) }
+    var actionFor by remember { mutableStateOf<ConversationItem?>(null) }
+    var blockFor by remember { mutableStateOf<ConversationItem?>(null) }
+    var reportFor by remember { mutableStateOf<ConversationItem?>(null) }
     val list = if (showArchived) archivedConversations else conversations
 
     Column(Modifier.fillMaxSize().background(Sc.Bg)) {
@@ -129,7 +190,6 @@ private fun ConversationList(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 if (showArchived || onBack != null) {
-                    // Spetsifikatsiya: gradient topbar'da orqaga — oq aylana + `‹` brandDark.
                     ScCircleButton(
                         ScIcons.ChevronLeft,
                         { if (showArchived) showArchived = false else onBack?.invoke() },
@@ -145,7 +205,10 @@ private fun ConversationList(
 
         if (list.isEmpty()) {
             Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
-                ScText(if (showArchived) "Arxiv bo'sh" else "Suhbatlar yo'q", 14f, FontWeight.Medium, Sc.Muted)
+                ScText(
+                    if (showArchived) "Arxiv bo'sh" else "Suhbatlar yo'q.\n\"Do'stlar\" bo'limidan yozishni boshlang.",
+                    14f, FontWeight.Medium, Sc.Muted, lineHeight = 21f,
+                )
             }
         } else {
             LazyColumn(
@@ -157,59 +220,77 @@ private fun ConversationList(
                 ),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                items(list, key = { it.id }) { c ->
-                    val index = list.indexOf(c).coerceAtLeast(0)
-                    ConversationRow(c, index, onClick = { onOpen(c) }, onLongPress = { conversationForAction = c })
+                itemsIndexed(list, key = { _, c -> c.id }) { index, c ->
+                    ConversationRow(c, index, onClick = { onOpen(c) }, onLongPress = { actionFor = c })
                 }
             }
         }
     }
 
-    // Uzoq bosishda amallar (arxivlash / o'chirish)
-    val action = conversationForAction
+    val action = actionFor
     if (action != null) {
         AlertDialog(
-            onDismissRequest = { conversationForAction = null },
-            title = { Text(action.peerName, style = scStyle(17f, FontWeight.ExtraBold)) },
+            onDismissRequest = { actionFor = null },
+            title = { Text(action.other.displayName, style = scStyle(17f, FontWeight.ExtraBold)) },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     ActionRow(
                         if (action.archived) ScIcons.ChevronRight else ScIcons.Archive,
                         if (action.archived) "Arxivdan chiqarish" else "Arxivlash",
                     ) {
                         if (action.archived) onUnarchive(action) else onArchive(action)
-                        conversationForAction = null
+                        actionFor = null
                     }
-                    ActionRow(ScIcons.Close, "O'chirish", danger = true) {
-                        conversationToDelete = action
-                        conversationForAction = null
+                    ActionRow(ScIcons.Users, "Bloklash", danger = true) {
+                        blockFor = action
+                        actionFor = null
+                    }
+                    ActionRow(ScIcons.Bell, "Shikoyat qilish", danger = true) {
+                        reportFor = action
+                        actionFor = null
                     }
                 }
             },
             confirmButton = {},
             dismissButton = {
-                TextButton(onClick = { conversationForAction = null }) {
+                TextButton(onClick = { actionFor = null }) {
                     Text("Bekor", style = scStyle(14f, FontWeight.Bold, Sc.InkSoft))
                 }
             },
         )
     }
 
-    val target = conversationToDelete
-    if (target != null) {
+    val blockTarget = blockFor
+    if (blockTarget != null) {
         ConfirmDialog(
-            title = "Suhbatni o'chirish",
-            message = "\"${target.peerName}\" bilan suhbat va barcha xabarlar o'chiriladi. Davom etasizmi?",
-            confirmLabel = "O'chirish",
-            onConfirm = { onDelete(target); conversationToDelete = null },
-            onDismiss = { conversationToDelete = null },
+            title = "Bloklash",
+            // Suhbatni o'chirish endpointi yo'q — blok esa bog'lanishni server tomonda uzadi.
+            message = "${blockTarget.other.displayName} bloklanadi: bog'lanish o'chadi va " +
+                "ikkalangiz bir-biringizga yozolmaysiz.",
+            confirmLabel = "Bloklash",
+            onConfirm = { onBlock(blockTarget); blockFor = null },
+            onDismiss = { blockFor = null },
+        )
+    }
+
+    val reportTarget = reportFor
+    if (reportTarget != null) {
+        ReportDialog(
+            title = "Shikoyat: ${reportTarget.other.displayName}",
+            onSend = { reason, note -> onReport(reportTarget, reason, note); reportFor = null },
+            onDismiss = { reportFor = null },
         )
     }
 }
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun ConversationRow(c: Conversation, index: Int, onClick: () -> Unit, onLongPress: () -> Unit) {
+private fun ConversationRow(
+    c: ConversationItem,
+    index: Int,
+    onClick: () -> Unit,
+    onLongPress: () -> Unit,
+) {
     val (tint, accent) = avatarVisuals[index.mod(avatarVisuals.size)]
     Row(
         Modifier.fillMaxWidth()
@@ -221,9 +302,10 @@ private fun ConversationRow(c: Conversation, index: Int, onClick: () -> Unit, on
     ) {
         Box {
             ScIconTile(tint, size = 50.dp, radius = 25.dp) {
-                ScText(c.peerInitial, 19f, FontWeight.ExtraBold, accent)
+                ScText(c.other.initial, 19f, FontWeight.ExtraBold, accent)
             }
-            if (c.online) {
+            // Onlayn holati SHU ro'yxatda haqiqiy (Redis'dan) — qidiruvdagidan farqli.
+            if (c.other.online) {
                 Box(
                     Modifier.align(Alignment.BottomEnd)
                         .padding(1.dp)
@@ -235,12 +317,15 @@ private fun ConversationRow(c: Conversation, index: Int, onClick: () -> Unit, on
             }
         }
         Column(Modifier.weight(1f)) {
-            ScText(c.peerName, 15.5f, FontWeight.ExtraBold, Sc.Ink, maxLines = 1)
+            ScText(c.other.displayName, 15.5f, FontWeight.ExtraBold, Sc.Ink, maxLines = 1)
             Spacer(Modifier.height(2.dp))
-            ScText(c.lastMessage, 13.5f, FontWeight.Medium, Sc.Muted, maxLines = 1)
+            ScText(
+                c.lastMessage?.body ?: "Xabar yozing…",
+                13.5f, FontWeight.Medium, Sc.Muted, maxLines = 1,
+            )
         }
         Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(5.dp)) {
-            ScText(c.lastTime, 12f, FontWeight.SemiBold, Sc.MutedLight, maxLines = 1)
+            ScText(ChatFormat.listStamp(c.conversation.lastMessageAt), 12f, FontWeight.SemiBold, Sc.MutedLight, maxLines = 1)
             if (c.unreadCount > 0) {
                 Box(
                     Modifier.size(19.dp).background(Sc.Brand, RoundedCornerShape(percent = 50)),
@@ -257,80 +342,193 @@ private fun ConversationRow(c: Conversation, index: Int, onClick: () -> Unit, on
 
 @Composable
 private fun ChatThread(
-    conversation: Conversation,
-    messages: List<Message>,
-    draft: String,
+    conversation: ConversationItem,
+    state: ChatUiState,
     onBack: () -> Unit,
     onDraft: (String) -> Unit,
     onSend: () -> Unit,
-    onDeleteMessage: (String) -> Unit,
-    onClearMessages: () -> Unit,
+    onRetry: (String) -> Unit,
+    onLoadOlder: () -> Unit,
+    onMarkRead: () -> Unit,
+    onDisconnect: (String) -> Unit,
+    onBlock: (String) -> Unit,
+    onReportStudent: (String, ReportReason, String?) -> Unit,
+    onReportMessage: (String, ReportReason, String?) -> Unit,
 ) {
-    var messageToDelete by remember { mutableStateOf<Message?>(null) }
-    var showClearConfirm by remember { mutableStateOf(false) }
+    var messageMenu by remember { mutableStateOf<ChatMessageUi?>(null) }
+    var reportMessageFor by remember { mutableStateOf<String?>(null) }
+    var showMenu by remember { mutableStateOf(false) }
+    var reportStudent by remember { mutableStateOf(false) }
+    var confirmDisconnect by remember { mutableStateOf(false) }
+    var confirmBlock by remember { mutableStateOf(false) }
 
     val listState = rememberLazyListState()
+    val messages = state.messages
     val imeBottom = WindowInsets.ime.getBottom(LocalDensity.current)
+
+    // Yangi xabar kelganda / klaviatura ochilganda pastga suriladi.
     LaunchedEffect(messages.size, imeBottom) {
         if (messages.isNotEmpty()) listState.animateScrollToItem(messages.size - 1)
     }
+    // Ekran ochiq turganda kelgan xabarlar darhol o'qilgan hisoblanadi.
+    LaunchedEffect(messages.size) { onMarkRead() }
+
+    // Tepaga yetganda eski xabarlar yuklanadi (kursorli sahifalash, `?before=`).
+    val atTop by remember {
+        derivedStateOf { listState.firstVisibleItemIndex <= 1 && messages.isNotEmpty() }
+    }
+    LaunchedEffect(atTop) { if (atTop) onLoadOlder() }
 
     Column(Modifier.fillMaxSize().background(Sc.ChatBg).imePadding()) {
-        ChatThreadHeader(conversation, onBack, onMenu = { showClearConfirm = true })
+        ChatThreadHeader(
+            conversation = conversation,
+            typing = state.peerTyping,
+            realtime = state.realtime,
+            onBack = onBack,
+            onMenu = { showMenu = true },
+        )
 
         Box(Modifier.fillMaxWidth().weight(1f)) {
             // Fon — brend rangining 6% shaffofligidagi nuqtali pattern (22dp qadam).
             DottedBackground()
+            if (messages.isEmpty()) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    ScText("Xabar yozib, suhbatni boshlang", 13.5f, FontWeight.Medium, Sc.Muted)
+                }
+            }
             LazyColumn(
                 state = listState,
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(horizontal = 14.dp, vertical = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                if (messages.isNotEmpty()) {
-                    item("date") {
-                        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                            Box(
-                                Modifier.background(Sc.Ink.copy(alpha = 0.12f), RoundedCornerShape(20.dp))
-                                    .padding(horizontal = 13.dp, vertical = 4.dp),
-                            ) { ScText("Bugun", 12f, FontWeight.Bold, Sc.ChipInk) }
-                        }
-                    }
-                }
                 items(messages, key = { it.id }) { m ->
-                    MessageBubble(m, onLongPress = { messageToDelete = m })
+                    if (m.dayLabel != null) DaySeparator(m.dayLabel)
+                    MessageBubble(m, onLongPress = { messageMenu = m })
                 }
             }
         }
 
-        Composer(draft, onDraft, onSend)
+        Composer(state.draft, onDraft, onSend)
     }
 
-    val target = messageToDelete
-    if (target != null) {
-        ConfirmDialog(
-            title = "Xabarni o'chirish",
-            message = "Bu xabarni o'chirmoqchimisiz?",
-            confirmLabel = "O'chirish",
-            onConfirm = { onDeleteMessage(target.id); messageToDelete = null },
-            onDismiss = { messageToDelete = null },
+    // --- Dialoglar ---------------------------------------------------------------------
+
+    val menuMessage = messageMenu
+    if (menuMessage != null) {
+        AlertDialog(
+            onDismissRequest = { messageMenu = null },
+            title = { Text("Xabar", style = scStyle(17f, FontWeight.ExtraBold)) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    if (menuMessage.status == MessageStatus.FAILED) {
+                        ActionRow(ScIcons.Return, "Qayta yuborish") {
+                            onRetry(menuMessage.id)
+                            messageMenu = null
+                        }
+                    }
+                    // Xabarni o'chirish/tahrirlash endpointi yo'q (chat.md §14) — faqat shikoyat.
+                    if (!menuMessage.outgoing) {
+                        ActionRow(ScIcons.Bell, "Shikoyat qilish", danger = true) {
+                            reportMessageFor = menuMessage.id
+                            messageMenu = null
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { messageMenu = null }) {
+                    Text("Yopish", style = scStyle(14f, FontWeight.Bold, Sc.InkSoft))
+                }
+            },
         )
     }
 
-    if (showClearConfirm) {
+    if (showMenu) {
+        AlertDialog(
+            onDismissRequest = { showMenu = false },
+            title = { Text(conversation.other.displayName, style = scStyle(17f, FontWeight.ExtraBold)) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    ActionRow(ScIcons.Close, "Bog'lanishni uzish") {
+                        showMenu = false
+                        confirmDisconnect = true
+                    }
+                    ActionRow(ScIcons.Users, "Bloklash", danger = true) {
+                        showMenu = false
+                        confirmBlock = true
+                    }
+                    ActionRow(ScIcons.Bell, "Shikoyat qilish", danger = true) {
+                        showMenu = false
+                        reportStudent = true
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { showMenu = false }) {
+                    Text("Bekor", style = scStyle(14f, FontWeight.Bold, Sc.InkSoft))
+                }
+            },
+        )
+    }
+
+    if (confirmDisconnect) {
         ConfirmDialog(
-            title = "Suhbatni tozalash",
-            message = "Bu suhbatdagi barcha xabarlar o'chiriladi. Davom etasizmi?",
-            confirmLabel = "Tozalash",
-            onConfirm = { onClearMessages(); showClearConfirm = false },
-            onDismiss = { showClearConfirm = false },
+            title = "Bog'lanishni uzish",
+            // Suhbat qoladi — tarix o'qiladi, lekin yangi xabar yozib bo'lmaydi (403).
+            message = "Bog'lanish uzilgach bu suhbatga yozolmaysiz, lekin eski xabarlar qoladi.",
+            confirmLabel = "Uzish",
+            onConfirm = { onDisconnect(conversation.other.id); confirmDisconnect = false },
+            onDismiss = { confirmDisconnect = false },
+        )
+    }
+
+    if (confirmBlock) {
+        ConfirmDialog(
+            title = "Bloklash",
+            message = "${conversation.other.displayName} bloklanadi: bog'lanish o'chadi va " +
+                "ikkalangiz bir-biringizga yozolmaysiz.",
+            confirmLabel = "Bloklash",
+            onConfirm = { onBlock(conversation.other.id); confirmBlock = false },
+            onDismiss = { confirmBlock = false },
+        )
+    }
+
+    if (reportStudent) {
+        ReportDialog(
+            title = "Shikoyat: ${conversation.other.displayName}",
+            onSend = { reason, note ->
+                onReportStudent(conversation.other.id, reason, note)
+                reportStudent = false
+            },
+            onDismiss = { reportStudent = false },
+        )
+    }
+
+    val reportedMessage = reportMessageFor
+    if (reportedMessage != null) {
+        ReportDialog(
+            title = "Xabar ustidan shikoyat",
+            onSend = { reason, note ->
+                onReportMessage(reportedMessage, reason, note)
+                reportMessageFor = null
+            },
+            onDismiss = { reportMessageFor = null },
         )
     }
 }
 
 /** Suhbat sarlavhasi — gradient, pastki burchaklari to'g'ri (dizaynda yumaloq emas). */
 @Composable
-private fun ChatThreadHeader(conversation: Conversation, onBack: () -> Unit, onMenu: () -> Unit) {
+private fun ChatThreadHeader(
+    conversation: ConversationItem,
+    typing: Boolean,
+    realtime: Boolean,
+    onBack: () -> Unit,
+    onMenu: () -> Unit,
+) {
     StatusBarAppearance(darkIcons = false)
     Column(
         Modifier.fillMaxWidth()
@@ -349,8 +547,8 @@ private fun ChatThreadHeader(conversation: Conversation, onBack: () -> Unit, onM
                     Modifier.size(44.dp)
                         .background(Color.White.copy(alpha = 0.9f), RoundedCornerShape(percent = 50)),
                     contentAlignment = Alignment.Center,
-                ) { ScText(conversation.peerInitial, 18f, FontWeight.ExtraBold, Sc.Violet) }
-                if (conversation.online) {
+                ) { ScText(conversation.other.initial, 18f, FontWeight.ExtraBold, Sc.Violet) }
+                if (conversation.other.online) {
                     Box(
                         Modifier.align(Alignment.BottomEnd)
                             .size(12.dp)
@@ -361,13 +559,19 @@ private fun ChatThreadHeader(conversation: Conversation, onBack: () -> Unit, onM
                 }
             }
             Column(Modifier.weight(1f)) {
-                ScText(conversation.peerName, 17f, FontWeight.ExtraBold, Color.White, letterSpacing = -0.2f, maxLines = 1)
                 ScText(
-                    if (conversation.online) "online" else "oflayn",
-                    13f, FontWeight.Medium, Color.White.copy(alpha = 0.9f), maxLines = 1,
+                    conversation.other.displayName, 17f, FontWeight.ExtraBold, Color.White,
+                    letterSpacing = -0.2f, maxLines = 1,
                 )
+                val status = when {
+                    typing -> "yozmoqda…"
+                    conversation.other.online -> "onlayn"
+                    // Real-time kanal yopiq bo'lsa onlayn holati eskirgan bo'lishi mumkin.
+                    !realtime -> "ulanmoqda…"
+                    else -> ChatFormat.lastSeen(conversation.other.lastSeenAt)
+                }
+                ScText(status, 13f, FontWeight.Medium, Color.White.copy(alpha = 0.9f), maxLines = 1)
             }
-            HeaderGlassButton(ScIcons.PhoneCall, "Qo'ng'iroq") {}
             HeaderGlassButton(ScIcons.DotsVertical, "Menyu", onMenu)
         }
     }
@@ -408,9 +612,19 @@ private fun DottedBackground() {
     }
 }
 
+@Composable
+private fun DaySeparator(label: String) {
+    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+        Box(
+            Modifier.background(Sc.Ink.copy(alpha = 0.12f), RoundedCornerShape(20.dp))
+                .padding(horizontal = 13.dp, vertical = 4.dp),
+        ) { ScText(label, 12f, FontWeight.Bold, Sc.ChipInk) }
+    }
+}
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun MessageBubble(message: Message, onLongPress: () -> Unit) {
+private fun MessageBubble(message: ChatMessageUi, onLongPress: () -> Unit) {
     val align = if (message.outgoing) Alignment.CenterEnd else Alignment.CenterStart
     Box(Modifier.fillMaxWidth(), contentAlignment = align) {
         // Dumcha o'z tomonida: chiquvchi 20/20/6/20, kiruvchi 20/20/20/6.
@@ -440,12 +654,22 @@ private fun MessageBubble(message: Message, onLongPress: () -> Unit) {
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                ScText(
-                    message.time, 11f, FontWeight.SemiBold,
-                    if (message.outgoing) Color.White.copy(alpha = 0.85f) else Sc.MutedLight,
-                )
-                if (message.outgoing) {
-                    Icon(ScIcons.DoubleCheck, null, tint = Color.White, modifier = Modifier.size(15.dp))
+                if (message.status == MessageStatus.FAILED) {
+                    ScText("yuborilmadi · qayta urinish", 11f, FontWeight.SemiBold, Color.White)
+                } else {
+                    ScText(
+                        message.time, 11f, FontWeight.SemiBold,
+                        if (message.outgoing) Color.White.copy(alpha = 0.85f) else Sc.MutedLight,
+                    )
+                }
+                if (message.outgoing && message.status != MessageStatus.FAILED) {
+                    // Bitta belgicha — yuborilmoqda; ikkita — yetkazildi; yorqin — o'qildi.
+                    Icon(
+                        if (message.status == MessageStatus.SENDING) AppIcons.Check else ScIcons.DoubleCheck,
+                        null,
+                        tint = Color.White.copy(alpha = if (message.read) 1f else 0.6f),
+                        modifier = Modifier.size(15.dp),
+                    )
                 }
             }
         }
@@ -470,7 +694,9 @@ private fun Composer(draft: String, onDraft: (String) -> Unit, onSend: () -> Uni
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                Icon(ScIcons.Paperclip, "Biriktirish", tint = Sc.Muted, modifier = Modifier.size(21.dp))
+                // Rasm/fayl/ovoz — backendда hali yo'q (v1 da faqat TEXT), shuning uchun
+                // biriktirish ikonasi dekorativ.
+                Icon(ScIcons.Paperclip, null, tint = Sc.Muted, modifier = Modifier.size(21.dp))
                 Box(Modifier.weight(1f)) {
                     if (draft.isEmpty()) {
                         ScText("Xabar yozing…", 15f, FontWeight.Medium, Sc.NavIdle, maxLines = 1)
@@ -492,7 +718,6 @@ private fun Composer(draft: String, onDraft: (String) -> Unit, onSend: () -> Uni
                     .clickable(onClick = onSend),
                 contentAlignment = Alignment.Center,
             ) {
-                // Matn kiritilmaganda — mikrofon, kiritilganda jo'natish belgisi.
                 Icon(
                     if (draft.isBlank()) ScIcons.Mic else ScIcons.Return,
                     "Yuborish", tint = Color.White, modifier = Modifier.size(22.dp),
@@ -513,7 +738,7 @@ private fun ActionRow(
     danger: Boolean = false,
     onClick: () -> Unit,
 ) {
-    val tint = if (danger) Color(0xFFDC2626) else Sc.Brand
+    val tint = if (danger) Sc.Danger else Sc.Brand
     Row(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable(onClick = onClick)
             .padding(vertical = 10.dp, horizontal = 4.dp),
@@ -539,7 +764,7 @@ private fun ConfirmDialog(
         text = { Text(message, style = scStyle(14f, FontWeight.Medium, Sc.InkSoft, lineHeight = 20f)) },
         confirmButton = {
             TextButton(onClick = onConfirm) {
-                Text(confirmLabel, style = scStyle(14f, FontWeight.ExtraBold, Color(0xFFDC2626)))
+                Text(confirmLabel, style = scStyle(14f, FontWeight.ExtraBold, Sc.Danger))
             }
         },
         dismissButton = {
@@ -549,3 +774,75 @@ private fun ConfirmDialog(
         },
     )
 }
+
+/** Shikoyat dialogi — sabab (majburiy) + ixtiyoriy izoh (≤1000 belgi). */
+@Composable
+private fun ReportDialog(
+    title: String,
+    onSend: (ReportReason, String?) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var reason by remember { mutableStateOf(ReportReason.SPAM) }
+    var note by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title, style = scStyle(17f, FontWeight.ExtraBold)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(
+                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(7.dp),
+                ) {
+                    ReportReason.entries.forEach { r ->
+                        Box(
+                            Modifier.clip(RoundedCornerShape(999.dp))
+                                .background(if (reason == r) Sc.Brand else Sc.Chip)
+                                .clickable { reason = r }
+                                .padding(horizontal = 14.dp, vertical = 7.dp),
+                        ) {
+                            ScText(
+                                r.label, 12.5f, FontWeight.Bold,
+                                if (reason == r) Color.White else Sc.ChipInk, maxLines = 1,
+                            )
+                        }
+                    }
+                }
+                Box(
+                    Modifier.fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Sc.FieldBg)
+                        .border(1.dp, Sc.Border, RoundedCornerShape(12.dp))
+                        .padding(horizontal = 12.dp, vertical = 11.dp),
+                ) {
+                    if (note.isEmpty()) ScText("Izoh (ixtiyoriy)", 13.5f, FontWeight.Medium, Sc.NavIdle)
+                    BasicTextField(
+                        value = note,
+                        onValueChange = { if (it.length <= 1000) note = it },
+                        textStyle = scStyle(13.5f, FontWeight.Medium, Sc.Ink),
+                        cursorBrush = SolidColor(Sc.Brand),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onSend(reason, note.takeIf { it.isNotBlank() }) }) {
+                Text("Yuborish", style = scStyle(14f, FontWeight.ExtraBold, Sc.Danger))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Bekor", style = scStyle(14f, FontWeight.Bold, Sc.InkSoft))
+            }
+        },
+    )
+}
+
+private val ReportReason.label: String
+    get() = when (this) {
+        ReportReason.SPAM -> "Spam"
+        ReportReason.SCAM -> "Firibgarlik"
+        ReportReason.HARASSMENT -> "Haqorat"
+        ReportReason.INAPPROPRIATE -> "Nomaqbul"
+        ReportReason.OTHER -> "Boshqa"
+    }

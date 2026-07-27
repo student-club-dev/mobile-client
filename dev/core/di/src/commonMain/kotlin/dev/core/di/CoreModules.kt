@@ -59,10 +59,13 @@ const val DEFAULT_BASE_URL = DEV_BASE_URL
 /**
  * Offline-first sinxronlash yoqilganmi (B4).
  *
- * `student-club.json` (talaba API'si) **auth**, **profil**, **geo**, **media** va "Siz uchun"
- * feed'ini (**catalog** + **discounts**) beradi. Ishlar/talabalar/universitetlar/klublar uchun
- * endpoint hali yo'q — ular local bazadan (seed) ishlaydi, shuning uchun bu umumiy bayroq
- * `false` bo'lib qoladi; feed o'zining [DISCOUNTS_REMOTE_ENABLED] bayrog'idan yuradi.
+ * `student-club.json` (talaba API'si) **auth**, **profil**, **geo**, **media**, "Siz uchun"
+ * feed'ini (**catalog** + **discounts**), shuningdek **connections** va **chat** ni beradi.
+ * Ishlar/talabalar ro'yxati/universitetlar/klublar uchun endpoint hali yo'q — ular local
+ * bazadan (seed) ishlaydi, shuning uchun bu umumiy bayroq `false` bo'lib qoladi.
+ *
+ * Bayroqqa **bog'liq bo'lmaganlari**: feed ([DISCOUNTS_REMOTE_ENABLED]), profil,
+ * bog'lanishlar va chat — ular doim backenddan ishlaydi.
  */
 const val REMOTE_SYNC_ENABLED = false
 

@@ -94,8 +94,11 @@ dependencies {
     releaseImplementation(libs.chucker.noop)
 
     // Firebase — google-services.json orqali sozlanadi. Auth uchun EMAS (u backendda):
-    // BOM faqat chat Firestore'i uchun umumiy versiyalarni beradi.
+    // faqat **push** (FCM) uchun — `StudentClubMessagingService` va qurilma tokeni.
     implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.messaging)
+    // Push tokenini bog'lash (`PushTokenBridge`) shu modulda.
+    implementation(projects.dev.feature.notifications.data)
 
     implementation(libs.androidx.core.ktx)
     // Android 12+ tizim splash ekrani (`installSplashScreen()` MainActivity'da).

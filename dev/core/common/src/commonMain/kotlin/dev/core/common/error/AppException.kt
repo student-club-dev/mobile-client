@@ -25,13 +25,19 @@ sealed class AppException(
     class Unauthorized(cause: Throwable? = null) :
         AppException("Sessiya tugagan. Iltimos, qaytadan kiring.", cause)
 
-    /** Ruxsat yo'q (403). */
-    class PermissionDenied(cause: Throwable? = null) :
-        AppException("Bu amal uchun ruxsat yo'q.", cause)
+    /**
+     * Ruxsat yo'q (403).
+     *
+     * [reason] — backend konvertidagi `message`. Berilsa foydalanuvchi aynan shuni ko'radi:
+     * masalan chat'da `403 NOT_CONNECTED` uchun "Bu foydalanuvchi bilan yozisha olmaysiz"
+     * umumiy "ruxsat yo'q" dan ancha aniqroq.
+     */
+    class PermissionDenied(cause: Throwable? = null, val reason: String? = null) :
+        AppException(reason ?: "Bu amal uchun ruxsat yo'q.", cause)
 
-    /** Ma'lumot topilmadi (404). */
-    class NotFound(cause: Throwable? = null) :
-        AppException("Ma'lumot topilmadi.", cause)
+    /** Ma'lumot topilmadi (404). [reason] — backend bergan aniqroq matn (bo'lsa). */
+    class NotFound(cause: Throwable? = null, val reason: String? = null) :
+        AppException(reason ?: "Ma'lumot topilmadi.", cause)
 
     /** Server xatosi (5xx). */
     class Server(val code: Int? = null, cause: Throwable? = null) :

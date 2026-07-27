@@ -19,6 +19,7 @@ import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.defaultRequest
 import io.ktor.client.plugins.logging.LogLevel
 import io.ktor.client.plugins.logging.Logging
+import io.ktor.client.plugins.websocket.WebSockets
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
@@ -140,6 +141,27 @@ private data class TokensResponse(
 )
 
 /**
+ * **WebSocket klienti** — chat real-time kanali uchun (`{HOST}/socket.io/`, Socket.IO).
+ *
+ * Nega alohida klient (ilovaning umumiy klienti EMAS):
+ * - [EnvelopeUnwrapPlugin] har javob tanasini `BaseResponse` deb o'qishga urinadi — WS
+ *   handshake javobi JSON emas, ya'ni plagin uni buzardi;
+ * - `expectSuccess = true` handshake'ning `101 Switching Protocols` javobini xato deb bilardi;
+ * - `Auth` plagini (Bearer + refresh) WS uchun keraksiz — token handshake so'roviga qo'lda
+ *   qo'shiladi (qarang `SocketIoClient`), chunki Socket.IO uni CONNECT paketida ham kutadi.
+ *
+ * `pingIntervalMillis` **berilmaydi**: Engine.IO o'zining matnli `2`/`3` ping-pong'ini yuritadi
+ * (qarang `SocketIoClient`), ustiga protokol darajasidagi ping qo'shish ortiqcha.
+ */
+fun createWebSocketClient(): HttpClient = platformHttpClient(debugInterceptors = false) {
+    install(WebSockets)
+    install(HttpTimeout) {
+        // WS sessiyasi uzoq yashaydi — so'rov/soket chegaralari qo'yilmaydi, faqat ulanish.
+        connectTimeoutMillis = CONNECT_TIMEOUT_MS
+    }
+}
+
+/**
  * Tashqi (uchinchi tomon) xizmatlar uchun klient — masalan OpenStreetMap Nominatim.
  *
  * Ilovaning umumiy klientidan farqi: **Bearer token qo'shmaydi** va bazaviy manzili yo'q.
@@ -168,4 +190,15 @@ private const val REQUEST_TIMEOUT_MS = 15_000L
 private const val SOCKET_TIMEOUT_MS = 15_000L
 
 /** Platformaga xos HTTP engine (Android: OkHttp, iOS: Darwin). */
-expect fun platformHttpClient(config: HttpClientConfig<*>.() -> Unit): HttpClient
+/**
+ * Platforma engine'i bilan klient quradi.
+ *
+ * [debugInterceptors] — Android'dagi debug HTTP inspektorlari ([OkHttpInterceptors], masalan
+ * Chucker) qo'shilsinmi. **WebSocket klienti uchun `false`**: ular application-level
+ * interceptor bo'lgani uchun `101 Switching Protocols` javobining tanasini almashtiradi va
+ * upgrade buziladi. Ustiga, HTTP inspektorining WS kanalida ishi ham yo'q.
+ */
+expect fun platformHttpClient(
+    debugInterceptors: Boolean = true,
+    config: HttpClientConfig<*>.() -> Unit,
+): HttpClient

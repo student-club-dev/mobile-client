@@ -129,8 +129,10 @@ class DatabaseSchemaTest {
         // 12.sqm — e'lon jinsi (kiyim uchun Erkak/Ayol), 13.sqm — e'lon koordinatasi (xarita),
         // 14.sqm — e'lonning to'rt turi (chegirma/ijara/xizmat/ish): ListingEntity qayta qurildi,
         // turga xos maydonlar detailsJson ga ko'chdi, 15.sqm — sessiya backend tokenlariga
-        // ko'chdi: UserEntity.userId olib tashlandi, `uid` = JWT `sub`.
-        assertEquals(16L, StudentClubDatabase.Schema.version)
+        // ko'chdi: UserEntity.userId olib tashlandi, `uid` = JWT `sub`, 16.sqm — chat backendga
+        // ulandi: suhbat ikkinchi tomonning qisqa profilini, xabar esa `seq`/`senderId`/holatini
+        // saqlaydi (eski demo jadvallar tashlab yuborildi).
+        assertEquals(17L, StudentClubDatabase.Schema.version)
     }
 
     @Test
@@ -180,6 +182,75 @@ class DatabaseSchemaTest {
 
         db.profileQueries.clear()
         assertNull(db.profileQueries.selectCurrent().executeAsOneOrNull())
+
+        driver.close()
+    }
+
+    /**
+     * Chat keshi (16.sqm) — eng nozik joyi: serverdan kelgan ro'yxat **local** ustunlarni
+     * (`archived`, `lastReadSeq`) bosib ketmasligi kerak. Shu sabab `upsert` bitta so'rov
+     * emas, `insertConversationIfNew` + `updateConversation` juftligi.
+     */
+    @Test
+    fun chatCacheKeepsLocalColumnsOnRefresh() {
+        val driver = freshDriver()
+        StudentClubDatabase.Schema.create(driver)
+        val db = StudentClubDatabase(driver)
+        val q = db.chatQueries
+
+        q.insertConversationIfNew(
+            id = "cnv_1", type = "DIRECT", lastMessageAt = 1_000L,
+            otherId = "std_ali", otherUsername = "alisher", otherFullName = "Alisher Valiyev",
+            otherAvatarUrl = null, otherOnline = 1L, otherLastSeenAt = null,
+            lastMessageBody = "Salom!", lastMessageSenderId = "std_ali",
+            unreadCount = 3L, lastReadSeq = 0L,
+        )
+        // Foydalanuvchi suhbatni arxivlab, 42-xabargacha o'qidi.
+        q.setArchived(1L, "cnv_1")
+        q.markRead(42L, "cnv_1")
+
+        // Serverdan yangi ro'yxat keldi (u arxiv ham, o'qilgan kursor ham bilmaydi).
+        q.insertConversationIfNew(
+            id = "cnv_1", type = "DIRECT", lastMessageAt = 2_000L,
+            otherId = "std_ali", otherUsername = "alisher", otherFullName = "Alisher Valiyev",
+            otherAvatarUrl = null, otherOnline = 0L, otherLastSeenAt = 1_500L,
+            lastMessageBody = "Yangi xabar", lastMessageSenderId = "std_ali",
+            unreadCount = 1L, lastReadSeq = 0L,
+        )
+        q.updateConversation(
+            type = "DIRECT", lastMessageAt = 2_000L,
+            otherId = "std_ali", otherUsername = "alisher", otherFullName = "Alisher Valiyev",
+            otherAvatarUrl = null, otherOnline = 0L, otherLastSeenAt = 1_500L,
+            lastMessageBody = "Yangi xabar", lastMessageSenderId = "std_ali",
+            unreadCount = 1L, lastReadSeq = 0L, id = "cnv_1",
+        )
+
+        val row = q.selectConversation("cnv_1").executeAsOne()
+        assertEquals("Yangi xabar", row.lastMessageBody) // server ma'lumoti yangilandi
+        assertEquals(1L, row.unreadCount)
+        assertEquals(1L, row.archived) // ...local arxiv bayrog'i saqlandi
+        assertEquals(42L, row.lastReadSeq) // ...va o'qilgan kursor ortga surilmadi
+
+        // Arxivlangan suhbat oddiy ro'yxatda ko'rinmaydi.
+        assertEquals(0, q.selectConversations().executeAsList().size)
+        assertEquals(1, q.selectArchivedConversations().executeAsList().size)
+
+        // Xabarlar: `seq = 0` (yuborilayotgan) ENG OXIRIDA turishi kerak.
+        q.upsertMessage("m2", "cnv_1", "std_ali", 42L, "TEXT", "Salom!", 2_000L, null, "SENT")
+        q.upsertMessage("m1", "cnv_1", "std_men", 41L, "TEXT", "Assalomu alaykum", 1_000L, null, "SENT")
+        q.upsertMessage("local:x", "cnv_1", "std_men", 0L, "TEXT", "Ketyapti…", 3_000L, "cmid-1", "SENDING")
+        assertEquals(
+            listOf("m1", "m2", "local:x"),
+            q.selectMessages("cnv_1").executeAsList().map { it.id },
+        )
+
+        // Kursorlar: eng eski (0 dan katta) va eng yangi `seq`.
+        assertEquals(41L, q.minSeq("cnv_1").executeAsOne())
+        assertEquals(42L, q.maxSeq("cnv_1").executeAsOne())
+
+        // `message:new` o'z xabarimiz bo'lib qaytganda optimistik nusxa matn bo'yicha o'chadi.
+        q.deleteSendingByBody("cnv_1", "Ketyapti…")
+        assertEquals(2, q.selectMessages("cnv_1").executeAsList().size)
 
         driver.close()
     }

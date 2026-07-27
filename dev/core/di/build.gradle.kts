@@ -27,6 +27,8 @@ kotlin {
             api(projects.dev.feature.settings.presentation)
             api(projects.dev.feature.university.presentation)
             api(projects.dev.feature.ads.presentation)
+            // connectionsModule() — "Do'stlar" (Connections). chatModule() undan foydalanadi.
+            api(projects.dev.feature.connections.presentation)
             api(projects.dev.feature.chat.presentation)
             api(projects.dev.feature.home.presentation)
             api(libs.koin.core)

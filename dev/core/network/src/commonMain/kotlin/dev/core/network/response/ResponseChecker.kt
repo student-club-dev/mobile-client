@@ -39,8 +39,10 @@ fun BaseResponse<*>.toAppException(httpStatus: Int? = null): AppException {
     // Maydon xatolari bor bo'lsa status qanday bo'lishidan qat'i nazar bu — validatsiya.
     return when (val s = status ?: httpStatus) {
         401 -> AppException.Unauthorized()
-        403 -> AppException.PermissionDenied()
-        404 -> AppException.NotFound()
+        // 403/404 da backendning o'zbekcha `message` i umumiy matndan aniqroq
+        // (masalan `NOT_CONNECTED` → "Avval bog'lanish kerak").
+        403 -> AppException.PermissionDenied(reason = text)
+        404 -> AppException.NotFound(reason = text)
         408 -> AppException.Timeout()
         null -> validationOrUnknown(text, fields)
         in 400..499 -> AppException.Validation(text ?: "So'rov noto'g'ri.", fields)

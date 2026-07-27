@@ -10,6 +10,7 @@ import dev.core.common.error.AppException
 import dev.core.common.errorOf
 import dev.core.common.network.NetworkConnectivity
 import dev.core.common.platformName
+import dev.core.common.push.PushRegistrar
 import dev.core.database.sql.StudentClubDatabase
 import dev.core.database.sql.UserEntity
 import dev.core.domain.model.AuthIdentifier
@@ -60,6 +61,12 @@ class ApiAuthRepository(
     private val httpClient: HttpClient,
     private val connectivity: NetworkConnectivity,
     private val profileRepository: ProfileRepository,
+    /**
+     * Qurilma push tokenini sessiya bilan bog'laydi (`POST/DELETE /v1/devices`).
+     * Auth qatlami push tafsilotlarini bilmaydi — faqat "sessiya ochildi/yopilmoqda"
+     * signalini beradi. Implementatsiya `:dev:feature:notifications:data` da.
+     */
+    private val pushRegistrar: PushRegistrar = PushRegistrar.None,
 ) : AuthRepository {
 
     private val userQueries get() = database.userQueries
@@ -95,7 +102,7 @@ class ApiAuthRepository(
      */
     override suspend fun register(identifier: AuthIdentifier, password: String): Resource<User> =
         authenticate(identifier, persistSession = false) {
-            api.register(
+            api.studentAuthRegister(
                 RegisterDto(
                     password = password,
                     email = (identifier as? AuthIdentifier.Email)?.value,
@@ -156,7 +163,11 @@ class ApiAuthRepository(
                 )
                 httpClient.resetAuthTokenCache()
                 if (persistSession) {
-                    Resource.Success(cacheSession(uid, identifier))
+                    val user = cacheSession(uid, identifier)
+                    // Sessiya tayyor — endi push tokenini bog'lash mumkin (so'rov `Bearer`
+                    // talab qiladi). Xato bo'lsa ham kirish davom etadi.
+                    runCatching { pushRegistrar.onSessionStarted() }
+                    Resource.Success(user)
                 } else {
                     // Kutilayotgan ro'yxat — identifikatorni eslab qolamiz, local sessiya
                     // faqat `completeRegistration()` da yoziladi.
@@ -215,6 +226,9 @@ class ApiAuthRepository(
     // ------------------------------------------------------------------
 
     override suspend fun logout() {
+        // Push tokenini AVVAL uzamiz — tokenlar tozalangandan keyin so'rov `401` bo'lardi
+        // va qurilma serverda "faol" bo'lib qolib, chiqqan foydalanuvchiga push kelaverardi.
+        runCatching { pushRegistrar.onSessionEnding() }
         // Refresh tokenni serverda bekor qilamiz. Tarmoq bo'lmasa ham local sessiya tozalanadi:
         // foydalanuvchi "chiqdim" degan bo'lsa, ilova uni ushlab turmasligi kerak.
         tokenStore.tokens()?.refreshToken?.let { refresh ->
@@ -310,7 +324,7 @@ class ApiAuthRepository(
     // ------------------------------------------------------------------
 
     override suspend fun sessions(): Resource<List<DeviceSession>> = safeCall(connectivity) {
-        api.list().body().map { it.toDomain() }
+        api.studentSessionsList().body().map { it.toDomain() }
     }
 
     override suspend fun revokeSession(id: String): Resource<Unit> = safeCall(connectivity) {

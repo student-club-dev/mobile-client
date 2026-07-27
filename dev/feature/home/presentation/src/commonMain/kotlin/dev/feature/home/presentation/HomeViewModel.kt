@@ -3,23 +3,25 @@ package dev.feature.home.presentation
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.feature.clubs.domain.model.Club
+import dev.core.common.Resource
 import dev.core.domain.model.DiscountOffer
-import dev.feature.students.domain.model.FriendStatus
+import dev.feature.connections.domain.model.StudentSummary
+import dev.feature.connections.domain.repository.ConnectionsRepository
 import dev.feature.listings.domain.model.Listing
 import dev.feature.listings.domain.model.ListingKind
 import dev.feature.listings.domain.usecase.ObserveListingsByKindUseCase
-import dev.feature.students.domain.model.Student
 import dev.feature.clubs.domain.repository.ClubRepository
 import dev.core.domain.repository.DiscountRepository
 import dev.core.domain.repository.RegionRepository
 import dev.feature.notifications.domain.repository.NotificationRepository
-import dev.feature.students.domain.repository.StudentRepository
 import dev.feature.university.domain.repository.UniversityRepository
 import dev.core.domain.usecase.ObserveCurrentUserUseCase
 import dev.feature.profile.domain.usecase.ObserveProfileUseCase
 import dev.feature.profile.domain.usecase.RefreshProfileUseCase
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -85,7 +87,15 @@ data class HomeUiState(
     val rentals: List<Listing> = emptyList(),
     /** Faol yordam e'lonlari ([ListingKind.TASK]) — bir martalik topshiriqlar. */
     val tasks: List<Listing> = emptyList(),
-    val students: List<Student> = emptyList(),
+    /**
+     * Bog'langan talabalar — `GET /v1/connections` dan **haqiqiy** ma'lumot.
+     *
+     * ⚠️ Bu "universitetim talabalari" EMAS. Backendda talabalarni universitet bo'yicha
+     * ro'yxatlash imkoni yo'q: `GET /v1/students/search` da `q` majburiy, universitet filtri
+     * yo'q va `StudentSummaryDto` `universityId` qaytarmaydi — ya'ni klientda filtrlab ham
+     * bo'lmaydi. Shu endpoint qo'shilgach, bu bo'lim o'shanga o'tkaziladi.
+     */
+    val connections: List<StudentSummary> = emptyList(),
     val clubs: List<Club> = emptyList(),
     val hasUnreadNotifications: Boolean = false,
 )
@@ -98,12 +108,22 @@ class HomeViewModel(
     private val discountRepository: DiscountRepository,
     private val regionRepository: RegionRepository,
     observeListingsByKind: ObserveListingsByKindUseCase,
-    private val studentRepository: StudentRepository,
+    private val connectionsRepository: ConnectionsRepository,
     clubRepository: ClubRepository,
     notificationRepository: NotificationRepository,
 ) : ViewModel() {
 
+    /**
+     * Bog'lanishlar keshi. `ConnectionsRepository` — `suspend`, oqim bermaydi (holat ikki
+     * tomonlama va tez o'zgargani uchun u yerda kesh yo'q), shuning uchun Home o'zi bir marta
+     * yuklab shu oqimga qo'yadi. Xato bo'lsa bo'sh qoladi — Home'da xato ko'rsatilmaydi,
+     * bo'lim shunchaki yashirinadi.
+     */
+    private val _connections = MutableStateFlow<List<StudentSummary>>(emptyList())
+    val connections: StateFlow<List<StudentSummary>> = _connections.asStateFlow()
+
     init {
+        refreshConnections()
         // Offline-first: universitetlarni backend'dan sinxronlashga urinamiz.
         viewModelScope.launch { universityRepository.refresh() }
         // Bosh ekrandagi uchta bo'lim ham backend feed'idan yuradi — `POST /v1/catalog/*` +
@@ -163,9 +183,9 @@ class HomeViewModel(
         discountRepository.observeCategories(),
         discountRepository.observeAllOffers(),
         listings,
-        studentRepository.observeStudents(),
+        connections,
         clubRepository.observeClubs(),
-    ) { categories, offers, (jobs, rentals, tasks), students, clubs ->
+    ) { categories, offers, (jobs, rentals, tasks), connections, clubs ->
         // Tur nomi ham kerak: backend kaliti (`NATIONAL_FOOD`) o'zi yetarli bo'lmasligi mumkin.
         val names = categories.associate { it.id to it.name }
         val grouped = offers.groupBy { homeSectionOf(it, names) }
@@ -173,7 +193,7 @@ class HomeViewModel(
             food = grouped[SECTION_FOOD].orEmpty(),
             clothing = grouped[SECTION_CLOTHING].orEmpty(),
             leisure = grouped[SECTION_LEISURE].orEmpty(),
-            jobs = jobs, rentals = rentals, tasks = tasks, students = students, clubs = clubs,
+            jobs = jobs, rentals = rentals, tasks = tasks, connections = connections, clubs = clubs,
         )
     }
 
@@ -191,7 +211,7 @@ class HomeViewModel(
             jobs = c.jobs,
             rentals = c.rentals,
             tasks = c.tasks,
-            students = c.students,
+            connections = c.connections,
             clubs = c.clubs,
             hasUnreadNotifications = unread > 0,
         )
@@ -206,10 +226,15 @@ class HomeViewModel(
             .firstOrNull { it.id == universityId }?.city
     }
 
-    /** Student kartasidagi "+Do'st" ↔ "Kutilmoqda" o'zgartirish. */
-    fun toggleFriend(student: Student) {
-        val next = if (student.friendStatus == FriendStatus.NONE) FriendStatus.PENDING else FriendStatus.NONE
-        viewModelScope.launch { studentRepository.setFriendStatus(student.id, next) }
+    /**
+     * Bog'lanishlarni qayta yuklaydi. Ekranga qaytilganda chaqiriladi — `Connections`
+     * bo'limida yangi so'rov qabul qilingan bo'lsa, Home eskirgan ro'yxatni ko'rsatmasin.
+     */
+    fun refreshConnections() {
+        viewModelScope.launch {
+            val res = connectionsRepository.connections(size = HOME_CONNECTIONS_SIZE)
+            if (res is Resource.Success) _connections.value = res.data.items.map { it.student }
+        }
     }
 
     private data class Header(
@@ -225,10 +250,13 @@ class HomeViewModel(
         val jobs: List<Listing>,
         val rentals: List<Listing>,
         val tasks: List<Listing>,
-        val students: List<Student>,
+        val connections: List<StudentSummary>,
         val clubs: List<Club>,
     )
 }
+
+/** Home'da faqat bir nechta karta ko'rinadi — butun ro'yxatni tortishning hojati yo'q. */
+private const val HOME_CONNECTIONS_SIZE = 10
 
 // Profil "1".."4" yozadi (EditProfileScreen); eski yozuvlarda "ONE".."FOUR" uchraydi.
 private fun courseLabel(courseYear: String): String = when (courseYear) {

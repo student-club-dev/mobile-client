@@ -1,27 +1,72 @@
 package dev.feature.chat.domain.model
 
-/** Suhbat turi — oddiy student yoki kompaniya HR. */
-enum class ConversationType { PEER, HR }
+import dev.feature.connections.domain.model.StudentSummary
+import kotlinx.datetime.Instant
 
-/** Xabarlar ro'yxatidagi bitta suhbat. */
+/** v1 da faqat `DIRECT` yaratiladi; `GROUP` — keyingi bosqich. */
+enum class ConversationType { DIRECT, GROUP }
+
+/** v1 da faqat `TEXT` yoziladi; qolganlari kelajak uchun. */
+enum class MessageType { TEXT, IMAGE, FILE, VOICE, SYSTEM }
+
+/** Xabarning **local** yuborilish holati (serverda bunday maydon yo'q). */
+enum class MessageStatus {
+    /** Ekranда ko'rsatildi, lekin server hali tasdiqlamadi. */
+    SENDING,
+
+    /** Server qabul qildi — `seq` va `id` haqiqiy. */
+    SENT,
+
+    /** Yuborib bo'lmadi — foydalanuvchi qayta urinishi mumkin (o'sha `clientMsgId` bilan). */
+    FAILED,
+}
+
+/** Suhbatning o'zi. */
 data class Conversation(
     val id: String,
-    val peerName: String,
-    val peerInitial: String,
-    val type: ConversationType,
-    val online: Boolean,
-    val lastMessage: String,
-    val lastTime: String,        // "14:22", "Kecha"
-    val unreadCount: Int = 0,
-    val archived: Boolean = false,
+    val type: ConversationType = ConversationType.DIRECT,
+    /** Oxirgi xabar vaqti. Yangi (bo'sh) suhbatda `null`. */
+    val lastMessageAt: Instant? = null,
 )
 
-/** Suhbat ichidagi bitta xabar. */
+/**
+ * Suhbatlar ro'yxatidagi bitta qator.
+ *
+ * ⚠️ [other].`online` / `lastSeenAt` — **shu yerda haqiqiy** (Redis'dan jonli o'qiladi va WS
+ * `presence:update` bilan yangilanadi). `students/search` dagi qiymatlarga ishonmang.
+ */
+data class ConversationItem(
+    val conversation: Conversation,
+    val other: StudentSummary,
+    val lastMessage: Message? = null,
+    val unreadCount: Int = 0,
+    /**
+     * Suhbatdosh o'qigan eng yuqori `seq` (WS `message:read`). Chiquvchi xabar shu
+     * qiymatdan past `seq` ga ega bo'lsa — "o'qildi". Serverdan o'qish endpointi yo'q,
+     * shuning uchun ilova qayta ochilganda 0 dan boshlanadi.
+     */
+    val otherReadSeq: Int = 0,
+    /** Faqat local bayroq — backendda arxivlash endpointi yo'q. */
+    val archived: Boolean = false,
+) {
+    val id: String get() = conversation.id
+}
+
+/**
+ * Suhbat ichidagi bitta xabar.
+ *
+ * [seq] — suhbat ichidagi tartib o'qi: 1 dan boshlanadi, bo'shliq qoldirmaydi. **Tartiblash,
+ * tarix kursori (`before`), qayta ulanishda yetishib olish (`after`) va o'qildi belgisi —
+ * hammasi shu bo'yicha**, `createdAt` bo'yicha emas. Hali yuborilmagan xabarda `0`.
+ */
 data class Message(
     val id: String,
     val conversationId: String,
-    val text: String,
-    val outgoing: Boolean,       // true → o'ng (violet), false → chap (oq)
-    val time: String,            // "10:24"
-    val createdAt: Long,         // tartiblash uchun
+    val senderId: String,
+    val seq: Int,
+    val body: String,
+    val createdAt: Instant,
+    val type: MessageType = MessageType.TEXT,
+    val status: MessageStatus = MessageStatus.SENT,
+    val clientMsgId: String? = null,
 )

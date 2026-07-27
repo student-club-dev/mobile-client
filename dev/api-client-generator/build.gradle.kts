@@ -56,8 +56,13 @@ val apiServerUrl = "https://api.studentclub.uz/v1"
  *    uni kompilyatsiya qilolmaydi. Haqiqiy tip `format` → `example` → maydon nomi bo'yicha tiklanadi.
  * 5. **Butun sonlar `integer` ga o'tkaziladi** — NestJS hamma sonni `number` deb yozadi, natijada
  *    `sortOrder`/`viewsCount` kabi maydonlar `Double` bo'lib qolardi (kasrlilarda `format` bor).
- * 6. **operationId'lar qisqartiriladi** — `BusinessController_getMy` → `getMy`. Tag ichida nom
- *    takrorlansa, to'liq (prefiksli) nom saqlanadi.
+ * 6. **operationId'lar qisqartiriladi** — `BusinessController_getMy` → `getMy`. Qisqa nom
+ *    spec bo'ylab takrorlansa (masalan `SearchController_search` va
+ *    `StudentSearchController_search` — ikkalasi ham `search`), kontroller nomi bilan
+ *    ajratiladi: `studentSearch`. Kontroller nomining o'zi qisqa nom bilan tugasa u
+ *    yakka holda ishlatiladi (`studentSearchSearch` emas, `studentSearch`), shuning uchun
+ *    `SearchController_search` **`search`** bo'lib qoladi — spec kengayganda mavjud
+ *    metodlar nomi o'zgarmaydi.
  * 7. **Tag nomlari ASCII'ga keltiriladi va guruhlanadi** — `Auth — Business OTP` va qo'shnilari
  *    bitta `AuthBusinessApi` klassiga yig'iladi (aks holda 8 ta mayda API klassi chiqadi).
  * 8. **`$ref` yonidagi `nullable` saqlanadi** — OpenAPI 3.0 da `$ref` bilan yonma-yon turgan
@@ -215,6 +220,39 @@ val cleanSwagger = tasks.register("cleanSwagger") {
         }
         val ambiguous = shortNames.groupingBy { it }.eachCount().filterValues { it > 1 }.keys
 
+        /**
+         * Takrorlangan qisqa nomni kontroller nomi bilan ajratadi.
+         *
+         * Kontroller nomi qisqa nom bilan TUGASA u yakka holda yetarli
+         * (`StudentSearchController_search` → `studentSearch`, `studentSearchSearch` emas).
+         * Shu qoida tufayli `SearchController_search` uchun nomzod — oddiy `search`, ya'ni
+         * spec'ga yangi `…Search` kontrolleri qo'shilganda MAVJUD metod nomi o'zgarmaydi.
+         */
+        fun disambiguate(rawId: String, short: String): String {
+            val prefix = rawId.substringBefore('_').removeSuffix("Controller")
+            val merged = if (prefix.lowercase().endsWith(short.lowercase())) {
+                prefix
+            } else {
+                prefix + short.replaceFirstChar(Char::uppercaseChar)
+            }
+            return merged.replaceFirstChar(Char::lowercaseChar)
+        }
+
+        // Nomzodlar hali ham to'qnashsa (masalan ikkita bir xil kontroller nomi) — to'liq
+        // prefiksli shaklga qaytamiz, aks holda generator ikkita bir xil metod chiqarardi.
+        val candidates = mutableListOf<String>()
+        paths.values.forEach { pathItem ->
+            @Suppress("UNCHECKED_CAST")
+            (pathItem as MutableMap<String, Any?>).forEach { (method, op) ->
+                if (method !in methods) return@forEach
+                @Suppress("UNCHECKED_CAST")
+                val rawId = (op as MutableMap<String, Any?>)["operationId"]?.toString().orEmpty()
+                val short = rawId.substringAfter('_', rawId)
+                candidates.add(if (short in ambiguous) disambiguate(rawId, short) else short)
+            }
+        }
+        val stillAmbiguous = candidates.groupingBy { it }.eachCount().filterValues { it > 1 }.keys
+
         val rewrittenPaths = linkedMapOf<String, Any?>()
         paths.forEach { (path, pathItem) ->
             @Suppress("UNCHECKED_CAST")
@@ -233,8 +271,14 @@ val cleanSwagger = tasks.register("cleanSwagger") {
                 val rawId = operation["operationId"]?.toString().orEmpty()
                 val short = rawId.substringAfter('_', rawId)
                 operation["operationId"] = if (short in ambiguous) {
-                    val prefix = rawId.substringBefore('_').removeSuffix("Controller")
-                    prefix.replaceFirstChar(Char::lowercaseChar) + short.replaceFirstChar(Char::uppercaseChar)
+                    val candidate = disambiguate(rawId, short)
+                    if (candidate in stillAmbiguous) {
+                        val prefix = rawId.substringBefore('_').removeSuffix("Controller")
+                        prefix.replaceFirstChar(Char::lowercaseChar) +
+                            short.replaceFirstChar(Char::uppercaseChar)
+                    } else {
+                        candidate
+                    }
                 } else {
                     short
                 }

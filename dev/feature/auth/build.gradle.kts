@@ -23,7 +23,8 @@ kotlin {
             api(projects.dev.feature.jobs.domain)
             implementation(projects.dev.feature.jobs.presentation)
             api(projects.dev.feature.students.domain)
-            implementation(projects.dev.feature.students.presentation)
+            // "Do'stlar" (Connections) ekrani — StudentShell uni ochadi.
+            implementation(projects.dev.feature.connections.presentation)
             implementation(projects.dev.feature.notifications.domain)
             implementation(projects.dev.feature.notifications.presentation)
             implementation(projects.dev.feature.clubs.domain)
@@ -34,9 +35,7 @@ kotlin {
             implementation(projects.dev.feature.university.presentation)
             // E'lonlar feature'i — StudentShell PostAdScreen'ni ochadi.
             implementation(projects.dev.feature.ads.presentation)
-            // Chat feature'i — FirestoreChatRealtimeSource chat.domain'ni implement qiladi;
-            // StudentShell ChatScreen'ni ochadi.
-            api(projects.dev.feature.chat.domain)
+            // Chat feature'i — StudentShell ChatScreen'ni ochadi.
             implementation(projects.dev.feature.chat.presentation)
             // Home agregator ekrani — StudentShell HomeScreen'ni ochadi.
             implementation(projects.dev.feature.home.presentation)
@@ -51,15 +50,9 @@ kotlin {
             implementation(libs.ktor.client.core)
             // JWT payload'ini o'qish (JwtClaims) uchun
             implementation(libs.kotlinx.serialization.json)
-
-            // GitLive Firebase — faqat CHAT real-time (Firestore) uchun.
-            // Autentifikatsiya Firebase'da EMAS: u backend tokenlariga tayanadi.
-            implementation(libs.gitlive.firebase.firestore)
         }
 
         androidMain.dependencies {
-            // GitLive Firestore Android tomonda Firebase SDK'sini talab qiladi (chat).
-            implementation(project.dependencies.platform(libs.firebase.bom))
             // Google Sign-In — Credential Manager + Google ID (backendga ID token beradi)
             implementation(libs.androidx.credentials)
             implementation(libs.androidx.credentials.playServicesAuth)

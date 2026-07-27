@@ -4,6 +4,7 @@ import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -50,7 +51,6 @@ import dev.core.uikit.components.ScIconTile
 import dev.core.uikit.components.ScIcons
 import dev.core.uikit.components.ScMonogramTile
 import dev.core.uikit.components.ScSectionHeader
-import dev.core.uikit.components.ScSoftButton
 import dev.core.uikit.components.ScText
 import dev.core.uikit.components.scCard
 import dev.core.uikit.components.scSoftShadow
@@ -61,8 +61,7 @@ import dev.core.domain.model.DiscountTag
 import dev.feature.clubs.domain.model.Club
 import dev.feature.listings.domain.model.Listing
 import dev.feature.listings.domain.model.formatSum
-import dev.feature.students.domain.model.FriendStatus
-import dev.feature.students.domain.model.Student
+import dev.feature.connections.domain.model.StudentSummary
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
@@ -87,7 +86,14 @@ fun HomeScreen(
     onOpenRentals: () -> Unit = {},
     onOpenTasks: () -> Unit = {},
     onOpenListing: (String) -> Unit = {},
+    /** "Do'stlar" — `Connections` ekrani bog'langanlar bo'limi bilan. */
     onOpenStudents: () -> Unit = {},
+    /** Qidiruv maydoni — o'sha ekran, Qidiruv bo'limi ochilgan holda. */
+    onOpenStudentSearch: () -> Unit = {},
+    /** "Kutilayotganlar" — o'sha ekran, So'rovlar bo'limi ochilgan holda. */
+    onOpenStudentRequests: () -> Unit = {},
+    /** Bog'langan talaba kartasidagi "Xabar" — chat tab'ini o'sha odam bilan ochadi. */
+    onOpenChatWith: (String) -> Unit = {},
     vm: HomeViewModel = koinViewModel(),
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
@@ -113,7 +119,8 @@ fun HomeScreen(
             ClubsSection(state.clubs, onOpenClubs)
             RentalsSection(state.rentals, onOpenRentals, onOpenListing)
             JobsSection(state.jobs, onOpenJobs, onOpenListing)
-            StudentsSection(state.students, onOpenStudents) { vm.toggleFriend(it) }
+            StudentsSearchSection(onOpenStudentSearch, onOpenStudents, onOpenStudentRequests)
+            ConnectionsSection(state.connections, onOpenStudents, onOpenChatWith)
             // Pastki navigatsiya + FAB uchun joy.
             Spacer(Modifier.height(96.dp))
         }
@@ -565,19 +572,97 @@ private val studentVisuals: List<Pair<Color, Color>>
     Sc.TintGreen to Sc.Success,
 )
 
+/**
+ * Talabalar bloki: qidiruvga kirish + "Do'stlar" / "Kutilayotganlar" ga o'tish.
+ *
+ * Qidiruv maydoni bu yerda **ishlamaydi** — bosilganda `Connections` ekrani Qidiruv bo'limi
+ * ochilgan holda kelади. Sabab: to'liq qidiruv (debounce, bog'lanish tugmalari, "⋮" menyusi,
+ * blok/shikoyat) o'sha ekranda allaqachon bor, uni Home'da takrorlash ikki nusxa kod bo'lardi.
+ *
+ * Backendda talabalarni shunchaki ro'yxatlash imkoni yo'q (`GET /v1/students/search` da `q`
+ * majburiy), shuning uchun Home o'zi hech kimni ko'rsata olmaydi — faqat kirish nuqtasi.
+ */
 @Composable
-private fun StudentsSection(
-    students: List<Student>, onSeeAll: () -> Unit, onFriend: (Student) -> Unit
+private fun StudentsSearchSection(
+    onOpenSearch: () -> Unit,
+    onOpenConnected: () -> Unit,
+    onOpenRequests: () -> Unit,
 ) {
-    if (students.isEmpty()) return
+    Column(verticalArrangement = Arrangement.spacedBy(13.dp)) {
+        PaddedHeader("Talabalar", "Do'st toping va bog'laning", action = null)
+
+        // Haqiqiy maydon emas — butun qatorning o'zi tugma.
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = Sc.ScreenPadding)
+                .clip(RoundedCornerShape(16.dp))
+                .background(Sc.FieldBg)
+                .border(1.dp, Sc.Border, RoundedCornerShape(16.dp))
+                .clickable(onClick = onOpenSearch)
+                .padding(horizontal = 14.dp, vertical = 13.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Icon(ScIcons.Search, null, tint = Sc.Muted, modifier = Modifier.size(18.dp))
+            ScText(
+                "Ism yoki username…", 14.5f, FontWeight.Medium, Sc.NavIdle,
+                maxLines = 1, modifier = Modifier.weight(1f),
+            )
+        }
+
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = Sc.ScreenPadding),
+            horizontalArrangement = Arrangement.spacedBy(11.dp),
+        ) {
+            NavTile("Do'stlar", ScIcons.Users, Sc.TintBlue, Sc.Brand, Modifier.weight(1f), onOpenConnected)
+            // "Kutilayotganlar" kartaga sig'maydi; Connections ekranidagi tab ham "So'rovlar".
+            NavTile("So'rovlar", ScIcons.Bell, Sc.TintViolet, Sc.Violet, Modifier.weight(1f), onOpenRequests)
+        }
+    }
+}
+
+/** Talabalar blokidagi o'tish kartasi — ikona + yorliq + ">" belgisi. */
+@Composable
+private fun NavTile(
+    label: String,
+    icon: ImageVector,
+    tint: Color,
+    accent: Color,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier.scCard(radius = 18.dp).clickable(onClick = onClick).padding(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        ScIconTile(tint, size = 36.dp, radius = 13.dp) {
+            Icon(icon, null, tint = accent, modifier = Modifier.size(18.dp))
+        }
+        ScText(label, 13.5f, FontWeight.Bold, Sc.Ink, maxLines = 1, modifier = Modifier.weight(1f))
+        Icon(ScIcons.ChevronRight, null, tint = Sc.MutedLight, modifier = Modifier.size(15.dp))
+    }
+}
+
+/**
+ * Bog'langan talabalar. Bularning hammasi bilan allaqachon bog'langanmiz, shuning uchun
+ * kartadagi yagona amal — "Xabar" (chat faqat bog'langanlar uchun ochiq).
+ *
+ * Ikkinchi qator — `@username`; universitet ko'rsatilmaydi, chunki backend qisqa profilda
+ * (`StudentSummaryDto`) universitet ma'lumotini qaytarmaydi.
+ */
+@Composable
+private fun ConnectionsSection(
+    connections: List<StudentSummary>, onSeeAll: () -> Unit, onMessage: (String) -> Unit
+) {
+    if (connections.isEmpty()) return
     Column(verticalArrangement = Arrangement.spacedBy(13.dp)) {
         PaddedHeader(
-            "Studentlar",
-            "Universitet bo'yicha do'st toping",
+            "Bog'lanishlarim",
+            "Do'stlaringiz bilan suhbatlashing",
             action = "Ko'proq",
             onAction = onSeeAll
         )
-        EdgeRow(students.take(6)) { index, student ->
+        EdgeRow(connections.take(6)) { index, student ->
             val (tint, accent) = studentVisuals[index.mod(studentVisuals.size)]
             Column(
                 Modifier.width(150.dp).scCard(radius = 26.dp)
@@ -586,37 +671,20 @@ private fun StudentsSection(
             ) {
                 ScMonogramTile(student.initial, tint, accent)
                 Spacer(Modifier.height(12.dp))
-                ScText(student.firstName, 16f, FontWeight.ExtraBold, Sc.Ink, maxLines = 1)
+                ScText(student.displayName, 16f, FontWeight.ExtraBold, Sc.Ink, maxLines = 1)
                 Spacer(Modifier.height(3.dp))
                 ScText(
-                    student.universityMonogram, 12.5f, FontWeight.SemiBold, Sc.Muted, maxLines = 1
+                    student.username?.let { "@$it" }.orEmpty(),
+                    12.5f, FontWeight.SemiBold, Sc.Muted, maxLines = 1,
                 )
                 Spacer(Modifier.height(14.dp))
-                FriendButton(student, onFriend)
+                ScGradientButton(
+                    "Xabar", { onMessage(student.id) },
+                    radius = 16.dp, verticalPadding = 10.dp, fontSize = 13.5f,
+                    weight = FontWeight.Bold,
+                )
             }
         }
-    }
-}
-
-@Composable
-private fun FriendButton(student: Student, onFriend: (Student) -> Unit) {
-    when (student.friendStatus) {
-        FriendStatus.NONE -> ScGradientButton(
-            "+ Do'st", { onFriend(student) },
-            radius = 16.dp, verticalPadding = 10.dp, fontSize = 13.5f, weight = FontWeight.Bold,
-        )
-
-        FriendStatus.PENDING -> ScSoftButton(
-            "Kutilmoqda", { onFriend(student) },
-            radius = 16.dp, verticalPadding = 10.dp, fontSize = 13.5f,
-            background = Sc.TintBlue, color = Sc.Brand,
-        )
-
-        FriendStatus.FRIENDS -> ScSoftButton(
-            "Do'st", { onFriend(student) },
-            radius = 16.dp, verticalPadding = 10.dp, fontSize = 13.5f,
-            background = Sc.TintBlue, color = Sc.Brand,
-        )
     }
 }
 

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Status bar bildirishnoma ikonasi.
+
+  Android bu ikonani **siluet** sifatida chizadi: faqat alfa kanali ishlatiladi, rang
+  e'tiborsiz qoldiriladi. Shu sabab u bir rangli (oq) va soddalashtirilgan chat pufagi —
+  brend gradientini bu yerga qo'yib bo'lmaydi (kulrang kvadrat bo'lib chiqardi).
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M12,3C7.03,3 3,6.58 3,11c0,2.29 1.09,4.35 2.83,5.79L5,21l4.5,-2.06C10.29,19.11 11.13,19.2 12,19.2c4.97,0 9,-3.58 9,-8.2S16.97,3 12,3z" />
+</vector>
