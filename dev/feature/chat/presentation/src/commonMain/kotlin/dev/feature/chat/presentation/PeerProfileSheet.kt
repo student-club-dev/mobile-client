@@ -1,15 +1,12 @@
 package dev.feature.chat.presentation
 
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -31,11 +28,14 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
@@ -45,19 +45,24 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.lerp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil3.compose.AsyncImage
 import dev.core.uikit.components.AppIcons
-import dev.core.uikit.components.ScAvatar
 import dev.core.uikit.components.ScIcons
 import dev.core.uikit.components.ScText
 import dev.core.uikit.components.StatusBarAppearance
 import dev.core.uikit.theme.Sc
 import dev.feature.chat.domain.model.ConversationItem
 import dev.feature.connections.domain.model.Gender
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
 
 /** Profil ekranidagi bo'limlar — Telegram maketidagi tartibda. */
 private enum class ProfileTab(val label: String) {
@@ -94,38 +99,9 @@ internal fun PeerProfileSheet(
     onSoon: (String) -> Unit,
 ) {
     var viewer by remember { mutableStateOf<Int?>(null) }
-    var expanded by remember { mutableStateOf(false) }
     var tab by remember { mutableStateOf(ProfileTab.MEDIA) }
     val student = conversation.other
     val hasPhoto = !student.avatarUrl.isNullOrBlank()
-
-    val scroll = rememberScrollState()
-    // Telegram'dagi jest: ro'yxat TEPASIDA turib pastga tortilsa sarlavha yoyiladi,
-    // yoyilgan holatda yuqoriga tortilsa yig'iladi.
-    val pullToExpand = remember(scroll, hasPhoto) {
-        object : NestedScrollConnection {
-            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-                // Yoyilgan sarlavha ustida yuqoriga surish — avval uni yig'amiz va
-                // jestni O'ZIMIZ yutamiz, aks holda kontent bir vaqtda sakrab ketardi.
-                if (expanded && available.y < -DRAG_THRESHOLD && scroll.value == 0) {
-                    expanded = false
-                    return available
-                }
-                return Offset.Zero
-            }
-
-            override fun onPostScroll(
-                consumed: Offset,
-                available: Offset,
-                source: NestedScrollSource,
-            ): Offset {
-                // `available` — kontent yutmagan qoldiq. Tepada pastga tortilganda
-                // hammasi qoldiq bo'lib qaytadi.
-                if (!expanded && hasPhoto && available.y > DRAG_THRESHOLD) expanded = true
-                return Offset.Zero
-            }
-        }
-    }
 
     val status = when {
         typing -> "yozmoqda…"
@@ -136,108 +112,168 @@ internal fun PeerProfileSheet(
 
     Dialog(onDismissRequest = onClose, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         StatusBarAppearance(darkIcons = false)
-        Column(
-            Modifier.fillMaxSize()
-                .background(Sc.Bg)
-                .nestedScroll(pullToExpand)
-                .verticalScroll(scroll),
-        ) {
+        BoxWithConstraints(Modifier.fillMaxSize().background(Sc.Bg)) {
+            val density = LocalDensity.current
+            val minPx = with(density) { COLLAPSED_HEADER.toPx() }
+            // Yoyilgan sarlavha — kvadrat: balandligi ekran kengligiga teng.
+            val maxPx = with(density) { maxWidth.toPx() }
 
-            // Balandlik keskin sakramasin — `SizeTransform` ikki sarlavha orasidagi
-            // o'tishni silliqlaydi.
-            AnimatedContent(
-                targetState = expanded && hasPhoto,
-                transitionSpec = {
-                    (fadeIn(tween(180)) togetherWith fadeOut(tween(140)))
-                        .using(SizeTransform(clip = true))
-                },
-                label = "profileHeader",
-            ) { isExpanded ->
-                if (isExpanded) {
-                    ExpandedHeader(
-                        name = student.displayName,
-                        status = status,
-                        avatarUrl = student.avatarUrl,
-                        // Backend bitta rasm beradi; ro'yxat kelganda chiziqchalar ko'payadi.
-                        photoCount = 1,
-                        onClose = onClose,
-                        onCollapse = { expanded = false },
-                        onOpenPhoto = { viewer = AVATAR_VIEWER },
-                    )
-                } else {
-                    CollapsedHeader(
-                        student = student,
-                        status = status,
-                        onClose = onClose,
-                        onExpand = { if (hasPhoto) expanded = true },
-                    )
+            // Sarlavha balandligi PIKSELDA saqlanadi va barmoq bilan bir kadrda
+            // o'zgaradi. `Animatable` ishlatilmadi: uning `snapTo` si suspend, ya'ni
+            // har bir surish korutinaga tushib bir kadr kechikardi.
+            var headerPx by remember(maxPx) { mutableFloatStateOf(minPx) }
+            val scope = rememberCoroutineScope()
+            var snapJob by remember { mutableStateOf<Job?>(null) }
+
+            fun snapTo(target: Float) {
+                snapJob?.cancel()
+                snapJob = scope.launch {
+                    animate(headerPx, target, animationSpec = tween(SNAP_DURATION_MS)) { value, _ ->
+                        headerPx = value
+                    }
                 }
             }
 
+            val scroll = rememberScrollState()
+
+            /**
+             * Yig'iluvchi sarlavha (collapsing toolbar): kontent aylanishidan OLDIN
+             * sarlavha o'z ulushini oladi, shuning uchun u barmoqqa 1:1 ergashadi.
+             */
+            val collapsing = remember(minPx, maxPx, hasPhoto, scroll) {
+                object : NestedScrollConnection {
+                    override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                        val delta = available.y
+                        // Yuqoriga surish — avval SARLAVHA yig'iladi, kontent keyin aylanadi.
+                        if (delta < 0 && headerPx > minPx) {
+                            snapJob?.cancel()
+                            val next = (headerPx + delta).coerceAtLeast(minPx)
+                            val used = next - headerPx
+                            headerPx = next
+                            return Offset(0f, used)
+                        }
+                        return Offset.Zero
+                    }
+
+                    override fun onPostScroll(
+                        consumed: Offset,
+                        available: Offset,
+                        source: NestedScrollSource,
+                    ): Offset {
+                        val delta = available.y
+                        // `available` — kontent yutmagan qoldiq, ya'ni ro'yxat allaqachon
+                        // tepasida. Shundagina sarlavha yoyiladi.
+                        if (delta > 0 && hasPhoto && headerPx < maxPx) {
+                            snapJob?.cancel()
+                            val next = (headerPx + delta).coerceAtMost(maxPx)
+                            val used = next - headerPx
+                            headerPx = next
+                            return Offset(0f, used)
+                        }
+                        return Offset.Zero
+                    }
+
+                    // Barmoq ko'tarilganda oraliq holatda qolmasin — eng yaqiniga tushadi.
+                    override suspend fun onPreFling(available: Velocity): Velocity {
+                        if (headerPx > minPx && headerPx < maxPx) {
+                            val half = minPx + (maxPx - minPx) * SNAP_POINT
+                            snapTo(if (headerPx >= half) maxPx else minPx)
+                        }
+                        return Velocity.Zero
+                    }
+                }
+            }
+
+            val progress = if (maxPx > minPx) {
+                ((headerPx - minPx) / (maxPx - minPx)).coerceIn(0f, 1f)
+            } else {
+                0f
+            }
+
             Column(
-                Modifier.fillMaxWidth().padding(horizontal = 14.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp),
+                Modifier.fillMaxSize().nestedScroll(collapsing).verticalScroll(scroll),
             ) {
-                Spacer(Modifier.height(2.dp))
+                ProfileHeader(
+                    name = student.displayName,
+                    status = status,
+                    avatarUrl = student.avatarUrl,
+                    height = with(density) { headerPx.toDp() },
+                    progress = progress,
+                    // Backend bitta rasm beradi; ro'yxat kelganda chiziqchalar ko'payadi.
+                    photoCount = 1,
+                    onClose = onClose,
+                    onAvatarClick = {
+                        when {
+                            !hasPhoto -> Unit
+                            // Yig'ilgan holatda bosish — yoyadi; yoyilganda — to'liq ekran.
+                            progress < 1f -> snapTo(maxPx)
+                            else -> viewer = AVATAR_VIEWER
+                        }
+                    },
+                )
 
-                // --- To'rtta amal tugmasi ---------------------------------------------
-                Row(
-                    Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(9.dp),
+                Column(
+                    Modifier.fillMaxWidth().padding(horizontal = 14.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp),
                 ) {
-                    ActionTile(ScIcons.ChatRound, "Xabar", Modifier.weight(1f), onClick = onClose)
-                    ActionTile(ScIcons.Bell, "Sukut qilish", Modifier.weight(1f)) {
-                        onSoon("Sukut qilish tez orada")
-                    }
-                    ActionTile(ScIcons.PhoneCall, "Chaqiruv", Modifier.weight(1f)) {
-                        onSoon("Qo'ng'iroq tez orada")
-                    }
-                    ActionTile(AppIcons.Camera, "Video", Modifier.weight(1f)) {
-                        onSoon("Video qo'ng'iroq tez orada")
-                    }
-                }
+                    Spacer(Modifier.height(2.dp))
 
-                // --- Ma'lumotlar -------------------------------------------------------
-                InfoCard {
-                    student.username?.takeIf { it.isNotBlank() }?.let {
-                        InfoRow("@$it", "Foydalanuvchi nomi")
+                    // --- To'rtta amal tugmasi -----------------------------------------
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+                        ActionTile(ScIcons.ChatRound, "Xabar", Modifier.weight(1f), onClick = onClose)
+                        ActionTile(ScIcons.Bell, "Sukut qilish", Modifier.weight(1f)) {
+                            onSoon("Sukut qilish tez orada")
+                        }
+                        ActionTile(ScIcons.PhoneCall, "Chaqiruv", Modifier.weight(1f)) {
+                            onSoon("Qo'ng'iroq tez orada")
+                        }
+                        ActionTile(AppIcons.Camera, "Video", Modifier.weight(1f)) {
+                            onSoon("Video qo'ng'iroq tez orada")
+                        }
                     }
-                    // Backend suhbatdoshning raqamini ham, tarjimayi holini ham bermaydi.
-                    InfoRow(null, "Mobil raqam")
-                    InfoRow(null, "Tarjimayi hol")
-                    universityName?.let { InfoRow(it, "Universitet") }
-                    student.courseYear?.let { InfoRow(it.courseLabel(), "Kurs") }
-                    student.gender?.let {
-                        InfoRow(if (it == Gender.MALE) "Erkak" else "Ayol", "Jinsi")
-                    }
-                }
 
-                // --- Bo'limlar ---------------------------------------------------------
-                TabBar(selected = tab, onSelect = { tab = it })
-
-                when (tab) {
-                    ProfileTab.MEDIA -> if (photos.isEmpty()) {
-                        EmptySection("Bu suhbatda hali rasm yo'q")
-                    } else {
-                        PhotoGrid(photos, onOpen = { viewer = it })
+                    // --- Ma'lumotlar ---------------------------------------------------
+                    InfoCard {
+                        student.username?.takeIf { it.isNotBlank() }?.let {
+                            InfoRow("@$it", "Foydalanuvchi nomi")
+                        }
+                        // Backend suhbatdoshning raqamini ham, bio'sini ham bermaydi.
+                        InfoRow(null, "Mobil raqam")
+                        InfoRow(null, "Tarjimayi hol")
+                        universityName?.let { InfoRow(it, "Universitet") }
+                        student.courseYear?.let { InfoRow(it.courseLabel(), "Kurs") }
+                        student.gender?.let {
+                            InfoRow(if (it == Gender.MALE) "Erkak" else "Ayol", "Jinsi")
+                        }
                     }
-                    ProfileTab.LINKS -> if (links.isEmpty()) {
-                        EmptySection("Bu suhbatda havola yuborilmagan")
-                    } else {
-                        LinkList(links)
-                    }
-                    // Ikkalasi ham backendga bog'liq — qarang: `STORY_AND_PROFILE_BACKEND.md`.
-                    ProfileTab.POSTS -> EmptySection("Postlar tez orada")
-                    ProfileTab.FILES -> EmptySection("Fayl yuborish tez orada")
-                }
 
-                // --- Amallar -----------------------------------------------------------
-                Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(Sc.Card)) {
-                    ProfileAction(ScIcons.Close, "Bog'lanishni uzish", onClick = onDisconnect)
-                    ProfileAction(ScIcons.Users, "Bloklash", danger = true, onClick = onBlock)
-                    ProfileAction(ScIcons.Bell, "Shikoyat qilish", danger = true, onClick = onReport)
+                    // --- Bo'limlar -----------------------------------------------------
+                    TabBar(selected = tab, onSelect = { tab = it })
+
+                    when (tab) {
+                        ProfileTab.MEDIA -> if (photos.isEmpty()) {
+                            EmptySection("Bu suhbatda hali rasm yo'q")
+                        } else {
+                            PhotoGrid(photos, onOpen = { viewer = it })
+                        }
+                        ProfileTab.LINKS -> if (links.isEmpty()) {
+                            EmptySection("Bu suhbatda havola yuborilmagan")
+                        } else {
+                            LinkList(links)
+                        }
+                        // Ikkalasi ham backendga bog'liq — `STORY_AND_PROFILE_BACKEND.md`.
+                        ProfileTab.POSTS -> EmptySection("Postlar tez orada")
+                        ProfileTab.FILES -> EmptySection("Fayl yuborish tez orada")
+                    }
+
+                    // --- Amallar -------------------------------------------------------
+                    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(Sc.Card)) {
+                        ProfileAction(ScIcons.Close, "Bog'lanishni uzish", onClick = onDisconnect)
+                        ProfileAction(ScIcons.Users, "Bloklash", danger = true, onClick = onBlock)
+                        ProfileAction(ScIcons.Bell, "Shikoyat qilish", danger = true, onClick = onReport)
+                    }
+                    Spacer(Modifier.height(8.dp).navigationBarsPadding())
                 }
-                Spacer(Modifier.height(8.dp).navigationBarsPadding())
             }
         }
     }
@@ -255,98 +291,117 @@ internal fun PeerProfileSheet(
 }
 
 // ---------------------------------------------------------------------------
-// Sarlavha
+// Sarlavha — yig'iluvchi (collapsing)
 // ---------------------------------------------------------------------------
 
-/** Odatiy holat — markazda kichik doira, ostida ism va holat. */
-@Composable
-private fun CollapsedHeader(
-    student: dev.feature.connections.domain.model.StudentSummary,
-    status: String,
-    onClose: () -> Unit,
-    onExpand: () -> Unit,
-) {
-    Column(
-        Modifier.fillMaxWidth()
-            .background(Sc.headerBrush)
-            .statusBarsPadding()
-            .padding(start = 12.dp, end = 12.dp, top = 6.dp, bottom = 20.dp),
-    ) {
-        HeaderBar(onClose = onClose, onMenu = null, tint = Color.White)
-        Spacer(Modifier.height(6.dp))
-        Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-            ScAvatar(
-                name = student.displayName,
-                size = 96.dp,
-                avatarUrl = student.avatarUrl,
-                background = Color.White.copy(alpha = 0.9f),
-                initialColor = Sc.Violet,
-                modifier = Modifier.clickable(onClick = onExpand),
-            )
-            Spacer(Modifier.height(12.dp))
-            ScText(
-                student.displayName, 21f, FontWeight.ExtraBold, Color.White,
-                letterSpacing = -0.3f, maxLines = 2,
-            )
-            Spacer(Modifier.height(3.dp))
-            ScText(status, 13.5f, FontWeight.Medium, Color.White.copy(alpha = 0.85f))
-        }
-    }
-}
-
 /**
- * Yoyilgan holat — rasm butun kenglikda, ustida pastdan yuqoriga qorayadigan gradient
- * va chap pastda ism. Yuqorida rasm sonini ko'rsatuvchi chiziqchalar.
+ * Bitta sarlavha, ikki chekka holat orasida **uzluksiz** o'zgaradi:
+ *
+ * - `progress = 0` — brend gradienti, markazda 96 dp li dumaloq avatar, ostida ism;
+ * - `progress = 1` — rasm butun kenglikni egallaydi, ustida pastdan qorayadigan gradient
+ *   va chap pastda ism.
+ *
+ * Avatar **o'sib boradi**: o'lchami va burchak radiusi oralatib hisoblanadi, shuning
+ * uchun doira asta-sekin to'rtburchak rasmga aylanadi. Matnlar esa bir-birini almashtiradi
+ * (shaffoflik bo'yicha) — ikki xil joylashuvni piksel bo'yicha oralatishdan ko'ra
+ * ishonchliroq va sakramaydi.
  */
 @Composable
-private fun ExpandedHeader(
+private fun ProfileHeader(
     name: String,
     status: String,
     avatarUrl: String?,
+    height: Dp,
+    progress: Float,
     photoCount: Int,
     onClose: () -> Unit,
-    onCollapse: () -> Unit,
-    onOpenPhoto: () -> Unit,
+    onAvatarClick: () -> Unit,
 ) {
-    Box(Modifier.fillMaxWidth().aspectRatio(1f).clickable(onClick = onOpenPhoto)) {
-        AsyncImage(
-            model = avatarUrl,
-            contentDescription = "Profil rasmi",
-            contentScale = ContentScale.Crop,
-            modifier = Modifier.fillMaxSize(),
-        )
-        // Yuqorida ham, pastda ham gradient: tugmalar va ism har qanday rasm ustida o'qiladi.
+    Box(Modifier.fillMaxWidth().height(height)) {
+        // Brend gradienti — rasm yoyilgani sari so'nadi.
+        Box(Modifier.fillMaxSize().alpha(1f - progress).background(Sc.headerBrush))
+
+        // Avatar: markazdagi doiradan butun sarlavhagacha.
+        val avatarSize = lerp(COLLAPSED_AVATAR, height, progress)
+        val corner = lerp(COLLAPSED_AVATAR / 2, 0.dp, progress)
         Box(
-            Modifier.fillMaxSize().background(
-                Brush.verticalGradient(
-                    0f to Color.Black.copy(alpha = 0.45f),
-                    0.28f to Color.Transparent,
-                    0.62f to Color.Transparent,
-                    1f to Color.Black.copy(alpha = 0.75f),
+            Modifier.align(Alignment.TopCenter)
+                .padding(top = lerp(COLLAPSED_AVATAR_TOP, 0.dp, progress))
+                .size(avatarSize)
+                .clip(RoundedCornerShape(corner))
+                .background(Color.White.copy(alpha = 0.9f))
+                .clickable(onClick = onAvatarClick),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (avatarUrl.isNullOrBlank()) {
+                ScText(name.take(1).uppercase(), 34f, FontWeight.ExtraBold, Sc.Violet)
+            } else {
+                AsyncImage(
+                    model = avatarUrl,
+                    contentDescription = "Profil rasmi",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+        }
+
+        // Rasm ustidagi gradient — tugmalar va ism har qanday rasmda o'qilsin.
+        if (progress > 0f) {
+            Box(
+                Modifier.fillMaxSize().alpha(progress).background(
+                    Brush.verticalGradient(
+                        0f to Color.Black.copy(alpha = 0.45f),
+                        0.3f to Color.Transparent,
+                        0.6f to Color.Transparent,
+                        1f to Color.Black.copy(alpha = 0.75f),
+                    ),
                 ),
-            ),
-        )
+            )
+        }
 
         Column(Modifier.statusBarsPadding().padding(horizontal = 12.dp, vertical = 6.dp)) {
             if (photoCount > 1) {
-                PhotoDashes(count = photoCount, current = 0)
+                PhotoDashes(count = photoCount, current = 0, alpha = progress)
                 Spacer(Modifier.height(8.dp))
             }
-            HeaderBar(onClose = onClose, onMenu = onCollapse, tint = Color.White)
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                GlassButton(ScIcons.ChevronLeft, "Orqaga", Color.White, onClose)
+            }
         }
 
-        Column(Modifier.align(Alignment.BottomStart).padding(start = 18.dp, end = 18.dp, bottom = 18.dp)) {
-            ScText(name, 27f, FontWeight.ExtraBold, Color.White, letterSpacing = -0.5f, maxLines = 2)
-            Spacer(Modifier.height(2.dp))
-            ScText(status, 14f, FontWeight.Medium, Color.White.copy(alpha = 0.85f))
+        // Yig'ilgan holatdagi ism — markazda, avatar ostida.
+        if (progress < 1f) {
+            Column(
+                Modifier.align(Alignment.BottomCenter)
+                    .alpha(1f - progress)
+                    .padding(start = 16.dp, end = 16.dp, bottom = 18.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                ScText(name, 21f, FontWeight.ExtraBold, Color.White, letterSpacing = -0.3f, maxLines = 2)
+                Spacer(Modifier.height(3.dp))
+                ScText(status, 13.5f, FontWeight.Medium, Color.White.copy(alpha = 0.85f))
+            }
+        }
+
+        // Yoyilgan holatdagi ism — chap pastda, kattaroq.
+        if (progress > 0f) {
+            Column(
+                Modifier.align(Alignment.BottomStart)
+                    .alpha(progress)
+                    .padding(start = 18.dp, end = 18.dp, bottom = 18.dp),
+            ) {
+                ScText(name, 27f, FontWeight.ExtraBold, Color.White, letterSpacing = -0.5f, maxLines = 2)
+                Spacer(Modifier.height(2.dp))
+                ScText(status, 14f, FontWeight.Medium, Color.White.copy(alpha = 0.85f))
+            }
         }
     }
 }
 
 /** Telegram'dagidek: rasm soniga qarab yuqoridagi chiziqchalar. */
 @Composable
-private fun PhotoDashes(count: Int, current: Int) {
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+private fun PhotoDashes(count: Int, current: Int, alpha: Float) {
+    Row(Modifier.fillMaxWidth().alpha(alpha), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
         repeat(count) { index ->
             Box(
                 Modifier.weight(1f)
@@ -355,15 +410,6 @@ private fun PhotoDashes(count: Int, current: Int) {
                     .background(Color.White.copy(alpha = if (index == current) 1f else 0.35f)),
             )
         }
-    }
-}
-
-@Composable
-private fun HeaderBar(onClose: () -> Unit, onMenu: (() -> Unit)?, tint: Color) {
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        GlassButton(ScIcons.ChevronLeft, "Orqaga", tint, onClose)
-        Spacer(Modifier.weight(1f))
-        if (onMenu != null) GlassButton(ScIcons.Close, "Yig'ish", tint, onMenu)
     }
 }
 
@@ -524,7 +570,16 @@ private fun String.courseLabel(): String = when (uppercase()) {
 private const val AVATAR_VIEWER = -1
 
 /** Jest tasodifiy tegishdan ishlab ketmasin — shu piksellardan keyin hisobga olinadi. */
-private const val DRAG_THRESHOLD = 12f
+/** Yig'ilgan sarlavha balandligi (avatar + ism + holat sig'adigan eng kichik o'lcham). */
+private val COLLAPSED_HEADER = 250.dp
+
+/** Yig'ilgan holatdagi avatar diametri va uning tepadan chekinishi. */
+private val COLLAPSED_AVATAR = 96.dp
+private val COLLAPSED_AVATAR_TOP = 62.dp
+
+/** Barmoq ko'tarilganda shu ulushdan oshgan sarlavha to'liq ochiladi, aks holda yopiladi. */
+private const val SNAP_POINT = 0.4f
+private const val SNAP_DURATION_MS = 220
 
 private const val PHOTO_COLUMNS = 3
 private val PHOTO_CELL = 108.dp
