@@ -1,6 +1,11 @@
 package dev.feature.chat.presentation
 
-import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -32,6 +37,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -88,6 +97,35 @@ internal fun PeerProfileSheet(
     var expanded by remember { mutableStateOf(false) }
     var tab by remember { mutableStateOf(ProfileTab.MEDIA) }
     val student = conversation.other
+    val hasPhoto = !student.avatarUrl.isNullOrBlank()
+
+    val scroll = rememberScrollState()
+    // Telegram'dagi jest: ro'yxat TEPASIDA turib pastga tortilsa sarlavha yoyiladi,
+    // yoyilgan holatda yuqoriga tortilsa yig'iladi.
+    val pullToExpand = remember(scroll, hasPhoto) {
+        object : NestedScrollConnection {
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                // Yoyilgan sarlavha ustida yuqoriga surish — avval uni yig'amiz va
+                // jestni O'ZIMIZ yutamiz, aks holda kontent bir vaqtda sakrab ketardi.
+                if (expanded && available.y < -DRAG_THRESHOLD && scroll.value == 0) {
+                    expanded = false
+                    return available
+                }
+                return Offset.Zero
+            }
+
+            override fun onPostScroll(
+                consumed: Offset,
+                available: Offset,
+                source: NestedScrollSource,
+            ): Offset {
+                // `available` — kontent yutmagan qoldiq. Tepada pastga tortilganda
+                // hammasi qoldiq bo'lib qaytadi.
+                if (!expanded && hasPhoto && available.y > DRAG_THRESHOLD) expanded = true
+                return Offset.Zero
+            }
+        }
+    }
 
     val status = when {
         typing -> "yozmoqda…"
@@ -98,28 +136,42 @@ internal fun PeerProfileSheet(
 
     Dialog(onDismissRequest = onClose, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         StatusBarAppearance(darkIcons = false)
-        Column(Modifier.fillMaxSize().background(Sc.Bg).verticalScroll(rememberScrollState())) {
+        Column(
+            Modifier.fillMaxSize()
+                .background(Sc.Bg)
+                .nestedScroll(pullToExpand)
+                .verticalScroll(scroll),
+        ) {
 
-            if (expanded && !student.avatarUrl.isNullOrBlank()) {
-                ExpandedHeader(
-                    name = student.displayName,
-                    status = status,
-                    avatarUrl = student.avatarUrl,
-                    // Backend bitta rasm beradi; ro'yxat kelganda chiziqchalar o'zi ko'payadi.
-                    photoCount = 1,
-                    onClose = onClose,
-                    onCollapse = { expanded = false },
-                    onOpenPhoto = { viewer = AVATAR_VIEWER },
-                )
-            } else {
-                CollapsedHeader(
-                    student = student,
-                    status = status,
-                    onClose = onClose,
-                    onExpand = {
-                        if (!student.avatarUrl.isNullOrBlank()) expanded = true
-                    },
-                )
+            // Balandlik keskin sakramasin — `SizeTransform` ikki sarlavha orasidagi
+            // o'tishni silliqlaydi.
+            AnimatedContent(
+                targetState = expanded && hasPhoto,
+                transitionSpec = {
+                    (fadeIn(tween(180)) togetherWith fadeOut(tween(140)))
+                        .using(SizeTransform(clip = true))
+                },
+                label = "profileHeader",
+            ) { isExpanded ->
+                if (isExpanded) {
+                    ExpandedHeader(
+                        name = student.displayName,
+                        status = status,
+                        avatarUrl = student.avatarUrl,
+                        // Backend bitta rasm beradi; ro'yxat kelganda chiziqchalar ko'payadi.
+                        photoCount = 1,
+                        onClose = onClose,
+                        onCollapse = { expanded = false },
+                        onOpenPhoto = { viewer = AVATAR_VIEWER },
+                    )
+                } else {
+                    CollapsedHeader(
+                        student = student,
+                        status = status,
+                        onClose = onClose,
+                        onExpand = { if (hasPhoto) expanded = true },
+                    )
+                }
             }
 
             Column(
@@ -214,7 +266,6 @@ private fun CollapsedHeader(
     onClose: () -> Unit,
     onExpand: () -> Unit,
 ) {
-    val size by animateDpAsState(96.dp, label = "avatar")
     Column(
         Modifier.fillMaxWidth()
             .background(Sc.headerBrush)
@@ -226,7 +277,7 @@ private fun CollapsedHeader(
         Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
             ScAvatar(
                 name = student.displayName,
-                size = size,
+                size = 96.dp,
                 avatarUrl = student.avatarUrl,
                 background = Color.White.copy(alpha = 0.9f),
                 initialColor = Sc.Violet,
@@ -471,6 +522,9 @@ private fun String.courseLabel(): String = when (uppercase()) {
 
 /** Avatar ko'rgichi suhbat rasmlaridan farq qilsin — indeks sifatida maxsus qiymat. */
 private const val AVATAR_VIEWER = -1
+
+/** Jest tasodifiy tegishdan ishlab ketmasin — shu piksellardan keyin hisobga olinadi. */
+private const val DRAG_THRESHOLD = 12f
 
 private const val PHOTO_COLUMNS = 3
 private val PHOTO_CELL = 108.dp
