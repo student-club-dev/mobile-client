@@ -63,6 +63,7 @@ fun chatModule() = module {
             remote = get(),
             socket = get(),
             tokenStore = get(),
+            media = get(),
         )
     }
 

@@ -10,4 +10,6 @@ kotlin { sourceSets { commonMain.dependencies {
     implementation(projects.dev.core.network)
     // Vaqt yorliqlari (ChatFormat) va domen modellaridagi `Instant`.
     implementation(libs.kotlinx.datetime)
+    // Chatdagi rasmlar (`AsyncImage`) — yuklangan media havolasi bo'yicha ko'rsatiladi.
+    implementation(libs.coil.compose)
 } } }

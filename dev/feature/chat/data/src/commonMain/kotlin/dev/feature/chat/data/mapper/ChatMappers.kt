@@ -4,6 +4,7 @@ import dev.core.database.sql.ConversationEntity
 import dev.core.database.sql.MessageEntity
 import dev.core.network.generated.model.MessageDto
 import dev.feature.chat.data.realtime.WsMessage
+import dev.feature.chat.domain.model.Attachment
 import dev.feature.chat.domain.model.Conversation
 import dev.feature.chat.domain.model.ConversationItem
 import dev.feature.chat.domain.model.ConversationType
@@ -29,7 +30,8 @@ internal fun ConversationEntity.toDomain(): ConversationItem = ConversationItem(
         online = otherOnline != 0L,
         lastSeenAt = otherLastSeenAt?.let(Instant::fromEpochMilliseconds),
     ),
-    // Ro'yxat qatorida to'liq xabar kerak emas — matn va kim yozgani yetarli.
+    // Ro'yxat qatorida to'liq xabar kerak emas — matn, turi va kim yozgani yetarli.
+    // Turi shu yerda ham aniqlanadi, aks holda ro'yxatda rasm o'rniga uzun havola ko'rinardi.
     lastMessage = lastMessageBody?.let { text ->
         Message(
             id = "$id-last",
@@ -38,6 +40,7 @@ internal fun ConversationEntity.toDomain(): ConversationItem = ConversationItem(
             seq = 0,
             body = text,
             createdAt = Instant.fromEpochMilliseconds(lastMessageAt ?: 0L),
+            type = MediaContent.detect(text),
         )
     },
     unreadCount = unreadCount.toInt(),
@@ -56,6 +59,15 @@ internal fun MessageEntity.toDomain(): Message = Message(
     type = parseEnum(type, MessageType.TEXT),
     status = parseEnum(status, MessageStatus.SENT),
     clientMsgId = clientMsgId,
+    attachment = attachmentUrl?.let { url ->
+        Attachment(
+            url = url,
+            thumbUrl = attachmentThumbUrl,
+            width = attachmentWidth.toInt(),
+            height = attachmentHeight.toInt(),
+        )
+    },
+    albumId = albumId,
 )
 
 // --- Server javoblari → kesh ustunlari ---------------------------------------------------
@@ -71,30 +83,69 @@ internal data class MessageRow(
     val createdAt: Long,
     val clientMsgId: String?,
     val status: String = MessageStatus.SENT.name,
+    val attachmentUrl: String? = null,
+    val attachmentThumbUrl: String? = null,
+    val attachmentWidth: Long = 0,
+    val attachmentHeight: Long = 0,
+    val albumId: String? = null,
 )
 
-internal fun MessageDto.toRow(clientMsgId: String? = null): MessageRow = MessageRow(
+// v1 da server faqat TEXT yozadi, lekin sxemada `body` nullable — bo'sh matn bilan qoplaymiz.
+internal fun MessageDto.toRow(clientMsgId: String? = null): MessageRow = messageRow(
     id = id,
     conversationId = conversationId,
     senderId = senderId,
     seq = seq.toLong(),
-    type = type.name,
-    // v1 da faqat TEXT yoziladi, lekin sxemada `body` nullable — bo'sh matn bilan qoplaymiz.
+    serverType = type.name,
     body = body.orEmpty(),
     createdAt = createdAt.toEpochMilliseconds(),
     clientMsgId = clientMsgId,
 )
 
-internal fun WsMessage.toRow(): MessageRow = MessageRow(
+internal fun WsMessage.toRow(): MessageRow = messageRow(
     id = id,
     conversationId = conversationId,
     senderId = senderId,
     seq = seq.toLong(),
-    type = type,
+    serverType = type,
     body = body.orEmpty(),
     createdAt = parseInstant(createdAt),
     clientMsgId = null,
 )
+
+/**
+ * Serverdan kelgan xabardan kesh qatorini quradi va **turini aniqlaydi**.
+ *
+ * Server `TEXT` dan boshqa tur bergan bo'lsa — unga ishonamiz (backend tipli xabarni
+ * qo'shgani). Aks holda tana bo'yicha taxmin qilamiz: rasm havolasi → `IMAGE`, yakka
+ * emoji → `STICKER` (qarang [MediaContent]).
+ */
+private fun messageRow(
+    id: String,
+    conversationId: String,
+    senderId: String,
+    seq: Long,
+    serverType: String,
+    body: String,
+    createdAt: Long,
+    clientMsgId: String?,
+): MessageRow {
+    val fromServer = parseEnum(serverType, MessageType.TEXT)
+    val type = if (fromServer != MessageType.TEXT) fromServer else MediaContent.detect(body)
+    return MessageRow(
+        id = id,
+        conversationId = conversationId,
+        senderId = senderId,
+        seq = seq,
+        type = type.name,
+        body = body,
+        createdAt = createdAt,
+        clientMsgId = clientMsgId,
+        // Rasmda tananing o'zi havola — biriktirma ham shu. Server o'lcham qaytarmaydi,
+        // shuning uchun kengligi/balandligi `0` bo'lib qoladi va UI kvadratga tushadi.
+        attachmentUrl = if (type == MessageType.IMAGE) MediaContent.imageUrlOrNull(body) else null,
+    )
+}
 
 /**
  * ISO-8601 → epoch ms. Server doim to'g'ri sana yuboradi, lekin parse xatosi butun suhbatni

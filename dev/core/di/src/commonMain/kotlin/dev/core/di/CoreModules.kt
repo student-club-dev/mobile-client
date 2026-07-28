@@ -32,6 +32,7 @@ import dev.core.domain.usecase.SetPasswordUseCase
 import dev.core.domain.usecase.VerifyPhoneOtpUseCase
 import dev.core.network.NetworkConfig
 import dev.core.network.createHttpClient
+import dev.core.network.media.MediaUploader
 import dev.core.network.generated.api.CatalogApi
 import dev.core.network.generated.api.GeoApi
 import dev.core.network.generated.api.DiscountsApi
@@ -88,6 +89,13 @@ val networkModule = module {
 
     // Har so'rovga `Authorization: Bearer <accessToken>`; 401 da refresh avtomatik.
     single<HttpClient> { createHttpClient(get(), get()) }
+
+    // Rasm yuklash (`POST /v1/media/upload`) — generatsiya qilingan `MediaApi` multipart
+    // qismiga `filename` qo'ymagani uchun qo'lda yozilgan (qarang: `MediaUploader` izohi).
+    //
+    // Bu yerda — chunki uni bir nechta feature ishlatadi (profil avatari, chat rasmlari).
+    // Har feature o'zi ro'yxatdan o'tkazsa Koin `DefinitionOverrideException` bilan yiqilardi.
+    single { MediaUploader(client = get(), config = get()) }
 }
 
 val databaseModule = module {

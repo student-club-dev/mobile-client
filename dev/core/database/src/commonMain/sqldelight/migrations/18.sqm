@@ -1,0 +1,19 @@
+-- v18 -> v19 — chatda media xabarlar (rasm) va stiker.
+--
+-- ⚠️ Backend tipli xabarni HALI qo'llab-quvvatlamaydi: `SendMessageDto` da `type` yo'q va
+-- `POST /v1/media/upload` faqat rasm qabul qiladi (CHAT_MEDIA_AND_CALLS_BACKEND.md §0).
+-- Shuning uchun xabarning turi KLIENT tomonida aniqlanadi:
+--   * tanasi rasm havolasi bo'lgan xabar → IMAGE (`attachmentUrl` to'ladi),
+--   * yakka emoji → STICKER.
+-- Backend `type` + `attachment` qo'shganda mapper serverning qiymatini afzal ko'radi va
+-- bu ustunlar o'sha yerdan to'ladi — sxema o'zgarishsiz qoladi.
+--
+-- `albumId` — bir martada yuborilgan rasmlarni bog'laydi. Faqat YUBORUVCHI qurilmada
+-- to'ladi (server uni qaytarmaydi); qabul qiluvchi tomonda albom qo'shni xabarlardan
+-- taxmin qilinadi, shuning uchun ustun nullable va indekslanmagan.
+
+ALTER TABLE MessageEntity ADD COLUMN attachmentUrl TEXT;
+ALTER TABLE MessageEntity ADD COLUMN attachmentThumbUrl TEXT;
+ALTER TABLE MessageEntity ADD COLUMN attachmentWidth INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE MessageEntity ADD COLUMN attachmentHeight INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE MessageEntity ADD COLUMN albumId TEXT;

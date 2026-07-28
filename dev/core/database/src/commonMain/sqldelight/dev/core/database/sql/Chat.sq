@@ -51,7 +51,20 @@ CREATE TABLE MessageEntity (
     -- Idempotentlik kaliti (C6): qayta yuborishda server yangi xabar yaratmaydi.
     clientMsgId TEXT,
     -- SENDING | SENT | FAILED
-    status TEXT NOT NULL DEFAULT 'SENT'
+    status TEXT NOT NULL DEFAULT 'SENT',
+
+    -- Media biriktirmasi. Backend tipli xabarni hali qo'llab-quvvatlamaydi, shuning uchun
+    -- `type`/`attachmentUrl` KLIENT tomonida aniqlanadi: tanasi rasm havolasi bo'lgan
+    -- xabar — IMAGE, yakka emoji — STICKER (CHAT_MEDIA_AND_CALLS_BACKEND.md §0).
+    attachmentUrl TEXT,
+    attachmentThumbUrl TEXT,
+    -- 0 — o'lcham noma'lum (server qaytarmaydi); UI kvadrat nisbatga tushadi.
+    attachmentWidth INTEGER NOT NULL DEFAULT 0,
+    attachmentHeight INTEGER NOT NULL DEFAULT 0,
+    -- Bir martada yuborilgan rasmlarni bog'laydi. Faqat SHU qurilmada to'ladi — server
+    -- `albumId` ni qaytarmaydi, qabul qiluvchi tomonda albom qo'shni xabarlardan taxmin
+    -- qilinadi (ChatViewModel).
+    albumId TEXT
 );
 
 CREATE INDEX message_conversation_idx ON MessageEntity(conversationId, seq);
@@ -160,11 +173,17 @@ SELECT * FROM MessageEntity WHERE id = ?;
 
 upsertMessage:
 INSERT OR REPLACE INTO MessageEntity(
-    id, conversationId, senderId, seq, type, body, createdAt, clientMsgId, status
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+    id, conversationId, senderId, seq, type, body, createdAt, clientMsgId, status,
+    attachmentUrl, attachmentThumbUrl, attachmentWidth, attachmentHeight, albumId
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 setMessageStatus:
 UPDATE MessageEntity SET status = ? WHERE id = ?;
+
+-- Rasm yuklanib bo'lgach: optimistik qatorning tanasi va biriktirmasi haqiqiy havolaga
+-- almashadi. Qator o'chirilmaydi — `id` o'zgarmagani uchun ekranda sakrash bo'lmaydi.
+setMessageMedia:
+UPDATE MessageEntity SET body = ?, attachmentUrl = ?, attachmentThumbUrl = ? WHERE id = ?;
 
 -- Optimistik qator ack kelganda serverning haqiqiy id/seq'iga almashadi.
 deleteMessage:

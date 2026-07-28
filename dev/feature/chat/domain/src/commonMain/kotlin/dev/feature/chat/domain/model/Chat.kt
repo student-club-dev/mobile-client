@@ -6,12 +6,21 @@ import kotlinx.datetime.Instant
 /** v1 da faqat `DIRECT` yaratiladi; `GROUP` — keyingi bosqich. */
 enum class ConversationType { DIRECT, GROUP }
 
-/** v1 da faqat `TEXT` yoziladi; qolganlari kelajak uchun. */
-enum class MessageType { TEXT, IMAGE, FILE, VOICE, SYSTEM }
+/**
+ * Xabar turi.
+ *
+ * ⚠️ Backend hozir **faqat `TEXT` yaratadi** — `SendMessageDto` da `type` maydoni yo'q
+ * (qarang: `CHAT_MEDIA_AND_CALLS_BACKEND.md` §0). Shuning uchun `IMAGE` va `STICKER`
+ * turlari **klient tomonida** aniqlanadi: rasm xabarining tanasi — rasm havolasi,
+ * stikerniki — yakka emoji. Ikkalasi ham eski klientlarda o'qiladigan holda ko'rinadi
+ * (havola / emoji), backend tipli xabarni qo'shganda esa mapper serverning `type` ini
+ * afzal ko'radi va bu evristika o'zi ishlamay qoladi.
+ */
+enum class MessageType { TEXT, IMAGE, GIF, VIDEO, VOICE, FILE, STICKER, CALL, SYSTEM }
 
 /** Xabarning **local** yuborilish holati (serverda bunday maydon yo'q). */
 enum class MessageStatus {
-    /** Ekranда ko'rsatildi, lekin server hali tasdiqlamadi. */
+    /** Ekranda ko'rsatildi, lekin server hali tasdiqlamadi. */
     SENDING,
 
     /** Server qabul qildi — `seq` va `id` haqiqiy. */
@@ -75,4 +84,40 @@ data class Message(
     val type: MessageType = MessageType.TEXT,
     val status: MessageStatus = MessageStatus.SENT,
     val clientMsgId: String? = null,
+    /** `IMAGE`/`GIF`/`VIDEO`/`VOICE`/`FILE` da to'ladi; `TEXT` da doim `null`. */
+    val attachment: Attachment? = null,
+    /**
+     * Bir martada yuborilgan rasmlarni bog'laydi. Backend bu maydonni hali qaytarmaydi,
+     * shuning uchun hozir **klient o'zi qo'yadi** va u faqat shu qurilmada saqlanadi —
+     * boshqa tomonda albom qo'shni xabarlardan taxmin qilinadi.
+     */
+    val albumId: String? = null,
+)
+
+/**
+ * Media biriktirmasi.
+ *
+ * [width]/[height] `0` bo'lishi mumkin — backend hozir rasm o'lchamini qaytarmaydi
+ * (`MediaUploadResponseDto` da faqat `url` bor). Shunda UI kvadrat nisbatga tushadi.
+ */
+data class Attachment(
+    val url: String,
+    val thumbUrl: String? = null,
+    val mimeType: String? = null,
+    val width: Int = 0,
+    val height: Int = 0,
+    val sizeBytes: Long = 0,
+    val durationMs: Int = 0,
+) {
+    /** Ko'rsatish uchun eng arzon havola — ro'yxatda kichigi, ochilganda to'lig'i. */
+    val previewUrl: String get() = thumbUrl ?: url
+
+    /** Nisbat ma'lum bo'lmasa `null` — chaqiruvchi o'zining odatiy nisbatini qo'yadi. */
+    val aspectRatio: Float? get() = if (width > 0 && height > 0) width.toFloat() / height else null
+}
+
+/** Yuborish uchun tayyorlangan rasm — domen qatlami platformadagi tanlagichga bog'lanmasin. */
+class OutgoingImage(
+    val bytes: ByteArray,
+    val fileName: String,
 )

@@ -7,6 +7,9 @@ import dev.core.common.auth.TokenStore
 import dev.feature.chat.domain.model.ConversationItem
 import dev.feature.chat.domain.model.Message
 import dev.feature.chat.domain.model.MessageStatus
+import dev.feature.chat.domain.model.MessageType
+import dev.feature.chat.domain.model.OutgoingImage
+import dev.feature.chat.domain.model.Sticker
 import dev.feature.chat.domain.repository.ChatRepository
 import dev.feature.connections.domain.model.ReportReason
 import dev.feature.connections.domain.repository.ConnectionsRepository
@@ -25,6 +28,19 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+/** Albomdagi (yoki yakka) bitta rasm. */
+data class ChatImageUi(
+    /** Qaysi xabarga tegishli — bosilganda/qayta yuborilganda kerak. */
+    val messageId: String,
+    /** Serverdagi havola. Hali yuklanmagan bo'lsa `null`. */
+    val url: String?,
+    /** Yuklanayotgan paytdagi local nusxa — havola paydo bo'lguncha shu ko'rsatiladi. */
+    val localBytes: ByteArray?,
+    val aspectRatio: Float?,
+) {
+    val loading: Boolean get() = url == null
+}
+
 /** Ekranda ko'rsatiladigan xabar — domen modeli + tayyor yorliqlar. */
 data class ChatMessageUi(
     val id: String,
@@ -38,6 +54,16 @@ data class ChatMessageUi(
     val delivered: Boolean,
     /** `null` bo'lmasa — bu xabardan oldin sana ajratgichi chiziladi. */
     val dayLabel: String? = null,
+    val type: MessageType = MessageType.TEXT,
+    /**
+     * Rasm(lar). Bir martada yuborilganlari **bitta** qatorga yig'iladi va to'r bo'lib
+     * chiziladi — shuning uchun ro'yxatda ular yakka xabar sifatida ko'rinmaydi.
+     */
+    val images: List<ChatImageUi> = emptyList(),
+    /** `STICKER` da — katta chiziladigan emoji. */
+    val sticker: String? = null,
+    /** Albomdagi barcha xabar id'lari — qayta yuborish hammasiga tegishli. */
+    val messageIds: List<String> = listOf(id),
 )
 
 data class ChatUiState(
@@ -110,16 +136,24 @@ class ChatViewModel(
         chatRepository.observeArchivedConversations(),
         selectedId,
         messagesFlow,
-        combine(draft, typingFlow, chatRepository.observeRealtimeConnected(), extra) { d, typing, rt, e ->
-            Quad(d, typing, rt, e)
-        },
+        combine(
+            draft,
+            typingFlow,
+            chatRepository.observeRealtimeConnected(),
+            extra,
+            chatRepository.observeLocalImages(),
+        ) { d, typing, rt, e, local -> Rest(d, typing, rt, e, local) },
     ) { conversations, archived, id, messages, rest ->
         val selected = (conversations + archived).firstOrNull { it.id == id }
         ChatUiState(
             conversations = conversations,
             archivedConversations = archived,
             selected = selected,
-            messages = messages.toUi(selected?.otherReadSeq ?: 0, selected?.otherDeliveredSeq ?: 0),
+            messages = messages.toUi(
+                otherReadSeq = selected?.otherReadSeq ?: 0,
+                otherDeliveredSeq = selected?.otherDeliveredSeq ?: 0,
+                localImages = rest.localImages,
+            ),
             draft = rest.draft,
             peerTyping = rest.typing,
             realtime = rest.realtime,
@@ -132,35 +166,103 @@ class ChatViewModel(
         .catch { emit(ChatUiState()) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), ChatUiState())
 
-    private data class Quad(
+    private data class Rest(
         val draft: String,
         val typing: Boolean,
         val realtime: Boolean,
         val extra: ExtraState,
+        val localImages: Map<String, ByteArray>,
     )
 
-    /** Domen xabarlari → ekran modeli: kim yozgani, soat, sana ajratgichi, o'qilganligi. */
-    private fun List<Message>.toUi(otherReadSeq: Int, otherDeliveredSeq: Int): List<ChatMessageUi> =
-        mapIndexed { index, m ->
-            val previous = getOrNull(index - 1)
+    /**
+     * Domen xabarlari → ekran modeli: kim yozgani, soat, sana ajratgichi, o'qilganligi.
+     *
+     * Ketma-ket kelgan rasmlar avval **albomga** yig'iladi (qarang [groupAlbums]), shuning
+     * uchun natijadagi qatorlar soni xabarlar sonidan kam bo'lishi mumkin.
+     */
+    private fun List<Message>.toUi(
+        otherReadSeq: Int,
+        otherDeliveredSeq: Int,
+        localImages: Map<String, ByteArray>,
+    ): List<ChatMessageUi> {
+        val groups = groupAlbums()
+        return groups.mapIndexed { index, group ->
+            // Guruh sarlavhasi — birinchi xabar; vaqt va belgichalar — oxirgisiniki.
+            val head = group.first()
+            val tail = group.last()
+            val previous = groups.getOrNull(index - 1)?.last()
             ChatMessageUi(
-                id = m.id,
-                text = m.body,
-                outgoing = m.senderId == myId,
-                time = ChatFormat.time(m.createdAt),
-                status = m.status,
+                id = head.id,
+                text = head.body,
+                outgoing = head.senderId == myId,
+                time = ChatFormat.time(tail.createdAt),
+                // Albomda bittasi ham yuborilmagan bo'lsa — butun to'r shu holatda ko'rinadi.
+                status = group.combinedStatus(),
                 // `seq = 0` — hali yuborilmagan xabar, o'qilgan bo'lishi mumkin emas.
-                read = m.seq > 0 && m.seq <= otherReadSeq,
+                read = tail.seq > 0 && tail.seq <= otherReadSeq,
                 // O'qilgan xabar, ta'rifi bo'yicha, yetkazilgan ham — kursorlar alohida
                 // kelgani uchun (delivered kechikishi mumkin) buni ochiq yozamiz.
-                delivered = m.seq > 0 && (m.seq <= otherDeliveredSeq || m.seq <= otherReadSeq),
-                dayLabel = if (previous == null || !ChatFormat.sameDay(previous.createdAt, m.createdAt)) {
-                    ChatFormat.dayLabel(m.createdAt)
+                delivered = tail.seq > 0 && (tail.seq <= otherDeliveredSeq || tail.seq <= otherReadSeq),
+                dayLabel = if (previous == null || !ChatFormat.sameDay(previous.createdAt, head.createdAt)) {
+                    ChatFormat.dayLabel(head.createdAt)
                 } else {
                     null
                 },
+                type = head.type,
+                images = if (head.type == MessageType.IMAGE) {
+                    group.map { m ->
+                        ChatImageUi(
+                            messageId = m.id,
+                            url = m.attachment?.url?.takeIf { it.isNotBlank() },
+                            localBytes = localImages[m.id],
+                            aspectRatio = m.attachment?.aspectRatio,
+                        )
+                    }
+                } else {
+                    emptyList()
+                },
+                sticker = head.body.takeIf { head.type == MessageType.STICKER },
+                messageIds = group.map { it.id },
             )
         }
+    }
+
+    /**
+     * Ketma-ket rasmlarni albomga yig'adi.
+     *
+     * `albumId` faqat **yuboruvchi** qurilmada bo'ladi — server uni qaytarmaydi
+     * (`CHAT_MEDIA_AND_CALLS_BACKEND.md` §3). Shuning uchun qabul qiluvchi tomonda albom
+     * qo'shni xabarlardan taxmin qilinadi: bir odam, ketma-ket, [ALBUM_WINDOW_SECONDS]
+     * ichida yuborgan rasmlar bitta to'r hisoblanadi.
+     */
+    private fun List<Message>.groupAlbums(): List<List<Message>> {
+        val groups = mutableListOf<MutableList<Message>>()
+        forEach { message ->
+            val current = groups.lastOrNull()
+            val previous = current?.last()
+            val joins = previous != null &&
+                current.size < MAX_ALBUM_SIZE &&
+                message.type == MessageType.IMAGE &&
+                previous.type == MessageType.IMAGE &&
+                message.senderId == previous.senderId &&
+                sameAlbum(previous, message)
+            if (joins) current.add(message) else groups.add(mutableListOf(message))
+        }
+        return groups
+    }
+
+    private fun sameAlbum(a: Message, b: Message): Boolean = when {
+        // Kamida bittasida kalit bor — u holda faqat kalit hal qiladi.
+        a.albumId != null || b.albumId != null -> a.albumId == b.albumId
+        else -> (b.createdAt - a.createdAt).inWholeSeconds <= ALBUM_WINDOW_SECONDS
+    }
+
+    /** Albomning umumiy holati: yiqilgani bo'lsa `FAILED`, yuborilayotgani bo'lsa `SENDING`. */
+    private fun List<Message>.combinedStatus(): MessageStatus = when {
+        any { it.status == MessageStatus.FAILED } -> MessageStatus.FAILED
+        any { it.status == MessageStatus.SENDING } -> MessageStatus.SENDING
+        else -> MessageStatus.SENT
+    }
 
     // --- Suhbat ochish -------------------------------------------------------------------
 
@@ -265,11 +367,49 @@ class ChatViewModel(
         }
     }
 
-    /** Yuborilmagan xabarni qayta yuborish (o'sha `clientMsgId` bilan — idempotent). */
-    fun retry(messageId: String) = viewModelScope.launch {
-        when (val res = chatRepository.retry(messageId)) {
-            is Resource.Error -> extra.update { it.copy(message = res.message) }
-            else -> Unit
+    /**
+     * Tanlangan rasmlarni yuboradi — bir martada bir nechtasi.
+     *
+     * Yuklash **fon rejimida** ketadi: ekranda rasmlar darhol paydo bo'ladi va yuklanish
+     * tugagach havolaga almashadi, ya'ni foydalanuvchi kutib turmaydi va boshqa xabar
+     * yozishi mumkin.
+     */
+    fun sendImages(images: List<OutgoingImage>) {
+        val id = selectedId.value ?: return
+        if (images.isEmpty()) return
+        stopTyping()
+        viewModelScope.launch {
+            when (val res = chatRepository.sendImages(id, images)) {
+                // Yiqilganlari ro'yxatda `FAILED` bo'lib qoladi — qayta urinish mumkin.
+                is Resource.Error -> extra.update { it.copy(message = res.message) }
+                else -> Unit
+            }
+        }
+    }
+
+    fun sendSticker(sticker: Sticker) {
+        val id = selectedId.value ?: return
+        stopTyping()
+        viewModelScope.launch {
+            when (val res = chatRepository.sendSticker(id, sticker)) {
+                is Resource.Error -> extra.update { it.copy(message = res.message) }
+                else -> Unit
+            }
+        }
+    }
+
+    /**
+     * Yuborilmagan xabarni qayta yuborish (o'sha `clientMsgId` bilan — idempotent).
+     *
+     * Albomda bir nechta xabar bo'lishi mumkin — faqat **yiqilganlari** qayta yuboriladi,
+     * muvaffaqiyatlisiga tegilmaydi.
+     */
+    fun retry(messageIds: List<String>) = viewModelScope.launch {
+        messageIds.forEach { id ->
+            when (val res = chatRepository.retry(id)) {
+                is Resource.Error -> extra.update { it.copy(message = res.message) }
+                else -> Unit
+            }
         }
     }
 
@@ -340,5 +480,14 @@ class ChatViewModel(
 
     private companion object {
         const val TYPING_IDLE_MS = 3_000L
+
+        /** Bir albomdagi rasmlar chegarasi — `ChatRepositoryImpl` dagi bilan bir xil. */
+        const val MAX_ALBUM_SIZE = 10
+
+        /**
+         * Qabul qiluvchi tomonda albomni taxmin qilish oynasi. Server `albumId` ni
+         * qaytarmagani uchun ketma-ket kelgan rasmlar shu oraliqda bitta to'r hisoblanadi.
+         */
+        const val ALBUM_WINDOW_SECONDS = 60L
     }
 }

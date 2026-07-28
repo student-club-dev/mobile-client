@@ -133,8 +133,9 @@ class DatabaseSchemaTest {
         // ulandi: suhbat ikkinchi tomonning qisqa profilini, xabar esa `seq`/`senderId`/holatini
         // saqlaydi (eski demo jadvallar tashlab yuborildi), 17.sqm — suhbatdoshning
         // "yetkazildi" kursori (`otherDeliveredSeq`) + profil jinsi va "oxirgi ko'rilgan"
-        // maxfiyligi (backend 2026-07-28 spec'i).
-        assertEquals(18L, StudentClubDatabase.Schema.version)
+        // maxfiyligi (backend 2026-07-28 spec'i), 18.sqm — chatda media: rasm biriktirmasi
+        // (`attachmentUrl`/`attachmentThumbUrl`/o'lchamlar) va albom kaliti (`albumId`).
+        assertEquals(19L, StudentClubDatabase.Schema.version)
     }
 
     @Test
@@ -249,9 +250,12 @@ class DatabaseSchemaTest {
         assertEquals(1, q.selectArchivedConversations().executeAsList().size)
 
         // Xabarlar: `seq = 0` (yuborilayotgan) ENG OXIRIDA turishi kerak.
-        q.upsertMessage("m2", "cnv_1", "std_ali", 42L, "TEXT", "Salom!", 2_000L, null, "SENT")
-        q.upsertMessage("m1", "cnv_1", "std_men", 41L, "TEXT", "Assalomu alaykum", 1_000L, null, "SENT")
-        q.upsertMessage("local:x", "cnv_1", "std_men", 0L, "TEXT", "Ketyapti…", 3_000L, "cmid-1", "SENDING")
+        q.message("m2", seq = 42L, sender = "std_ali", body = "Salom!", createdAt = 2_000L)
+        q.message("m1", seq = 41L, sender = "std_men", body = "Assalomu alaykum", createdAt = 1_000L)
+        q.message(
+            "local:x", seq = 0L, sender = "std_men", body = "Ketyapti…", createdAt = 3_000L,
+            clientMsgId = "cmid-1", status = "SENDING",
+        )
         assertEquals(
             listOf("m1", "m2", "local:x"),
             q.selectMessages("cnv_1").executeAsList().map { it.id },
@@ -267,6 +271,70 @@ class DatabaseSchemaTest {
 
         driver.close()
     }
+
+    /**
+     * Rasm xabari: yuklanayotganda tanasi bo'sh, yuklangach `setMessageMedia` uni havolaga
+     * almashtiradi va aynan shu matn bo'yicha optimistik nusxa o'chiriladi (18.sqm).
+     */
+    @Test
+    fun imageMessageStoresAttachmentAndAlbum() {
+        val driver = freshDriver()
+        val db = StudentClubDatabase(driver).also { StudentClubDatabase.Schema.create(driver) }
+        val q = db.chatQueries
+
+        q.message(
+            "local:img", seq = 0L, sender = "std_men", body = "", createdAt = 1_000L,
+            clientMsgId = "cmid-img", status = "SENDING", type = "IMAGE", albumId = "alb_1",
+        )
+        val pending = q.selectMessageById("local:img").executeAsOne()
+        assertEquals("IMAGE", pending.type)
+        assertEquals("alb_1", pending.albumId)
+        assertNull(pending.attachmentUrl)
+        assertEquals(0L, pending.attachmentWidth)
+
+        val url = "https://cdn.example.uz/uploads/LISTING/a.jpg"
+        q.setMessageMedia(url, url, null, "local:img")
+
+        val uploaded = q.selectMessageById("local:img").executeAsOne()
+        assertEquals(url, uploaded.body)
+        assertEquals(url, uploaded.attachmentUrl)
+        assertNull(uploaded.attachmentThumbUrl)
+
+        // Server o'sha xabarni qaytarganda optimistik qator tana (havola) bo'yicha topiladi.
+        q.deleteSendingByBody("cnv_1", url)
+        assertNull(q.selectMessageById("local:img").executeAsOneOrNull())
+
+        driver.close()
+    }
+
+    /** `upsertMessage` ning uzun imzosini testlarda takrorlamaslik uchun. */
+    private fun dev.core.database.sql.ChatQueries.message(
+        id: String,
+        seq: Long,
+        sender: String,
+        body: String,
+        createdAt: Long,
+        conversationId: String = "cnv_1",
+        type: String = "TEXT",
+        clientMsgId: String? = null,
+        status: String = "SENT",
+        albumId: String? = null,
+    ) = upsertMessage(
+        id = id,
+        conversationId = conversationId,
+        senderId = sender,
+        seq = seq,
+        type = type,
+        body = body,
+        createdAt = createdAt,
+        clientMsgId = clientMsgId,
+        status = status,
+        attachmentUrl = null,
+        attachmentThumbUrl = null,
+        attachmentWidth = 0L,
+        attachmentHeight = 0L,
+        albumId = albumId,
+    )
 
     @Test
     fun migrationFromV1AddsNewTablesAndColumn() {

@@ -63,9 +63,14 @@ import dev.core.uikit.components.ScText
 import dev.core.uikit.components.StatusBarAppearance
 import dev.core.uikit.components.scCard
 import dev.core.uikit.components.scStyle
+import dev.core.uikit.media.rememberMultiImagePicker
 import dev.core.uikit.theme.Sc
 import dev.feature.chat.domain.model.ConversationItem
+import dev.feature.chat.domain.model.Message
 import dev.feature.chat.domain.model.MessageStatus
+import dev.feature.chat.domain.model.MessageType
+import dev.feature.chat.domain.model.OutgoingImage
+import dev.feature.chat.domain.model.Sticker
 import dev.feature.connections.domain.model.ReportReason
 import kotlinx.coroutines.delay
 import org.koin.compose.viewmodel.koinViewModel
@@ -124,6 +129,8 @@ fun ChatScreen(
                 onBack = vm::close,
                 onDraft = vm::onDraft,
                 onSend = vm::send,
+                onSendImages = vm::sendImages,
+                onSendSticker = vm::sendSticker,
                 onRetry = vm::retry,
                 onLoadOlder = vm::loadOlder,
                 onMarkRead = vm::markRead,
@@ -151,6 +158,18 @@ fun ChatScreen(
             ) { ScText(message, 13.5f, FontWeight.SemiBold, Color.White) }
         }
     }
+}
+
+/**
+ * Ro'yxatdagi qisqa ko'rinish. Rasm xabarining tanasi — uzun havola, stikerniki — emoji,
+ * shuning uchun ular matn sifatida ko'rsatilmaydi.
+ */
+private fun Message?.preview(): String = when {
+    this == null -> "Xabar yozing…"
+    type == MessageType.IMAGE -> "📷 Rasm"
+    type == MessageType.STICKER -> "$body Stiker"
+    body.isBlank() -> "Xabar yozing…"
+    else -> body
 }
 
 /** Suhbat avatarlari navbat bilan uch tint ranggida. */
@@ -320,7 +339,7 @@ private fun ConversationRow(
             ScText(c.other.displayName, 15.5f, FontWeight.ExtraBold, Sc.Ink, maxLines = 1)
             Spacer(Modifier.height(2.dp))
             ScText(
-                c.lastMessage?.body ?: "Xabar yozing…",
+                c.lastMessage.preview(),
                 13.5f, FontWeight.Medium, Sc.Muted, maxLines = 1,
             )
         }
@@ -347,7 +366,9 @@ private fun ChatThread(
     onBack: () -> Unit,
     onDraft: (String) -> Unit,
     onSend: () -> Unit,
-    onRetry: (String) -> Unit,
+    onSendImages: (List<OutgoingImage>) -> Unit,
+    onSendSticker: (Sticker) -> Unit,
+    onRetry: (List<String>) -> Unit,
     onLoadOlder: () -> Unit,
     onMarkRead: () -> Unit,
     onDisconnect: (String) -> Unit,
@@ -361,6 +382,15 @@ private fun ChatThread(
     var reportStudent by remember { mutableStateOf(false) }
     var confirmDisconnect by remember { mutableStateOf(false) }
     var confirmBlock by remember { mutableStateOf(false) }
+    var stickersOpen by remember { mutableStateOf(false) }
+    // Ochilgan rasm: qaysi xabar va uning nechanchi rasmi.
+    var viewer by remember { mutableStateOf<Pair<List<ChatImageUi>, Int>?>(null) }
+
+    val picker = rememberMultiImagePicker { picked ->
+        if (picked.isNotEmpty()) {
+            onSendImages(picked.map { OutgoingImage(it.bytes, it.fileName) })
+        }
+    }
 
     val listState = rememberLazyListState()
     val messages = state.messages
@@ -404,12 +434,36 @@ private fun ChatThread(
             ) {
                 items(messages, key = { it.id }) { m ->
                     if (m.dayLabel != null) DaySeparator(m.dayLabel)
-                    MessageBubble(m, onLongPress = { messageMenu = m })
+                    MessageBubble(
+                        message = m,
+                        onLongPress = { messageMenu = m },
+                        onOpenImage = { index -> viewer = m.images to index },
+                    )
                 }
             }
         }
 
-        Composer(state.draft, onDraft, onSend)
+        Composer(
+            draft = state.draft,
+            onDraft = onDraft,
+            onSend = onSend,
+            onPickImages = {
+                stickersOpen = false
+                picker.pick()
+            },
+            stickersOpen = stickersOpen,
+            onToggleStickers = { stickersOpen = !stickersOpen },
+            onPickSticker = onSendSticker,
+        )
+    }
+
+    val openViewer = viewer
+    if (openViewer != null) {
+        ImageViewerDialog(
+            images = openViewer.first,
+            startIndex = openViewer.second,
+            onDismiss = { viewer = null },
+        )
     }
 
     // --- Dialoglar ---------------------------------------------------------------------
@@ -423,7 +477,7 @@ private fun ChatThread(
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     if (menuMessage.status == MessageStatus.FAILED) {
                         ActionRow(ScIcons.Return, "Qayta yuborish") {
-                            onRetry(menuMessage.id)
+                            onRetry(menuMessage.messageIds)
                             messageMenu = null
                         }
                     }
@@ -622,9 +676,27 @@ private fun DaySeparator(label: String) {
     }
 }
 
+/**
+ * Xabar qatori — turiga qarab pufak, rasm to'ri yoki stiker.
+ *
+ * `onOpenImage` albomdagi rasm bosilganda chaqiriladi (indeks bilan).
+ */
+@Composable
+private fun MessageBubble(
+    message: ChatMessageUi,
+    onLongPress: () -> Unit,
+    onOpenImage: (Int) -> Unit,
+) {
+    when (message.type) {
+        MessageType.IMAGE -> ImageAlbumBubble(message, onOpen = onOpenImage, onLongPress = onLongPress)
+        MessageType.STICKER -> StickerBubble(message, onLongPress = onLongPress)
+        else -> TextBubble(message, onLongPress = onLongPress)
+    }
+}
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun MessageBubble(message: ChatMessageUi, onLongPress: () -> Unit) {
+private fun TextBubble(message: ChatMessageUi, onLongPress: () -> Unit) {
     val align = if (message.outgoing) Alignment.CenterEnd else Alignment.CenterStart
     Box(Modifier.fillMaxWidth(), contentAlignment = align) {
         // Dumcha o'z tomonida: chiquvchi 20/20/6/20, kiruvchi 20/20/20/6.
@@ -649,38 +721,29 @@ private fun MessageBubble(message: ChatMessageUi, onLongPress: () -> Unit) {
                 lineHeight = 21f,
             )
             Spacer(Modifier.height(2.dp))
-            Row(
-                Modifier.align(Alignment.End),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                if (message.status == MessageStatus.FAILED) {
-                    ScText("yuborilmadi · qayta urinish", 11f, FontWeight.SemiBold, Color.White)
-                } else {
-                    ScText(
-                        message.time, 11f, FontWeight.SemiBold,
-                        if (message.outgoing) Color.White.copy(alpha = 0.85f) else Sc.MutedLight,
-                    )
-                }
-                if (message.outgoing && message.status != MessageStatus.FAILED) {
-                    // Bitta belgicha — server qabul qildi; ikkita — suhbatdoshning
-                    // qurilmasiga yetdi; yorqin ikkita — o'qildi.
-                    val doubleCheck = message.status != MessageStatus.SENDING && message.delivered
-                    Icon(
-                        if (doubleCheck) ScIcons.DoubleCheck else AppIcons.Check,
-                        null,
-                        tint = Color.White.copy(alpha = if (message.read) 1f else 0.6f),
-                        modifier = Modifier.size(15.dp),
-                    )
-                }
-            }
+            MessageMeta(message, Modifier.align(Alignment.End), onDark = message.outgoing)
         }
     }
 }
 
-/** Pastdagi kiritish paneli — biriktirish + pill maydon + gradient tugma. */
+/**
+ * Pastdagi kiritish paneli — biriktirish + pill maydon + gradient tugma, tagida ochiladigan
+ * stiker paneli.
+ *
+ * Qog'oz qisqich galereyani ochadi (bir martada 10 tagacha rasm), tabassum stikerlarni.
+ * Ovoz yozish hali yo'q — mikrofon ikonasi bo'sh maydonda ko'rinadi, lekin bosilganda
+ * hech narsa qilmaydi (backendda ovoz yuklash endpointi yo'q).
+ */
 @Composable
-private fun Composer(draft: String, onDraft: (String) -> Unit, onSend: () -> Unit) {
+private fun Composer(
+    draft: String,
+    onDraft: (String) -> Unit,
+    onSend: () -> Unit,
+    onPickImages: () -> Unit,
+    stickersOpen: Boolean,
+    onToggleStickers: () -> Unit,
+    onPickSticker: (Sticker) -> Unit,
+) {
     Column(Modifier.fillMaxWidth().background(Color.White).navigationBarsPadding()) {
         Box(Modifier.fillMaxWidth().height(1.dp).background(Sc.Border))
         Row(
@@ -696,9 +759,12 @@ private fun Composer(draft: String, onDraft: (String) -> Unit, onSend: () -> Uni
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                // Rasm/fayl/ovoz — backendда hali yo'q (v1 da faqat TEXT), shuning uchun
-                // biriktirish ikonasi dekorativ.
-                Icon(ScIcons.Paperclip, null, tint = Sc.Muted, modifier = Modifier.size(21.dp))
+                Icon(
+                    ScIcons.Paperclip,
+                    "Rasm biriktirish",
+                    tint = Sc.Muted,
+                    modifier = Modifier.size(21.dp).clickable(onClick = onPickImages),
+                )
                 Box(Modifier.weight(1f)) {
                     if (draft.isEmpty()) {
                         ScText("Xabar yozing…", 15f, FontWeight.Medium, Sc.NavIdle, maxLines = 1)
@@ -711,13 +777,19 @@ private fun Composer(draft: String, onDraft: (String) -> Unit, onSend: () -> Uni
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
-                Icon(ScIcons.Smile, null, tint = Sc.Muted, modifier = Modifier.size(21.dp))
+                Icon(
+                    ScIcons.Smile,
+                    "Stikerlar",
+                    tint = if (stickersOpen) Sc.Brand else Sc.Muted,
+                    modifier = Modifier.size(21.dp).clickable(onClick = onToggleStickers),
+                )
             }
             Box(
                 Modifier.size(48.dp)
                     .clip(RoundedCornerShape(percent = 50))
                     .background(Sc.tileBrush)
-                    .clickable(onClick = onSend),
+                    // Bo'sh maydonda yuborish ma'nosiz — ovoz yozish esa hali yo'q.
+                    .clickable(enabled = draft.isNotBlank(), onClick = onSend),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
@@ -726,6 +798,7 @@ private fun Composer(draft: String, onDraft: (String) -> Unit, onSend: () -> Uni
                 )
             }
         }
+        if (stickersOpen) StickerPanel(onPick = onPickSticker)
     }
 }
 

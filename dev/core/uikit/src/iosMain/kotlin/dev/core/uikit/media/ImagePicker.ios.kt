@@ -66,6 +66,67 @@ private class PhotoPickerDelegate : NSObject(), PHPickerViewControllerDelegatePr
     }
 }
 
+@Composable
+actual fun rememberMultiImagePicker(
+    maxItems: Int,
+    onResult: (List<PickedImage>) -> Unit,
+): ImagePicker {
+    val delegate = remember { MultiPhotoPickerDelegate() }
+    delegate.onResult = onResult
+
+    return remember(delegate, maxItems) {
+        ImagePicker {
+            val config = PHPickerConfiguration().apply {
+                setFilter(PHPickerFilter.imagesFilter())
+                setSelectionLimit(maxItems.coerceAtLeast(1).toLong())
+            }
+            val picker = PHPickerViewController(configuration = config)
+            picker.delegate = delegate
+
+            UIApplication.sharedApplication.keyWindow?.rootViewController
+                ?.presentViewController(picker, animated = true, completion = null)
+        }
+    }
+}
+
+/**
+ * Ko'p rasmli PHPicker delegati.
+ *
+ * `loadDataRepresentation` har bir element uchun **alohida va asinxron** tugaydi, tartibi
+ * ham kafolatlanmagan. Shuning uchun natijalar indeks bo'yicha oldindan o'lchamli massivga
+ * yoziladi (tanlangan tartib saqlanadi) va faqat **oxirgisi** kelganda callback chaqiriladi.
+ */
+private class MultiPhotoPickerDelegate : NSObject(), PHPickerViewControllerDelegateProtocol {
+
+    var onResult: (List<PickedImage>) -> Unit = {}
+
+    override fun picker(picker: PHPickerViewController, didFinishPicking: List<*>) {
+        picker.dismissViewControllerAnimated(true, completion = null)
+
+        val providers = didFinishPicking.mapNotNull { (it as? PHPickerResult)?.itemProvider }
+        if (providers.isEmpty()) {
+            onResult(emptyList()) // bekor qilindi
+            return
+        }
+
+        val slots = arrayOfNulls<PickedImage>(providers.size)
+        var remaining = providers.size
+
+        providers.forEachIndexed { index, provider ->
+            provider.loadDataRepresentationForTypeIdentifier(UTI_IMAGE) { data, _ ->
+                val image = data?.toByteArray()?.let { PickedImage(it, "image_$index.jpg") }
+                // Yig'ish ham, callback ham FAQAT asosiy oqimda: `remaining` ustida poyga
+                // bo'lmaydi va atomik hisoblagich kerak emas.
+                dispatch_async(dispatch_get_main_queue()) {
+                    slots[index] = image
+                    remaining -= 1
+                    if (remaining == 0) onResult(slots.filterNotNull())
+                }
+            }
+        }
+    }
+}
+
 @OptIn(ExperimentalForeignApi::class)
 private fun NSData.toByteArray(): ByteArray {
     val size = length.toInt()
