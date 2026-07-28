@@ -139,6 +139,7 @@ fun ChatScreen(
                 onBlock = { vm.block(it) },
                 onReportStudent = { id, reason, note -> vm.reportStudent(id, reason, note) },
                 onReportMessage = { id, reason, note -> vm.reportMessage(id, reason, note) },
+                onSoon = vm::showMessage,
             )
         }
 
@@ -380,6 +381,8 @@ private fun ChatThread(
     onBlock: (String) -> Unit,
     onReportStudent: (String, ReportReason, String?) -> Unit,
     onReportMessage: (String, ReportReason, String?) -> Unit,
+    /** Hali tayyor bo'lmagan amal bosilganda ko'rsatiladigan bir martalik xabar. */
+    onSoon: (String) -> Unit,
 ) {
     var messageMenu by remember { mutableStateOf<ChatMessageUi?>(null) }
     var reportMessageFor by remember { mutableStateOf<String?>(null) }
@@ -470,6 +473,7 @@ private fun ChatThread(
             typing = state.peerTyping,
             realtime = state.realtime,
             photos = state.photos,
+            links = state.links,
             universityName = state.peerUniversity,
             onClose = { profileOpen = false },
             onDisconnect = {
@@ -484,6 +488,7 @@ private fun ChatThread(
                 profileOpen = false
                 reportStudent = true
             },
+            onSoon = onSoon,
         )
     }
 

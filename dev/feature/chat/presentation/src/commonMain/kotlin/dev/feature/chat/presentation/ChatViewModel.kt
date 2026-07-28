@@ -42,6 +42,14 @@ data class ChatImageUi(
     val loading: Boolean get() = url == null
 }
 
+/** Profil ekranidagi «Havolalar» bo'limi uchun bitta havola. */
+data class ChatLinkUi(
+    val messageId: String,
+    val url: String,
+    /** Ro'yxatda sarlavha o'rnida — `studentclub.uz` kabi. */
+    val host: String,
+)
+
 /** Ekranda ko'rsatiladigan xabar — domen modeli + tayyor yorliqlar. */
 data class ChatMessageUi(
     val id: String,
@@ -98,10 +106,39 @@ data class ChatUiState(
             // Hali yuklanmagani (havolasiz) to'rda ko'rsatilmaydi.
             .filter { it.url != null }
 
+    /**
+     * Matnli xabarlardagi havolalar — «Havolalar» bo'limi, yangidan eskiga.
+     *
+     * Rasm xabarining tanasi ham havola (backend tipli xabarni bermaydi), lekin u
+     * `IMAGE` deb ajratilgani uchun bu yerga tushmaydi.
+     */
+    val links: List<ChatLinkUi>
+        get() = messages.asReversed()
+            .filter { it.type == MessageType.TEXT }
+            .flatMap { message -> message.text.extractLinks().map { message.id to it } }
+            .distinctBy { (_, url) -> url }
+            .map { (id, url) -> ChatLinkUi(messageId = id, url = url, host = url.hostOf()) }
+
     /** Suhbatdoshning universiteti — katalogda topilmasa `null` (xom `emis-142` ko'rsatilmaydi). */
     val peerUniversity: String?
         get() = selected?.other?.universityId?.let { universityNames[it] }
 }
+
+/** Matndagi `http(s)://…` bo'laklari. Tinish belgilari havolaga yopishib qolmasin. */
+private fun String.extractLinks(): List<String> = split(' ', '\n', '\t')
+    .map { it.trim().trimEnd('.', ',', ')', ']', '!', '?', ';', ':') }
+    .filter { it.startsWith("https://") || it.startsWith("http://") }
+    .filter { it.length > MIN_LINK_LENGTH }
+
+/** `https://studentclub.uz/a/b?x=1` → `studentclub.uz`. */
+private fun String.hostOf(): String = substringAfter("://")
+    .substringBefore('/')
+    .substringBefore('?')
+    .removePrefix("www.")
+    .ifBlank { this }
+
+/** `https://` ning o'zi havola emas. */
+private const val MIN_LINK_LENGTH = 11
 
 /**
  * Chat ekranining holati — suhbatlar ro'yxati va ochilgan suhbat bitta ViewModel'da
@@ -504,6 +541,9 @@ class ChatViewModel(
         }
         extra.update { it.copy(message = text) }
     }
+
+    /** Hali tayyor bo'lmagan amal uchun bir martalik xabar («tez orada»). */
+    fun showMessage(text: String) = extra.update { it.copy(message = text) }
 
     fun messageShown() = extra.update { it.copy(message = null) }
 
