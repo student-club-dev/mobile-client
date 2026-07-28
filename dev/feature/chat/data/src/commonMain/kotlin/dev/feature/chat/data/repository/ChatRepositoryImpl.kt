@@ -127,6 +127,15 @@ class ChatRepositoryImpl(
             }
         }
         launch {
+            socket.deliveredCursors.collect { cursor ->
+                // O'z qurilmamiz yuborgan "yetkazildi" qaytib kelsa — e'tiborsiz.
+                if (cursor.byStudentId == null || cursor.byStudentId == currentUserId) return@collect
+                withContext(dispatchers.io) {
+                    q.setOtherDeliveredSeq(cursor.seq.toLong(), cursor.conversationId)
+                }
+            }
+        }
+        launch {
             socket.presence.collect { presence ->
                 withContext(dispatchers.io) {
                     q.setPresence(
@@ -172,13 +181,10 @@ class ChatRepositoryImpl(
                 withContext(dispatchers.io) {
                     q.transaction {
                         res.data.items.forEach { item ->
-                            // Server o'qilgan kursorni qaytarmaydi. `unread == 0` bo'lsa
-                            // hammasi o'qilgan — kursor oxirgi xabarda.
-                            val readSeq = if (item.unreadCount == 0) {
-                                (item.lastMessage?.seq ?: 0).toLong()
-                            } else {
-                                0L
-                            }
+                            // Uchala kursor ham serverdan keladi (spec 2026-07-28) — avvalgi
+                            // "unread == 0 bo'lsa hammasi o'qilgan" taxmini kerak emas, va
+                            // ✓/✓✓ holati ilova qayta ochilganda ham tiklanadi.
+                            val readSeq = item.myReadSeq.toLong()
                             q.insertConversationIfNew(
                                 id = item.conversation.id,
                                 type = item.conversation.type.name,
@@ -193,6 +199,8 @@ class ChatRepositoryImpl(
                                 lastMessageSenderId = item.lastMessage?.senderId,
                                 unreadCount = item.unreadCount.toLong(),
                                 lastReadSeq = readSeq,
+                                otherReadSeq = item.peerReadSeq.toLong(),
+                                otherDeliveredSeq = item.peerDeliveredSeq.toLong(),
                             )
                             // Local ustunlarga (`archived`) tegmaydi.
                             q.updateConversation(
@@ -208,6 +216,8 @@ class ChatRepositoryImpl(
                                 lastMessageSenderId = item.lastMessage?.senderId,
                                 unreadCount = item.unreadCount.toLong(),
                                 lastReadSeq = readSeq,
+                                otherReadSeq = item.peerReadSeq.toLong(),
+                                otherDeliveredSeq = item.peerDeliveredSeq.toLong(),
                                 id = item.conversation.id,
                             )
                             item.lastMessage?.let { q.insert(it.toRow()) }

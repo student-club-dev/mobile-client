@@ -129,6 +129,19 @@ class ProfileViewModel(
     }
 
     /**
+     * "Oxirgi ko'rilgan" maxfiyligi: `EVERYONE` | `CONNECTIONS` | `NOBODY`.
+     *
+     * Profil hali yuklanmagan bo'lsa (kesh bo'sh) bo'sh profilga yozib yuborardik va
+     * ism/universitetni o'chirib yuborish xavfi bor edi — shuning uchun `null` da hech
+     * nima qilinmaydi.
+     */
+    fun setLastSeenVisibility(value: String) {
+        val current = state.value.profile ?: return
+        if (current.lastSeenVisibility == value) return
+        viewModelScope.launch { saveProfileUseCase(current.copy(lastSeenVisibility = value)) }
+    }
+
+    /**
      * Galereyadan tanlangan rasmni yuklaydi va profilga bog'laydi. [onResult] `null` —
      * muvaffaqiyat (kesh yangilanib, `state.profile.avatarUrl` avtomatik keladi),
      * aks holda xato matni.

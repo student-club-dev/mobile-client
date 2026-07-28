@@ -54,6 +54,7 @@ import dev.core.uikit.components.ScreenTitle
 import dev.feature.auth.presentation.flow.AuthFlowState
 import dev.feature.auth.presentation.flow.AuthFlowViewModel
 import dev.feature.auth.presentation.flow.CourseYear
+import dev.feature.auth.presentation.flow.ProfileGender
 import dev.feature.university.domain.model.University
 import dev.core.uikit.theme.AppPalette
 import dev.core.uikit.theme.appPalette
@@ -147,6 +148,17 @@ fun ProfileScreen(
             }
         }
 
+        // Ixtiyoriy: talabalar qidiruvidagi jins filtri aynan shu maydonga tayanadi
+        // (ko'rsatilmasa, filtrlangan ro'yxatga tushmaysiz).
+        Spacer(Modifier.height(14.dp))
+        FieldLabel("Jins (ixtiyoriy)")
+        Spacer(Modifier.height(8.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+            ProfileGender.entries.forEach { g ->
+                OptionChip(g.label, state.gender == g, { vm.onGenderChange(g) }, Modifier.weight(1f), palette)
+            }
+        }
+
         ErrorText(state.error)
 
         Spacer(Modifier.height(20.dp))
@@ -214,7 +226,26 @@ private fun BirthYearRow(year: Int, onSelect: (Int) -> Unit, palette: AppPalette
 }
 
 @Composable
-private fun CourseOption(course: CourseYear, active: Boolean, onClick: () -> Unit, modifier: Modifier, palette: AppPalette) {
+private fun CourseOption(course: CourseYear, active: Boolean, onClick: () -> Unit, modifier: Modifier, palette: AppPalette) =
+    OptionChip(
+        label = course.label,
+        active = active,
+        onClick = onClick,
+        modifier = modifier,
+        palette = palette,
+        fontSize = if (course == CourseYear.MASTER) 13f else 14f,
+    )
+
+/** Kurs va jins tanlovidagi bir xil ko'rinishdagi tugma. */
+@Composable
+private fun OptionChip(
+    label: String,
+    active: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier,
+    palette: AppPalette,
+    fontSize: Float = 14f,
+) {
     val shape = RoundedCornerShape(12.dp)
     Box(
         modifier
@@ -226,8 +257,8 @@ private fun CourseOption(course: CourseYear, active: Boolean, onClick: () -> Uni
         contentAlignment = Alignment.Center,
     ) {
         Text(
-            course.label,
-            style = TextStyle(fontFamily = AppFontFamily, fontSize = if (course == CourseYear.MASTER) 13.sp else 14.sp, fontWeight = FontWeight.ExtraBold, color = if (active) Color.White else palette.inkMuted),
+            label,
+            style = TextStyle(fontFamily = AppFontFamily, fontSize = fontSize.sp, fontWeight = FontWeight.ExtraBold, color = if (active) Color.White else palette.inkMuted),
         )
     }
 }

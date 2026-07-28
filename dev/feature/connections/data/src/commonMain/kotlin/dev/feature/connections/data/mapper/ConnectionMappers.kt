@@ -5,20 +5,25 @@ import dev.core.network.generated.model.ConnectionStatusDto
 import dev.core.network.generated.model.ConnectionSummaryDto
 import dev.core.network.generated.model.ConnectionSummaryPageDto
 import dev.core.network.generated.model.ConnectionViewDto
+import dev.core.network.generated.model.CourseYearDto
+import dev.core.network.generated.model.GenderDto
 import dev.core.network.generated.model.ReportReasonDto
 import dev.core.network.generated.model.RequestItemDto
 import dev.core.network.generated.model.RequestItemPageDto
 import dev.core.network.generated.model.SearchResultDto
 import dev.core.network.generated.model.SearchResultPageDto
+import dev.core.network.generated.model.StudentSortDto
 import dev.core.network.generated.model.StudentSummaryDto
 import dev.feature.connections.domain.model.ConnectedStudent
 import dev.feature.connections.domain.model.Connection
 import dev.feature.connections.domain.model.ConnectionRequest
 import dev.feature.connections.domain.model.ConnectionStatus
 import dev.feature.connections.domain.model.ConnectionView
+import dev.feature.connections.domain.model.Gender
 import dev.feature.connections.domain.model.Page
 import dev.feature.connections.domain.model.ReportReason
 import dev.feature.connections.domain.model.SearchedStudent
+import dev.feature.connections.domain.model.StudentSort
 import dev.feature.connections.domain.model.StudentSummary
 
 // Generatsiya qilingan DTO'lar → domen modellari. Bitta yo'nalish: domen backendga
@@ -29,6 +34,9 @@ fun StudentSummaryDto.toDomain(): StudentSummary = StudentSummary(
     username = username,
     fullName = fullName,
     avatarUrl = avatarUrl,
+    universityId = universityId,
+    gender = gender?.toDomain(),
+    courseYear = courseYear?.value,
     online = online,
     lastSeenAt = lastSeenAt,
 )
@@ -39,11 +47,40 @@ fun SearchResultDto.toDomain(): SearchedStudent = SearchedStudent(
         username = username,
         fullName = fullName,
         avatarUrl = avatarUrl,
+        universityId = universityId,
+        gender = gender?.toDomain(),
+        courseYear = courseYear?.value,
         online = online,
         lastSeenAt = lastSeenAt,
     ),
     connectionStatus = connectionStatus.toDomain(),
 )
+
+fun GenderDto.toDomain(): Gender = when (this) {
+    GenderDto.MALE -> Gender.MALE
+    GenderDto.FEMALE -> Gender.FEMALE
+}
+
+fun Gender.toDto(): GenderDto = when (this) {
+    Gender.MALE -> GenderDto.MALE
+    Gender.FEMALE -> GenderDto.FEMALE
+}
+
+fun ConnectionView.toDto(): ConnectionViewDto = when (this) {
+    ConnectionView.NONE -> ConnectionViewDto.NONE
+    ConnectionView.PENDING_OUT -> ConnectionViewDto.PENDING_OUT
+    ConnectionView.PENDING_IN -> ConnectionViewDto.PENDING_IN
+    ConnectionView.CONNECTED -> ConnectionViewDto.CONNECTED
+}
+
+fun StudentSort.toDto(): StudentSortDto = when (this) {
+    StudentSort.RECENT -> StudentSortDto.RECENT
+    StudentSort.NAME -> StudentSortDto.NAME
+}
+
+/** `"1".."4"`/`"MASTER"` → enum. Noma'lum qiymat filtrga qo'shilmaydi (`null`). */
+fun String.toCourseYearDtoOrNull(): CourseYearDto? =
+    CourseYearDto.entries.firstOrNull { it.value == this }
 
 fun ConnectionViewDto.toDomain(): ConnectionView = when (this) {
     ConnectionViewDto.NONE -> ConnectionView.NONE

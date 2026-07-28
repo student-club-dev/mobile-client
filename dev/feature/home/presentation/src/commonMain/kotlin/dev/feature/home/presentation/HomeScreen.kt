@@ -61,7 +61,8 @@ import dev.core.domain.model.DiscountTag
 import dev.feature.clubs.domain.model.Club
 import dev.feature.listings.domain.model.Listing
 import dev.feature.listings.domain.model.formatSum
-import dev.feature.connections.domain.model.StudentSummary
+import dev.feature.connections.domain.model.ConnectionView
+import dev.feature.connections.domain.model.SearchedStudent
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
@@ -120,7 +121,22 @@ fun HomeScreen(
             RentalsSection(state.rentals, onOpenRentals, onOpenListing)
             JobsSection(state.jobs, onOpenJobs, onOpenListing)
             StudentsSearchSection(onOpenStudentSearch, onOpenStudents, onOpenStudentRequests)
-            ConnectionsSection(state.connections, onOpenStudents, onOpenChatWith)
+            StudentsSection(
+                title = "Universitetimda",
+                subtitle = "Bir universitetda o'qiyotgan talabalar",
+                students = state.universityStudents,
+                onSeeAll = onOpenStudentSearch,
+                onConnect = vm::connect,
+                onMessage = onOpenChatWith,
+            )
+            StudentsSection(
+                title = "Barcha talabalar",
+                subtitle = "Yangi qo'shilganlar birinchi",
+                students = state.allStudents,
+                onSeeAll = onOpenStudentSearch,
+                onConnect = vm::connect,
+                onMessage = onOpenChatWith,
+            )
             // Pastki navigatsiya + FAB uchun joy.
             Spacer(Modifier.height(96.dp))
         }
@@ -576,11 +592,9 @@ private val studentVisuals: List<Pair<Color, Color>>
  * Talabalar bloki: qidiruvga kirish + "Do'stlar" / "Kutilayotganlar" ga o'tish.
  *
  * Qidiruv maydoni bu yerda **ishlamaydi** — bosilganda `Connections` ekrani Qidiruv bo'limi
- * ochilgan holda kelади. Sabab: to'liq qidiruv (debounce, bog'lanish tugmalari, "⋮" menyusi,
- * blok/shikoyat) o'sha ekranda allaqachon bor, uni Home'da takrorlash ikki nusxa kod bo'lardi.
- *
- * Backendda talabalarni shunchaki ro'yxatlash imkoni yo'q (`GET /v1/students/search` da `q`
- * majburiy), shuning uchun Home o'zi hech kimni ko'rsata olmaydi — faqat kirish nuqtasi.
+ * ochilgan holda kelади. Sabab: to'liq qidiruv (debounce, filtrlar, bog'lanish tugmalari,
+ * "⋮" menyusi, blok/shikoyat) o'sha ekranda allaqachon bor, uni Home'da takrorlash ikki
+ * nusxa kod bo'lardi.
  */
 @Composable
 private fun StudentsSearchSection(
@@ -644,25 +658,30 @@ private fun NavTile(
 }
 
 /**
- * Bog'langan talabalar. Bularning hammasi bilan allaqachon bog'langanmiz, shuning uchun
- * kartadagi yagona amal — "Xabar" (chat faqat bog'langanlar uchun ochiq).
+ * Talabalar kartalari qatori — Home'dagi ikkala bo'lim ham shu (faqat sarlavha va manba
+ * ro'yxati boshqa).
  *
- * Ikkinchi qator — `@username`; universitet ko'rsatilmaydi, chunki backend qisqa profilda
- * (`StudentSummaryDto`) universitet ma'lumotini qaytarmaydi.
+ * Ro'yxat bo'sh bo'lsa bo'lim butunlay yashiriladi: Home'da xato ko'rsatilmaydi, ya'ni
+ * so'rov yiqilganda bo'sh sarlavha osilib qolmasin.
+ *
+ * Kartadagi amal munosabatga qarab: hali bog'lanmagan bo'lsa «Bog'lanish», bog'langan
+ * bo'lsa «Xabar» (chat faqat bog'langanlar uchun ochiq), so'rov yuborilgan bo'lsa —
+ * o'chirilgan yozuv (yuborilgan so'rovni bekor qilish endpointi yo'q).
  */
 @Composable
-private fun ConnectionsSection(
-    connections: List<StudentSummary>, onSeeAll: () -> Unit, onMessage: (String) -> Unit
+private fun StudentsSection(
+    title: String,
+    subtitle: String,
+    students: List<SearchedStudent>,
+    onSeeAll: () -> Unit,
+    onConnect: (String) -> Unit,
+    onMessage: (String) -> Unit,
 ) {
-    if (connections.isEmpty()) return
+    if (students.isEmpty()) return
     Column(verticalArrangement = Arrangement.spacedBy(13.dp)) {
-        PaddedHeader(
-            "Bog'lanishlarim",
-            "Do'stlaringiz bilan suhbatlashing",
-            action = "Ko'proq",
-            onAction = onSeeAll
-        )
-        EdgeRow(connections.take(6)) { index, student ->
+        PaddedHeader(title, subtitle, action = "Ko'proq", onAction = onSeeAll)
+        EdgeRow(students.take(10)) { index, result ->
+            val student = result.student
             val (tint, accent) = studentVisuals[index.mod(studentVisuals.size)]
             Column(
                 Modifier.width(150.dp).scCard(radius = 26.dp)
@@ -678,11 +697,23 @@ private fun ConnectionsSection(
                     12.5f, FontWeight.SemiBold, Sc.Muted, maxLines = 1,
                 )
                 Spacer(Modifier.height(14.dp))
-                ScGradientButton(
-                    "Xabar", { onMessage(student.id) },
-                    radius = 16.dp, verticalPadding = 10.dp, fontSize = 13.5f,
-                    weight = FontWeight.Bold,
-                )
+                when (result.connectionStatus) {
+                    ConnectionView.CONNECTED -> ScGradientButton(
+                        "Xabar", { onMessage(student.id) },
+                        radius = 16.dp, verticalPadding = 10.dp, fontSize = 13.5f,
+                        weight = FontWeight.Bold,
+                    )
+                    // Kiruvchi so'rovga ham shu tugma javob beradi: server qarshi so'rovni
+                    // darhol qabul qilingan bog'lanishga aylantiradi (C1).
+                    ConnectionView.NONE, ConnectionView.PENDING_IN -> ScGradientButton(
+                        "Bog'lanish", { onConnect(student.id) },
+                        radius = 16.dp, verticalPadding = 10.dp, fontSize = 13.5f,
+                        weight = FontWeight.Bold,
+                    )
+                    ConnectionView.PENDING_OUT -> ScText(
+                        "Yuborildi", 12.5f, FontWeight.Bold, Sc.Muted, maxLines = 1,
+                    )
+                }
             }
         }
     }

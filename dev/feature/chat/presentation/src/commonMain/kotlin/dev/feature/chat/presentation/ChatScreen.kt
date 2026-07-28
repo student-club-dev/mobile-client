@@ -663,9 +663,11 @@ private fun MessageBubble(message: ChatMessageUi, onLongPress: () -> Unit) {
                     )
                 }
                 if (message.outgoing && message.status != MessageStatus.FAILED) {
-                    // Bitta belgicha — yuborilmoqda; ikkita — yetkazildi; yorqin — o'qildi.
+                    // Bitta belgicha — server qabul qildi; ikkita — suhbatdoshning
+                    // qurilmasiga yetdi; yorqin ikkita — o'qildi.
+                    val doubleCheck = message.status != MessageStatus.SENDING && message.delivered
                     Icon(
-                        if (message.status == MessageStatus.SENDING) AppIcons.Check else ScIcons.DoubleCheck,
+                        if (doubleCheck) ScIcons.DoubleCheck else AppIcons.Check,
                         null,
                         tint = Color.White.copy(alpha = if (message.read) 1f else 0.6f),
                         modifier = Modifier.size(15.dp),

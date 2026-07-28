@@ -42,6 +42,7 @@ internal fun ConversationEntity.toDomain(): ConversationItem = ConversationItem(
     },
     unreadCount = unreadCount.toInt(),
     otherReadSeq = otherReadSeq.toInt(),
+    otherDeliveredSeq = otherDeliveredSeq.toInt(),
     archived = archived != 0L,
 )
 

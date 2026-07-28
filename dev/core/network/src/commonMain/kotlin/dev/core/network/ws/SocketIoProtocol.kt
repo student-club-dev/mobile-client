@@ -2,6 +2,8 @@ package dev.core.network.ws
 
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 
 /**
  * Socket.IO paketining tarkibi (Engine.IO `4` — MESSAGE — dan keyingi qism).
@@ -32,6 +34,13 @@ internal object SocketIoProtocol {
     const val ENGINE_PING = '2'
     const val ENGINE_PONG = '3'
     const val ENGINE_MESSAGE = '4'
+
+    /**
+     * Polling'da bitta HTTP javobiga bir nechta paket sig'adi — ular shu belgi (U+001E,
+     * record separator) bilan ajratiladi. WebSocket'da har paket alohida ramka bo'lgani
+     * uchun u yerda ishlatilmaydi.
+     */
+    const val RECORD_SEPARATOR = "\u001E"
 
     const val CONNECT = '0'
     const val DISCONNECT = '1'
@@ -85,6 +94,24 @@ internal object SocketIoProtocol {
             ackId = if (i > 0) rest.substring(0, i).toIntOrNull() else null,
             body = rest.substring(i),
         )
+    }
+
+    /**
+     * Polling javobini alohida paketlarga ajratadi. Bo'sh bo'laklar tashlanadi: ajratgich
+     * oxirida ham turishi mumkin.
+     */
+    fun splitPayload(body: String): List<String> =
+        body.split(RECORD_SEPARATOR).filter { it.isNotEmpty() }
+
+    /**
+     * Handshake javobidagi OPEN paketidan (`0{"sid":…}`) sessiya id'sini oladi.
+     * `null` — paket OPEN emas yoki `sid` yo'q (server xatosi).
+     */
+    fun openSid(packet: String): String? {
+        if (packet.firstOrNull() != ENGINE_OPEN) return null
+        return runCatching {
+            json.parseToJsonElement(packet.substring(1)).jsonObject["sid"]?.jsonPrimitive?.content
+        }.getOrNull()?.takeIf { it.isNotEmpty() }
     }
 
     const val DEFAULT_NAMESPACE = "/"

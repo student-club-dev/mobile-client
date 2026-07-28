@@ -52,14 +52,20 @@ import dev.feature.profile.presentation.components.ProfileAvatar
 import dev.feature.university.domain.model.University
 import org.koin.compose.viewmodel.koinViewModel
 
-private data class CourseOption(val value: String, val label: String)
+/** Tanlov tugmasining qiymati (backendga ketadigan) va ekrandagi yorlig'i. */
+private data class ChoiceOption(val value: String, val label: String)
 
 private val courseOptions = listOf(
-    CourseOption("1", "1-kurs"),
-    CourseOption("2", "2-kurs"),
-    CourseOption("3", "3-kurs"),
-    CourseOption("4", "4-kurs"),
-    CourseOption("MASTER", "Magistr"),
+    ChoiceOption("1", "1-kurs"),
+    ChoiceOption("2", "2-kurs"),
+    ChoiceOption("3", "3-kurs"),
+    ChoiceOption("4", "4-kurs"),
+    ChoiceOption("MASTER", "Magistr"),
+)
+
+private val genderOptions = listOf(
+    ChoiceOption("MALE", "Erkak"),
+    ChoiceOption("FEMALE", "Ayol"),
 )
 
 /**
@@ -76,6 +82,7 @@ fun EditProfileScreen(onBack: () -> Unit, vm: ProfileViewModel = koinViewModel()
     var phone by remember(profile) { mutableStateOf(profile?.phoneNumber.orEmpty()) }
     var universityId by remember(profile) { mutableStateOf(profile?.universityId) }
     var courseYear by remember(profile) { mutableStateOf(profile?.courseYear) }
+    var gender by remember(profile) { mutableStateOf(profile?.gender) }
 
     var uniExpanded by remember { mutableStateOf(false) }
     var uniQuery by remember { mutableStateOf("") }
@@ -225,20 +232,19 @@ fun EditProfileScreen(onBack: () -> Unit, vm: ProfileViewModel = koinViewModel()
             FieldLabel("Kurs")
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 courseOptions.forEach { opt ->
-                    val active = opt.value == courseYear
-                    Box(
-                        Modifier.weight(1f).height(42.dp)
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(if (active) Sc.TintBlue else Sc.Card)
-                            .border(1.dp, if (active) Sc.Brand else Sc.Border, RoundedCornerShape(14.dp))
-                            .clickable { courseYear = opt.value },
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        ScText(
-                            opt.label, 12f, FontWeight.Bold,
-                            if (active) Sc.Brand else Sc.InkSoft,
-                            maxLines = 1,
-                        )
+                    ChoiceBox(opt.label, opt.value == courseYear, Modifier.weight(1f)) {
+                        courseYear = opt.value
+                    }
+                }
+            }
+
+            // Jins — talabalar qidiruvidagi filtr shu maydonga tayanadi. Ixtiyoriy:
+            // tanlangan tugmani qayta bosish tanlovni bekor qiladi.
+            FieldLabel("Jins (ixtiyoriy)")
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                genderOptions.forEach { opt ->
+                    ChoiceBox(opt.label, opt.value == gender, Modifier.weight(1f)) {
+                        gender = if (gender == opt.value) null else opt.value
                     }
                 }
             }
@@ -260,6 +266,7 @@ fun EditProfileScreen(onBack: () -> Unit, vm: ProfileViewModel = koinViewModel()
                         phoneNumber = phone.trim().ifBlank { null },
                         universityId = universityId,
                         courseYear = courseYear,
+                        gender = gender,
                     )
                     vm.saveProfile(updated) { err ->
                         saving = false
@@ -275,6 +282,21 @@ fun EditProfileScreen(onBack: () -> Unit, vm: ProfileViewModel = koinViewModel()
 @Composable
 private fun FieldLabel(text: String) {
     ScText(text, 12.5f, FontWeight.Bold, Sc.InkSoft, maxLines = 1)
+}
+
+/** Kurs / jins qatoridagi bir xil ko'rinishdagi tanlov tugmasi. */
+@Composable
+private fun ChoiceBox(label: String, active: Boolean, modifier: Modifier, onClick: () -> Unit) {
+    Box(
+        modifier.height(42.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .background(if (active) Sc.TintBlue else Sc.Card)
+            .border(1.dp, if (active) Sc.Brand else Sc.Border, RoundedCornerShape(14.dp))
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        ScText(label, 12f, FontWeight.Bold, if (active) Sc.Brand else Sc.InkSoft, maxLines = 1)
+    }
 }
 
 @Composable

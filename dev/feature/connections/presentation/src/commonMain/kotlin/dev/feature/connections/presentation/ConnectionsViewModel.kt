@@ -7,11 +7,16 @@ import dev.feature.connections.domain.model.ConnectedStudent
 import dev.feature.connections.domain.model.ConnectionRequest
 import dev.feature.connections.domain.model.ConnectionStatus
 import dev.feature.connections.domain.model.ConnectionView
+import dev.feature.connections.domain.model.Gender
 import dev.feature.connections.domain.model.ReportReason
 import dev.feature.connections.domain.model.RequestDirection
 import dev.feature.connections.domain.model.SearchedStudent
+import dev.feature.connections.domain.model.StudentFilter
+import dev.feature.connections.domain.model.StudentSort
 import dev.feature.connections.domain.model.StudentSummary
 import dev.feature.connections.domain.repository.ConnectionsRepository
+import dev.feature.profile.domain.usecase.ObserveProfileUseCase
+import dev.feature.university.domain.repository.UniversityRepository
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -30,11 +35,20 @@ data class ConnectionsUiState(
     val tab: ConnectionsTab = ConnectionsTab.CONNECTED,
     val requestsTab: RequestsTab = RequestsTab.INCOMING,
 
-    val query: String = "",
+    /** Qidiruv matni + barcha filtrlar bitta joyda — so'rov aynan shundan quriladi. */
+    val filter: StudentFilter = StudentFilter(),
     val searching: Boolean = false,
     val results: List<SearchedStudent> = emptyList(),
-    /** Qidiruv bajarildi-yu, natija bo'sh — "hech nima topilmadi" ni faqat shunda ko'rsatamiz. */
+    /** So'rov bajarildi-yu, natija bo'sh — "hech kim topilmadi" ni faqat shunda ko'rsatamiz. */
     val searched: Boolean = false,
+
+    /** Profildagi universitet — "Universitetim" filtri shu id bo'yicha ishlaydi. */
+    val myUniversityId: String? = null,
+    /**
+     * `universityId` → monogramma (local katalog). Backend qisqa profilda universitet
+     * **nomini** qaytarmaydi (katalogi yo'q), faqat id'ni — nomni o'zimiz topamiz.
+     */
+    val universityMonograms: Map<String, String> = emptyMap(),
 
     val incoming: List<ConnectionRequest> = emptyList(),
     val outgoing: List<ConnectionRequest> = emptyList(),
@@ -52,6 +66,16 @@ data class ConnectionsUiState(
 ) {
     val requests: List<ConnectionRequest>
         get() = if (requestsTab == RequestsTab.INCOMING) incoming else outgoing
+
+    val query: String get() = filter.query.orEmpty()
+
+    /** Matndan tashqari birorta filtr yoqilganmi — "Tozalash" tugmasi shunda ko'rinadi. */
+    val hasActiveFilters: Boolean
+        get() = filter.copy(query = null).isEmpty.not() || filter.sort != StudentSort.RECENT
+
+    /** Talaba qatorida ko'rsatiladigan universitet monogrammasi (katalogda bo'lmasa `null`). */
+    fun universityLabel(student: StudentSummary): String? =
+        student.universityId?.let { universityMonograms[it] }
 }
 
 /**
@@ -62,6 +86,8 @@ data class ConnectionsUiState(
  */
 class ConnectionsViewModel(
     private val repository: ConnectionsRepository,
+    observeProfile: ObserveProfileUseCase,
+    universityRepository: UniversityRepository,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(ConnectionsUiState())
@@ -72,6 +98,20 @@ class ConnectionsViewModel(
 
     init {
         refreshAll()
+        // `GET /v1/students` filtrsiz ham ishlaydi, shuning uchun ro'yxat darrov to'ladi —
+        // avvalgidek "avval biror narsa yozing" holatida turmaydi.
+        loadStudents(debounce = false)
+
+        viewModelScope.launch {
+            observeProfile().collect { profile ->
+                _state.update { it.copy(myUniversityId = profile?.universityId) }
+            }
+        }
+        viewModelScope.launch {
+            universityRepository.observeUniversities().collect { list ->
+                _state.update { s -> s.copy(universityMonograms = list.associate { it.id to it.monogram }) }
+            }
+        }
     }
 
     fun refreshAll() {
@@ -84,7 +124,9 @@ class ConnectionsViewModel(
         when (tab) {
             ConnectionsTab.REQUESTS -> loadRequests()
             ConnectionsTab.CONNECTED -> loadConnections()
-            ConnectionsTab.SEARCH -> Unit
+            // Ro'yxat init'da yuklanadi; bo'sh bo'lsa (masalan birinchi so'rov xato bergan)
+            // qayta urinamiz.
+            ConnectionsTab.SEARCH -> if (_state.value.results.isEmpty()) loadStudents(debounce = false)
         }
     }
 
@@ -94,31 +136,73 @@ class ConnectionsViewModel(
 
     fun messageShown() = _state.update { it.copy(message = null) }
 
-    // --- Qidiruv -------------------------------------------------------------------------
+    // --- Qidiruv va filtrlar -------------------------------------------------------------
 
-    fun onQueryChange(value: String) {
-        _state.update { it.copy(query = value) }
-        searchJob?.cancel()
-        if (value.isBlank()) {
-            _state.update { it.copy(results = emptyList(), searching = false, searched = false) }
-            return
+    fun onQueryChange(value: String) =
+        applyFilter(debounce = true) { it.copy(query = value.takeIf { v -> v.isNotBlank() }) }
+
+    fun clearQuery() = onQueryChange("")
+
+    /**
+     * "Universitetim" — profildagi `universityId` bo'yicha filtr. Profil to'ldirilmagan
+     * bo'lsa tugma umuman ko'rsatilmaydi (ekran [ConnectionsUiState.myUniversityId] ni
+     * tekshiradi), shuning uchun bu yerda qo'shimcha shart yo'q.
+     */
+    fun toggleMyUniversity() {
+        val mine = _state.value.myUniversityId ?: return
+        applyFilter {
+            it.copy(universityIds = if (mine in it.universityIds) emptyList() else listOf(mine))
         }
+    }
+
+    fun toggleGender(gender: Gender) = applyFilter {
+        it.copy(genders = it.genders.toggle(gender))
+    }
+
+    fun toggleCourseYear(year: String) = applyFilter {
+        it.copy(courseYears = it.courseYears.toggle(year))
+    }
+
+    /** "Yangi odamlar" — hali munosabat yo'q talabalar (`connectionStatus = NONE`). */
+    fun toggleOnlyNew() = applyFilter {
+        it.copy(connectionStatus = if (it.connectionStatus == ConnectionView.NONE) null else ConnectionView.NONE)
+    }
+
+    fun setSort(sort: StudentSort) = applyFilter { it.copy(sort = sort) }
+
+    /** Matnga tegmaydi — foydalanuvchi yozgan so'rov saqlanib qoladi. */
+    fun clearFilters() = applyFilter {
+        StudentFilter(query = it.query)
+    }
+
+    private fun applyFilter(debounce: Boolean = false, change: (StudentFilter) -> StudentFilter) {
+        _state.update { it.copy(filter = change(it.filter)) }
+        loadStudents(debounce)
+    }
+
+    /**
+     * Ro'yxatni qayta tortadi. [debounce] — matn yozilayotganda: server IP bo'yicha
+     * daqiqasiga 30 so'rovni cheklaydi, har harfga so'rov yuborsak `429` ga tushamiz.
+     */
+    private fun loadStudents(debounce: Boolean) {
+        searchJob?.cancel()
         searchJob = viewModelScope.launch {
-            delay(SEARCH_DEBOUNCE_MS)
+            if (debounce) delay(SEARCH_DEBOUNCE_MS)
             _state.update { it.copy(searching = true) }
-            when (val res = repository.search(value)) {
+            when (val res = repository.students(_state.value.filter)) {
                 is Resource.Success -> _state.update {
                     it.copy(results = res.data.items, searching = false, searched = true)
                 }
                 is Resource.Error -> _state.update {
-                    it.copy(searching = false, message = res.message)
+                    it.copy(searching = false, searched = true, message = res.message)
                 }
                 Resource.Loading -> Unit
             }
         }
     }
 
-    fun clearQuery() = onQueryChange("")
+    private fun <T> List<T>.toggle(value: T): List<T> =
+        if (value in this) this - value else this + value
 
     // --- Amallar -------------------------------------------------------------------------
 

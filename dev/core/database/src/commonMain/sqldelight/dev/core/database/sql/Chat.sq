@@ -13,8 +13,8 @@ CREATE TABLE ConversationEntity (
     -- Oxirgi xabar vaqti (epoch ms). Xabar yozilmagan suhbatda NULL.
     lastMessageAt INTEGER,
 
-    -- Ikkinchi tomon (StudentSummary). Chat ro'yxatida `online`/`lastSeenAt` HAQIQIY
-    -- (Connections bo'limida ular doim false/null edi).
+    -- Ikkinchi tomon (StudentSummary). `online`/`lastSeenAt` — haqiqiy qiymat; suhbatdosh
+    -- `lastSeenVisibility = NOBODY` qo'ygan bo'lsa server false/null yuboradi.
     otherId TEXT NOT NULL,
     otherUsername TEXT,
     otherFullName TEXT,
@@ -29,9 +29,12 @@ CREATE TABLE ConversationEntity (
     unreadCount INTEGER NOT NULL DEFAULT 0,
     -- Men o'qigan eng yuqori seq — qayta ulanishda `?after=` shundan boshlanadi.
     lastReadSeq INTEGER NOT NULL DEFAULT 0,
-    -- Suhbatdosh o'qigan eng yuqori seq (WS `message:read`) — chiquvchi xabardagi
-    -- ikki belgichaning rangi shunga qarab. Serverdan o'qish endpointi yo'q, faqat WS.
+    -- Suhbatdosh o'qigan eng yuqori seq — chiquvchi xabardagi ikki belgichaning rangi
+    -- shunga qarab. Manba: WS `message:read` va `GET /v1/conversations` (`peerReadSeq`).
     otherReadSeq INTEGER NOT NULL DEFAULT 0,
+    -- Suhbatdoshning qurilmasi qabul qilgan eng yuqori seq (WS `message:delivered` va
+    -- `peerDeliveredSeq`) — bitta belgicha ikkitaga aynan shunda aylanadi.
+    otherDeliveredSeq INTEGER NOT NULL DEFAULT 0,
     archived INTEGER NOT NULL DEFAULT 0
 );
 
@@ -82,8 +85,8 @@ insertConversationIfNew:
 INSERT OR IGNORE INTO ConversationEntity(
     id, type, lastMessageAt,
     otherId, otherUsername, otherFullName, otherAvatarUrl, otherOnline, otherLastSeenAt,
-    lastMessageBody, lastMessageSenderId, unreadCount, lastReadSeq
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+    lastMessageBody, lastMessageSenderId, unreadCount, lastReadSeq, otherReadSeq, otherDeliveredSeq
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 updateConversation:
 UPDATE ConversationEntity SET
@@ -98,8 +101,10 @@ UPDATE ConversationEntity SET
     lastMessageBody = ?,
     lastMessageSenderId = ?,
     unreadCount = ?,
-    -- Local kursor ORTGA surilmasin: WS orqali allaqachon o'qilgan bo'lishi mumkin.
-    lastReadSeq = max(lastReadSeq, :lastReadSeq)
+    -- Kursorlar ORTGA surilmasin: WS orqali allaqachon oldinga ketgan bo'lishi mumkin.
+    lastReadSeq = max(lastReadSeq, :lastReadSeq),
+    otherReadSeq = max(otherReadSeq, :otherReadSeq),
+    otherDeliveredSeq = max(otherDeliveredSeq, :otherDeliveredSeq)
 WHERE id = :id;
 
 -- WS `message:new` — ro'yxatdagi qatorni yangilaydi (suhbat allaqachon keshda bo'lsa).
@@ -119,6 +124,10 @@ UPDATE ConversationEntity SET unreadCount = 0, lastReadSeq = max(lastReadSeq, ?)
 -- WS `message:read` (server → klient) — suhbatdosh qayergacha o'qigani.
 setOtherReadSeq:
 UPDATE ConversationEntity SET otherReadSeq = max(otherReadSeq, ?) WHERE id = ?;
+
+-- WS `message:delivered` (server → klient) — suhbatdoshning qurilmasi qayergacha olgani.
+setOtherDeliveredSeq:
+UPDATE ConversationEntity SET otherDeliveredSeq = max(otherDeliveredSeq, ?) WHERE id = ?;
 
 setArchived:
 UPDATE ConversationEntity SET archived = ? WHERE id = ?;

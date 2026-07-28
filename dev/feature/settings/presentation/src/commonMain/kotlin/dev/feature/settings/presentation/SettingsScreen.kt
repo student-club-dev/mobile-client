@@ -124,6 +124,16 @@ fun SettingsScreen(
             )
 
             Spacer(Modifier.height(4.dp))
+            SectionTitle("Maxfiylik")
+            LastSeenSelector(state.profile?.lastSeenVisibility) { vm.setLastSeenVisibility(it) }
+            Text(
+                "\"Oxirgi ko'rilgan\" va \"onlayn\" holatini kim ko'rishi. \"Hech kim\" " +
+                    "tanlansa, siz ham boshqalarnikini ko'rishda davom etasiz.",
+                style = scStyle(12f, FontWeight.Medium, Sc.Muted, lineHeight = 17f),
+                modifier = Modifier.padding(horizontal = 6.dp),
+            )
+
+            Spacer(Modifier.height(4.dp))
             SectionTitle("Bildirishnomalar")
             ToggleRow(AppIcons.Bell, Sc.TintPink, Sc.Pink, "Push bildirishnomalar", settings.pushEnabled) {
                 settingsVm.setPush(it)
@@ -226,6 +236,40 @@ private fun RegionRow(label: String, active: Boolean, onClick: () -> Unit) {
             if (active) Sc.Brand else Sc.Ink, Modifier.weight(1f), maxLines = 1,
         )
         if (active) Icon(AppIcons.Check, null, tint = Sc.Brand, modifier = Modifier.size(18.dp))
+    }
+}
+
+/**
+ * "Oxirgi ko'rilgan" maxfiyligi (`PUT /v1/profile/me` → `lastSeenVisibility`).
+ *
+ * Server sukuti — `CONNECTIONS`, shuning uchun profil hali yuklanmagan bo'lsa ham shu
+ * variant faol ko'rinadi. `NOBODY` da server `online` ni ham yashiradi va sizning
+ * `presence:update` hodisangizni umuman yubormaydi.
+ */
+@Composable
+private fun LastSeenSelector(current: String?, onSelect: (String) -> Unit) {
+    val options = listOf(
+        "EVERYONE" to "Hamma",
+        "CONNECTIONS" to "Do'stlar",
+        "NOBODY" to "Hech kim",
+    )
+    val selected = current ?: "CONNECTIONS"
+    Row(
+        Modifier.fillMaxWidth().scCard(radius = 18.dp).padding(5.dp),
+        horizontalArrangement = Arrangement.spacedBy(5.dp),
+    ) {
+        options.forEach { (value, label) ->
+            val active = value == selected
+            Box(
+                Modifier.weight(1f).height(38.dp)
+                    .clip(RoundedCornerShape(13.dp))
+                    .background(if (active) Sc.TintBlue else Color.Transparent)
+                    .clickable { onSelect(value) },
+                contentAlignment = Alignment.Center,
+            ) {
+                ScText(label, 13f, FontWeight.Bold, if (active) Sc.Brand else Sc.Muted, maxLines = 1)
+            }
+        }
     }
 }
 

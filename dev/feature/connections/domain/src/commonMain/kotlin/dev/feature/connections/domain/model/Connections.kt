@@ -6,9 +6,11 @@ import kotlinx.datetime.Instant
  * **Qisqa profil** — odam ko'rsatiladigan hamma joyda bir xil shakl (`StudentSummary`).
  * Qidiruv, so'rovlar, bog'langanlar va suhbatlar ro'yxati — hammasi shuni qaytaradi.
  *
- * ⚠️ [online] / [lastSeenAt] **`Connections` bo'limida doim `false` / `null`** — backend ularni
- * u yerda to'ldirmaydi. Haqiqiy qiymat faqat `GET /v1/conversations` javobida va WS
- * `presence:update` hodisasida keladi. Onlayn indikatorini qidiruv natijasiga bog'lamang.
+ * [online] / [lastSeenAt] **hamma joyda haqiqiy** (backend Redis'dan o'qiydi). Ular
+ * ko'rsatilgan talabaning `lastSeenVisibility` sozlamasiga bo'ysunadi: `EVERYONE` — doim,
+ * `CONNECTIONS` (sukut) — faqat bog'langanlarga, `NOBODY` — hech kimga. Yashirilganda
+ * server `online = false`, `lastSeenAt = null` yuboradi, ya'ni klientda alohida tekshiruv
+ * kerak emas.
  */
 data class StudentSummary(
     val id: String,
@@ -17,6 +19,15 @@ data class StudentSummary(
     /** `firstName + " " + lastName`; ikkalasi ham bo'sh bo'lsa `null`. */
     val fullName: String? = null,
     val avatarUrl: String? = null,
+    /**
+     * Talabaning o'zi profilida ko'rsatgan universitet — **erkin satr** (`emis-142`).
+     * Serverda universitetlar katalogi yo'q, shuning uchun nom qaytmaydi: uni local
+     * `University` jadvalidan shu id bo'yicha topamiz.
+     */
+    val universityId: String? = null,
+    val gender: Gender? = null,
+    /** `"1".."4"` yoki `"MASTER"` — profildagi bilan bir xil shakl. */
+    val courseYear: String? = null,
     val online: Boolean = false,
     val lastSeenAt: Instant? = null,
 ) {
@@ -58,7 +69,40 @@ enum class RequestDirection { INCOMING, OUTGOING }
 /** Shikoyat sababi. */
 enum class ReportReason { SPAM, SCAM, HARASSMENT, INAPPROPRIATE, OTHER }
 
-/** Qidiruv natijasidagi bitta talaba — qisqa profil + men bilan munosabati. */
+/** Talabaning jinsi — profilda ko'rsatiladi va `GET /v1/students` da filtr sifatida ketadi. */
+enum class Gender { MALE, FEMALE }
+
+/** Ro'yxat tartibi: `RECENT` — eng yangi hisoblar birinchi (sukut), `NAME` — ism bo'yicha. */
+enum class StudentSort { RECENT, NAME }
+
+/**
+ * `GET /v1/students` filtri. **Hammasi ixtiyoriy**: bo'sh filtr = sahifalangan to'liq
+ * ro'yxat. Filtrlar bir-birini toraytiradi (AND), ko'p qiymatli filtr ichida esa OR.
+ *
+ * [query] — username (prefiks) **yoki** ism/familiya (ichidan); registrga sezgir emas.
+ * Ikki so'zli qidiruv ("Alisher Valiyev") ishlamaydi — server har bo'lakni alohida emas,
+ * butun satrni solishtiradi.
+ */
+data class StudentFilter(
+    val query: String? = null,
+    /** `emis-142` ko'rinishidagi id'lar — aniq moslik, ro'yxat ichida OR. */
+    val universityIds: List<String> = emptyList(),
+    val genders: List<Gender> = emptyList(),
+    /** `"1".."4"`, `"MASTER"`. */
+    val courseYears: List<String> = emptyList(),
+    val birthYearFrom: Int? = null,
+    val birthYearTo: Int? = null,
+    /** Munosabat bo'yicha toraytirish; `NONE` — "hali hech qanday munosabat yo'q". */
+    val connectionStatus: ConnectionView? = null,
+    val sort: StudentSort = StudentSort.RECENT,
+) {
+    val isEmpty: Boolean
+        get() = query.isNullOrBlank() && universityIds.isEmpty() && genders.isEmpty() &&
+            courseYears.isEmpty() && birthYearFrom == null && birthYearTo == null &&
+            connectionStatus == null
+}
+
+/** Ro'yxatdagi bitta talaba — qisqa profil + men bilan munosabati. */
 data class SearchedStudent(
     val student: StudentSummary,
     val connectionStatus: ConnectionView,

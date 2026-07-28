@@ -2,10 +2,18 @@ package dev.core.network.ws
 
 import io.github.aakira.napier.Napier
 import io.ktor.client.HttpClient
+import io.ktor.client.plugins.timeout
 import io.ktor.client.plugins.websocket.DefaultClientWebSocketSession
 import io.ktor.client.plugins.websocket.webSocketSession
+import io.ktor.client.request.get
 import io.ktor.client.request.header
+import io.ktor.client.request.post
+import io.ktor.client.request.setBody
+import io.ktor.client.statement.bodyAsText
+import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
+import io.ktor.http.contentType
+import io.ktor.http.isSuccess
 import io.ktor.websocket.Frame
 import io.ktor.websocket.close
 import io.ktor.websocket.readText
@@ -13,6 +21,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
@@ -26,6 +35,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.datetime.Clock
 import kotlinx.serialization.json.JsonArray
@@ -103,6 +113,21 @@ class SocketIoClient(
 
     private var loopJob: Job? = null
 
+    /**
+     * Ketma-ket nechta sessiya polling bilan o'tdi. `0` — keyingi urinish WebSocket'dan
+     * boshlanadi. Ya'ni WS to'silgan tarmoqda har sessiyada bekorga urinib o'tirmaymiz,
+     * lekin [WS_RETRY_EVERY] da bir marta qayta sinaymiz.
+     */
+    private var pollingRounds = 0
+
+    /**
+     * Server namespace'ni uzdi (`41/chat` yoki CONNECT_ERROR) — sessiyani tugatish kerak.
+     * WebSocket'da buni soketning yopilishi bildirardi, polling'da esa transport tirik
+     * qolaveradi: shu bayroqsiz ilova "ulanmoqda…" da abadiy aylanib, tokenni ham
+     * yangilamasdi.
+     */
+    private var namespaceClosed = false
+
     /** Qayta ulanish siklini boshlaydi (allaqachon ishlayotgan bo'lsa — hech nima). */
     fun start() {
         if (loopJob?.isActive == true) return
@@ -173,7 +198,18 @@ class SocketIoClient(
         }
     }
 
-    /** Bitta sessiya. Muvaffaqiyatli CONNECT bo'lgan bo'lsa `true` qaytaradi. */
+    /**
+     * Bitta sessiya — avval WebSocket, u ulanmasa **polling**. Muvaffaqiyatli CONNECT
+     * bo'lgan bo'lsa `true`.
+     *
+     * Nega ikki transport: Engine.IO ning o'zi ham shunday ishlaydi. WebSocket upgrade'ni
+     * reverse-proxy (nginx'da `proxy_set_header Upgrade` unutilgan bo'lsa), korporativ
+     * proxy yoki ba'zi mobil operatorlar to'sib qo'yishi mumkin — o'shanda polling ishlaydi
+     * va chat jonli qolaveradi, faqat kechikish biroz kattaroq.
+     *
+     * Polling'ga tushib qolsak ham [WS_RETRY_EVERY] sessiyada bir marta WebSocket qayta
+     * sinaladi: server tuzatilgan kuni ilova o'zi yaxshiroq transportga qaytadi.
+     */
     private suspend fun runSession(refreshToken: Boolean): Boolean {
         val token = runCatching { tokenProvider(refreshToken) }.getOrNull()
         // Sessiya yo'q — ulanishga urinishning ma'nosi yo'q (kirmagan foydalanuvchi).
@@ -181,6 +217,24 @@ class SocketIoClient(
             Napier.w("WS: token yo'q — ulanmaymiz", tag = LOG_TAG)
             return false
         }
+
+        if (pollingRounds == 0) {
+            namespaceClosed = false
+            if (runWebSocketSession(token)) return true
+            Napier.w("WS transporti ulanmadi — polling'ga o'tamiz", tag = LOG_TAG)
+        }
+
+        namespaceClosed = false
+        val connected = runPollingSession(token)
+        // Polling ham ishlamasa hisoblagichni nolga qaytaramiz: muammo transportda emas,
+        // tarmoqda — keyingi urinish yana WebSocket'dan boshlansin.
+        pollingRounds = if (connected) (pollingRounds + 1) % WS_RETRY_EVERY else 0
+        return connected
+    }
+
+    // --- WebSocket transporti -------------------------------------------------------------
+
+    private suspend fun runWebSocketSession(token: String): Boolean {
         Napier.d("WS: ulanmoqda → ${handshakeUrl()}", tag = LOG_TAG)
 
         var session: DefaultClientWebSocketSession? = null
@@ -196,6 +250,8 @@ class SocketIoClient(
                 for (frame in session.incoming) {
                     if (frame !is Frame.Text) continue
                     if (handleFrame(session, frame.readText(), token)) didConnect = true
+                    // Server namespace'ni uzdi — soketni ushlab turishning ma'nosi yo'q.
+                    if (namespaceClosed) break
                 }
             } finally {
                 writer.cancel()
@@ -207,13 +263,7 @@ class SocketIoClient(
             // busiz "ulanmoqda…" da qotib qolgan chatning sababini topib bo'lmaydi.
             Napier.w("WS sessiyasi uzildi: ${e::class.simpleName}: ${e.message}", e, tag = LOG_TAG)
         } finally {
-            _connected.value = false
-            // Kutilayotgan ack'larni bo'shatamiz, aks holda `emitWithAck` timeout'gacha osilib
-            // qolardi va xabar zaxira (REST) yo'liga kech tushardi.
-            ackMutex.withLock {
-                acks.values.forEach { it.complete(null) }
-                acks.clear()
-            }
+            endSession()
             runCatching { session?.close() }
         }
         return didConnect
@@ -235,6 +285,138 @@ class SocketIoClient(
         return false
     }
 
+    // --- Polling transporti ---------------------------------------------------------------
+
+    /**
+     * Engine.IO **long-polling** sessiyasi — WebSocket'siz ham jonli kanal.
+     *
+     * ```
+     * GET  /socket.io/?EIO=4&transport=polling            → 0{"sid":…,"pingInterval":25000,…}
+     * POST /socket.io/?EIO=4&transport=polling&sid=<sid>  ← chiquvchi paketlar, javob: "ok"
+     * GET  /socket.io/?EIO=4&transport=polling&sid=<sid>  → server paket yubormaguncha ushlab turadi
+     * ```
+     *
+     * Bitta javobda bir nechta paket kelishi mumkin — ular `RECORD_SEPARATOR` (U+001E) bilan
+     * ajratiladi. Server har `pingInterval` da `2` (ping) yuboradi, biz `3` (pong) bilan
+     * javob beramiz; javob bermasak server `pingTimeout` dan keyin sessiyani yopadi.
+     */
+    private suspend fun runPollingSession(token: String): Boolean {
+        Napier.d("WS: polling → ${pollingUrl(sid = null)}", tag = LOG_TAG)
+
+        var didConnect = false
+        var writer: Job? = null
+        var sid: String? = null
+        try {
+            val handshake = httpPoll(pollingUrl(sid = null), token)
+            val packets = SocketIoProtocol.splitPayload(handshake)
+            sid = packets.firstNotNullOfOrNull { SocketIoProtocol.openSid(it) }
+            if (sid == null) {
+                Napier.w("Polling: handshake javobida `sid` yo'q — ${handshake.take(120)}", tag = LOG_TAG)
+                return false
+            }
+
+            // OPEN kelgach namespace'ga CONNECT (token `auth` obyektida — WS'dagidek).
+            postPackets(sid, token, listOf(connectPacket(token)))
+            // Handshake javobidagi qolgan paketlar ham ishlansin (odatda bo'sh).
+            packets.forEach { if (handleEnginePacket(it, sid, token)) didConnect = true }
+
+            writer = scope.launch { pumpOutgoing(sid, token) }
+
+            while (currentCoroutineContext().isActive && !namespaceClosed) {
+                val body = httpPoll(pollingUrl(sid), token)
+                // Bo'sh javob — server so'rovni shunchaki yopdi; qayta so'raymiz.
+                if (body.isEmpty()) continue
+                for (packet in SocketIoProtocol.splitPayload(body)) {
+                    if (packet.firstOrNull() == SocketIoProtocol.ENGINE_CLOSE) {
+                        Napier.d("Polling: server sessiyani yopdi", tag = LOG_TAG)
+                        return didConnect
+                    }
+                    if (handleEnginePacket(packet, sid, token)) didConnect = true
+                }
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            Napier.w("Polling sessiyasi uzildi: ${e::class.simpleName}: ${e.message}", e, tag = LOG_TAG)
+        } finally {
+            writer?.cancel()
+            endSession()
+        }
+        return didConnect
+    }
+
+    /** Chiquvchi navbatni POST'lar bilan bo'shatadi. Navbatdagi paketlar bitta so'rovga birlashadi. */
+    private suspend fun pumpOutgoing(sid: String, token: String) {
+        for (first in outgoing) {
+            val batch = mutableListOf(first)
+            // Navbatda kutayotganlarni ham qo'shamiz — har `typing` uchun alohida so'rov
+            // yubormaymiz (polling'da har so'rov qimmat).
+            while (batch.size < MAX_BATCH) {
+                batch += outgoing.tryReceive().getOrNull() ?: break
+            }
+            runCatching { postPackets(sid, token, batch) }
+                .onFailure { Napier.w("Polling: yuborib bo'lmadi — ${it.message}", tag = LOG_TAG) }
+        }
+    }
+
+    /** Engine.IO ramkasi (polling varianti — javob bir xil, faqat yo'llash usuli boshqa). */
+    private suspend fun handleEnginePacket(packet: String, sid: String, token: String): Boolean {
+        when (packet.firstOrNull()) {
+            SocketIoProtocol.ENGINE_PING ->
+                postPackets(sid, token, listOf(SocketIoProtocol.ENGINE_PONG.toString()))
+            SocketIoProtocol.ENGINE_MESSAGE -> return handlePacket(packet.substring(1))
+        }
+        return false
+    }
+
+    /**
+     * Long-poll so'rovi. Odatdagi 15 soniyalik chegara bu yerda YARAMAYDI: server ping
+     * intervali 25 s, ya'ni javob shuncha kutishi normal — chegara qisqa bo'lsa sessiya
+     * har safar uzilib turardi.
+     */
+    private suspend fun httpPoll(url: String, token: String): String {
+        val response = client.get(url) {
+            header(HttpHeaders.Authorization, "Bearer $token")
+            timeout {
+                requestTimeoutMillis = POLL_TIMEOUT_MS
+                socketTimeoutMillis = POLL_TIMEOUT_MS
+            }
+        }
+        if (!response.status.isSuccess()) error("polling GET ${response.status}")
+        return response.bodyAsText()
+    }
+
+    private suspend fun postPackets(sid: String, token: String, packets: List<String>) {
+        val response = client.post(pollingUrl(sid)) {
+            header(HttpHeaders.Authorization, "Bearer $token")
+            contentType(ContentType.Text.Plain)
+            setBody(packets.joinToString(SocketIoProtocol.RECORD_SEPARATOR))
+        }
+        if (!response.status.isSuccess()) error("polling POST ${response.status}")
+    }
+
+    private fun pollingUrl(sid: String?): String {
+        val base = "${endpoint.trimEnd('/')}/socket.io/?EIO=4&transport=polling"
+        return if (sid == null) base else "$base&sid=$sid"
+    }
+
+    /**
+     * Sessiya tugadi: holatni tozalaymiz (ikkala transport uchun ham bir xil).
+     *
+     * [NonCancellable] — bu `finally` da chaqiriladi va sessiya bekor qilingan bo'lishi
+     * mumkin; usiz `withLock` darhol qayta uzilib, kutayotgan ack'lar bo'shatilmasdan
+     * qolardi (chat esa timeout'gacha "yuborilmoqda" da turardi).
+     */
+    private suspend fun endSession() = withContext(NonCancellable) {
+        _connected.value = false
+        // Kutilayotgan ack'larni bo'shatamiz, aks holda `emitWithAck` timeout'gacha osilib
+        // qolardi va xabar zaxira (REST) yo'liga kech tushardi.
+        ackMutex.withLock {
+            acks.values.forEach { it.complete(null) }
+            acks.clear()
+        }
+    }
+
     /** Socket.IO paketi (Engine.IO `4` dan keyingi qism). CONNECT bo'lsa `true`. */
     private suspend fun handlePacket(raw: String): Boolean {
         // Boshqa namespace'ga tegishli paket — `null`, e'tiborsiz qoldiramiz.
@@ -249,6 +431,7 @@ class SocketIoClient(
             SocketIoProtocol.DISCONNECT, SocketIoProtocol.CONNECT_ERROR -> {
                 Napier.w("WS: server uzdi (tur=${packet.type}) — ${packet.body}", tag = LOG_TAG)
                 _connected.value = false
+                namespaceClosed = true
             }
             SocketIoProtocol.EVENT -> {
                 val array = packet.body.asJsonArray() ?: return false
@@ -305,6 +488,19 @@ class SocketIoClient(
         const val LOG_TAG = "ChatWS"
 
         const val ACK_TIMEOUT_MS = 10_000L
+
+        /**
+         * Long-poll so'rovining chegarasi. Server ping intervali 25 s, shuning uchun bundan
+         * kattaroq bo'lishi shart — aks holda har poll o'z chegarasida uzilib, sessiya
+         * behuda qayta qurilardi.
+         */
+        const val POLL_TIMEOUT_MS = 45_000L
+
+        /** Bitta POST'ga birlashtiriladigan paketlarning maksimumi. */
+        const val MAX_BATCH = 16
+
+        /** Polling'da shuncha sessiyadan keyin WebSocket qayta sinaladi. */
+        const val WS_RETRY_EVERY = 5
 
         /** Shundan qisqa sessiya — deyarli aniq auth muammosi. */
         const val SHORT_SESSION_MS = 3_000L

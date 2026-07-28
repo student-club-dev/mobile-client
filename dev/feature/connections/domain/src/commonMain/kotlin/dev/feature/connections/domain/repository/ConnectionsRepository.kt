@@ -8,6 +8,7 @@ import dev.feature.connections.domain.model.Page
 import dev.feature.connections.domain.model.ReportReason
 import dev.feature.connections.domain.model.RequestDirection
 import dev.feature.connections.domain.model.SearchedStudent
+import dev.feature.connections.domain.model.StudentFilter
 
 /**
  * **Bog'lanishlar** (LinkedIn uslubi): talaba topish → so'rov → qabul/rad → bog'langanlar,
@@ -23,11 +24,20 @@ import dev.feature.connections.domain.model.SearchedStudent
 interface ConnectionsRepository {
 
     /**
-     * Talaba qidirish. Moslik: `username` **boshidan**, `firstName`/`lastName` **ichidan** —
-     * har biri ALOHIDA, ya'ni "Alisher Valiyev" deb qidirilsa hech nima topilmaydi.
-     * O'zingiz va blok bilan bog'liq talabalar natijaga tushmaydi.
+     * Talabalar ro'yxati — `GET /v1/students` (qidiruv ham, filtr ham shu yerda).
+     *
+     * Filtrsiz chaqirilsa **to'liq ro'yxat** qaytadi (eng yangi hisoblar birinchi) — ya'ni
+     * ekran endi "avval yozing" holatida turishi shart emas. O'zingiz va blok bilan bog'liq
+     * talabalar hech qachon natijaga tushmaydi.
+     *
+     * Server IP bo'yicha **daqiqasiga 30 so'rov** bilan cheklaydi (oshsa `429`), shuning
+     * uchun qidiruvni debounce'siz chaqirmang.
      */
-    suspend fun search(query: String, page: Int = 1, size: Int = DEFAULT_PAGE_SIZE): Resource<Page<SearchedStudent>>
+    suspend fun students(
+        filter: StudentFilter = StudentFilter(),
+        page: Int = 1,
+        size: Int = DEFAULT_PAGE_SIZE,
+    ): Resource<Page<SearchedStudent>>
 
     /**
      * So'rov yuborish. Agar u odam sizga allaqachon so'rov yuborgan bo'lsa — javobda

@@ -116,6 +116,8 @@ class ProfileRepositoryImpl(
                 universityEmail = p.universityEmail,
                 birthYear = p.birthYear?.toLong(),
                 courseYear = p.courseYear,
+                gender = p.gender,
+                lastSeenVisibility = p.lastSeenVisibility,
                 avatarUrl = p.avatarUrl,
                 businessName = p.businessName,
                 businessType = p.businessType,

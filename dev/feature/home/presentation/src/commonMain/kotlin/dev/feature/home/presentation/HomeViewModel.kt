@@ -5,7 +5,10 @@ import androidx.lifecycle.viewModelScope
 import dev.feature.clubs.domain.model.Club
 import dev.core.common.Resource
 import dev.core.domain.model.DiscountOffer
-import dev.feature.connections.domain.model.StudentSummary
+import dev.feature.connections.domain.model.ConnectionStatus
+import dev.feature.connections.domain.model.ConnectionView
+import dev.feature.connections.domain.model.SearchedStudent
+import dev.feature.connections.domain.model.StudentFilter
 import dev.feature.connections.domain.repository.ConnectionsRepository
 import dev.feature.listings.domain.model.Listing
 import dev.feature.listings.domain.model.ListingKind
@@ -29,6 +32,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /**
@@ -88,14 +92,16 @@ data class HomeUiState(
     /** Faol yordam e'lonlari ([ListingKind.TASK]) — bir martalik topshiriqlar. */
     val tasks: List<Listing> = emptyList(),
     /**
-     * Bog'langan talabalar — `GET /v1/connections` dan **haqiqiy** ma'lumot.
-     *
-     * ⚠️ Bu "universitetim talabalari" EMAS. Backendda talabalarni universitet bo'yicha
-     * ro'yxatlash imkoni yo'q: `GET /v1/students/search` da `q` majburiy, universitet filtri
-     * yo'q va `StudentSummaryDto` `universityId` qaytarmaydi — ya'ni klientda filtrlab ham
-     * bo'lmaydi. Shu endpoint qo'shilgach, bu bo'lim o'shanga o'tkaziladi.
+     * Universitetim talabalari — `GET /v1/students?universityId=<profil>&connectionStatus=NONE`,
+     * ya'ni hali bog'lanmaganlar. Profilda universitet ko'rsatilmagan bo'lsa bo'sh qoladi
+     * va bo'lim yashiriladi.
      */
-    val connections: List<StudentSummary> = emptyList(),
+    val universityStudents: List<SearchedStudent> = emptyList(),
+    /**
+     * **Barcha talabalar** — `GET /v1/students` filtrsiz. Yuqoridagi "Universitetimda"
+     * bo'limida ko'ringanlar bu ro'yxatdan chiqarib tashlanadi (takrorlanmasin).
+     */
+    val allStudents: List<SearchedStudent> = emptyList(),
     val clubs: List<Club> = emptyList(),
     val hasUnreadNotifications: Boolean = false,
 )
@@ -114,16 +120,18 @@ class HomeViewModel(
 ) : ViewModel() {
 
     /**
-     * Bog'lanishlar keshi. `ConnectionsRepository` — `suspend`, oqim bermaydi (holat ikki
+     * Talabalar keshi. `ConnectionsRepository` — `suspend`, oqim bermaydi (holat ikki
      * tomonlama va tez o'zgargani uchun u yerda kesh yo'q), shuning uchun Home o'zi bir marta
      * yuklab shu oqimga qo'yadi. Xato bo'lsa bo'sh qoladi — Home'da xato ko'rsatilmaydi,
      * bo'lim shunchaki yashirinadi.
      */
-    private val _connections = MutableStateFlow<List<StudentSummary>>(emptyList())
-    val connections: StateFlow<List<StudentSummary>> = _connections.asStateFlow()
+    private val _students = MutableStateFlow<List<SearchedStudent>>(emptyList())
+
+    /** Universitetim talabalari — xuddi shu sababga ko'ra (oqim yo'q) qo'lda yuklanadi. */
+    private val _universityStudents = MutableStateFlow<List<SearchedStudent>>(emptyList())
 
     init {
-        refreshConnections()
+        refreshStudents()
         // Offline-first: universitetlarni backend'dan sinxronlashga urinamiz.
         viewModelScope.launch { universityRepository.refresh() }
         // Bosh ekrandagi uchta bo'lim ham backend feed'idan yuradi — `POST /v1/catalog/*` +
@@ -145,6 +153,7 @@ class HomeViewModel(
                         regionRepository.syncWithUniversity(universityId, addressOf(universityId))
                     }
                     discountRepository.refresh()
+                    loadUniversityStudents(universityId)
                 }
         }
         // Kirishdan keyin ilova shu ekrandan boshlanadi — profilni masofaviy manbadan
@@ -183,9 +192,8 @@ class HomeViewModel(
         discountRepository.observeCategories(),
         discountRepository.observeAllOffers(),
         listings,
-        connections,
         clubRepository.observeClubs(),
-    ) { categories, offers, (jobs, rentals, tasks), connections, clubs ->
+    ) { categories, offers, (jobs, rentals, tasks), clubs ->
         // Tur nomi ham kerak: backend kaliti (`NATIONAL_FOOD`) o'zi yetarli bo'lmasligi mumkin.
         val names = categories.associate { it.id to it.name }
         val grouped = offers.groupBy { homeSectionOf(it, names) }
@@ -193,13 +201,13 @@ class HomeViewModel(
             food = grouped[SECTION_FOOD].orEmpty(),
             clothing = grouped[SECTION_CLOTHING].orEmpty(),
             leisure = grouped[SECTION_LEISURE].orEmpty(),
-            jobs = jobs, rentals = rentals, tasks = tasks, connections = connections, clubs = clubs,
+            jobs = jobs, rentals = rentals, tasks = tasks, clubs = clubs,
         )
     }
 
     val state: StateFlow<HomeUiState> = combine(
-        header, content, notificationRepository.observeUnreadCount(),
-    ) { h, c, unread ->
+        header, content, notificationRepository.observeUnreadCount(), _universityStudents, _students,
+    ) { h, c, unread, universityStudents, students ->
         HomeUiState(
             userName = h.name,
             avatarUrl = h.avatarUrl,
@@ -211,7 +219,11 @@ class HomeViewModel(
             jobs = c.jobs,
             rentals = c.rentals,
             tasks = c.tasks,
-            connections = c.connections,
+            universityStudents = universityStudents,
+            // Yuqoridagi "Universitetimda" bo'limida ko'ringanlar takrorlanmasin.
+            allStudents = students.filterNot { s ->
+                universityStudents.any { it.student.id == s.student.id }
+            },
             clubs = c.clubs,
             hasUnreadNotifications = unread > 0,
         )
@@ -227,14 +239,60 @@ class HomeViewModel(
     }
 
     /**
-     * Bog'lanishlarni qayta yuklaydi. Ekranga qaytilganda chaqiriladi — `Connections`
-     * bo'limida yangi so'rov qabul qilingan bo'lsa, Home eskirgan ro'yxatni ko'rsatmasin.
+     * **Barcha talabalar** — `GET /v1/students` filtrsiz (eng yangi hisoblar birinchi).
+     * Ekranga qaytilganda ham chaqiriladi: "Do'stlar" bo'limida so'rov yuborilgan/qabul
+     * qilingan bo'lsa, Home kartalardagi tugmani eskirgan holatda ko'rsatmasin.
      */
-    fun refreshConnections() {
+    fun refreshStudents() {
         viewModelScope.launch {
-            val res = connectionsRepository.connections(size = HOME_CONNECTIONS_SIZE)
-            if (res is Resource.Success) _connections.value = res.data.items.map { it.student }
+            val res = connectionsRepository.students(size = HOME_STUDENTS_SIZE)
+            if (res is Resource.Success) _students.value = res.data.items
         }
+    }
+
+    /**
+     * Talaba kartasidagi «Bog'lanish». Javobdagi `status = ACCEPTED` — u odam sizga
+     * allaqachon so'rov yuborgan ekan, ya'ni bog'lanish darhol sodir bo'ldi.
+     *
+     * Xato bo'lsa (masalan 24 soatlik sovish muddati) Home'da xabar ko'rsatilmaydi —
+     * to'liq oqim "Do'stlar" ekranida; bu yerda tugma shunchaki eski holatida qoladi.
+     */
+    fun connect(studentId: String) {
+        viewModelScope.launch {
+            val res = connectionsRepository.sendRequest(studentId)
+            if (res !is Resource.Success) return@launch
+            val status = if (res.data.status == ConnectionStatus.ACCEPTED) {
+                ConnectionView.CONNECTED
+            } else {
+                ConnectionView.PENDING_OUT
+            }
+            val update = { list: List<SearchedStudent> ->
+                list.map { if (it.student.id == studentId) it.copy(connectionStatus = status) else it }
+            }
+            _universityStudents.update(update)
+            _students.update(update)
+        }
+    }
+
+    /**
+     * "Universitetimda" bo'limi. `universityId` — profildagi **erkin satr** (`emis-142`);
+     * serverda universitetlar katalogi yo'q, filtr shu satrni aynan solishtiradi. Shuning
+     * uchun profildagi format bilan `University.id` formati bir xil bo'lishi shart.
+     */
+    private suspend fun loadUniversityStudents(universityId: String?) {
+        if (universityId.isNullOrBlank()) {
+            _universityStudents.value = emptyList()
+            return
+        }
+        val res = connectionsRepository.students(
+            filter = StudentFilter(
+                universityIds = listOf(universityId),
+                // Allaqachon bog'langanlar pastdagi "Bog'lanishlarim" bo'limida turadi.
+                connectionStatus = ConnectionView.NONE,
+            ),
+            size = HOME_STUDENTS_SIZE,
+        )
+        if (res is Resource.Success) _universityStudents.value = res.data.items
     }
 
     private data class Header(
@@ -250,13 +308,12 @@ class HomeViewModel(
         val jobs: List<Listing>,
         val rentals: List<Listing>,
         val tasks: List<Listing>,
-        val connections: List<StudentSummary>,
         val clubs: List<Club>,
     )
 }
 
 /** Home'da faqat bir nechta karta ko'rinadi — butun ro'yxatni tortishning hojati yo'q. */
-private const val HOME_CONNECTIONS_SIZE = 10
+private const val HOME_STUDENTS_SIZE = 10
 
 // Profil "1".."4" yozadi (EditProfileScreen); eski yozuvlarda "ONE".."FOUR" uchraydi.
 private fun courseLabel(courseYear: String): String = when (courseYear) {

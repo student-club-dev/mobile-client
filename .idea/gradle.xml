@@ -48,6 +48,10 @@
             <option value="$PROJECT_DIR$/dev/feature/clubs/data" />
             <option value="$PROJECT_DIR$/dev/feature/clubs/domain" />
             <option value="$PROJECT_DIR$/dev/feature/clubs/presentation" />
+            <option value="$PROJECT_DIR$/dev/feature/connections" />
+            <option value="$PROJECT_DIR$/dev/feature/connections/data" />
+            <option value="$PROJECT_DIR$/dev/feature/connections/domain" />
+            <option value="$PROJECT_DIR$/dev/feature/connections/presentation" />
             <option value="$PROJECT_DIR$/dev/feature/home" />
             <option value="$PROJECT_DIR$/dev/feature/home/presentation" />
             <option value="$PROJECT_DIR$/dev/feature/jobs" />

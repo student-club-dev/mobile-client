@@ -131,8 +131,10 @@ class DatabaseSchemaTest {
         // turga xos maydonlar detailsJson ga ko'chdi, 15.sqm — sessiya backend tokenlariga
         // ko'chdi: UserEntity.userId olib tashlandi, `uid` = JWT `sub`, 16.sqm — chat backendga
         // ulandi: suhbat ikkinchi tomonning qisqa profilini, xabar esa `seq`/`senderId`/holatini
-        // saqlaydi (eski demo jadvallar tashlab yuborildi).
-        assertEquals(17L, StudentClubDatabase.Schema.version)
+        // saqlaydi (eski demo jadvallar tashlab yuborildi), 17.sqm — suhbatdoshning
+        // "yetkazildi" kursori (`otherDeliveredSeq`) + profil jinsi va "oxirgi ko'rilgan"
+        // maxfiyligi (backend 2026-07-28 spec'i).
+        assertEquals(18L, StudentClubDatabase.Schema.version)
     }
 
     @Test
@@ -169,6 +171,8 @@ class DatabaseSchemaTest {
             universityEmail = null,
             birthYear = 2004L,
             courseYear = "3",
+            gender = "MALE",
+            lastSeenVisibility = "NOBODY",
             avatarUrl = "https://cdn.studentclub.uz/avatars/uid-1.jpg",
             businessName = null,
             businessType = null,
@@ -178,6 +182,8 @@ class DatabaseSchemaTest {
         assertEquals("Quvonchbek", profile.firstName)
         assertEquals("tuit", profile.universityId)
         assertEquals(2004L, profile.birthYear)
+        assertEquals("MALE", profile.gender)
+        assertEquals("NOBODY", profile.lastSeenVisibility)
         assertEquals("https://cdn.studentclub.uz/avatars/uid-1.jpg", profile.avatarUrl)
 
         db.profileQueries.clear()
@@ -203,33 +209,40 @@ class DatabaseSchemaTest {
             otherId = "std_ali", otherUsername = "alisher", otherFullName = "Alisher Valiyev",
             otherAvatarUrl = null, otherOnline = 1L, otherLastSeenAt = null,
             lastMessageBody = "Salom!", lastMessageSenderId = "std_ali",
-            unreadCount = 3L, lastReadSeq = 0L,
+            unreadCount = 3L, lastReadSeq = 0L, otherReadSeq = 0L, otherDeliveredSeq = 0L,
         )
-        // Foydalanuvchi suhbatni arxivlab, 42-xabargacha o'qidi.
+        // Foydalanuvchi suhbatni arxivlab, 42-xabargacha o'qidi. WS esa suhbatdosh
+        // 40-xabargacha o'qiganini aytdi.
         q.setArchived(1L, "cnv_1")
         q.markRead(42L, "cnv_1")
+        q.setOtherReadSeq(40L, "cnv_1")
+        q.setOtherDeliveredSeq(41L, "cnv_1")
 
-        // Serverdan yangi ro'yxat keldi (u arxiv ham, o'qilgan kursor ham bilmaydi).
+        // Serverdan yangi ro'yxat keldi (u arxivni bilmaydi, kursorlari esa eskirgan
+        // bo'lishi mumkin — WS ulardan oldinroq kelgan bo'lardi).
         q.insertConversationIfNew(
             id = "cnv_1", type = "DIRECT", lastMessageAt = 2_000L,
             otherId = "std_ali", otherUsername = "alisher", otherFullName = "Alisher Valiyev",
             otherAvatarUrl = null, otherOnline = 0L, otherLastSeenAt = 1_500L,
             lastMessageBody = "Yangi xabar", lastMessageSenderId = "std_ali",
-            unreadCount = 1L, lastReadSeq = 0L,
+            unreadCount = 1L, lastReadSeq = 0L, otherReadSeq = 0L, otherDeliveredSeq = 0L,
         )
         q.updateConversation(
             type = "DIRECT", lastMessageAt = 2_000L,
             otherId = "std_ali", otherUsername = "alisher", otherFullName = "Alisher Valiyev",
             otherAvatarUrl = null, otherOnline = 0L, otherLastSeenAt = 1_500L,
             lastMessageBody = "Yangi xabar", lastMessageSenderId = "std_ali",
-            unreadCount = 1L, lastReadSeq = 0L, id = "cnv_1",
+            unreadCount = 1L, lastReadSeq = 0L, otherReadSeq = 10L, otherDeliveredSeq = 10L,
+            id = "cnv_1",
         )
 
         val row = q.selectConversation("cnv_1").executeAsOne()
         assertEquals("Yangi xabar", row.lastMessageBody) // server ma'lumoti yangilandi
         assertEquals(1L, row.unreadCount)
         assertEquals(1L, row.archived) // ...local arxiv bayrog'i saqlandi
-        assertEquals(42L, row.lastReadSeq) // ...va o'qilgan kursor ortga surilmadi
+        assertEquals(42L, row.lastReadSeq) // ...va kursorlarning hech biri
+        assertEquals(40L, row.otherReadSeq) // ...ortga surilmadi
+        assertEquals(41L, row.otherDeliveredSeq)
 
         // Arxivlangan suhbat oddiy ro'yxatda ko'rinmaydi.
         assertEquals(0, q.selectConversations().executeAsList().size)

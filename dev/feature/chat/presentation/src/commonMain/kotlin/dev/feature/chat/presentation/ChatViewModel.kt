@@ -32,8 +32,10 @@ data class ChatMessageUi(
     val outgoing: Boolean,
     val time: String,
     val status: MessageStatus,
-    /** Suhbatdosh o'qiganmi (chiquvchi xabarda ikki belgicha yoniq turadi). */
+    /** Suhbatdosh o'qiganmi — chiquvchi xabarda ikki belgicha YORQIN yonadi. */
     val read: Boolean,
+    /** Suhbatdoshning qurilmasiga yetib borganmi — ikki belgicha (xira). */
+    val delivered: Boolean,
     /** `null` bo'lmasa — bu xabardan oldin sana ajratgichi chiziladi. */
     val dayLabel: String? = null,
 )
@@ -117,7 +119,7 @@ class ChatViewModel(
             conversations = conversations,
             archivedConversations = archived,
             selected = selected,
-            messages = messages.toUi(selected?.otherReadSeq ?: 0),
+            messages = messages.toUi(selected?.otherReadSeq ?: 0, selected?.otherDeliveredSeq ?: 0),
             draft = rest.draft,
             peerTyping = rest.typing,
             realtime = rest.realtime,
@@ -138,7 +140,7 @@ class ChatViewModel(
     )
 
     /** Domen xabarlari → ekran modeli: kim yozgani, soat, sana ajratgichi, o'qilganligi. */
-    private fun List<Message>.toUi(otherReadSeq: Int): List<ChatMessageUi> =
+    private fun List<Message>.toUi(otherReadSeq: Int, otherDeliveredSeq: Int): List<ChatMessageUi> =
         mapIndexed { index, m ->
             val previous = getOrNull(index - 1)
             ChatMessageUi(
@@ -149,6 +151,9 @@ class ChatViewModel(
                 status = m.status,
                 // `seq = 0` — hali yuborilmagan xabar, o'qilgan bo'lishi mumkin emas.
                 read = m.seq > 0 && m.seq <= otherReadSeq,
+                // O'qilgan xabar, ta'rifi bo'yicha, yetkazilgan ham — kursorlar alohida
+                // kelgani uchun (delivered kechikishi mumkin) buni ochiq yozamiz.
+                delivered = m.seq > 0 && (m.seq <= otherDeliveredSeq || m.seq <= otherReadSeq),
                 dayLabel = if (previous == null || !ChatFormat.sameDay(previous.createdAt, m.createdAt)) {
                     ChatFormat.dayLabel(m.createdAt)
                 } else {

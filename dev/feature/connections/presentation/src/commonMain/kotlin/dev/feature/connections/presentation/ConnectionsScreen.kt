@@ -50,7 +50,9 @@ import dev.core.uikit.components.scStyle
 import dev.core.uikit.theme.Sc
 import dev.feature.connections.domain.model.ConnectionRequest
 import dev.feature.connections.domain.model.ConnectionView
+import dev.feature.connections.domain.model.Gender
 import dev.feature.connections.domain.model.ReportReason
+import dev.feature.connections.domain.model.StudentSort
 import dev.feature.connections.domain.model.StudentSummary
 import kotlinx.coroutines.delay
 import org.koin.compose.viewmodel.koinViewModel
@@ -125,6 +127,7 @@ fun ConnectionsScreen(
                     onConnect = vm::connect,
                     onOpenChat = onOpenChat,
                     onMenu = { menuFor = it },
+                    vm = vm,
                     modifier = Modifier.weight(1f),
                 )
                 ConnectionsTab.REQUESTS -> RequestsSection(
@@ -249,18 +252,24 @@ private fun SearchSection(
     onConnect: (StudentSummary) -> Unit,
     onOpenChat: (String, String) -> Unit,
     onMenu: (StudentSummary) -> Unit,
+    vm: ConnectionsViewModel,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier.fillMaxWidth()) {
         SearchField(state.query, onQuery, onClear)
+        Spacer(Modifier.height(10.dp))
+        FilterBar(state, vm)
         Spacer(Modifier.height(12.dp))
         when {
-            state.query.isBlank() -> Hint(
-                // Qidiruv `firstName` va `lastName` ni ALOHIDA tekshiradi — to'liq ism ishlamaydi.
-                "Ism yoki username bo'yicha qidiring.\nBitta so'z yozing — to'liq ism bo'yicha qidiruv ishlamaydi.",
+            state.searching && state.results.isEmpty() -> Hint("Yuklanmoqda…")
+            state.searched && state.results.isEmpty() -> Hint(
+                if (state.query.isNotBlank()) {
+                    // Qidiruv `firstName` va `lastName` ni ALOHIDA tekshiradi — to'liq ism ishlamaydi.
+                    "Hech kim topilmadi.\nBitta so'z yozing — to'liq ism bo'yicha qidiruv ishlamaydi."
+                } else {
+                    "Bu filtrlarga mos talaba yo'q"
+                },
             )
-            state.searching && state.results.isEmpty() -> Hint("Qidirilmoqda…")
-            state.searched && state.results.isEmpty() -> Hint("Hech kim topilmadi")
             else -> LazyColumn(
                 Modifier.fillMaxWidth(),
                 contentPadding = PaddingValues(horizontal = Sc.ScreenPadding, vertical = 4.dp),
@@ -269,7 +278,7 @@ private fun SearchSection(
                 items(state.results, key = { it.student.id }) { result ->
                     PersonRow(
                         student = result.student,
-                        subtitle = result.student.username?.let { "@$it" },
+                        subtitle = state.subtitleOf(result.student),
                         onMenu = { onMenu(result.student) },
                     ) {
                         val busy = result.student.id in state.busyIds
@@ -293,6 +302,61 @@ private fun SearchSection(
         }
     }
 }
+
+/**
+ * `GET /v1/students` filtrlari. Hammasi bir-birini toraytiradi (AND), bitta filtr ichida
+ * esa OR — ya'ni "1-kurs" + "2-kurs" = birinchi **yoki** ikkinchi kurs.
+ *
+ * "Universitetim" faqat profilda universitet ko'rsatilgan bo'lsa chiqadi: serverda
+ * universitetlar katalogi yo'q, filtr profildagi satrni aynan solishtiradi.
+ */
+@Composable
+private fun FilterBar(state: ConnectionsUiState, vm: ConnectionsViewModel) {
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = Sc.ScreenPadding)
+            .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        val mine = state.myUniversityId
+        if (mine != null) {
+            SmallChip("Universitetim", mine in state.filter.universityIds, vm::toggleMyUniversity)
+        }
+        SmallChip(
+            "Yangi odamlar",
+            state.filter.connectionStatus == ConnectionView.NONE,
+            vm::toggleOnlyNew,
+        )
+        SmallChip("Erkak", Gender.MALE in state.filter.genders) { vm.toggleGender(Gender.MALE) }
+        SmallChip("Ayol", Gender.FEMALE in state.filter.genders) { vm.toggleGender(Gender.FEMALE) }
+        courseOptions.forEach { (value, label) ->
+            SmallChip(label, value in state.filter.courseYears) { vm.toggleCourseYear(value) }
+        }
+        SmallChip("Ism bo'yicha", state.filter.sort == StudentSort.NAME) {
+            vm.setSort(if (state.filter.sort == StudentSort.NAME) StudentSort.RECENT else StudentSort.NAME)
+        }
+        if (state.hasActiveFilters) SmallChip("Tozalash", active = false, onClick = vm::clearFilters)
+    }
+}
+
+/** Filtr chiplaridagi va qatordagi kurs yorliqlari — profildagi qiymatlar bilan bir xil. */
+private val courseOptions = listOf(
+    "1" to "1-kurs",
+    "2" to "2-kurs",
+    "3" to "3-kurs",
+    "4" to "4-kurs",
+    "MASTER" to "Magistr",
+)
+
+/**
+ * Qator ostidagi matn: `@username · TATU · 2-kurs`. Universitet **monogrammasi** local
+ * katalogdan olinadi — backend qisqa profilda faqat `universityId` ni qaytaradi.
+ */
+private fun ConnectionsUiState.subtitleOf(student: StudentSummary): String? =
+    listOfNotNull(
+        student.username?.let { "@$it" },
+        universityLabel(student),
+        student.courseYear?.let { year -> courseOptions.firstOrNull { it.first == year }?.second },
+    ).joinToString(" · ").ifBlank { null }
 
 @Composable
 private fun RequestsSection(
@@ -326,7 +390,7 @@ private fun RequestsSection(
                     val busy = request.student.id in state.busyIds
                     PersonRow(
                         student = request.student,
-                        subtitle = request.student.username?.let { "@$it" },
+                        subtitle = state.subtitleOf(request.student),
                         onMenu = { onMenu(request.student) },
                     ) {
                         if (state.requestsTab == RequestsTab.INCOMING) {
@@ -365,7 +429,7 @@ private fun ConnectedSection(
         items(state.connections, key = { it.student.id }) { connected ->
             PersonRow(
                 student = connected.student,
-                subtitle = connected.student.username?.let { "@$it" },
+                subtitle = state.subtitleOf(connected.student),
                 onMenu = { onMenu(connected.student) },
             ) {
                 PillButton("Xabar") { onOpenChat(connected.student.id, connected.student.displayName) }

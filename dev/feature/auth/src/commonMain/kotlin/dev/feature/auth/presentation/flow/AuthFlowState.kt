@@ -2,9 +2,17 @@ package dev.feature.auth.presentation.flow
 
 import dev.feature.university.domain.model.University
 
-/** Kurs bosqichi. */
-enum class CourseYear(val label: String) {
-    ONE("1"), TWO("2"), THREE("3"), FOUR("4"), MASTER("Mag")
+/**
+ * Kurs bosqichi. [apiValue] — backend kutadigan qiymat (`"1".."4"`, `"MASTER"`); enum
+ * nomini yuborib bo'lmaydi, server uni rad etadi va kurs saqlanmay qolardi.
+ */
+enum class CourseYear(val label: String, val apiValue: String) {
+    ONE("1", "1"), TWO("2", "2"), THREE("3", "3"), FOUR("4", "4"), MASTER("Mag", "MASTER")
+}
+
+/** Jins — profilda ixtiyoriy, `GET /v1/students?gender=` filtri shunga tayanadi. */
+enum class ProfileGender(val label: String, val apiValue: String) {
+    MALE("Erkak", "MALE"), FEMALE("Ayol", "FEMALE")
 }
 
 /**
@@ -35,6 +43,8 @@ data class AuthFlowState(
     val selectedUniversity: University? = null,
     val birthYear: Int = 2004,
     val courseYear: CourseYear = CourseYear.TWO,
+    /** `null` — ko'rsatilmagan (ixtiyoriy maydon, keyin profilda o'zgartirsa bo'ladi). */
+    val gender: ProfileGender? = null,
     // Umumiy
     val isLoading: Boolean = false,
     val error: String? = null,

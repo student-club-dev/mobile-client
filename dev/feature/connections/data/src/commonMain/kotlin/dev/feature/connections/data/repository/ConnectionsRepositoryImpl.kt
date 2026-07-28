@@ -8,6 +8,7 @@ import dev.core.network.generated.model.BlockDto
 import dev.core.network.generated.model.CreateReportDto
 import dev.core.network.generated.model.SendConnectionRequestDto
 import dev.core.network.response.safeCall
+import dev.feature.connections.data.mapper.toCourseYearDtoOrNull
 import dev.feature.connections.data.mapper.toDomain
 import dev.feature.connections.data.mapper.toDto
 import dev.feature.connections.domain.model.ConnectedStudent
@@ -17,6 +18,7 @@ import dev.feature.connections.domain.model.Page
 import dev.feature.connections.domain.model.ReportReason
 import dev.feature.connections.domain.model.RequestDirection
 import dev.feature.connections.domain.model.SearchedStudent
+import dev.feature.connections.domain.model.StudentFilter
 import dev.feature.connections.domain.repository.ConnectionsRepository
 
 /**
@@ -32,13 +34,33 @@ class ConnectionsRepositoryImpl(
     private val connectivity: NetworkConnectivity,
 ) : ConnectionsRepository {
 
-    override suspend fun search(query: String, page: Int, size: Int): Resource<Page<SearchedStudent>> {
-        // Bo'sh so'rovda server 422 qaytaradi — tarmoqqa chiqmasdan bo'sh natija beramiz.
-        val q = query.trim()
-        if (q.isEmpty()) return Resource.Success(Page.empty())
-        return safeCall(connectivity) { api.studentSearch(q = q, page = page, size = size).body() }
-            .map { it.toDomain() }
-    }
+    /**
+     * `GET /v1/students` — generatorda `studentSearchList` (eski `studentSearch` =
+     * `/v1/students/search`, u **deprecated** va shu endpointga delegatsiya qiladi).
+     *
+     * Ko'p qiymatli parametrlar bo'sh ro'yxat bo'lganda **umuman yuborilmaydi**: bo'sh
+     * `?gender=` server tomonda `422` beradi.
+     */
+    override suspend fun students(
+        filter: StudentFilter,
+        page: Int,
+        size: Int,
+    ): Resource<Page<SearchedStudent>> = safeCall(connectivity) {
+        api.studentSearchList(
+            page = page,
+            size = size,
+            q = filter.query?.trim()?.takeIf { it.isNotEmpty() },
+            universityId = filter.universityIds.takeIf { it.isNotEmpty() },
+            gender = filter.genders.map { it.toDto() }.takeIf { it.isNotEmpty() },
+            // Noma'lum kurs qiymati (eski kesh) filtrni 422 ga olib kelmasin — tashlab yuboramiz.
+            courseYear = filter.courseYears.mapNotNull { it.toCourseYearDtoOrNull() }
+                .takeIf { it.isNotEmpty() },
+            birthYearFrom = filter.birthYearFrom,
+            birthYearTo = filter.birthYearTo,
+            connectionStatus = filter.connectionStatus?.toDto(),
+            sort = filter.sort.toDto(),
+        ).body()
+    }.map { it.toDomain() }
 
     override suspend fun sendRequest(studentId: String): Resource<Connection> =
         safeCall(connectivity) {

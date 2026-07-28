@@ -139,6 +139,10 @@ class AuthFlowViewModel(
     fun onBirthYearChange(y: Int) = _state.update { it.copy(birthYear = y) }
     fun onCourseYearChange(c: CourseYear) = _state.update { it.copy(courseYear = c) }
 
+    /** Bosilgan tugmani qayta bosish — tanlovni bekor qiladi (maydon ixtiyoriy). */
+    fun onGenderChange(g: ProfileGender) =
+        _state.update { it.copy(gender = if (it.gender == g) null else g) }
+
     // ------------------------------------------------------------------
     // Universitet tanlash — ro'yxat prof-emis API'sidan
     // ------------------------------------------------------------------
@@ -434,7 +438,8 @@ class AuthFlowViewModel(
         universityId = s.universityId,
         universityEmail = s.universityEmail.ifBlank { null },
         birthYear = s.birthYear,
-        courseYear = s.courseYear.name,
+        courseYear = s.courseYear.apiValue,
+        gender = s.gender?.apiValue,
     )
 
     // ------------------------------------------------------------------

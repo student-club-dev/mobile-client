@@ -32,8 +32,9 @@ data class Conversation(
 /**
  * Suhbatlar ro'yxatidagi bitta qator.
  *
- * ⚠️ [other].`online` / `lastSeenAt` — **shu yerda haqiqiy** (Redis'dan jonli o'qiladi va WS
- * `presence:update` bilan yangilanadi). `students/search` dagi qiymatlarga ishonmang.
+ * [other].`online` / `lastSeenAt` — Redis'dan jonli o'qiladi va WS `presence:update` bilan
+ * yangilanadi. Suhbatdosh `lastSeenVisibility = NOBODY` qo'ygan bo'lsa server ikkalasini
+ * ham yashiradi (`false` / `null`).
  */
 data class ConversationItem(
     val conversation: Conversation,
@@ -41,11 +42,16 @@ data class ConversationItem(
     val lastMessage: Message? = null,
     val unreadCount: Int = 0,
     /**
-     * Suhbatdosh o'qigan eng yuqori `seq` (WS `message:read`). Chiquvchi xabar shu
-     * qiymatdan past `seq` ga ega bo'lsa — "o'qildi". Serverdan o'qish endpointi yo'q,
-     * shuning uchun ilova qayta ochilganda 0 dan boshlanadi.
+     * Suhbatdosh **o'qigan** eng yuqori `seq` — chiquvchi xabar shundan past yoki teng
+     * bo'lsa "o'qildi" (✓✓ yorqin). Ikki manba: WS `message:read` va ro'yxat javobidagi
+     * `peerReadSeq` — ya'ni ilova qayta ochilganda holat tiklanadi.
      */
     val otherReadSeq: Int = 0,
+    /**
+     * Suhbatdoshning **qurilmasi olgan** eng yuqori `seq` (WS `message:delivered` /
+     * `peerDeliveredSeq`). Shundan past `seq` — "yetkazildi" (✓✓ xira).
+     */
+    val otherDeliveredSeq: Int = 0,
     /** Faqat local bayroq — backendda arxivlash endpointi yo'q. */
     val archived: Boolean = false,
 ) {

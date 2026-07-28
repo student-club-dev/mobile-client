@@ -2,6 +2,8 @@ package dev.feature.profile.data.mapper
 
 import dev.core.database.sql.ProfileEntity
 import dev.core.network.generated.model.CourseYearDto
+import dev.core.network.generated.model.GenderDto
+import dev.core.network.generated.model.LastSeenVisibilityDto
 import dev.core.network.generated.model.ProfileRoleDto
 import dev.core.network.generated.model.UpdateProfileDto
 import dev.core.network.generated.model.UserProfileDto
@@ -20,6 +22,8 @@ fun ProfileEntity.toDomain(): UserProfile = UserProfile(
     universityEmail = universityEmail,
     birthYear = birthYear?.toInt(),
     courseYear = courseYear,
+    gender = gender,
+    lastSeenVisibility = lastSeenVisibility,
     avatarUrl = avatarUrl,
     businessName = businessName,
     businessType = businessType,
@@ -39,6 +43,8 @@ fun UserProfileDto.toDomain(): UserProfile = UserProfile(
     universityEmail = universityEmail,
     birthYear = birthYear,
     courseYear = courseYear?.value,
+    gender = gender?.value,
+    lastSeenVisibility = lastSeenVisibility?.value,
     avatarUrl = avatarUrl,
 )
 
@@ -51,6 +57,8 @@ fun UserProfile.toUpdateRequest(): UpdateProfileDto = UpdateProfileDto(
     universityEmail = universityEmail,
     birthYear = birthYear,
     courseYear = courseYear?.toCourseYearDto(),
+    gender = gender?.toGenderDto(),
+    lastSeenVisibility = lastSeenVisibility?.toLastSeenVisibilityDto(),
     avatarUrl = avatarUrl,
 )
 
@@ -60,3 +68,9 @@ private fun String.toRoleDto(): ProfileRoleDto? =
 
 private fun String.toCourseYearDto(): CourseYearDto? =
     CourseYearDto.entries.firstOrNull { it.value == this }
+
+private fun String.toGenderDto(): GenderDto? =
+    GenderDto.entries.firstOrNull { it.value == this }
+
+private fun String.toLastSeenVisibilityDto(): LastSeenVisibilityDto? =
+    LastSeenVisibilityDto.entries.firstOrNull { it.value == this }

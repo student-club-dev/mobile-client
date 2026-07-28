@@ -16,6 +16,16 @@ data class UserProfile(
     val universityEmail: String? = null,
     val birthYear: Int? = null,
     val courseYear: String? = null,    // "1".."4" | "MASTER"
+    /**
+     * "MALE" | "FEMALE". `GET /v1/students?gender=` filtri aynan shu maydonga tayanadi —
+     * ko'rsatilmasa, talaba jins bo'yicha qidiruvga umuman tushmaydi.
+     */
+    val gender: String? = null,
+    /**
+     * Kim `online` / `lastSeenAt` ni ko'radi: "EVERYONE" | "CONNECTIONS" | "NOBODY".
+     * `null` — server sukut qiymatini ("CONNECTIONS") qo'llaydi.
+     */
+    val lastSeenVisibility: String? = null,
     /** Profil rasmi — `POST /v1/profile/me/avatar` qaytargan ochiq URL. */
     val avatarUrl: String? = null,
     // Biznes egasi (rol == "BUSINESS") — universitet/kurs o'rniga shu maydonlar to'ldiriladi.

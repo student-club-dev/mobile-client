@@ -117,4 +117,41 @@ class SocketIoProtocolTest {
         val packet = SocketIoProtocol.decode(ns, frame.substring(1))!!
         assertEquals(123, packet.ackId)
     }
+
+    // --- Polling transporti ---------------------------------------------------------------
+    // Bitta HTTP javobida bir nechta paket keladi. Jonli serverdan olingan misol:
+    //   40/chat,{"sid":"…"}<RS>41/chat,
+
+    private val rs = SocketIoProtocol.RECORD_SEPARATOR
+
+    @Test
+    fun splitsPollingPayloadIntoPackets() {
+        val body = """40/chat,{"sid":"jTxmHq7kgGfGGIn5AAAD"}${rs}41/chat,"""
+        assertEquals(
+            listOf("""40/chat,{"sid":"jTxmHq7kgGfGGIn5AAAD"}""", "41/chat,"),
+            SocketIoProtocol.splitPayload(body),
+        )
+    }
+
+    @Test
+    fun splitPayloadDropsEmptyChunks() {
+        // Ajratgich oxirida ham turishi mumkin; bo'sh javob esa bo'sh ro'yxat beradi.
+        assertEquals(listOf("2"), SocketIoProtocol.splitPayload("2$rs"))
+        assertEquals(emptyList(), SocketIoProtocol.splitPayload(""))
+    }
+
+    @Test
+    fun readsSidFromHandshake() {
+        val open = """0{"sid":"Z6ZJIileKp3xhx65AAAC","upgrades":["websocket"],"pingInterval":25000}"""
+        assertEquals("Z6ZJIileKp3xhx65AAAC", SocketIoProtocol.openSid(open))
+    }
+
+    @Test
+    fun openSidIsNullForOtherPackets() {
+        // Ping paketi ham `0` bilan boshlanmaydi, ham JSON emas — yiqilmasligi kerak.
+        assertNull(SocketIoProtocol.openSid("2"))
+        assertNull(SocketIoProtocol.openSid("""40/chat,{"sid":"x"}"""))
+        assertNull(SocketIoProtocol.openSid("""0{"pingInterval":25000}"""))
+        assertNull(SocketIoProtocol.openSid("0not-json"))
+    }
 }
