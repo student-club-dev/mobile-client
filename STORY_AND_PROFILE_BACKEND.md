@@ -39,34 +39,35 @@ deb turibdi — bu hujjat aynan o'shalarni yopadi.
 
 ---
 
-## 0.1 ⛔ ENG BIRINCHI TUZATILADIGAN NARSA — yuklangan fayllar ochiq emas
+## 0.1 ⛔ ENG BIRINCHI TUZATILADIGAN NARSA — rasmlarning bir qismi `404` qaytaradi
 
-**Hozir ilovada birorta ham yuklangan rasm ko'rinmaydi.** Sabab profil yoki chatda emas —
-**yuklangan fayllar ochiq domenda umuman tarqatilmaydi**.
+Kuzatilgan holat: rasmlarning **ayrimlari ochiladi, ayrimlari yo'q**. Ya'ni statik xizmat
+ishlaydi, lekin **fayllarning bir qismi serverda topilmaydi**.
 
-Tekshiruv (autentifikatsiyasiz, brauzerdan ham ko'rish mumkin):
+Eng ehtimolli sabab — **fayllar mahalliy diskda saqlanadi va API bir nechta nusxada
+ishlaydi**. Yuklash A nusxasiga tushadi, keyingi so'rov esa B nusxasiga boradi va u yerda
+fayl yo'q → `404`. Bunda xato **tasodifiy** ko'rinadi: bir rasm ochiladi, qo'shnisi yo'q,
+sahifani yangilasa boshqasi ochilmaydi.
 
+Ikkinchi ehtimol — **konteyner qayta joylashtirilganda yuklangan fayllar o'chib ketadi**
+(doimiy volume ulanmagan): eski profillarning rasmi yo'qoladi, yangilari ishlayveradi.
+
+**Tekshirish:**
+
+```bash
+# Bitta havolani bir necha marta so'rang. Javob GOH 200, GOH 404 bo'lsa —
+# nusxalar orasida fayl bo'linib ketgan.
+for i in $(seq 5); do curl -s -o /dev/null -w "%{http_code}\n" "<avatarUrl>"; done
 ```
-$ curl -i https://api.studentclub.uz/uploads/LOGO/test.jpg
 
-{"success":false,"status":404,"code":"NOT_FOUND",
- "message":"Cannot GET /uploads/LOGO/test.jpg", …}
-```
+**Talablar:**
 
-`Cannot GET /uploads/…` — bu **Express/NestJS router'ining** javobi, ya'ni `/uploads/*`
-uchun **na marshrut, na statik fayl xizmati ro'yxatdan o'tgan**. Fayl bor-yo'qligidan
-qat'i nazar, bu yo'l orqali hech narsa berilmaydi.
-
-Ustiga, `POST /v1/media/upload` javobidagi misol havola — `http://localhost:3000/uploads/…`,
-ya'ni server URL'ni **o'zining ichki manzili** bilan quradi. Telefonda `localhost` —
-telefonning o'zi; `http://` esa Android 9+ da cleartext sifatida bloklanadi.
-
-**Talab (uchalasi ham bajarilsin):**
-
-1. **Fayllar ochiq berilsin.** NestJS'da `ServeStaticModule` (yoki nginx'da alohida
-   `location /uploads/`) sozlansin, shunda `GET https://api.studentclub.uz/uploads/<...>`
-   rasmni qaytarsin. Nginx varianti tavsiya etiladi — statik faylni Node'dan o'tkazish
-   ortiqcha yuk:
+1. **Umumiy saqlash joyi.** Fayllar mahalliy diskda emas, **S3/MinIO** yoki barcha
+   nusxalarga ulangan **umumiy volume** da saqlansin. Bitta nusxada ishlansa ham,
+   qayta joylashtirishda yo'qolmaydigan doimiy volume bo'lishi shart.
+2. **Statik yo'lga cheklov qo'yilmasin.** `/uploads/*` uchun `ThrottlerGuard` yoki auth
+   ishlamasin — bitta ekranda 20–30 ta rasm so'raladi va limit ularni to'sib qo'yadi.
+   Nginx'da alohida `location` bo'lsa, so'rov Node'ga umuman bormaydi:
 
    ```nginx
    location /uploads/ {
@@ -76,20 +77,20 @@ telefonning o'zi; `http://` esa Android 9+ da cleartext sifatida bloklanadi.
        access_log off;
    }
    ```
+3. **Yo'qolgan fayllar aniqlansin.** Bazadagi `avatarUrl` lar bo'yicha bir martalik
+   tekshiruv o'tkazilsin: fayli yo'q bo'lganlar `NULL` ga tushirilsin — u holda ilova
+   bosh harfni ko'rsatadi, «buzuq rasm» emas.
 
-2. **Qaytariladigan URL ochiq va `https` bo'lsin.** Havola muhit o'zgaruvchisidan
-   qurilsin (`PUBLIC_MEDIA_BASE_URL=https://api.studentclub.uz`), `req.host` yoki
-   `localhost:3000` dan **emas**. Bu qoida `MediaUploadResponseDto.url` ga ham,
-   `avatarUrl` ga ham, kelajakdagi story havolalariga ham tegishli.
+**Havola formati (alohida, lekin bog'liq muammo).** `POST /v1/media/upload` javobidagi
+misol — `http://localhost:3000/uploads/…`. Havola muhit o'zgaruvchisidan qurilsin
+(`PUBLIC_MEDIA_BASE_URL=https://api.studentclub.uz`), `req.host` yoki `localhost` dan
+**emas**: telefonda `localhost` telefonning o'zi, `http://` esa Android 9+ da cleartext
+sifatida bloklanadi. Bazadagi eski `localhost` havolalari ham bir martalik migratsiya
+bilan almashtirilsin.
 
-3. **Eski yozuvlar ko'chirilsin.** Bazada allaqachon `http://localhost:3000/...` shaklida
-   saqlangan `avatarUrl` lar bo'lsa, ular bir martalik migratsiya bilan yangi bazaga
-   almashtirilsin — aks holda eski profillar rasmsiz qolaveradi.
-
-> Klient tomonida vaqtinchalik himoya bor: `localhost` xosti API manziliga almashtiriladi
-> va `http` → `https` ga ko'tariladi (`MediaUrl.normalize`). **Lekin bu 1-bandni bajarmasa
-> yordam bermaydi** — tuzatilgan havola ham `404` qaytaradi, chunki tarqatadigan hech
-> narsa yo'q.
+> Klient tomonida vaqtinchalik himoya bor (`MediaUrl.normalize`): `localhost` xosti API
+> manziliga almashtiriladi, `http` → `https` ga ko'tariladi. **Lekin fayl serverda
+> bo'lmasa hech qanday klient tuzatishi yordam bermaydi.**
 
 ---
 
@@ -442,17 +443,16 @@ yopiladi. Bu hujjatda takrorlanmaydi.
 
 > **Vazifa:** Student Club'ga Story va boyitilgan profil qo'shish.
 >
-> **⛔ ENG BIRINCHI — hozir ilovada birorta ham rasm ko'rinmaydi.**
-> `curl https://api.studentclub.uz/uploads/LOGO/test.jpg` → `Cannot GET /uploads/…`, ya'ni
-> yuklangan fayllar uchun **statik xizmat umuman sozlanmagan**. Ustiga, upload javobidagi
-> havola `http://localhost:3000/uploads/…` shaklida — telefonda `localhost` telefonning
-> o'zi, `http://` esa Android'da bloklanadi.
-> Kerak: (1) nginx'da `location /uploads/` (yoki `ServeStaticModule`) sozlansin;
-> (2) qaytariladigan havola muhit o'zgaruvchisidan qurilsin
-> (`PUBLIC_MEDIA_BASE_URL=https://api.studentclub.uz`), `req.host`/`localhost` dan emas;
-> (3) bazadagi eski `http://localhost:3000/...` havolalar bir martalik migratsiya bilan
-> almashtirilsin. **Buni bajarmasdan quyidagi ishlarning ma'nosi yo'q** — Story ham,
-> profil rasmlari ham o'sha teshikka tushadi.
+> **⛔ ENG BIRINCHI — rasmlarning bir qismi `404` qaytaradi.** Ayrimlari ochiladi,
+> ayrimlari yo'q. Eng ehtimolli sabab: fayllar **mahalliy diskda**, API esa bir nechta
+> nusxada ishlaydi — yuklash A nusxasiga tushadi, so'rov B ga boradi va u yerda fayl yo'q.
+> Kerak: (1) **umumiy saqlash joyi** (S3/MinIO yoki barcha nusxalarga ulangan doimiy
+> volume); (2) `/uploads/*` ga throttler/auth qo'yilmasin — bitta ekranda 20–30 ta rasm
+> so'raladi; (3) havola `PUBLIC_MEDIA_BASE_URL` dan qurilsin, `req.host`/`localhost` dan
+> emas, va bazadagi eski `localhost` havolalari migratsiya bilan almashtirilsin;
+> (4) fayli yo'qolgan `avatarUrl` lar `NULL` ga tushirilsin — ilova bosh harf ko'rsatadi.
+> **Buni bajarmasdan quyidagi ishlarning ma'nosi yo'q** — Story ham, profil rasmlari ham
+> o'sha teshikka tushadi.
 >
 > **Profil (avval, arzon):** `UpdateProfileDto`/`UserProfileDto` ga **`bio`** (140 belgi;
 > havola, `t.me`, `@kanal` va 7+ raqamli ketma-ketlik rad etilsin — spam profil orqali

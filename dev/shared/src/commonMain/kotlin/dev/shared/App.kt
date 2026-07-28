@@ -21,6 +21,7 @@ import io.github.aakira.napier.Napier
 import coil3.network.ktor3.KtorNetworkFetcherFactory
 import coil3.request.Options
 import dev.core.data.seed.LocalDataSeeder
+import dev.core.di.IMAGE_CLIENT
 import dev.core.network.NetworkConfig
 import dev.core.network.media.MediaUrl
 import dev.core.uikit.generated.resources.Res
@@ -32,6 +33,7 @@ import dev.feature.auth.presentation.flow.AuthNavHost
 import dev.core.uikit.theme.appPalette
 import io.ktor.client.HttpClient
 import org.koin.compose.koinInject
+import org.koin.core.qualifier.named
 
 /** Ilovaning ildiz Composable'i — Android MainActivity ham, iOS ham shuni ishlatadi. */
 @Composable
@@ -43,9 +45,10 @@ fun App() {
 @OptIn(org.jetbrains.compose.resources.ExperimentalResourceApi::class)
 @Composable
 private fun AppScaffold(content: @Composable () -> Unit) {
-    // Tarmoqdan rasm yuklash — Coil ilovaning o'z Ktor klientidan foydalanadi, shunda
-    // so'rovlarga sessiya tokeni ham qo'shiladi (himoyalangan rasm URL'lari uchun).
-    val httpClient = koinInject<HttpClient>()
+    // Rasmlar uchun ALOHIDA klient: umumiy klientning 15 soniyalik so'rov chegarasi
+    // navbatda turgan rasmlarni o'ldirardi va Chucker har bir rasmni bazasiga nusxalardi
+    // (qarang: `createImageHttpClient`).
+    val httpClient = koinInject<HttpClient>(named(IMAGE_CLIENT))
     // API manzilining origin qismi (`/v1/` siz) — buzuq havolalarni tuzatish uchun.
     val apiOrigin = koinInject<NetworkConfig>().baseUrl.substringBefore("/v1")
     setSingletonImageLoaderFactory { context ->

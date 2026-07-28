@@ -20,6 +20,7 @@ import io.ktor.client.plugins.defaultRequest
 import io.ktor.client.plugins.logging.LogLevel
 import io.ktor.client.plugins.logging.Logging
 import io.ktor.client.plugins.websocket.WebSockets
+import io.ktor.client.request.header
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
@@ -162,6 +163,38 @@ fun createWebSocketClient(): HttpClient = platformHttpClient(debugInterceptors =
 }
 
 /**
+ * **Rasmlar uchun klient** (Coil) — ilovaning umumiy klientidan ALOHIDA.
+ *
+ * Avval Coil umumiy klientdan foydalanardi va bu ko'p rasmli ekranlarda (talabalar
+ * ro'yxati, chatdagi albom, profil to'ri) qismning yuklanmasligiga olib kelardi:
+ *
+ * - **`requestTimeoutMillis = 15 s`** butun so'rovga, shu jumladan **navbatda turgan**
+ *   vaqtga ham tegishli. OkHttp bitta xostga bir vaqtda 5 ta so'rov yuboradi, qolgani
+ *   navbatda kutadi — 20 ta rasm so'ralganda oxirgilari yuklanishga ulgurmay chegaraga
+ *   urilardi va **jimgina yiqilardi**.
+ * - Debug qurilishida har rasm **Chucker** orqali o'tardi: u javob tanasini o'z bazasiga
+ *   nusxalaydi, ya'ni har bir rasm ikki marta xotiraga yozilardi.
+ * - `expectSuccess`, envelope va `Auth` (refresh) plaginlari rasm uchun keraksiz — ular
+ *   faqat qo'shimcha yiqilish yo'llarini ochardi.
+ *
+ * Bu yerda: **Chucker yo'q**, so'rov chegarasi kengroq (navbat o'ldirmaydi), plaginlar yo'q.
+ * Sessiya tokeni oddiy sarlavha bilan qo'shiladi — kelajakda himoyalangan media havolalari
+ * (`chat-upload`) uchun kerak bo'ladi, lekin `Auth` plaginining refresh mexanizmisiz:
+ * o'nlab rasm bir vaqtda 401 olsa, u o'nlab refresh so'rovini boshlab yuborardi.
+ */
+fun createImageHttpClient(tokenStore: TokenStore): HttpClient =
+    platformHttpClient(debugInterceptors = false) {
+        install(HttpTimeout) {
+            connectTimeoutMillis = CONNECT_TIMEOUT_MS
+            socketTimeoutMillis = IMAGE_SOCKET_TIMEOUT_MS
+            requestTimeoutMillis = IMAGE_REQUEST_TIMEOUT_MS
+        }
+        defaultRequest {
+            tokenStore.tokens()?.accessToken?.let { header("Authorization", "Bearer $it") }
+        }
+    }
+
+/**
  * Tashqi (uchinchi tomon) xizmatlar uchun klient — masalan OpenStreetMap Nominatim.
  *
  * Ilovaning umumiy klientidan farqi: **Bearer token qo'shmaydi** va bazaviy manzili yo'q.
@@ -188,6 +221,14 @@ fun createPublicHttpClient(): HttpClient = platformHttpClient {
 private const val CONNECT_TIMEOUT_MS = 8_000L
 private const val REQUEST_TIMEOUT_MS = 15_000L
 private const val SOCKET_TIMEOUT_MS = 15_000L
+
+/**
+ * Rasm so'rovlari uchun kengroq chegaralar. Sabab — OkHttp bitta xostga bir vaqtda atigi
+ * **5 ta** so'rov yuboradi: ro'yxatda 20 ta rasm bo'lsa, oxirgisi navbatda ~4 tsikl kutadi.
+ * Umumiy klientdagi 15 soniya shu kutishni ham o'z ichiga olgani uchun ular yiqilardi.
+ */
+private const val IMAGE_REQUEST_TIMEOUT_MS = 60_000L
+private const val IMAGE_SOCKET_TIMEOUT_MS = 30_000L
 
 /** Platformaga xos HTTP engine (Android: OkHttp, iOS: Darwin). */
 /**

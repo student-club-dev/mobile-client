@@ -32,12 +32,14 @@ import dev.core.domain.usecase.SetPasswordUseCase
 import dev.core.domain.usecase.VerifyPhoneOtpUseCase
 import dev.core.network.NetworkConfig
 import dev.core.network.createHttpClient
+import dev.core.network.createImageHttpClient
 import dev.core.network.media.MediaUploader
 import dev.core.network.generated.api.CatalogApi
 import dev.core.network.generated.api.GeoApi
 import dev.core.network.generated.api.DiscountsApi
 import io.ktor.client.HttpClient
 import org.koin.core.module.Module
+import org.koin.core.qualifier.named
 import org.koin.dsl.module
 
 /**
@@ -79,6 +81,9 @@ const val REMOTE_SYNC_ENABLED = false
  */
 const val DISCOUNTS_REMOTE_ENABLED = true
 
+/** Coil ishlatadigan rasm klientining Koin nomi. */
+const val IMAGE_CLIENT = "imageHttpClient"
+
 val networkModule = module {
     single { NetworkConfig(baseUrl = if (USE_PROD_API) PROD_BASE_URL else DEV_BASE_URL) }
 
@@ -89,6 +94,11 @@ val networkModule = module {
 
     // Har so'rovga `Authorization: Bearer <accessToken>`; 401 da refresh avtomatik.
     single<HttpClient> { createHttpClient(get(), get()) }
+
+    // Rasmlar (Coil) uchun ALOHIDA klient — Chucker'siz va kengroq chegaralar bilan
+    // (qarang: `createImageHttpClient` izohi). Umumiy klient ishlatilganda ko'p rasmli
+    // ekranlarda qismi yuklanmay qolardi.
+    single(named(IMAGE_CLIENT)) { createImageHttpClient(get()) }
 
     // Rasm yuklash (`POST /v1/media/upload`) — generatsiya qilingan `MediaApi` multipart
     // qismiga `filename` qo'ymagani uchun qo'lda yozilgan (qarang: `MediaUploader` izohi).
