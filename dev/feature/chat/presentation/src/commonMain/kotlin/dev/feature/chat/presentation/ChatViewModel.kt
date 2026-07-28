@@ -1,5 +1,6 @@
 package dev.feature.chat.presentation
 
+import androidx.compose.runtime.Immutable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.core.common.Resource
@@ -29,7 +30,14 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-/** Albomdagi (yoki yakka) bitta rasm. */
+/**
+ * Albomdagi (yoki yakka) bitta rasm.
+ *
+ * `@Immutable` — Compose `ByteArray` ni beqaror deb biladi va busiz HAR BIR xabar pufagi
+ * ota qayta chizilganda o'zi ham qayta chizilardi (uzun suhbatda bu sezilarli sekinlik).
+ * Va'da bajariladi: baytlar massivi yaratilgandan keyin O'ZGARTIRILMAYDI.
+ */
+@Immutable
 data class ChatImageUi(
     /** Qaysi xabarga tegishli — bosilganda/qayta yuborilganda kerak. */
     val messageId: String,
@@ -43,6 +51,7 @@ data class ChatImageUi(
 }
 
 /** Profil ekranidagi «Havolalar» bo'limi uchun bitta havola. */
+@Immutable
 data class ChatLinkUi(
     val messageId: String,
     val url: String,
@@ -51,6 +60,7 @@ data class ChatLinkUi(
 )
 
 /** Ekranda ko'rsatiladigan xabar — domen modeli + tayyor yorliqlar. */
+@Immutable
 data class ChatMessageUi(
     val id: String,
     val text: String,

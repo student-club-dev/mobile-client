@@ -46,6 +46,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
@@ -403,18 +404,52 @@ private fun ChatThread(
 
     val listState = rememberLazyListState()
     val messages = state.messages
-    val imeBottom = WindowInsets.ime.getBottom(LocalDensity.current)
 
-    // Yangi xabar kelganda / klaviatura ochilganda pastga suriladi.
-    LaunchedEffect(messages.size, imeBottom) {
-        if (messages.isNotEmpty()) listState.animateScrollToItem(messages.size - 1)
+    // ⚠️ Klaviatura balandligi animatsiya davomida HAR KADRDA o'zgaradi. Uni to'g'ridan-
+    // to'g'ri o'qish butun ekranni har kadrda qayta chizardi va `LaunchedEffect` ni qayta
+    // ishga tushirib, sekundiga o'nlab surish animatsiyasini boshlab yuborardi — chat
+    // aynan shundan qotib qolardi. Shuning uchun faqat "ochiqmi" bayrog'i kuzatiladi.
+    val density = LocalDensity.current
+    val imeInsets = WindowInsets.ime
+    val imeOpen by remember(imeInsets, density) {
+        derivedStateOf { imeInsets.getBottom(density) > 0 }
     }
-    // Ekran ochiq turganda kelgan xabarlar darhol o'qilgan hisoblanadi.
-    LaunchedEffect(messages.size) { onMarkRead() }
+
+    // Foydalanuvchi pastdami — eski xabarlarni o'qiyotgan bo'lsa uni pastga tortmaymiz.
+    val atBottom by remember(listState) {
+        derivedStateOf {
+            val last = listState.layoutInfo.visibleItemsInfo.lastOrNull()
+            last == null || last.index >= listState.layoutInfo.totalItemsCount - 2
+        }
+    }
+
+    // Suhbat birinchi ochilganda — DARHOL pastga. `animateScrollToItem` bu yerda butun
+    // tarixni aylantirib chiqardi va ochilish sezilarli darajada sekinlashardi.
+    var positioned by remember(conversation.id) { mutableStateOf(false) }
+    LaunchedEffect(conversation.id, messages.size) {
+        if (messages.isEmpty()) return@LaunchedEffect
+        when {
+            !positioned -> {
+                listState.scrollToItem(messages.lastIndex)
+                positioned = true
+            }
+            atBottom -> listState.animateScrollToItem(messages.lastIndex)
+        }
+    }
+    LaunchedEffect(imeOpen) {
+        if (imeOpen && messages.isNotEmpty()) listState.animateScrollToItem(messages.lastIndex)
+    }
+
+    // Ekran ochiq turganda kelgan xabarlar darhol o'qilgan hisoblanadi. Kalit — oxirgi
+    // xabar id'si: ro'yxat uzunligi eski tarix yuklanganda ham o'zgaradi, u esa
+    // "o'qildi" kursoriga aloqasi yo'q.
+    LaunchedEffect(messages.lastOrNull()?.id) { if (messages.isNotEmpty()) onMarkRead() }
 
     // Tepaga yetganda eski xabarlar yuklanadi (kursorli sahifalash, `?before=`).
-    val atTop by remember {
-        derivedStateOf { listState.firstVisibleItemIndex <= 1 && messages.isNotEmpty() }
+    val atTop by remember(listState) {
+        derivedStateOf {
+            listState.firstVisibleItemIndex <= 1 && listState.layoutInfo.totalItemsCount > 0
+        }
     }
     LaunchedEffect(atTop) { if (atTop) onLoadOlder() }
 
@@ -700,19 +735,29 @@ private fun HeaderGlassButton(
 @Composable
 private fun DottedBackground() {
     val dot = Sc.BrandDark.copy(alpha = 0.06f)
-    Canvas(Modifier.fillMaxSize()) {
-        val step = 22.dp.toPx()
-        val radius = 1.4f * density
-        var y = step / 2f
-        while (y < size.height) {
-            var x = step / 2f
-            while (x < size.width) {
-                drawCircle(dot, radius, Offset(x, y))
-                x += step
+    // `drawWithCache` — nuqtalar joylashuvi FAQAT o'lcham o'zgarganda hisoblanadi.
+    // Oddiy `Canvas` da bu ichma-ich sikl (ekranga ~500 ta doira) har chizishda,
+    // ya'ni aylantirishning har kadrida qayta bajarilardi.
+    Box(
+        Modifier.fillMaxSize().drawWithCache {
+            val step = 22.dp.toPx()
+            val radius = 1.4f * density
+            // `buildList` ichida `size` RO'YXAT o'lchamiga aylanadi — maydonni oldindan olamiz.
+            val area = size
+            val centers = buildList {
+                var y = step / 2f
+                while (y < area.height) {
+                    var x = step / 2f
+                    while (x < area.width) {
+                        add(Offset(x, y))
+                        x += step
+                    }
+                    y += step
+                }
             }
-            y += step
-        }
-    }
+            onDrawBehind { centers.forEach { drawCircle(dot, radius, it) } }
+        },
+    )
 }
 
 @Composable
