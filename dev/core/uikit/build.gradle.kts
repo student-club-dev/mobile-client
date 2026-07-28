@@ -22,6 +22,8 @@ kotlin {
             api(compose.ui)
             api(compose.components.resources)
             implementation(compose.materialIconsExtended)
+            // Foydalanuvchi avatarlari (`ScAvatar`) — serverdagi rasm havolasi bo'yicha.
+            implementation(libs.coil.compose)
         }
 
         androidMain.dependencies {

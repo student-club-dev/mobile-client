@@ -39,6 +39,7 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.core.uikit.components.ScAvatar
 import dev.core.uikit.components.ScCircleButton
 import dev.core.uikit.components.ScHeader
 import dev.core.uikit.components.ScHeaderTitle
@@ -454,9 +455,7 @@ private fun PersonRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(11.dp),
     ) {
-        ScIconTile(Sc.TintBlue, size = 46.dp, radius = 23.dp) {
-            ScText(student.initial, 18f, FontWeight.ExtraBold, Sc.Brand)
-        }
+        ScAvatar(name = student.displayName, size = 46.dp, avatarUrl = student.avatarUrl)
         Column(Modifier.weight(1f)) {
             ScText(student.displayName, 14.5f, FontWeight.ExtraBold, Sc.Ink, maxLines = 1)
             if (subtitle != null) {

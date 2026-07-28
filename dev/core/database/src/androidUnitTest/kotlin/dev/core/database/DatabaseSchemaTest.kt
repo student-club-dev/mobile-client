@@ -134,8 +134,10 @@ class DatabaseSchemaTest {
         // saqlaydi (eski demo jadvallar tashlab yuborildi), 17.sqm — suhbatdoshning
         // "yetkazildi" kursori (`otherDeliveredSeq`) + profil jinsi va "oxirgi ko'rilgan"
         // maxfiyligi (backend 2026-07-28 spec'i), 18.sqm — chatda media: rasm biriktirmasi
-        // (`attachmentUrl`/`attachmentThumbUrl`/o'lchamlar) va albom kaliti (`albumId`).
-        assertEquals(19L, StudentClubDatabase.Schema.version)
+        // (`attachmentUrl`/`attachmentThumbUrl`/o'lchamlar) va albom kaliti (`albumId`),
+        // 19.sqm — suhbatdosh profili (universitet/jins/kurs) chat ichidagi profil ekrani
+        // uchun, 20.sqm — "Siz uchun" e'lonining karta rasmi (`DiscountOfferEntity.imageUrl`).
+        assertEquals(21L, StudentClubDatabase.Schema.version)
     }
 
     @Test
@@ -208,7 +210,8 @@ class DatabaseSchemaTest {
         q.insertConversationIfNew(
             id = "cnv_1", type = "DIRECT", lastMessageAt = 1_000L,
             otherId = "std_ali", otherUsername = "alisher", otherFullName = "Alisher Valiyev",
-            otherAvatarUrl = null, otherOnline = 1L, otherLastSeenAt = null,
+            otherAvatarUrl = "https://cdn.example.uz/a.jpg", otherOnline = 1L, otherLastSeenAt = null,
+            otherUniversityId = "emis-142", otherGender = "MALE", otherCourseYear = "3",
             lastMessageBody = "Salom!", lastMessageSenderId = "std_ali",
             unreadCount = 3L, lastReadSeq = 0L, otherReadSeq = 0L, otherDeliveredSeq = 0L,
         )
@@ -224,14 +227,16 @@ class DatabaseSchemaTest {
         q.insertConversationIfNew(
             id = "cnv_1", type = "DIRECT", lastMessageAt = 2_000L,
             otherId = "std_ali", otherUsername = "alisher", otherFullName = "Alisher Valiyev",
-            otherAvatarUrl = null, otherOnline = 0L, otherLastSeenAt = 1_500L,
+            otherAvatarUrl = "https://cdn.example.uz/a.jpg", otherOnline = 0L, otherLastSeenAt = 1_500L,
+            otherUniversityId = "emis-142", otherGender = "MALE", otherCourseYear = "3",
             lastMessageBody = "Yangi xabar", lastMessageSenderId = "std_ali",
             unreadCount = 1L, lastReadSeq = 0L, otherReadSeq = 0L, otherDeliveredSeq = 0L,
         )
         q.updateConversation(
             type = "DIRECT", lastMessageAt = 2_000L,
             otherId = "std_ali", otherUsername = "alisher", otherFullName = "Alisher Valiyev",
-            otherAvatarUrl = null, otherOnline = 0L, otherLastSeenAt = 1_500L,
+            otherAvatarUrl = "https://cdn.example.uz/b.jpg", otherOnline = 0L, otherLastSeenAt = 1_500L,
+            otherUniversityId = "emis-142", otherGender = "MALE", otherCourseYear = "3",
             lastMessageBody = "Yangi xabar", lastMessageSenderId = "std_ali",
             unreadCount = 1L, lastReadSeq = 0L, otherReadSeq = 10L, otherDeliveredSeq = 10L,
             id = "cnv_1",
@@ -244,6 +249,10 @@ class DatabaseSchemaTest {
         assertEquals(42L, row.lastReadSeq) // ...va kursorlarning hech biri
         assertEquals(40L, row.otherReadSeq) // ...ortga surilmadi
         assertEquals(41L, row.otherDeliveredSeq)
+        // Profil maydonlari (19.sqm) — avatar va universitet serverdan yangilandi.
+        assertEquals("https://cdn.example.uz/b.jpg", row.otherAvatarUrl)
+        assertEquals("emis-142", row.otherUniversityId)
+        assertEquals("3", row.otherCourseYear)
 
         // Arxivlangan suhbat oddiy ro'yxatda ko'rinmaydi.
         assertEquals(0, q.selectConversations().executeAsList().size)

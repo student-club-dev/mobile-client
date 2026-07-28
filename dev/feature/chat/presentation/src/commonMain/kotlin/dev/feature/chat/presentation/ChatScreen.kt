@@ -54,6 +54,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.core.uikit.components.AppIcons
+import dev.core.uikit.components.ScAvatar
 import dev.core.uikit.components.ScCircleButton
 import dev.core.uikit.components.ScHeader
 import dev.core.uikit.components.ScHeaderTitle
@@ -320,9 +321,13 @@ private fun ConversationRow(
         horizontalArrangement = Arrangement.spacedBy(13.dp),
     ) {
         Box {
-            ScIconTile(tint, size = 50.dp, radius = 25.dp) {
-                ScText(c.other.initial, 19f, FontWeight.ExtraBold, accent)
-            }
+            ScAvatar(
+                name = c.other.displayName,
+                size = 50.dp,
+                avatarUrl = c.other.avatarUrl,
+                background = tint,
+                initialColor = accent,
+            )
             // Onlayn holati SHU ro'yxatda haqiqiy (Redis'dan) — qidiruvdagidan farqli.
             if (c.other.online) {
                 Box(
@@ -383,6 +388,7 @@ private fun ChatThread(
     var confirmDisconnect by remember { mutableStateOf(false) }
     var confirmBlock by remember { mutableStateOf(false) }
     var stickersOpen by remember { mutableStateOf(false) }
+    var profileOpen by remember { mutableStateOf(false) }
     // Ochilgan rasm: qaysi xabar va uning nechanchi rasmi.
     var viewer by remember { mutableStateOf<Pair<List<ChatImageUi>, Int>?>(null) }
 
@@ -416,6 +422,7 @@ private fun ChatThread(
             realtime = state.realtime,
             onBack = onBack,
             onMenu = { showMenu = true },
+            onOpenProfile = { profileOpen = true },
         )
 
         Box(Modifier.fillMaxWidth().weight(1f)) {
@@ -454,6 +461,29 @@ private fun ChatThread(
             stickersOpen = stickersOpen,
             onToggleStickers = { stickersOpen = !stickersOpen },
             onPickSticker = onSendSticker,
+        )
+    }
+
+    if (profileOpen) {
+        PeerProfileSheet(
+            conversation = conversation,
+            typing = state.peerTyping,
+            realtime = state.realtime,
+            photos = state.photos,
+            universityName = state.peerUniversity,
+            onClose = { profileOpen = false },
+            onDisconnect = {
+                profileOpen = false
+                confirmDisconnect = true
+            },
+            onBlock = {
+                profileOpen = false
+                confirmBlock = true
+            },
+            onReport = {
+                profileOpen = false
+                reportStudent = true
+            },
         )
     }
 
@@ -582,6 +612,7 @@ private fun ChatThreadHeader(
     realtime: Boolean,
     onBack: () -> Unit,
     onMenu: () -> Unit,
+    onOpenProfile: () -> Unit,
 ) {
     StatusBarAppearance(darkIcons = false)
     Column(
@@ -596,12 +627,24 @@ private fun ChatThreadHeader(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             HeaderGlassButton(ScIcons.ChevronLeft, "Orqaga", onBack)
+            // Avatar va ism — Telegram'dagidek profilni ochadi. Orqaga va menyu tugmalari
+            // shu sohadan TASHQARIDA qoladi, aks holda ular ham profilni ochib yuborardi.
+            Row(
+                Modifier.weight(1f)
+                    .clip(RoundedCornerShape(14.dp))
+                    .clickable(onClick = onOpenProfile)
+                    .padding(vertical = 2.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
             Box {
-                Box(
-                    Modifier.size(44.dp)
-                        .background(Color.White.copy(alpha = 0.9f), RoundedCornerShape(percent = 50)),
-                    contentAlignment = Alignment.Center,
-                ) { ScText(conversation.other.initial, 18f, FontWeight.ExtraBold, Sc.Violet) }
+                ScAvatar(
+                    name = conversation.other.displayName,
+                    size = 44.dp,
+                    avatarUrl = conversation.other.avatarUrl,
+                    background = Color.White.copy(alpha = 0.9f),
+                    initialColor = Sc.Violet,
+                )
                 if (conversation.other.online) {
                     Box(
                         Modifier.align(Alignment.BottomEnd)
@@ -625,6 +668,7 @@ private fun ChatThreadHeader(
                     else -> ChatFormat.lastSeen(conversation.other.lastSeenAt)
                 }
                 ScText(status, 13f, FontWeight.Medium, Color.White.copy(alpha = 0.9f), maxLines = 1)
+            }
             }
             HeaderGlassButton(ScIcons.DotsVertical, "Menyu", onMenu)
         }

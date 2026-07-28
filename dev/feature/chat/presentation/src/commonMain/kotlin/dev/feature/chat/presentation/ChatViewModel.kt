@@ -13,6 +13,7 @@ import dev.feature.chat.domain.model.Sticker
 import dev.feature.chat.domain.repository.ChatRepository
 import dev.feature.connections.domain.model.ReportReason
 import dev.feature.connections.domain.repository.ConnectionsRepository
+import dev.feature.university.domain.repository.UniversityRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -80,7 +81,27 @@ data class ChatUiState(
     val hasMoreHistory: Boolean = true,
     /** Bir martalik xabar (xato / tasdiq). */
     val message: String? = null,
-)
+    /**
+     * `universityId` → universitet nomi (local katalog). Backend qisqa profilda faqat
+     * id'ni qaytaradi (katalogi yo'q), nomni o'zimiz topamiz.
+     */
+    val universityNames: Map<String, String> = emptyMap(),
+) {
+    /**
+     * Suhbatdagi barcha rasmlar — profil ekranidagi «Umumiy media» to'ri, yangidan eskiga.
+     * Alohida so'rov kerak emas: [messages] allaqachon butun keshni qamraydi.
+     */
+    val photos: List<ChatImageUi>
+        get() = messages.asReversed()
+            .filter { it.type == MessageType.IMAGE }
+            .flatMap { it.images.asReversed() }
+            // Hali yuklanmagani (havolasiz) to'rda ko'rsatilmaydi.
+            .filter { it.url != null }
+
+    /** Suhbatdoshning universiteti — katalogda topilmasa `null` (xom `emis-142` ko'rsatilmaydi). */
+    val peerUniversity: String?
+        get() = selected?.other?.universityId?.let { universityNames[it] }
+}
 
 /**
  * Chat ekranining holati — suhbatlar ro'yxati va ochilgan suhbat bitta ViewModel'da
@@ -93,6 +114,7 @@ data class ChatUiState(
 class ChatViewModel(
     private val chatRepository: ChatRepository,
     private val connectionsRepository: ConnectionsRepository,
+    universityRepository: UniversityRepository,
     tokenStore: TokenStore,
 ) : ViewModel() {
 
@@ -113,9 +135,17 @@ class ChatViewModel(
     private var typingStopJob: Job? = null
     private var typingActive = false
 
+    /** Universitet nomlari — profil ekranida ko'rsatiladi. */
+    private val universityNames = MutableStateFlow<Map<String, String>>(emptyMap())
+
     init {
         chatRepository.connectRealtime()
         viewModelScope.launch { chatRepository.refreshConversations() }
+        viewModelScope.launch {
+            universityRepository.observeUniversities()
+                .catch { /* katalog bo'lmasa profil universitetsiz ko'rinadi */ }
+                .collect { list -> universityNames.value = list.associate { it.id to it.name } }
+        }
     }
 
     // MUHIM: `messagesFlow` combine'ning majburiy a'zosi. `onStart` darhol bo'sh ro'yxat
@@ -141,8 +171,10 @@ class ChatViewModel(
             typingFlow,
             chatRepository.observeRealtimeConnected(),
             extra,
-            chatRepository.observeLocalImages(),
-        ) { d, typing, rt, e, local -> Rest(d, typing, rt, e, local) },
+            combine(chatRepository.observeLocalImages(), universityNames) { local, unis ->
+                local to unis
+            },
+        ) { d, typing, rt, e, (local, unis) -> Rest(d, typing, rt, e, local, unis) },
     ) { conversations, archived, id, messages, rest ->
         val selected = (conversations + archived).firstOrNull { it.id == id }
         ChatUiState(
@@ -160,6 +192,7 @@ class ChatViewModel(
             loadingOlder = rest.extra.loadingOlder,
             hasMoreHistory = rest.extra.hasMoreHistory,
             message = rest.extra.message,
+            universityNames = rest.universityNames,
         )
     }
         // Manbalardan biri istisno tashlasa kolektor o'lib, state abadiy muzlab qolardi.
@@ -172,6 +205,7 @@ class ChatViewModel(
         val realtime: Boolean,
         val extra: ExtraState,
         val localImages: Map<String, ByteArray>,
+        val universityNames: Map<String, String>,
     )
 
     /**

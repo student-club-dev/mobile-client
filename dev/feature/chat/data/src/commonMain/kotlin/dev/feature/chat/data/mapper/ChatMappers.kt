@@ -11,6 +11,7 @@ import dev.feature.chat.domain.model.ConversationType
 import dev.feature.chat.domain.model.Message
 import dev.feature.chat.domain.model.MessageStatus
 import dev.feature.chat.domain.model.MessageType
+import dev.feature.connections.domain.model.Gender
 import dev.feature.connections.domain.model.StudentSummary
 import kotlinx.datetime.Instant
 
@@ -27,6 +28,10 @@ internal fun ConversationEntity.toDomain(): ConversationItem = ConversationItem(
         username = otherUsername,
         fullName = otherFullName,
         avatarUrl = otherAvatarUrl,
+        universityId = otherUniversityId,
+        // Noma'lum qiymat MALE bo'lib qolmasin — mos kelmasa ko'rsatilmaydi.
+        gender = Gender.entries.firstOrNull { it.name == otherGender },
+        courseYear = otherCourseYear,
         online = otherOnline != 0L,
         lastSeenAt = otherLastSeenAt?.let(Instant::fromEpochMilliseconds),
     ),

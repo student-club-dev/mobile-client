@@ -5,6 +5,9 @@ kotlin { sourceSets { commonMain.dependencies {
     implementation(projects.dev.feature.chat.data)
     // Bloklash / shikoyat / bog'lanishni uzish — chat ichidan chaqiriladi.
     implementation(projects.dev.feature.connections.data)
+    // Suhbatdosh profilidagi universitet nomi: backend faqat `universityId` beradi
+    // (katalogi yo'q), nomni local katalogdan topamiz.
+    implementation(projects.dev.feature.university.domain)
     // Koin moduli `ChatApi`, WS klienti va `TokenStore` ni quradi.
     implementation(projects.dev.core.database)
     implementation(projects.dev.core.network)
