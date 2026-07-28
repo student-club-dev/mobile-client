@@ -47,6 +47,9 @@ kotlin {
             // Rasm yuklash (avatar) — ilova darajasidagi ImageLoader sozlamasi App.kt'da.
             implementation(libs.coil.compose)
             implementation(libs.coil.network.ktor)
+            // Rasm havolasi tuzatilganini logga yozish (`MediaUrlMapper`) — buzuq havolani
+            // qurilmada tez topish uchun.
+            implementation(libs.napier)
             implementation(libs.ktor.client.core)
         }
     }

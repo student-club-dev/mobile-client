@@ -17,6 +17,7 @@ import androidx.compose.ui.Modifier
 import coil3.ImageLoader
 import coil3.compose.setSingletonImageLoaderFactory
 import coil3.map.Mapper
+import io.github.aakira.napier.Napier
 import coil3.network.ktor3.KtorNetworkFetcherFactory
 import coil3.request.Options
 import dev.core.data.seed.LocalDataSeeder
@@ -107,5 +108,11 @@ private fun AppScaffold(content: @Composable () -> Unit) {
  * `http://`, nisbiy yo'l) ko'rsatishdan oldin tuzatiladi. Qarang [MediaUrl].
  */
 private class MediaUrlMapper(private val apiOrigin: String) : Mapper<String, String> {
-    override fun map(data: String, options: Options): String? = MediaUrl.normalize(data, apiOrigin)
+    override fun map(data: String, options: Options): String? {
+        val fixed = MediaUrl.normalize(data, apiOrigin)
+        // Rasm ko'rinmasa birinchi savol — "server qanday havola bergan?". Logsiz buni
+        // faqat trafikni ushlab ko'rish bilan bilib bo'lardi.
+        if (fixed != data) Napier.d("Media URL: $data -> $fixed", tag = "Media")
+        return fixed
+    }
 }
