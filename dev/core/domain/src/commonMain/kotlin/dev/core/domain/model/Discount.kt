@@ -37,6 +37,8 @@ data class DiscountOffer(
     val featured: Boolean = false,   // Home feed'da ko'rsatiladimi
     val lat: Double = 0.0,           // joylashuv (xaritada ko'rsatish uchun); 0.0 → noma'lum
     val lng: Double = 0.0,
+    /** Karta rasmi. `null` — rasm yo'q, UI [emoji] ni chizadi. */
+    val imageUrl: String? = null,
 ) {
     /** Chegirmadan tejaladigan summa (so'm). Chegirmasizda 0. */
     val savedAmount: Long get() = if (isDiscount) (originalPrice - finalPrice).coerceAtLeast(0) else 0

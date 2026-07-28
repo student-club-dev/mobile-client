@@ -273,6 +273,8 @@ private fun DiscountCardDto.toOfferDto(type: CatalogTypeDto?) = DiscountOfferDto
     bannerAccent = type?.accentColor.toAccent(),
     lat = nearestBranch?.lat ?: 0.0,
     lng = nearestBranch?.lng ?: 0.0,
+    // Karta rasmi; yo'q bo'lsa biznes logotipi (Home kartasida ikkalasi ham bir xil joyni oladi).
+    imageUrl = imageUrl?.takeIf { it.isNotBlank() } ?: businessLogoUrl?.takeIf { it.isNotBlank() },
     saved = isFavorite,
 )
 

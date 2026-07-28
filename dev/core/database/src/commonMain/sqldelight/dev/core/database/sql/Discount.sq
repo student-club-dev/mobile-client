@@ -26,7 +26,9 @@ CREATE TABLE DiscountOfferEntity (
     bannerAccent INTEGER NOT NULL,
     featured INTEGER NOT NULL,
     lat REAL NOT NULL DEFAULT 0.0,
-    lng REAL NOT NULL DEFAULT 0.0
+    lng REAL NOT NULL DEFAULT 0.0,
+    -- Karta rasmi (`DiscountCardDto.imageUrl`). NULL — rasm yo'q, UI emoji chizadi.
+    imageUrl TEXT
 );
 
 CREATE TABLE SavedDiscountEntity (
@@ -62,8 +64,9 @@ VALUES (?, ?, ?, ?, ?);
 upsertOffer:
 INSERT OR REPLACE INTO DiscountOfferEntity(
     id, categoryId, subcategory, gender, merchant, title, isDiscount, discountPercent,
-    originalPrice, finalPrice, priceUnit, tag, promoCode, location, expiry, emoji, bannerAccent, featured, lat, lng
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+    originalPrice, finalPrice, priceUnit, tag, promoCode, location, expiry, emoji, bannerAccent, featured, lat, lng,
+    imageUrl
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 saveOffer:
 INSERT OR REPLACE INTO SavedDiscountEntity(offerId) VALUES (?);

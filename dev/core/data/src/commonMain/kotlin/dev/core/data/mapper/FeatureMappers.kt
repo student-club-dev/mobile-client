@@ -75,4 +75,5 @@ fun DiscountOfferEntity.toDomain(): DiscountOffer = DiscountOffer(
     featured = featured.toBool(),
     lat = lat,
     lng = lng,
+    imageUrl = imageUrl,
 )

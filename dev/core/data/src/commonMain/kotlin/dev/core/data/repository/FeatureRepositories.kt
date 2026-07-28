@@ -20,9 +20,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 
-// ===========================================================================
-// Chegirmalar
-// ===========================================================================
 class DiscountRepositoryImpl(
     private val db: StudentClubDatabase,
     private val dispatchers: AppDispatchers,
@@ -40,13 +37,16 @@ class DiscountRepositoryImpl(
         q.selectAllOffers().asFlow().mapToList(dispatchers.io).map { r -> r.map { it.toDomain() } }
 
     override fun observeOffers(categoryId: String): Flow<List<DiscountOffer>> =
-        q.selectOffersByCategory(categoryId).asFlow().mapToList(dispatchers.io).map { r -> r.map { it.toDomain() } }
+        q.selectOffersByCategory(categoryId).asFlow().mapToList(dispatchers.io)
+            .map { r -> r.map { it.toDomain() } }
 
     override fun observeFeatured(): Flow<List<DiscountOffer>> =
-        q.selectFeaturedOffers().asFlow().mapToList(dispatchers.io).map { r -> r.map { it.toDomain() } }
+        q.selectFeaturedOffers().asFlow().mapToList(dispatchers.io)
+            .map { r -> r.map { it.toDomain() } }
 
     override fun observeSaved(): Flow<List<DiscountOffer>> =
-        q.selectSavedOffers().asFlow().mapToList(dispatchers.io).map { r -> r.map { it.toDomain() } }
+        q.selectSavedOffers().asFlow().mapToList(dispatchers.io)
+            .map { r -> r.map { it.toDomain() } }
 
     /**
      * Avval local (UI darrov yangilanadi va oflaynda ham ishlaydi), keyin — serverga.
@@ -114,7 +114,7 @@ class DiscountRepositoryImpl(
                                 if (o.isDiscount) 1L else 0L, o.discountPercent.toLong(),
                                 o.originalPrice, o.finalPrice, o.priceUnit,
                                 o.tag, o.promoCode, o.location, o.expiry, o.emoji, o.bannerAccent,
-                                if (o.featured) 1L else 0L, o.lat, o.lng,
+                                if (o.featured) 1L else 0L, o.lat, o.lng, o.imageUrl,
                             )
                             // Saqlanganlar server holatiga tenglashtiriladi (boshqa qurilmada
                             // saqlangan/olib tashlangan e'lon shu yerda ko'rinadi).
@@ -124,6 +124,7 @@ class DiscountRepositoryImpl(
                 }
                 Resource.Success(Unit)
             }
+
             is Resource.Error -> res           // cache saqlanadi
             Resource.Loading -> Resource.Success(Unit)
         }
