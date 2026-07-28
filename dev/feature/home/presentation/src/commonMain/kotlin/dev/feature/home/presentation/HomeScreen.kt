@@ -37,19 +37,22 @@ import androidx.compose.ui.layout.ContentScale
 import coil3.compose.AsyncImage
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.lerp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.core.uikit.components.ScGlyph
 import dev.core.uikit.components.ScGradientButton
 import dev.core.uikit.components.ScHeader
 import dev.core.uikit.components.ScIconTile
 import dev.core.uikit.components.ScIcons
-import dev.core.uikit.components.ScMonogramTile
+import dev.core.uikit.components.ScAvatar
 import dev.core.uikit.components.ScSectionHeader
 import dev.core.uikit.components.ScText
 import dev.core.uikit.components.scCard
@@ -355,46 +358,152 @@ private fun OfferSection(
     if (offers.isEmpty()) return
     Column(verticalArrangement = Arrangement.spacedBy(13.dp)) {
         PaddedHeader(title, subtitle, onAction = onSeeAll)
-        EdgeRow(offers.take(8), spacing = 11.dp) { _, offer -> OfferCard(offer, onSeeAll) }
+        EdgeRow(offers.take(8), spacing = 12.dp) { _, offer -> OfferCard(offer, onSeeAll) }
     }
 }
 
+/** Karta rasmining balandligi — kenglikka nisbatan ~4:3. */
+private val OfferImageHeight = 132.dp
+private val OfferCardWidth = 178.dp
+
+/**
+ * "Siz uchun" e'loni kartasi: tepada RASM, ustida chegirma nishoni va tur yorlig'i
+ * (kiyimda — "Futbolka", ovqatda — "Pitsa"), pastida do'kon nomi, e'lon nomi va
+ * YASHIL narx.
+ *
+ * Rasm ([DiscountOffer.imageUrl]) faqat backend feed'ida bor; local seed'da yo'q, shuning
+ * uchun uning o'rniga turning rangli foni + emoji chiziladi — karta hech qachon bo'sh
+ * kulrang to'rtburchak bo'lib qolmaydi.
+ */
 @Composable
 private fun OfferCard(offer: DiscountOffer, onClick: () -> Unit) {
     val visual = categoryVisual(offer.categoryId)
     Column(
-        Modifier.width(212.dp).scCard(radius = 22.dp, elevation = 6.dp, onClick = onClick)
-            .padding(14.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        Modifier.width(OfferCardWidth).scCard(radius = 22.dp, elevation = 6.dp, onClick = onClick),
     ) {
-        Row(
-            Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        OfferImage(offer, visual)
+        Column(
+            Modifier.padding(horizontal = 12.dp, vertical = 11.dp),
+            verticalArrangement = Arrangement.spacedBy(7.dp),
         ) {
-            ScIconTile(visual.tint, size = 42.dp, radius = 15.dp) {
-                Icon(visual.icon, null, tint = visual.accent, modifier = Modifier.size(22.dp))
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                ScText(offer.merchant, 11.5f, FontWeight.Bold, visual.accent, maxLines = 1)
+                // `minLines = 2` — lentadagi kartalar bir xil balandlikda tursin (bir qatorli
+                // nom bilan ikki qatorli nom yonma-yon kelganda qator "arralanib" ketmasin).
+                Text(
+                    offer.title,
+                    style = scStyle(14.5f, FontWeight.ExtraBold, Sc.Ink, lineHeight = 18f, letterSpacing = -0.2f),
+                    minLines = 2,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
-            if (offer.isDiscount && offer.discountPercent > 0) {
-                Box(
-                    Modifier.clip(RoundedCornerShape(13.dp)).background(Sc.buttonBrush)
-                        .padding(horizontal = 10.dp, vertical = 6.dp),
-                ) {
-                    ScText("−${offer.discountPercent}%", 12.5f, FontWeight.ExtraBold, Color.White, maxLines = 1)
-                }
-            }
+            OfferPrice(offer)
+            val tag = if (offer.tag == DiscountTag.STUDENT_ID) "Talaba ID" else "Promokod"
+            ScText(
+                listOfNotNull(tag, offer.location, offer.expiry).joinToString(" · "),
+                11f, FontWeight.SemiBold, Sc.MutedLight, maxLines = 1,
+            )
         }
-        Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-            ScText(offer.merchant, 15f, FontWeight.ExtraBold, Sc.Ink, letterSpacing = -0.2f, maxLines = 1)
-            ScText(offer.title, 12.5f, FontWeight.Medium, Sc.Muted, maxLines = 2)
-        }
-        val tag = if (offer.tag == DiscountTag.STUDENT_ID) "Talaba ID bilan" else "Promokod"
-        ScText(
-            listOfNotNull(tag, offer.expiry).joinToString(" · "),
-            11.5f, FontWeight.SemiBold, visual.accent, maxLines = 1,
-        )
     }
 }
+
+/** Kartaning rasm qismi: rasm (yoki emoji), chegirma nishoni va tur yorlig'i. */
+@Composable
+private fun OfferImage(offer: DiscountOffer, visual: CategoryVisual) {
+    Box(Modifier.fillMaxWidth().height(OfferImageHeight).background(visual.tint)) {
+        // Emoji DOIM chiziladi, rasm esa uning ustiga tushadi — yuklanayotganda ham,
+        // havola buzuq bo'lganda ham karta bo'sh qolmaydi (ScAvatar bilan bir xil usul).
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            if (offer.emoji.isNotBlank()) {
+                Text(offer.emoji, style = TextStyle(fontSize = 46.sp))
+            } else {
+                Icon(visual.icon, null, tint = visual.accent, modifier = Modifier.size(40.dp))
+            }
+        }
+        if (!offer.imageUrl.isNullOrBlank()) {
+            AsyncImage(
+                model = offer.imageUrl,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+
+        if (offer.isDiscount && offer.discountPercent > 0) {
+            Box(
+                Modifier.align(Alignment.TopStart).padding(9.dp)
+                    .clip(RoundedCornerShape(11.dp)).background(Sc.buttonBrush)
+                    .padding(horizontal = 9.dp, vertical = 5.dp),
+            ) {
+                ScText("−${offer.discountPercent}%", 12f, FontWeight.ExtraBold, Color.White, maxLines = 1)
+            }
+        }
+
+        // Tur yorlig'i — kiyimda aynan shu "Futbolka / Ko'ylak / Poyabzal" ni ko'rsatadi.
+        val type = offer.typeLabel()
+        if (type.isNotBlank()) {
+            Box(
+                Modifier.align(Alignment.BottomStart).padding(9.dp)
+                    .clip(RoundedCornerShape(10.dp)).background(Color.White.copy(alpha = 0.94f))
+                    .padding(horizontal = 9.dp, vertical = 4.dp),
+            ) {
+                // Oq yorliq fon rasmidan qat'i nazar oq bo'lgani uchun matn ham doim to'q.
+                ScText(type, 11f, FontWeight.ExtraBold, InkOnLight, maxLines = 1)
+            }
+        }
+    }
+}
+
+/** Narx qatori — chegirmali narx YASHIL, ustidan chizilgan eski narx va o'lchov birligi. */
+@Composable
+private fun OfferPrice(offer: DiscountOffer) {
+    if (offer.effectivePrice <= 0) return
+    Row(
+        verticalAlignment = Alignment.Bottom,
+        horizontalArrangement = Arrangement.spacedBy(5.dp),
+    ) {
+        ScText(
+            "${offer.effectivePrice.spaced()} so'm", 15.5f, FontWeight.ExtraBold, Sc.Success,
+            letterSpacing = -0.2f, maxLines = 1,
+        )
+        if (offer.isDiscount && offer.originalPrice > offer.finalPrice) {
+            Text(
+                offer.originalPrice.spaced(),
+                style = scStyle(11f, FontWeight.SemiBold, Sc.MutedLight)
+                    .copy(textDecoration = TextDecoration.LineThrough),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        } else if (offer.priceUnit.isNotBlank()) {
+            ScText("/ ${offer.priceUnit}", 11f, FontWeight.SemiBold, Sc.MutedLight, maxLines = 1)
+        }
+    }
+}
+
+/**
+ * Kartadagi tur yorlig'i. Kiyimda jins ham qo'shiladi ("Erkaklar · Ko'ylak") — bir xil
+ * turdagi erkak/ayol modellari lentada aralashib ketmasin.
+ *
+ * Backend'da jinsning O'ZI kategoriya bo'lishi mumkin (`categoryKey = MEN` → "Erkaklar"),
+ * shunda yorliq "Erkaklar · Erkaklar" bo'lib qolardi — takror olib tashlanadi.
+ */
+private fun DiscountOffer.typeLabel(): String {
+    val genderLabel = when (gender.uppercase()) {
+        "MALE" -> "Erkaklar"
+        "FEMALE" -> "Ayollar"
+        else -> null
+    }
+    val type = subcategory.takeIf { it.isNotBlank() }
+    if (type != null && type.equals(genderLabel, ignoreCase = true)) return type
+    return listOfNotNull(genderLabel, type).joinToString(" · ")
+}
+
+/** "30 000" — uch xonadan bo'sh joy bilan. */
+private fun Long.spaced(): String = toString().reversed().chunked(3).joinToString(" ").reversed()
+
+/** Oq yorliq ustidagi matn — mavzudan qat'i nazar to'q (fon doim oq). */
+private val InkOnLight = Color(0xFF0F2A43)
 
 // ---------------------------------------------------------------------------
 // Yordam e'lonlari
@@ -688,7 +797,14 @@ private fun StudentsSection(
                     .padding(horizontal = 16.dp, vertical = 18.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                ScMonogramTile(student.initial, tint, accent)
+                ScAvatar(
+                    name = student.displayName,
+                    size = 62.dp,
+                    avatarUrl = student.avatarUrl,
+                    background = tint,
+                    initialColor = accent,
+                    shape = RoundedCornerShape(24.dp),
+                )
                 Spacer(Modifier.height(12.dp))
                 ScText(student.displayName, 16f, FontWeight.ExtraBold, Sc.Ink, maxLines = 1)
                 Spacer(Modifier.height(3.dp))

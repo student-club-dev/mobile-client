@@ -21,7 +21,37 @@ class DatabaseSchemaTest {
      * ClubEntity (3.sqm `joined` qo'shadi), ConversationEntity (4.sqm `archived` qo'shadi),
      * UserEntity (5.sqm profilni ajratib oladi — profil ustunlari hali ichida).
      */
+    /**
+     * `StudentEntity` **v1 dan beri** mavjud (`Student.sq` birinchi migratsiyadan oldin
+     * qo'shilgan), shuning uchun 21.sqm unga ustun QO'SHADI. Migratsiya testlarining
+     * boshlang'ich bazasida ham jadval bo'lishi shart, aks holda zanjir uziladi.
+     */
+    private fun createV1StudentTable(driver: JdbcSqliteDriver) {
+        driver.execute(
+            null,
+            """
+            CREATE TABLE StudentEntity (
+                id TEXT NOT NULL PRIMARY KEY,
+                firstName TEXT NOT NULL,
+                lastName TEXT NOT NULL,
+                initial TEXT NOT NULL,
+                universityId TEXT NOT NULL,
+                universityMonogram TEXT NOT NULL,
+                course INTEGER NOT NULL,
+                faculty TEXT NOT NULL,
+                friendStatus TEXT NOT NULL,
+                interests TEXT NOT NULL,
+                friendsCount INTEGER NOT NULL,
+                adsCount INTEGER NOT NULL,
+                rating REAL NOT NULL
+            )
+            """.trimIndent(),
+            0,
+        )
+    }
+
     private fun createV1Tables(driver: JdbcSqliteDriver) {
+        createV1StudentTable(driver)
         driver.execute(
             null,
             """
@@ -136,8 +166,9 @@ class DatabaseSchemaTest {
         // maxfiyligi (backend 2026-07-28 spec'i), 18.sqm — chatda media: rasm biriktirmasi
         // (`attachmentUrl`/`attachmentThumbUrl`/o'lchamlar) va albom kaliti (`albumId`),
         // 19.sqm — suhbatdosh profili (universitet/jins/kurs) chat ichidagi profil ekrani
-        // uchun, 20.sqm — "Siz uchun" e'lonining karta rasmi (`DiscountOfferEntity.imageUrl`).
-        assertEquals(21L, StudentClubDatabase.Schema.version)
+        // uchun, 20.sqm — "Siz uchun" e'lonining karta rasmi (`DiscountOfferEntity.imageUrl`),
+        // 21.sqm — talaba ro'yxatlaridagi profil rasmi (`StudentEntity.avatarUrl`).
+        assertEquals(22L, StudentClubDatabase.Schema.version)
     }
 
     @Test
@@ -485,6 +516,7 @@ class DatabaseSchemaTest {
             0,
         )
         createV1DiscountTables(driver)
+        createV1StudentTable(driver)
 
         // Koordinatasi bor e'lon — filialga aylanishi kerak.
         driver.execute(

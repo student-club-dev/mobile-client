@@ -16,8 +16,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import coil3.ImageLoader
 import coil3.compose.setSingletonImageLoaderFactory
+import coil3.map.Mapper
 import coil3.network.ktor3.KtorNetworkFetcherFactory
+import coil3.request.Options
 import dev.core.data.seed.LocalDataSeeder
+import dev.core.network.NetworkConfig
+import dev.core.network.media.MediaUrl
 import dev.core.uikit.generated.resources.Res
 import dev.core.uikit.theme.AppTheme
 import dev.feature.settings.domain.model.ThemeMode
@@ -38,12 +42,21 @@ fun App() {
 @OptIn(org.jetbrains.compose.resources.ExperimentalResourceApi::class)
 @Composable
 private fun AppScaffold(content: @Composable () -> Unit) {
-    // Tarmoqdan rasm yuklash (avatar) — Coil ilovaning o'z Ktor klientidan foydalanadi,
-    // shunda so'rovlarga Firebase ID token ham qo'shiladi (himoyalangan rasm URL'lari uchun).
+    // Tarmoqdan rasm yuklash — Coil ilovaning o'z Ktor klientidan foydalanadi, shunda
+    // so'rovlarga sessiya tokeni ham qo'shiladi (himoyalangan rasm URL'lari uchun).
     val httpClient = koinInject<HttpClient>()
+    // API manzilining origin qismi (`/v1/` siz) — buzuq havolalarni tuzatish uchun.
+    val apiOrigin = koinInject<NetworkConfig>().baseUrl.substringBefore("/v1")
     setSingletonImageLoaderFactory { context ->
         ImageLoader.Builder(context)
-            .components { add(KtorNetworkFetcherFactory(httpClient)) }
+            .components {
+                // ⚠️ Mapper fetcher'DAN OLDIN: backend rasm havolasini o'z ichki manzili
+                // bilan qaytarishi mumkin (`http://localhost:3000/uploads/…`) yoki nisbiy
+                // yo'l berishi mumkin. Tuzatilmasa Android'da BITTA HAM rasm ko'rinmaydi:
+                // `localhost` — telefonning o'zi, `http://` esa cleartext sifatida bloklanadi.
+                add(MediaUrlMapper(apiOrigin))
+                add(KtorNetworkFetcherFactory(httpClient))
+            }
             .build()
     }
 
@@ -87,4 +100,12 @@ private fun AppScaffold(content: @Composable () -> Unit) {
             }
         }
     }
+}
+
+/**
+ * Coil har bir havolani shu yerdan o'tkazadi — buzuq media havolalari (`localhost`,
+ * `http://`, nisbiy yo'l) ko'rsatishdan oldin tuzatiladi. Qarang [MediaUrl].
+ */
+private class MediaUrlMapper(private val apiOrigin: String) : Mapper<String, String> {
+    override fun map(data: String, options: Options): String? = MediaUrl.normalize(data, apiOrigin)
 }

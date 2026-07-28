@@ -86,7 +86,7 @@ class LocalDataSeeder(
                     if (o.isDiscount) 1L else 0L, o.discountPercent.toLong(),
                     o.originalPrice, finalPrice, o.priceUnit,
                     o.tag, o.promoCode, o.location, o.expiry, o.emoji, o.bannerAccent.toLong(16),
-                    if (o.featured) 1L else 0L, lat, lng,
+                    if (o.featured) 1L else 0L, lat, lng, o.imageUrl,
                 )
             }
         }
@@ -109,13 +109,14 @@ class LocalDataSeeder(
         val q = db.studentQueries
         if (q.countStudents().executeAsOne() > 0) return
         q.transaction {
-            // id, first, last, initial, uniId, uniMono, course, faculty, friendStatus, interests, friends, ads, rating
-            q.upsert("st-dilnoza", "Dilnoza", "Rahimova", "D", "tatu", "TATU", 2, "IT", "NONE",
+            // id, first, last, initial, avatarUrl, uniId, uniMono, course, faculty, friendStatus,
+            // interests, friends, ads, rating. Namuna ma'lumotda rasm yo'q — avatarda bosh harf.
+            q.upsert("st-dilnoza", "Dilnoza", "Rahimova", "D", null, "tatu", "TATU", 2, "IT", "NONE",
                 listOf("🎨 Dizayn", "💻 Frontend", "📷 Foto", "🏀 Sport").joinDb(), 148, 12, 4.9)
-            q.upsert("st-sardor", "Sardor", "Aliyev", "S", "tatu", "TATU", 3, "Telekom", "NONE", "", 96, 3, 4.7)
-            q.upsert("st-malika", "Malika", "Yo‘ldosheva", "M", "nuu", "O‘zMU", 2, "Iqtisod", "PENDING", "", 54, 1, 4.5)
-            q.upsert("st-kamron", "Kamron", "Yusupov", "K", "tatu", "TATU", 2, "Dasturiy inj.", "NONE", "", 71, 5, 4.8)
-            q.upsert("st-nigora", "Nigora", "Tosheva", "N", "tatu", "TATU", 1, "Kiberxavfsizlik", "NONE", "", 33, 0, 4.6)
+            q.upsert("st-sardor", "Sardor", "Aliyev", "S", null, "tatu", "TATU", 3, "Telekom", "NONE", "", 96, 3, 4.7)
+            q.upsert("st-malika", "Malika", "Yo‘ldosheva", "M", null, "nuu", "O‘zMU", 2, "Iqtisod", "PENDING", "", 54, 1, 4.5)
+            q.upsert("st-kamron", "Kamron", "Yusupov", "K", null, "tatu", "TATU", 2, "Dasturiy inj.", "NONE", "", 71, 5, 4.8)
+            q.upsert("st-nigora", "Nigora", "Tosheva", "N", null, "tatu", "TATU", 1, "Kiberxavfsizlik", "NONE", "", 33, 0, 4.6)
         }
     }
 
@@ -197,6 +198,7 @@ class LocalDataSeeder(
         val featured: Boolean = false,
         val lat: Double = 0.0,   // 0.0 → `location` matnidan tuman koordinatasi aniqlanadi
         val lng: Double = 0.0,
+        val imageUrl: String? = null,   // null → kartada emoji ko'rinadi
     )
 
     /**

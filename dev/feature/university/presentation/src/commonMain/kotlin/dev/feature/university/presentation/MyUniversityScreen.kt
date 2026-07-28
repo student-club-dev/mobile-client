@@ -49,6 +49,7 @@ import dev.core.uikit.components.ScHeader
 import dev.core.uikit.components.ScHeaderTitle
 import dev.core.uikit.components.ScIconTile
 import dev.core.uikit.components.ScIcons
+import dev.core.uikit.components.ScAvatar
 import dev.core.uikit.components.ScMonogramTile
 import dev.core.uikit.components.ScSectionHeader
 import dev.core.uikit.components.ScSheetHandle
@@ -285,7 +286,14 @@ private fun MateCard(student: Student, index: Int, onFriend: () -> Unit) {
         Modifier.width(150.dp).scCard(radius = 26.dp).padding(horizontal = 16.dp, vertical = 18.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        ScMonogramTile(student.initial, tint, accent)
+        ScAvatar(
+            name = student.firstName,
+            size = 62.dp,
+            avatarUrl = student.avatarUrl,
+            background = tint,
+            initialColor = accent,
+            shape = RoundedCornerShape(24.dp),
+        )
         Spacer(Modifier.height(12.dp))
         ScText(student.firstName, 16f, FontWeight.ExtraBold, Sc.Ink, maxLines = 1)
         Spacer(Modifier.height(3.dp))
@@ -589,7 +597,13 @@ private fun DetailedStudentCard(student: Student, index: Int, onFriend: (Student
     val (tint, accent) = tilePalette[index.mod(tilePalette.size)]
     Column(Modifier.fillMaxWidth().scCard(radius = 22.dp).padding(15.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(13.dp)) {
-            ScMonogramTile(student.initial, tint, accent, size = 52.dp, radius = 26.dp, fontSize = 19f)
+            ScAvatar(
+                name = student.fullName,
+                size = 52.dp,
+                avatarUrl = student.avatarUrl,
+                background = tint,
+                initialColor = accent,
+            )
             Column(Modifier.weight(1f)) {
                 ScText(student.fullName, 15.5f, FontWeight.ExtraBold, Sc.Ink, maxLines = 1)
                 Spacer(Modifier.height(3.dp))

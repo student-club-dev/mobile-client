@@ -8,6 +8,8 @@ data class StudentDto(
     val firstName: String,
     val lastName: String,
     val initial: String = "",
+    /** Profil rasmi — server bermasa `null`, u holda avatarda bosh harf ko'rinadi. */
+    val avatarUrl: String? = null,
     val universityId: String = "",
     val universityMonogram: String = "",
     val course: Int = 1,
