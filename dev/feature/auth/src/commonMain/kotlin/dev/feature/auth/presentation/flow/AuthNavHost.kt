@@ -228,9 +228,9 @@ fun AuthNavHost(vm: AuthFlowViewModel = koinViewModel()) {
             // Chiqish — grafning O'ZIDA kirish ekraniga qaytamiz va butun stack'ni tozalaymiz.
             //
             // MUHIM: bu yerda Activity'ni `recreate()` qilish MUMKIN EMAS. `rememberNavController()`
-            // back stack'ni saqlab qo'yadi va recreate'дан keyin uni TIKLAYDI — ustida hamon HOME
+            // back stack'ni saqlab qo'yadi va recreate'dan keyin uni TIKLAYDI — ustida hamon HOME
             // turadi, ya'ni `startDestination` (WELCOME) e'tiborga olinmaydi va foydalanuvchi
-            // chiqqan bo'lsa ham bosh ekranда qolib ketardi.
+            // chiqqan bo'lsa ham bosh ekranda qolib ketardi.
             val loggedOut: () -> Unit = {
                 nav.navigate(Route.WELCOME) {
                     popUpTo(0) { inclusive = true }

@@ -41,7 +41,7 @@ sealed class AppException(
 
     /** Server xatosi (5xx). */
     class Server(val code: Int? = null, cause: Throwable? = null) :
-        AppException("Serverда xatolik. Birozdan so'ng qayta urining.", cause)
+        AppException("Serverda xatolik. Birozdan so'ng qayta urining.", cause)
 
     /**
      * Kiritilgan ma'lumot noto'g'ri (validatsiya / 4xx).

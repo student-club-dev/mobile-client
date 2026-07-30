@@ -68,6 +68,12 @@ val apiServerUrl = "https://api.studentclub.uz/v1"
  * 8. **`$ref` yonidagi `nullable` saqlanadi** — OpenAPI 3.0 da `$ref` bilan yonma-yon turgan
  *    kalitlar e'tiborsiz qoladi, shuning uchun `{"nullable": true, "$ref": X}` `allOf` ichiga
  *    o'raladi (aks holda `UserProfileDto.gender` null bo'lolmay, javob parse bo'lmasdi).
+ * 9. **`multipart/form-data` maydonlaridagi `enum` olib tashlanadi** — generator enum uchun
+ *    `formData { append(key, value) }` ning `Any` variantini tanlaydi, u esa Ktor 3 da
+ *    `@InternalAPI` va kompilyatsiyani yiqitadi (`POST /media/chat-upload` dagi `kind`).
+ * 10. **`nullable` maydonlar `required` dan chiqariladi** — aks holda generator ularga
+ *    `@Required` qo'yadi va backend bitta kalitni tushirib qoldirsa butun javob pars
+ *    bo'lmaydi (masalan `MessageDto.deletedAt` yo'q bo'lsa — butun suhbat tarixi).
  */
 val cleanSwagger = tasks.register("cleanSwagger") {
     group = "openapi"
@@ -309,6 +315,23 @@ val cleanSwagger = tasks.register("cleanSwagger") {
                         )
                     if (hasBody) json["schema"] = payload else resp.remove("content")
                 }
+
+                // (9) `multipart/form-data` maydonlaridan `enum` olib tashlanadi.
+                // Enum bo'lsa generator nested enum klass chiqaradi va `formData { }` ichida
+                // `append(key, value)` ning `Any` variantini tanlaydi — u Ktor 3 da
+                // `@InternalAPI`, ya'ni kompilyatsiya XATOSI (`POST /media/chat-upload`
+                // dagi `kind` aynan shunday). Oddiy `string` da `String` overload'i tanlanadi.
+                // Qiymatlar yo'qolmaydi: chaqiruvchi enum'ning `value` ini uzatadi.
+                @Suppress("UNCHECKED_CAST")
+                val formSchema = ((operation["requestBody"] as? Map<String, Any?>)
+                    ?.get("content") as? Map<String, Any?>)
+                    ?.get("multipart/form-data") as? Map<String, Any?>
+                @Suppress("UNCHECKED_CAST")
+                val formProps = (formSchema?.get("schema") as? Map<String, Any?>)
+                    ?.get("properties") as? Map<String, Any?>
+                formProps?.values?.forEach { prop ->
+                    (prop as? MutableMap<String, Any?>)?.remove("enum")
+                }
             }
             // (3) `/v1` prefiksi bazaviy manzilga ko'chadi
             rewrittenPaths[path.removePrefix("/v1")] = item
@@ -318,6 +341,38 @@ val cleanSwagger = tasks.register("cleanSwagger") {
         // (4)(5) barcha sxemalarni tiplash — komponentlar va inline sxemalar birgalikda
         fixTypes(root["components"], null)
         fixTypes(root["paths"], null)
+
+        // (10) `nullable` maydonlar `required` ro'yxatidan chiqariladi.
+        //
+        // Spec'da ular "kalit DOIM bor, qiymati null bo'lishi mumkin" degani, va generator
+        // shuni `@Required` bilan ifodalaydi — kotlinx.serialization esa kalit yo'q bo'lsa
+        // `MissingFieldException` tashlaydi. Natijada backend bitta yangi maydonni javobdan
+        // tushirib qoldirsa (yoki eski versiya deploy bo'lsa) BUTUN suhbat tarixi pars
+        // bo'lmay, ekran bo'sh qolardi. Klient uchun to'g'ri xatti-harakat — yo'q kalitni
+        // `null` deb olish; qiymat baribir nullable, ya'ni chaqiruvchi kodda hech narsa
+        // o'zgarmaydi.
+        fun relaxRequired(node: Any?) {
+            when (node) {
+                is MutableMap<*, *> -> {
+                    @Suppress("UNCHECKED_CAST")
+                    val map = node as MutableMap<String, Any?>
+                    @Suppress("UNCHECKED_CAST")
+                    val props = map["properties"] as? Map<String, Any?>
+                    @Suppress("UNCHECKED_CAST")
+                    val required = map["required"] as? MutableList<Any?>
+                    if (props != null && required != null) {
+                        required.removeAll { name ->
+                            (props[name?.toString()] as? Map<*, *>)?.get("nullable") == true
+                        }
+                        if (required.isEmpty()) map.remove("required")
+                    }
+                    map.values.forEach { relaxRequired(it) }
+                }
+                is List<*> -> node.forEach { relaxRequired(it) }
+            }
+        }
+        relaxRequired(root["components"])
+        relaxRequired(root["paths"])
 
         // Xom spec'da `servers` bo'sh — generator BASE_URL konstantasi uchun manzil kutadi.
         root["servers"] = listOf(mapOf("url" to serverUrl, "description" to "Dev"))

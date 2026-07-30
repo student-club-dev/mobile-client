@@ -4,9 +4,9 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
- * Backend'ning **standart javob konverti** — har bir API so'rovi shu bitta shaklда qaytadi
+ * Backend'ning **standart javob konverti** — har bir API so'rovi shu bitta shaklda qaytadi
  * (IYM-business / Ipak Yo'li naqshi). Klient hech qachon "yalang'och" JSON kutmaydi:
- * status/xato bir joyда — [ResponseChecker] — tekshiriladi.
+ * status/xato bir joyda — [ResponseChecker] — tekshiriladi.
  *
  * Backend'lar turlicha nomlaydi, shuning uchun konvert moslashuvchan:
  * - muvaffaqiyat: [success] `true` **yoki** [status] 2xx,
@@ -23,7 +23,7 @@ data class BaseResponse<T>(
     @SerialName("data") val data: T? = null,
     val error: ApiError? = null,
 ) {
-    /** `result` yoki `data` — backend qaysi maydonда yuborsa. */
+    /** `result` yoki `data` — backend qaysi maydonda yuborsa. */
     val payload: T? get() = result ?: data
 
     /**

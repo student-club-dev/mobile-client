@@ -6,9 +6,12 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
 /**
- * Backend tipli xabarni qo'llab-quvvatlamagani uchun rasm va stiker xabar **tanasidan**
- * aniqlanadi (`CHAT_MEDIA_AND_CALLS_BACKEND.md` §0). Bu evristika juda ehtiyotkor bo'lishi
- * kerak: oddiy matnni rasm deb o'ylab qolsa, foydalanuvchining xabari ekranda yo'qoladi.
+ * Evristika endi **faqat eski kesh uchun zaxira**: yangi xabarlarda tur serverdan keladi
+ * (`MessageDto.type`, `handoff/chat.md`). 22.sqm dan oldin yozilgan suhbat qatorlarida
+ * `lastMessageType` bo'sh, shuning uchun ro'yxatdagi ko'rinish hali ham shundan foydalanadi.
+ *
+ * Ehtiyotkorlik talabi o'zgarmadi: oddiy matnni rasm deb o'ylab qolsa, foydalanuvchining
+ * xabari ekranda yo'qoladi.
  */
 class MediaContentTest {
 

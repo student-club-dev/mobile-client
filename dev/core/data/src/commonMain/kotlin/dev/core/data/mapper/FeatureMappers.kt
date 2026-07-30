@@ -1,8 +1,10 @@
 package dev.core.data.mapper
 
 import dev.core.database.sql.DiscountCategoryEntity
+import dev.core.database.sql.DiscountGroupEntity
 import dev.core.database.sql.DiscountOfferEntity
 import dev.core.domain.model.DiscountCategory
+import dev.core.domain.model.DiscountGroup
 import dev.core.domain.model.DiscountOffer
 import dev.core.domain.model.DiscountTag
 import dev.core.domain.model.OfferBranch
@@ -21,8 +23,13 @@ internal fun Long.toBool(): Boolean = this != 0L
 private inline fun <reified T : Enum<T>> parseEnum(value: String, default: T): T =
     runCatching { enumValueOf<T>(value) }.getOrDefault(default)
 
+fun DiscountGroupEntity.toDomain(): DiscountGroup = DiscountGroup(
+    key = key, name = name, emoji = emoji, accent = accent, sortOrder = sortOrder.toInt(),
+)
+
 fun DiscountCategoryEntity.toDomain(): DiscountCategory = DiscountCategory(
     id = id, name = name, emoji = emoji, offerCount = offerCount.toInt(), accent = accent,
+    groupKey = groupKey,
 )
 
 /**
@@ -57,6 +64,7 @@ fun DiscountOffer.toOfflineDetail(saved: Boolean): OfferDetail = OfferDetail(
 fun DiscountOfferEntity.toDomain(): DiscountOffer = DiscountOffer(
     id = id,
     categoryId = categoryId,
+    groupKey = groupKey,
     subcategory = subcategory,
     gender = gender,
     merchant = merchant,

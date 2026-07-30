@@ -30,6 +30,14 @@ CREATE TABLE ConversationEntity (
     -- Ro'yxatdagi ko'rinish uchun oxirgi xabarning nusxasi.
     lastMessageBody TEXT,
     lastMessageSenderId TEXT,
+    -- Oxirgi xabarning turi. Media xabarda tana BO'SH (server `body` ni faqat TEXT va
+    -- izohli rasm uchun to'ldiradi), shuning uchun turni bilmasak ro'yxatda "📷 Rasm"
+    -- o'rniga bo'sh qator ko'rinardi. Eski keshdagi qatorlarda NULL — o'shanda tur
+    -- tanadan taxmin qilinadi (`MediaContent`).
+    lastMessageType TEXT,
+    -- Oxirgi xabar o'chirilganmi (soft delete). Tanasi haqiqatan bo'shatilgani uchun
+    -- busiz ro'yxatda "Xabar yozing…" ko'rinardi.
+    lastMessageDeleted INTEGER NOT NULL DEFAULT 0,
 
     unreadCount INTEGER NOT NULL DEFAULT 0,
     -- Men o'qigan eng yuqori seq — qayta ulanishda `?after=` shundan boshlanadi.
@@ -58,17 +66,47 @@ CREATE TABLE MessageEntity (
     -- SENDING | SENT | FAILED
     status TEXT NOT NULL DEFAULT 'SENT',
 
-    -- Media biriktirmasi. Backend tipli xabarni hali qo'llab-quvvatlamaydi, shuning uchun
-    -- `type`/`attachmentUrl` KLIENT tomonida aniqlanadi: tanasi rasm havolasi bo'lgan
-    -- xabar — IMAGE, yakka emoji — STICKER (CHAT_MEDIA_AND_CALLS_BACKEND.md §0).
+    -- Xabar o'chirilgan vaqti (epoch ms). Qator O'CHIRILMAYDI: `seq` — tarix, o'qildi va
+    -- o'qilmaganlar arifmetikasining o'qi, uni yo'q qilish hammasida teshik qoldirardi
+    -- (`handoff/api-changes.md` §4b). Tanasi bo'shatiladi, ekranda tombstone chiziladi.
+    deletedAt INTEGER,
+
+    -- Media biriktirmasi — `MessageDto.attachment` ning ko'zgusi (`handoff/chat.md`).
+    -- `attachmentId` = server `mediaId`: biriktirma BIR MARTALIK, shuning uchun yiqilgan
+    -- xabarni qayta yuborishda uni qaytadan yuklamaymiz (422 MEDIA_ALREADY_USED).
+    attachmentId TEXT,
     attachmentUrl TEXT,
     attachmentThumbUrl TEXT,
-    -- 0 — o'lcham noma'lum (server qaytarmaydi); UI kvadrat nisbatga tushadi.
+    -- 0 — o'lcham noma'lum (ovoz/fayl uchun server qaytarmaydi); UI kvadrat nisbatga tushadi.
     attachmentWidth INTEGER NOT NULL DEFAULT 0,
     attachmentHeight INTEGER NOT NULL DEFAULT 0,
-    -- Bir martada yuborilgan rasmlarni bog'laydi. Faqat SHU qurilmada to'ladi — server
-    -- `albumId` ni qaytarmaydi, qabul qiluvchi tomonda albom qo'shni xabarlardan taxmin
-    -- qilinadi (ChatViewModel).
+    -- IMAGE | GIF | VIDEO | VOICE | FILE
+    attachmentKind TEXT,
+    -- PROCESSING | READY | FAILED. PROCESSING — video hali transkodlanmoqda; tugagach
+    -- WS `media:ready` shu qatorni to'ldiradi.
+    attachmentStatus TEXT,
+    attachmentMime TEXT,
+    attachmentSizeBytes INTEGER,
+    attachmentDurationMs INTEGER,
+    -- Ovozli xabarning 48 nuqtali to'lqin shakli, vergul bilan ajratilgan (`0..100`).
+    -- JSON emas: qiymatlar oddiy sonlar va SQLDelight'da massiv ustuni yo'q.
+    attachmentWaveform TEXT,
+    -- FILE uchun asl nom (server tozalagan holda).
+    attachmentFileName TEXT,
+    attachmentBlurHash TEXT,
+    -- 1 bo'lsa ovozsiz va takrorlanuvchi qilib o'ynatiladi (GIF va GIF'dan o'girilgan MP4).
+    attachmentIsAnimated INTEGER,
+
+    -- STICKER xabarida `body` TAQIQLANGAN, shuning uchun ko'rsatiladigan hamma narsa
+    -- shu ustunlarda: emoji (rasm bo'lmasa) va serverdagi tasviri.
+    stickerId TEXT,
+    stickerEmoji TEXT,
+    stickerUrl TEXT,
+
+    -- Bir martada yuborilgan rasmlarni bog'laydi. 2026-07-29 dan SERVER qaytaradi
+    -- (`MessageDto.albumId`) — ya'ni qabul qiluvchi tomonda ham to'g'ri to'r chiziladi.
+    -- Eski keshdagi qatorlarda NULL bo'lishi mumkin; o'shanda albom qo'shni xabarlardan
+    -- taxmin qilinadi (ChatViewModel).
     albumId TEXT
 );
 
@@ -104,8 +142,9 @@ INSERT OR IGNORE INTO ConversationEntity(
     id, type, lastMessageAt,
     otherId, otherUsername, otherFullName, otherAvatarUrl, otherOnline, otherLastSeenAt,
     otherUniversityId, otherGender, otherCourseYear,
-    lastMessageBody, lastMessageSenderId, unreadCount, lastReadSeq, otherReadSeq, otherDeliveredSeq
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+    lastMessageBody, lastMessageSenderId, lastMessageType, lastMessageDeleted,
+    unreadCount, lastReadSeq, otherReadSeq, otherDeliveredSeq
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 updateConversation:
 UPDATE ConversationEntity SET
@@ -122,6 +161,8 @@ UPDATE ConversationEntity SET
     otherCourseYear = ?,
     lastMessageBody = ?,
     lastMessageSenderId = ?,
+    lastMessageType = ?,
+    lastMessageDeleted = ?,
     unreadCount = ?,
     -- Kursorlar ORTGA surilmasin: WS orqali allaqachon oldinga ketgan bo'lishi mumkin.
     lastReadSeq = max(lastReadSeq, :lastReadSeq),
@@ -130,10 +171,26 @@ UPDATE ConversationEntity SET
 WHERE id = :id;
 
 -- WS `message:new` — ro'yxatdagi qatorni yangilaydi (suhbat allaqachon keshda bo'lsa).
+-- Yangi xabar kelgani uchun `lastMessageDeleted` doim nolga qaytadi.
 touchConversation:
 UPDATE ConversationEntity
-SET lastMessageBody = ?, lastMessageSenderId = ?, lastMessageAt = ?, unreadCount = unreadCount + ?
+SET lastMessageBody = ?, lastMessageSenderId = ?, lastMessageType = ?, lastMessageDeleted = 0,
+    lastMessageAt = ?, unreadCount = unreadCount + ?
 WHERE id = ?;
+
+-- Oxirgi xabar o'chirilganda (`message:deleted` yoki o'zimiz o'chirganda): ro'yxatdagi
+-- ko'rinish tombstone'ga aylanadi. Vaqt va jo'natuvchi joyida qoladi — xabar tarixdan
+-- yo'qolmaydi, faqat matni ko'rinmaydi.
+setLastMessageDeleted:
+UPDATE ConversationEntity SET lastMessageBody = '', lastMessageDeleted = 1 WHERE id = ?;
+
+-- O'chirilgan xabar o'qilmaganlar sanog'idan chiqadi: ko'rinmaydigan xabarni o'qib
+-- bo'lmaydi, aks holda badge abadiy yoqiq qolardi (`handoff/api-changes.md` §4b).
+-- Faqat hali o'qilmagan (`seq > lastReadSeq`) xabar sanoqni kamaytiradi.
+decrementUnreadForDeleted:
+UPDATE ConversationEntity
+SET unreadCount = max(0, unreadCount - 1)
+WHERE id = :id AND :seq > lastReadSeq;
 
 -- WS `presence:update` — onlayn holati (bir odam bir nechta suhbatda bo'lishi mumkin emas,
 -- lekin so'rov baribir `otherId` bo'yicha ketadi).
@@ -182,28 +239,70 @@ SELECT * FROM MessageEntity WHERE id = ?;
 
 upsertMessage:
 INSERT OR REPLACE INTO MessageEntity(
-    id, conversationId, senderId, seq, type, body, createdAt, clientMsgId, status,
-    attachmentUrl, attachmentThumbUrl, attachmentWidth, attachmentHeight, albumId
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+    id, conversationId, senderId, seq, type, body, createdAt, clientMsgId, status, deletedAt,
+    attachmentId, attachmentUrl, attachmentThumbUrl, attachmentWidth, attachmentHeight,
+    attachmentKind, attachmentStatus, attachmentMime, attachmentSizeBytes, attachmentDurationMs,
+    attachmentWaveform, attachmentFileName, attachmentBlurHash, attachmentIsAnimated,
+    stickerId, stickerEmoji, stickerUrl, albumId
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 setMessageStatus:
 UPDATE MessageEntity SET status = ? WHERE id = ?;
 
--- Rasm yuklanib bo'lgach: optimistik qatorning tanasi va biriktirmasi haqiqiy havolaga
--- almashadi. Qator o'chirilmaydi — `id` o'zgarmagani uchun ekranda sakrash bo'lmaydi.
-setMessageMedia:
-UPDATE MessageEntity SET body = ?, attachmentUrl = ?, attachmentThumbUrl = ? WHERE id = ?;
+-- Fayl yuklanib bo'lgach (`POST /v1/media/chat-upload`) va WS `media:ready` kelganda:
+-- optimistik qatorning biriktirmasi to'ldiriladi. Qator o'chirilmaydi — `id` o'zgarmagani
+-- uchun ekranda sakrash bo'lmaydi va `clientMsgId` joyida qolib, server javobiga moslik
+-- buzilmaydi. `attachmentId` saqlanishi shart: qayta yuborishda fayl QAYTA yuklanmaydi.
+setMessageAttachment:
+UPDATE MessageEntity SET
+    attachmentId = ?,
+    attachmentUrl = ?,
+    attachmentThumbUrl = ?,
+    attachmentWidth = ?,
+    attachmentHeight = ?,
+    attachmentKind = ?,
+    attachmentStatus = ?,
+    attachmentMime = ?,
+    attachmentSizeBytes = ?,
+    attachmentDurationMs = ?,
+    attachmentWaveform = ?,
+    attachmentFileName = ?,
+    attachmentBlurHash = ?,
+    attachmentIsAnimated = ?
+WHERE id = ?;
+
+-- Soft delete (`DELETE /v1/messages/{id}` va WS `message:deleted`). Tana **haqiqatan**
+-- bo'shatiladi — faqat DTO darajasida yashirish jo'natuvchiga yolg'on bo'lardi.
+-- Biriktirma havolalari ham tozalanadi: server fayllarni ham o'chiradi.
+setMessageDeleted:
+UPDATE MessageEntity SET
+    body = '',
+    deletedAt = ?,
+    attachmentId = NULL,
+    attachmentUrl = NULL,
+    attachmentThumbUrl = NULL,
+    stickerId = NULL,
+    stickerEmoji = NULL,
+    stickerUrl = NULL
+WHERE id = ?;
 
 -- Optimistik qator ack kelganda serverning haqiqiy id/seq'iga almashadi.
 deleteMessage:
 DELETE FROM MessageEntity WHERE id = ?;
 
--- `message:new` o'z xabarimiz bo'lib qaytganda optimistik nusxani olib tashlaydi.
--- Server `message:new` da `clientMsgId` yubormaydi, shuning uchun moslik matn bo'yicha —
--- ack ham shu ishni qiladi, bu esa ack'dan OLDIN kelgan holat uchun.
-deleteSendingByBody:
+-- `message:new` o'z xabarimiz bo'lib qaytganda optimistik nusxani olib tashlaydi (ack'dan
+-- OLDIN kelgan holat uchun — ack kelsa `deleteMessage` + `upsertMessage` shu ishni qiladi).
+--
+-- Moslik **`clientMsgId` bo'yicha**: backend 2026-07-29 dan uni `message:new` da
+-- jo'natuvchining o'z qurilmalariga qaytaradi (`handoff/chat.md`). Avval moslik matn
+-- bo'yicha edi va ikki joyda buzilardi: ketma-ket ikkita bir xil matnda NOTO'G'RI qator
+-- o'chirilardi, media xabarda esa tana bo'sh bo'lib usul umuman ishlamasdi.
+--
+-- `status = 'SENDING'` sharti ack allaqachon almashtirgan HAQIQIY qatorni himoya qiladi:
+-- u ham o'sha `clientMsgId` ni saqlaydi (qayta yuborish uchun kerak).
+deleteSendingByClientMsgId:
 DELETE FROM MessageEntity
-WHERE conversationId = ? AND status = 'SENDING' AND body = ?;
+WHERE conversationId = ? AND status = 'SENDING' AND clientMsgId = ?;
 
 clearConversationMessages:
 DELETE FROM MessageEntity WHERE conversationId = ?;

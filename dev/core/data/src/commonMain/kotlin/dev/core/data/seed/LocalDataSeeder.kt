@@ -10,7 +10,7 @@ import kotlinx.serialization.json.Json
 
 /**
  * Local bazani dizayndagi namuna ma'lumot bilan to'ldiradi (jadval bo'sh bo'lsagina).
- * Backend ulanганда bu seed o'rniga API'dan sinxronlash keladi — tuzilma bir xil.
+ * Backend ulanganda bu seed o'rniga API'dan sinxronlash keladi — tuzilma bir xil.
  */
 class LocalDataSeeder(
     private val db: StudentClubDatabase,
@@ -67,12 +67,21 @@ class LocalDataSeeder(
         if (settings.selectByKey(DISCOUNTS_SEED_KEY).executeAsOneOrNull() == DISCOUNTS_SEED_VERSION) return
 
         val counts = catalog.offers.groupingBy { it.categoryId }.eachCount()
+        // E'lonning bo'limi turidan olinadi — backend'da ham shunday (`CatalogTypeDto.groupKey`),
+        // shuning uchun seed'da har bir e'longa alohida yozib chiqilmaydi.
+        val groupOf = catalog.categories.associate { it.id to it.groupKey }
         q.transaction {
             settings.upsert(DISCOUNTS_SEED_KEY, DISCOUNTS_SEED_VERSION)
             q.clearOffers()
             q.clearCategories()
+            q.clearGroups()
+            catalog.groups.forEach { g ->
+                q.upsertGroup(g.key, g.name, g.emoji, g.accent.toLong(16), g.sortOrder.toLong())
+            }
             catalog.categories.forEach { c ->
-                q.upsertCategory(c.id, c.name, c.emoji, (counts[c.id] ?: 0).toLong(), c.accent.toLong(16))
+                q.upsertCategory(
+                    c.id, c.name, c.emoji, (counts[c.id] ?: 0).toLong(), c.accent.toLong(16), c.groupKey,
+                )
             }
             catalog.offers.forEach { o ->
                 val finalPrice = when {
@@ -82,7 +91,8 @@ class LocalDataSeeder(
                 }
                 val (lat, lng) = if (o.lat != 0.0 && o.lng != 0.0) o.lat to o.lng else coordsFor(o.location, o.id)
                 q.upsertOffer(
-                    o.id, o.categoryId, o.subcategory, o.gender, o.merchant, o.title,
+                    o.id, o.categoryId, groupOf[o.categoryId].orEmpty(),
+                    o.subcategory, o.gender, o.merchant, o.title,
                     if (o.isDiscount) 1L else 0L, o.discountPercent.toLong(),
                     o.originalPrice, finalPrice, o.priceUnit,
                     o.tag, o.promoCode, o.location, o.expiry, o.emoji, o.bannerAccent.toLong(16),
@@ -164,8 +174,19 @@ class LocalDataSeeder(
     // --- listings.json tuzilmasi ("Siz uchun" e'lonlari) ---------------------
     @Serializable
     private data class SeedCatalog(
+        val groups: List<SeedGroup> = emptyList(),
         val categories: List<SeedCategory> = emptyList(),
         val offers: List<SeedOffer> = emptyList(),
+    )
+
+    /** Bosh ekran bo'limi — backend'dagi `catalog/groups` javobining local ko'rinishi. */
+    @Serializable
+    private data class SeedGroup(
+        val key: String,
+        val name: String,
+        val emoji: String,
+        val accent: String,   // ARGB hex
+        val sortOrder: Int = 0,
     )
 
     @Serializable
@@ -174,6 +195,8 @@ class LocalDataSeeder(
         val name: String,
         val emoji: String,
         val accent: String,   // ARGB hex, masalan "FFF97316"
+        /** Tur qaysi bo'limda ([SeedGroup.key]) — e'lonlar ham shu orqali bo'limga tushadi. */
+        val groupKey: String = "",
     )
 
     @Serializable
@@ -219,7 +242,8 @@ class LocalDataSeeder(
 
         // "Siz uchun" seed'i shu versiyada. listings.json o'zgarsa bu qiymatni oshiring.
         const val DISCOUNTS_SEED_KEY = "discounts_seed_version"
-        const val DISCOUNTS_SEED_VERSION = "4"
+        // v5 — seed'ga bosh ekran bo'limlari (`groups`) va turlarning `groupKey` i qo'shildi.
+        const val DISCOUNTS_SEED_VERSION = "5"
 
         val TASHKENT_CENTER = 41.311081 to 69.240562
 

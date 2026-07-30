@@ -18,7 +18,7 @@ data class AuthTokens(
  * Tarmoq qatlami (Ktor `Auth` plagini) shu orqali tokenni o'qiydi va `TOKEN_EXPIRED` kelganda
  * yangilaganini qaytarib yozadi; auth feature'i esa kirish/chiqishda to'ldiradi va tozalaydi.
  * Implementatsiya `:dev:core:data` da (SQLDelight `AppSettingEntity`) — shu tarzda network
- * moduli bazaга bog'lanmaydi.
+ * moduli bazaga bog'lanmaydi.
  *
  * Metodlar **sinxron**: manba local baza, chaqiruvlar arzon va `SessionProvider.currentUid()`
  * ham sinxron bo'lishi kerak.

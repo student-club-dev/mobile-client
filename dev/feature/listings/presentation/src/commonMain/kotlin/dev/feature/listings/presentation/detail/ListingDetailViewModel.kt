@@ -14,7 +14,7 @@ import kotlinx.coroutines.launch
  * E'lonni to'liq ko'rish ekranining ViewModel'i.
  *
  * Ekran faqat o'qish uchun — shuning uchun holat ham juda sodda: e'lonning o'zi va yuklash
- * bosqichi. Tahrirlash oqimi butunlay boshqa ekranда ([dev.feature.listings.presentation.PostListingViewModel]).
+ * bosqichi. Tahrirlash oqimi butunlay boshqa ekranda ([dev.feature.listings.presentation.PostListingViewModel]).
  */
 class ListingDetailViewModel(
     private val getListing: GetListingUseCase,
@@ -30,7 +30,7 @@ class ListingDetailViewModel(
      * E'lonni yuklaydi.
      *
      * Ekran `LaunchedEffect` ichida chaqiradi va u konfiguratsiya o'zgarganda yoki qayta
-     * kompozitsiyaда yana ishga tushishi mumkin — shu sabab bir xil id ikkinchi marta
+     * kompozitsiyada yana ishga tushishi mumkin — shu sabab bir xil id ikkinchi marta
      * yuklanmaydi, aks holda tayyor kontent yana "Yuklanmoqda" holatiga qaytib ketardi.
      */
     fun load(listingId: String) {

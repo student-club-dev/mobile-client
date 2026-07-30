@@ -8,7 +8,7 @@ package dev.core.common.auth
  * katta hajm uchun mo'ljallanmagan. Qiymatlar qurilma qulfdan bir marta ochilgandan keyin
  * o'qiladi (ilova fonda token yangilay olishi uchun).
  *
- * Bu abstraktsiya tufayli [TokenStore] mantig'i bitta joyда (commonMain) qoladi — platformalar
+ * Bu abstraktsiya tufayli [TokenStore] mantig'i bitta joyda (commonMain) qoladi — platformalar
  * faqat saqlash usulini beradi.
  */
 interface SecureStorage {
@@ -27,7 +27,7 @@ interface SecureStorage {
  * Xotiradagi zaxira ombor.
  *
  * Platforma ombori ochilmasa (masalan Android Keystore buzilgan) ishlatiladi: sessiya
- * ilova ishlagunча saqlanadi, qayta ochilganда foydalanuvchi bir marta qaytadan kiradi.
+ * ilova ishlaguncha saqlanadi, qayta ochilganda foydalanuvchi bir marta qaytadan kiradi.
  * Tokenni ochiq holda diskka yozishdan ko'ra shu xavfsizroq.
  */
 class InMemorySecureStorage : SecureStorage {

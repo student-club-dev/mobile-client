@@ -5,7 +5,7 @@ import dev.core.network.appJson
 import kotlinx.serialization.json.JsonElement
 
 /**
- * **Checker** — javob konvertini bir joyда tekshiradi (IYM-business naqshi).
+ * **Checker** — javob konvertini bir joyda tekshiradi (IYM-business naqshi).
  *
  * Muvaffaqiyat bo'lsa [BaseResponse.payload] ni qaytaradi; aks holda status/xato bo'yicha
  * typed [AppException] tashlaydi. Shu sabab har bir data-source'da `if (response.status...)`

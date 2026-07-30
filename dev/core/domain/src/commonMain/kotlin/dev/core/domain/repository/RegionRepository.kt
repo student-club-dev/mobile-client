@@ -8,7 +8,7 @@ import kotlinx.coroutines.flow.Flow
  * Foydalanuvchi viloyati — e'lonlar feed'ining geo filtri.
  *
  * Tanlov ilova sozlamalarida (`AppSettingEntity`) saqlanadi, ya'ni sessiyadan mustaqil:
- * chiqib qayta kirilса ham o'sha viloyat qoladi. Tanlanmagan bo'lsa feed butun mamlakat
+ * chiqib qayta kirilsa ham o'sha viloyat qoladi. Tanlanmagan bo'lsa feed butun mamlakat
  * bo'yicha keladi — shuning uchun [syncWithUniversity] uni foydalanuvchi universitetining
  * manzilidan o'zi topib qo'yadi.
  */
@@ -36,7 +36,7 @@ interface RegionRepository {
      * saqlanadi). Ya'ni:
      * - profilda universitet almashtirilsa — viloyat ham darrov o'zgaradi;
      * - foydalanuvchi Filter/Sozlamalardan qo'lda boshqa viloyat tanlagan bo'lsa — u
-     *   universitet o'zgarmagunча saqlanadi (ilova har ochilganda ustidan yozilmaydi).
+     *   universitet o'zgarmaguncha saqlanadi (ilova har ochilganda ustidan yozilmaydi).
      *
      * [address] — universitetning to'liq manzili (prof-emis `address`); viloyat shundan topiladi.
      */

@@ -11,6 +11,6 @@ interface StudentRepository {
     fun observeByUniversity(universityId: String): Flow<List<Student>>
     suspend fun setFriendStatus(studentId: String, status: FriendStatus)
 
-    /** Backend'dan sinxronlab local DB'ni yangilaydi (offline-first). Xatoда cache saqlanadi. */
+    /** Backend'dan sinxronlab local DB'ni yangilaydi (offline-first). Xatoda cache saqlanadi. */
     suspend fun refresh(): Resource<Unit>
 }

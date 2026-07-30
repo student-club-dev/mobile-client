@@ -98,7 +98,7 @@ val networkModule = module {
     // Rasmlar (Coil) uchun ALOHIDA klient — Chucker'siz va kengroq chegaralar bilan
     // (qarang: `createImageHttpClient` izohi). Umumiy klient ishlatilganda ko'p rasmli
     // ekranlarda qismi yuklanmay qolardi.
-    single(named(IMAGE_CLIENT)) { createImageHttpClient(get()) }
+    single(named(IMAGE_CLIENT)) { createImageHttpClient(get(), get()) }
 
     // Rasm yuklash (`POST /v1/media/upload`) — generatsiya qilingan `MediaApi` multipart
     // qismiga `filename` qo'ymagani uchun qo'lda yozilgan (qarang: `MediaUploader` izohi).

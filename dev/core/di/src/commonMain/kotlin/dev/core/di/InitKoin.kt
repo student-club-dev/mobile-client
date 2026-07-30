@@ -37,7 +37,7 @@ fun appModules() = coreModules() +
     settingsModule() +
     universityModule(REMOTE_SYNC_ENABLED) +
     adsModule(REMOTE_SYNC_ENABLED) +
-    // Bog'lanishlar va chat — to'liq backendда (bayroqsiz): `Connections` + `Chat` bo'limlari.
+    // Bog'lanishlar va chat — to'liq backendda (bayroqsiz): `Connections` + `Chat` bo'limlari.
     connectionsModule() +
     chatModule() +
     homeModule()

@@ -6,6 +6,9 @@ import androidx.lifecycle.viewModelScope
 import dev.core.common.Resource
 import dev.core.common.auth.TokenStore
 import dev.feature.chat.domain.model.ConversationItem
+import dev.feature.chat.domain.model.EmojiText
+import dev.feature.chat.domain.model.FluentEmoji
+import dev.feature.chat.domain.model.GifItem
 import dev.feature.chat.domain.model.Message
 import dev.feature.chat.domain.model.MessageStatus
 import dev.feature.chat.domain.model.MessageType
@@ -41,11 +44,19 @@ import kotlinx.coroutines.launch
 data class ChatImageUi(
     /** Qaysi xabarga tegishli — bosilganda/qayta yuborilganda kerak. */
     val messageId: String,
-    /** Serverdagi havola. Hali yuklanmagan bo'lsa `null`. */
+    /**
+     * Ro'yxatda ko'rsatiladigan havola — server bergan **kichik nusxa** (`?variant=thumb`),
+     * bo'lmasa to'lig'i. Hali yuklanmagan bo'lsa `null`.
+     */
     val url: String?,
     /** Yuklanayotgan paytdagi local nusxa — havola paydo bo'lguncha shu ko'rsatiladi. */
     val localBytes: ByteArray?,
     val aspectRatio: Float?,
+    /**
+     * To'liq o'lchamdagi havola — rasm ochilganda. Ro'yxatdagi thumb 320px, uni butun
+     * ekranga cho'zsak xira ko'rinardi. Berilmasa [url] ning o'zi ishlatiladi.
+     */
+    val fullUrl: String? = url,
 ) {
     val loading: Boolean get() = url == null
 }
@@ -79,8 +90,23 @@ data class ChatMessageUi(
      * chiziladi — shuning uchun ro'yxatda ular yakka xabar sifatida ko'rinmaydi.
      */
     val images: List<ChatImageUi> = emptyList(),
-    /** `STICKER` da — katta chiziladigan emoji. */
+    /**
+     * Katta chiziladigan emoji — `STICKER` da stikerning emojisi, `TEXT` da esa faqat
+     * emojidan iborat qisqa xabar (Telegram/WhatsApp qoidasi, qarang [EmojiText]).
+     */
     val sticker: String? = null,
+    /**
+     * Server katalogidagi stikerning tasviri (shaffof fonli WebP). `null` bo'lsa [sticker]
+     * emojisi katta qilib chiziladi — zaxira katalogda rasm yo'q.
+     */
+    val stickerUrl: String? = null,
+    /**
+     * Xabar o'chirilgan — o'rniga tombstone chiziladi. Qator tarixda **qoladi**: `seq` —
+     * tarix va o'qildi kursorlarining o'qi (`handoff/api-changes.md` §4b).
+     */
+    val deleted: Boolean = false,
+    /** O'z xabarimizni o'chirish mumkin (`DELETE /v1/messages/{id}`). */
+    val canDelete: Boolean = false,
     /** Albomdagi barcha xabar id'lari — qayta yuborish hammasiga tegishli. */
     val messageIds: List<String> = listOf(id),
 )
@@ -100,6 +126,12 @@ data class ChatUiState(
     /** Bir martalik xabar (xato / tasdiq). */
     val message: String? = null,
     /**
+     * Barcha suhbatlardagi o'qilmagan xabarlar soni — pastki panel badge'i uchun
+     * (`GET /v1/conversations/unread-count`). O'chirilgan xabarlar hisobga olinmaydi.
+     * Busiz butun ro'yxatni yuklab, qo'lda qo'shish kerak bo'lardi.
+     */
+    val unreadTotal: Int = 0,
+    /**
      * `universityId` → universitet nomi (local katalog). Backend qisqa profilda faqat
      * id'ni qaytaradi (katalogi yo'q), nomni o'zimiz topamiz.
      */
@@ -111,20 +143,15 @@ data class ChatUiState(
      */
     val photos: List<ChatImageUi>
         get() = messages.asReversed()
-            .filter { it.type == MessageType.IMAGE }
+            .filter { it.type == MessageType.IMAGE && !it.deleted }
             .flatMap { it.images.asReversed() }
             // Hali yuklanmagani (havolasiz) to'rda ko'rsatilmaydi.
             .filter { it.url != null }
 
-    /**
-     * Matnli xabarlardagi havolalar — «Havolalar» bo'limi, yangidan eskiga.
-     *
-     * Rasm xabarining tanasi ham havola (backend tipli xabarni bermaydi), lekin u
-     * `IMAGE` deb ajratilgani uchun bu yerga tushmaydi.
-     */
+    /** Matnli xabarlardagi havolalar — «Havolalar» bo'limi, yangidan eskiga. */
     val links: List<ChatLinkUi>
         get() = messages.asReversed()
-            .filter { it.type == MessageType.TEXT }
+            .filter { it.type == MessageType.TEXT && !it.deleted }
             .flatMap { message -> message.text.extractLinks().map { message.id to it } }
             .distinctBy { (_, url) -> url }
             .map { (id, url) -> ChatLinkUi(messageId = id, url = url, host = url.hostOf()) }
@@ -176,6 +203,7 @@ class ChatViewModel(
         val loadingOlder: Boolean = false,
         val hasMoreHistory: Boolean = true,
         val message: String? = null,
+        val unreadTotal: Int = 0,
     )
 
     /** "Yozmoqda" ni to'xtatuvchi taymer — 3 soniya jimlikdan keyin `typing:stop`. */
@@ -187,7 +215,10 @@ class ChatViewModel(
 
     init {
         chatRepository.connectRealtime()
-        viewModelScope.launch { chatRepository.refreshConversations() }
+        viewModelScope.launch {
+            chatRepository.refreshConversations()
+            refreshUnreadTotal()
+        }
         viewModelScope.launch {
             universityRepository.observeUniversities()
                 .catch { /* katalog bo'lmasa profil universitetsiz ko'rinadi */ }
@@ -239,6 +270,7 @@ class ChatViewModel(
             loadingOlder = rest.extra.loadingOlder,
             hasMoreHistory = rest.extra.hasMoreHistory,
             message = rest.extra.message,
+            unreadTotal = rest.extra.unreadTotal,
             universityNames = rest.universityNames,
         )
     }
@@ -272,10 +304,11 @@ class ChatViewModel(
             val head = group.first()
             val tail = group.last()
             val previous = groups.getOrNull(index - 1)?.last()
+            val outgoing = head.senderId == myId
             ChatMessageUi(
                 id = head.id,
-                text = head.body,
-                outgoing = head.senderId == myId,
+                text = if (head.deleted) DELETED_TEXT else head.body,
+                outgoing = outgoing,
                 time = ChatFormat.time(tail.createdAt),
                 // Albomda bittasi ham yuborilmagan bo'lsa — butun to'r shu holatda ko'rinadi.
                 status = group.combinedStatus(),
@@ -289,32 +322,59 @@ class ChatViewModel(
                 } else {
                     null
                 },
-                type = head.type,
-                images = if (head.type == MessageType.IMAGE) {
+                // O'chirilgan media ham oddiy tombstone bo'lib chiziladi — havolasi yo'q.
+                type = if (head.deleted) MessageType.TEXT else head.type,
+                images = if (head.type == MessageType.IMAGE && !head.deleted) {
                     group.map { m ->
                         ChatImageUi(
                             messageId = m.id,
-                            url = m.attachment?.url?.takeIf { it.isNotBlank() },
+                            // Biriktirma URL'i himoyalangan (`/v1/media/{id}/raw`) — rasm
+                            // yuklovchi tokenli klientdan foydalanadi (`createImageHttpClient`).
+                            url = m.attachment?.previewUrl?.takeIf { it.isNotBlank() },
                             localBytes = localImages[m.id],
                             aspectRatio = m.attachment?.aspectRatio,
+                            fullUrl = m.attachment?.url?.takeIf { it.isNotBlank() },
                         )
                     }
                 } else {
                     emptyList()
                 },
-                sticker = head.body.takeIf { head.type == MessageType.STICKER },
+                sticker = head.bigEmojiOrNull(),
+                // Server tasviri bo'lmasa — Fluent 3D. Bu **qo'lda yozilgan** emojiga ham
+                // tegishli: yakka emoji baribir katta chizilardi, endi u tizim glifi emas,
+                // stiker ko'rinishida chiqadi. Rasm kelmasa chizuvchi emojiga qaytadi
+                // (`StickerImage`), ya'ni bu xavfsiz yaxshilanish.
+                stickerUrl = head.sticker?.url?.takeIf { it.isNotBlank() && !head.deleted }
+                    ?: head.bigEmojiOrNull()?.let { FluentEmoji.urlFor(it) },
+                deleted = head.deleted,
+                // Faqat o'z xabarimizni, faqat serverga yetib borganini va faqat bir marta.
+                canDelete = outgoing && !head.deleted && head.seq > 0,
                 messageIds = group.map { it.id },
             )
         }
     }
 
     /**
+     * `TEXT` xabarning tanasi faqat emojidan iborat bo'lsa — u katta chiziladi, `STICKER`
+     * bo'lsa esa stikerning emojisi olinadi.
+     *
+     * Qo'lda yozilgan emoji endi **hech qachon** `STICKER` bo'lib qaytmaydi: yangi
+     * kontraktda stiker `stickerId` bilan ketadi va tana taqiqlangan (`handoff/chat.md`).
+     * Katta chizish shuning uchun sof ko'rsatish qaroriga aylandi.
+     */
+    private fun Message.bigEmojiOrNull(): String? = when {
+        deleted -> null
+        type == MessageType.STICKER -> sticker?.emoji?.takeIf { it.isNotBlank() } ?: body
+        type == MessageType.TEXT && EmojiText.isLoneEmoji(body) -> body.trim()
+        else -> null
+    }
+
+    /**
      * Ketma-ket rasmlarni albomga yig'adi.
      *
-     * `albumId` faqat **yuboruvchi** qurilmada bo'ladi — server uni qaytarmaydi
-     * (`CHAT_MEDIA_AND_CALLS_BACKEND.md` §3). Shuning uchun qabul qiluvchi tomonda albom
-     * qo'shni xabarlardan taxmin qilinadi: bir odam, ketma-ket, [ALBUM_WINDOW_SECONDS]
-     * ichida yuborgan rasmlar bitta to'r hisoblanadi.
+     * `albumId` ni **server qaytaradi** (`MessageDto.albumId`, 2026-07-29 dan), shuning
+     * uchun to'r ikkala tomonda ham bir xil chiziladi. Vaqt oynasi ([ALBUM_WINDOW_SECONDS])
+     * faqat **zaxira**: keshda kalitsiz eski qatorlar qolgan bo'lishi mumkin.
      */
     private fun List<Message>.groupAlbums(): List<List<Message>> {
         val groups = mutableListOf<MutableList<Message>>()
@@ -325,6 +385,8 @@ class ChatViewModel(
                 current.size < MAX_ALBUM_SIZE &&
                 message.type == MessageType.IMAGE &&
                 previous.type == MessageType.IMAGE &&
+                // Tombstone alohida qator bo'lib qoladi — u to'rga qo'shilmaydi.
+                !message.deleted && !previous.deleted &&
                 message.senderId == previous.senderId &&
                 sameAlbum(previous, message)
             if (joins) current.add(message) else groups.add(mutableListOf(message))
@@ -333,7 +395,7 @@ class ChatViewModel(
     }
 
     private fun sameAlbum(a: Message, b: Message): Boolean = when {
-        // Kamida bittasida kalit bor — u holda faqat kalit hal qiladi.
+        // Kamida bittasida kalit bor — u holda FAQAT kalit hal qiladi.
         a.albumId != null || b.albumId != null -> a.albumId == b.albumId
         else -> (b.createdAt - a.createdAt).inWholeSeconds <= ALBUM_WINDOW_SECONDS
     }
@@ -409,7 +471,19 @@ class ChatViewModel(
     /** Ekranga qaytganda o'qilgan deb belgilaydi. */
     fun markRead() {
         val id = selectedId.value ?: return
-        viewModelScope.launch { chatRepository.markRead(id) }
+        viewModelScope.launch {
+            chatRepository.markRead(id)
+            refreshUnreadTotal()
+        }
+    }
+
+    /**
+     * Badge hisoblagichi. Xato bo'lsa **jim** o'tiladi: eski qiymat noto'g'ri ko'rsatishdan
+     * ko'ra, badge uchun xato xabari chiqarish bezovta qilardi.
+     */
+    private suspend fun refreshUnreadTotal() {
+        val res = chatRepository.unreadCount()
+        if (res is Resource.Success) extra.update { it.copy(unreadTotal = res.data.total) }
     }
 
     // --- Yozish --------------------------------------------------------------------------
@@ -480,6 +554,21 @@ class ChatViewModel(
     }
 
     /**
+     * Qidiruvdan tanlangan GIF. Fayl yuklanmaydi — provayder havolasi serverga
+     * **o'zgartirilmasdan** qaytariladi (`handoff/gif.md`).
+     */
+    fun sendGif(gif: GifItem) {
+        val id = selectedId.value ?: return
+        stopTyping()
+        viewModelScope.launch {
+            when (val res = chatRepository.sendGif(id, gif.toRef())) {
+                is Resource.Error -> extra.update { it.copy(message = res.message) }
+                else -> Unit
+            }
+        }
+    }
+
+    /**
      * Yuborilmagan xabarni qayta yuborish (o'sha `clientMsgId` bilan — idempotent).
      *
      * Albomda bir nechta xabar bo'lishi mumkin — faqat **yiqilganlari** qayta yuboriladi,
@@ -488,6 +577,21 @@ class ChatViewModel(
     fun retry(messageIds: List<String>) = viewModelScope.launch {
         messageIds.forEach { id ->
             when (val res = chatRepository.retry(id)) {
+                is Resource.Error -> extra.update { it.copy(message = res.message) }
+                else -> Unit
+            }
+        }
+    }
+
+    /**
+     * Xabarni o'chirish — **soft delete**: qator tarixda tombstone bo'lib qoladi, ikkala
+     * a'zoga WS `message:deleted` ketadi (`handoff/api-changes.md` §4b).
+     *
+     * Albomda bir nechta xabar bor — hammasi o'chiriladi, chunki ekranda ular bitta to'r.
+     */
+    fun deleteMessages(messageIds: List<String>) = viewModelScope.launch {
+        messageIds.forEach { id ->
+            when (val res = chatRepository.deleteMessage(id)) {
                 is Resource.Error -> extra.update { it.copy(message = res.message) }
                 else -> Unit
             }
@@ -569,9 +673,12 @@ class ChatViewModel(
         const val MAX_ALBUM_SIZE = 10
 
         /**
-         * Qabul qiluvchi tomonda albomni taxmin qilish oynasi. Server `albumId` ni
-         * qaytarmagani uchun ketma-ket kelgan rasmlar shu oraliqda bitta to'r hisoblanadi.
+         * Albomni taxmin qilish oynasi — **faqat zaxira**: keshda `albumId` siz eski
+         * qatorlar qolgan bo'lishi mumkin. Yangi xabarlarda kalit serverdan keladi.
          */
         const val ALBUM_WINDOW_SECONDS = 60L
+
+        /** Tombstone matni — xabar tarixda qoladi, lekin tanasi yo'q. */
+        const val DELETED_TEXT = "Xabar o'chirildi"
     }
 }

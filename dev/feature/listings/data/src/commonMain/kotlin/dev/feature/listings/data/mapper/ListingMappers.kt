@@ -49,7 +49,7 @@ private val json = Json {
 }
 
 // ---------------------------------------------------------------------------
-// JSON ustunlarining DTO'lari — faqat shu faylда ishlatiladi.
+// JSON ustunlarining DTO'lari — faqat shu faylda ishlatiladi.
 // ---------------------------------------------------------------------------
 
 @Serializable

@@ -1,5 +1,7 @@
 package dev.feature.connections.data.mapper
 
+import dev.core.network.generated.model.BlockedStudentDto
+import dev.core.network.generated.model.BlockedStudentPageDto
 import dev.core.network.generated.model.ConnectionDto
 import dev.core.network.generated.model.ConnectionStatusDto
 import dev.core.network.generated.model.ConnectionSummaryDto
@@ -14,6 +16,7 @@ import dev.core.network.generated.model.SearchResultDto
 import dev.core.network.generated.model.SearchResultPageDto
 import dev.core.network.generated.model.StudentSortDto
 import dev.core.network.generated.model.StudentSummaryDto
+import dev.feature.connections.domain.model.BlockedStudent
 import dev.feature.connections.domain.model.ConnectedStudent
 import dev.feature.connections.domain.model.Connection
 import dev.feature.connections.domain.model.ConnectionRequest
@@ -115,6 +118,15 @@ fun ConnectionSummaryDto.toDomain(): ConnectedStudent = ConnectedStudent(
     connectedAt = connectedAt,
 )
 
+/**
+ * Presence maydonlari serverda allaqachon maskalangan (`online = false`, `lastSeenAt = null`) —
+ * shu sabab bu yerda qo'shimcha tozalash yo'q, [StudentSummaryDto.toDomain] etarli.
+ */
+fun BlockedStudentDto.toDomain(): BlockedStudent = BlockedStudent(
+    student = student.toDomain(),
+    blockedAt = blockedAt,
+)
+
 fun ReportReason.toDto(): ReportReasonDto = when (this) {
     ReportReason.SPAM -> ReportReasonDto.SPAM
     ReportReason.SCAM -> ReportReasonDto.SCAM
@@ -133,4 +145,7 @@ fun RequestItemPageDto.toDomain(): Page<ConnectionRequest> =
     Page(items.map { it.toDomain() }, page, propertySize, total, hasNext)
 
 fun ConnectionSummaryPageDto.toDomain(): Page<ConnectedStudent> =
+    Page(items.map { it.toDomain() }, page, propertySize, total, hasNext)
+
+fun BlockedStudentPageDto.toDomain(): Page<BlockedStudent> =
     Page(items.map { it.toDomain() }, page, propertySize, total, hasNext)

@@ -7,9 +7,17 @@ import dev.core.network.generated.api.ChatApi
 import dev.core.network.ws.SocketIoClient
 import dev.feature.chat.data.realtime.ChatSocket
 import dev.feature.chat.data.remote.ChatRemoteDataSource
+import dev.feature.chat.data.remote.GifRemoteDataSource
+import dev.feature.chat.data.remote.StickerRemoteDataSource
 import dev.feature.chat.data.repository.ChatRepositoryImpl
+import dev.feature.chat.data.repository.GifRepositoryImpl
+import dev.feature.chat.data.repository.StickerRepositoryImpl
 import dev.feature.chat.domain.repository.ChatRepository
+import dev.feature.chat.domain.repository.GifRepository
+import dev.feature.chat.domain.repository.StickerRepository
 import dev.feature.chat.presentation.ChatViewModel
+import dev.feature.chat.presentation.gif.GifPanelViewModel
+import dev.feature.chat.presentation.gif.StickerPanelViewModel
 import io.ktor.client.HttpClient
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -28,7 +36,9 @@ import org.koin.dsl.module
 fun chatModule() = module {
 
     single { ChatApi(baseUrl = get<NetworkConfig>().baseUrl, httpClient = get<HttpClient>()) }
-    single { ChatRemoteDataSource(get(), get()) }
+    // `MediaUploader` — biriktirma yuklash uchun: generatsiya qilingan `chatUpload` multipart
+    // qismiga `filename` qo'ymaydi va NestJS uni fayl deb qabul qilmaydi.
+    single { ChatRemoteDataSource(api = get(), connectivity = get(), media = get()) }
 
     // WS uchun ALOHIDA klient — ilovaning umumiy klienti (envelope + expectSuccess + Auth)
     // handshake'ni buzardi; qarang `createWebSocketClient`.
@@ -63,11 +73,20 @@ fun chatModule() = module {
             remote = get(),
             socket = get(),
             tokenStore = get(),
-            media = get(),
         )
     }
 
+    // GIF va stiker — chat pipeline'idan MUSTAQIL qatlam: ular `ChatRepository` ni
+    // kengaytirmaydi, chunki yagona umumiy nuqta — yuborish (`sendGif`/`sendSticker`), qolgani
+    // (qidiruv, katalog, kesh) chatning offline-first keshiga umuman tegmaydi.
+    single { GifRemoteDataSource(api = get(), connectivity = get()) }
+    single { StickerRemoteDataSource(api = get(), connectivity = get()) }
+    single<GifRepository> { GifRepositoryImpl(remote = get()) }
+    single<StickerRepository> { StickerRepositoryImpl(remote = get()) }
+
     viewModelOf(::ChatViewModel)
+    viewModelOf(::GifPanelViewModel)
+    viewModelOf(::StickerPanelViewModel)
 }
 
 private const val WS_CLIENT = "chatWsClient"

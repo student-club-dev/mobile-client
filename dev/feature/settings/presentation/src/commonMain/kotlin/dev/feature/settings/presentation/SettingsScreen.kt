@@ -63,6 +63,8 @@ fun SettingsScreen(
     onBack: () -> Unit,
     onEditProfile: () -> Unit,
     onLoggedOut: () -> Unit,
+    /** "Bloklangan talabalar" ro'yxati — `Connections` feature'idagi alohida ekran. */
+    onOpenBlocked: () -> Unit = {},
     vm: ProfileViewModel = koinViewModel(),
     settingsVm: SettingsViewModel = koinViewModel(),
 ) {
@@ -131,6 +133,12 @@ fun SettingsScreen(
                     "tanlansa, siz ham boshqalarnikini ko'rishda davom etasiz.",
                 style = scStyle(12f, FontWeight.Medium, Sc.Muted, lineHeight = 17f),
                 modifier = Modifier.padding(horizontal = 6.dp),
+            )
+            // Ro'yxatda faqat foydalanuvchi bloklaganlari bo'ladi — ekranning o'zi ham shuni
+            // yozadi, bu yerda esa tugma "kim meni bloklagan" degan kutuvni uyg'otmasligi kerak.
+            SettingRow(
+                AppIcons.Lock, Sc.TintAmber, Sc.Danger,
+                "Bloklangan talabalar", null, onClick = onOpenBlocked,
             )
 
             Spacer(Modifier.height(4.dp))

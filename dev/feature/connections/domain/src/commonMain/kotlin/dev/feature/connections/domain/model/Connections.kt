@@ -138,6 +138,22 @@ data class ConnectedStudent(
 )
 
 /**
+ * Bloklangan talaba (`GET /v1/blocks`).
+ *
+ * Ro'yxatda **faqat SIZ bloklaganlaringiz** bo'ladi. Sizni kim bloklagani serverda ataylab
+ * berilmaydi — ya'ni bu ro'yxatni "meni kim bloklagan" deb o'qib bo'lmaydi va UI ham shunday
+ * tushuntirishi kerak.
+ *
+ * [student] ning `online` va `lastSeenAt` maydonlari bu yerda **doim maskalangan**
+ * (`false` / `null`): blok qilingandan keyin presence umuman ko'rinmaydi. Shu sabab ularni
+ * qatorda ko'rsatmaymiz — aks holda foydalanuvchi "hammasi oflayn" degan yolg'on xulosaga keladi.
+ */
+data class BlockedStudent(
+    val student: StudentSummary,
+    val blockedAt: Instant,
+)
+
+/**
  * Sahifalangan ro'yxat. ⚠️ Bu bo'limda sahifa **`1` dan** boshlanadi (feed'dagi `0` emas)
  * va parametrlar **query**'da ketadi.
  */

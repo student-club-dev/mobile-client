@@ -13,6 +13,6 @@ interface JobRepository {
     suspend fun setBookmarked(jobId: String, bookmarked: Boolean)
     suspend fun apply(job: Job)
 
-    /** Backend'dan sinxronlab local DB'ni yangilaydi (offline-first). Xatoда cache saqlanadi. */
+    /** Backend'dan sinxronlab local DB'ni yangilaydi (offline-first). Xatoda cache saqlanadi. */
     suspend fun refresh(): Resource<Unit>
 }

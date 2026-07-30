@@ -10,22 +10,27 @@ import dev.core.common.error.AppException
 import dev.core.common.errorOf
 import dev.core.database.sql.ChatQueries
 import dev.core.database.sql.StudentClubDatabase
-import dev.core.network.media.MediaPurpose
-import dev.core.network.media.MediaUploader
-import dev.feature.chat.data.mapper.MediaContent
+import dev.core.network.generated.model.ConversationListItemDto
+import dev.core.network.media.ChatMediaKind
+import dev.feature.chat.data.mapper.AttachmentColumns
 import dev.feature.chat.data.mapper.MessageRow
+import dev.feature.chat.data.mapper.SendPayload
 import dev.feature.chat.data.mapper.parseEnum
 import dev.feature.chat.data.mapper.parseInstant
+import dev.feature.chat.data.mapper.toColumns
 import dev.feature.chat.data.mapper.toDomain
+import dev.feature.chat.data.mapper.toJson
 import dev.feature.chat.data.mapper.toRow
 import dev.feature.chat.data.realtime.ChatSocket
 import dev.feature.chat.data.remote.ChatRemoteDataSource
 import dev.feature.chat.domain.model.ConversationItem
+import dev.feature.chat.domain.model.GifRef
 import dev.feature.chat.domain.model.Message
 import dev.feature.chat.domain.model.MessageStatus
 import dev.feature.chat.domain.model.MessageType
 import dev.feature.chat.domain.model.OutgoingImage
 import dev.feature.chat.domain.model.Sticker
+import dev.feature.chat.domain.model.UnreadCount
 import dev.feature.chat.domain.repository.ChatRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -46,8 +51,12 @@ import kotlin.random.Random
  * Oqim: ikkala manba ham SQLDelight keshiga yozadi, UI esa faqat keshni kuzatadi. Shuning
  * uchun ekran tarmoqqa bog'liq emas va WS uzilib-ulanganda qayta chizilmaydi.
  *
- * Tartib o'qi — **`seq`** (`chat.md` §1): tarix `?before=`, qayta ulanish `?after=`,
+ * Tartib o'qi — **`seq`** (`handoff/chat.md`): tarix `?before=`, qayta ulanish `?after=`,
  * o'qildi kursori ham shu.
+ *
+ * Media oqimi (2026-07-29 kontrakti): `POST /v1/media/chat-upload` → `mediaId` →
+ * `message:send { type, mediaId }`. Ilgari fayl havolasi xabar **tanasi** sifatida
+ * yuborilardi — bu vaqtinchalik hiyla edi va endi olib tashlangan.
  */
 class ChatRepositoryImpl(
     private val db: StudentClubDatabase,
@@ -55,7 +64,6 @@ class ChatRepositoryImpl(
     private val remote: ChatRemoteDataSource,
     private val socket: ChatSocket,
     private val tokenStore: TokenStore,
-    private val media: MediaUploader,
 ) : ChatRepository {
 
     private val q: ChatQueries get() = db.chatQueries
@@ -122,18 +130,35 @@ class ChatRepositoryImpl(
                 val row = event.message.toRow()
                 withContext(dispatchers.io) {
                     q.transaction {
-                        // O'z xabarimiz bo'lib qaytdi (server ikkala tomonga yuboradi) —
-                        // optimistik nusxani olib tashlaymiz, aks holda ikki marta ko'rinardi.
-                        if (row.senderId == currentUserId) {
-                            q.deleteSendingByBody(row.conversationId, row.body)
-                        }
-                        q.insert(row)
-                        val incoming = if (row.senderId != currentUserId) 1L else 0L
-                        q.touchConversation(row.body, row.senderId, row.createdAt, incoming, row.conversationId)
+                        // Server xabarni IKKALA tomonga yuboradi — o'zimizniki bo'lib qaytsa
+                        // optimistik nusxa [insertOwn] ichida olib tashlanadi, aks holda
+                        // ekranda ikki marta ko'rinardi.
+                        q.insertOwn(row, currentUserId)
+                        // O'chirilgan xabar o'qilmaganlar sanog'iga kirmaydi (server ham
+                        // shunday hisoblaydi), shuning uchun tombstone hech nimani surmaydi.
+                        val incoming = if (row.senderId != currentUserId && row.deletedAt == null) 1L else 0L
+                        q.touchConversation(row.body, row.senderId, row.type, row.createdAt, incoming, row.conversationId)
+                        if (row.deletedAt != null) q.setLastMessageDeleted(row.conversationId)
                     }
                 }
-                // Suhbat hali keshda yo'q (yangi suhbatdosh yozdi) — ro'yxatni yangilaymiz.
-                if (!conversationCached(row.conversationId)) refreshConversations()
+                // Suhbat hali keshda yo'q (yangi suhbatdosh yozdi) — butun ro'yxat o'rniga
+                // bitta qatorni olamiz (`GET /v1/conversations/{id}`, §4b).
+                if (!conversationCached(row.conversationId)) refreshConversation(row.conversationId)
+            }
+        }
+        launch {
+            // `message:deleted` IKKALA a'zoga keladi — o'zimiz o'chirgan bo'lsak ham,
+            // suhbatdosh o'chirgan bo'lsa ham bir xil yo'ldan yuriladi.
+            socket.deletedMessages.collect { event ->
+                applyDeleted(event.conversationId, event.messageId, event.seq)
+            }
+        }
+        launch {
+            // `media:ready` — video transkodlash tugadi (yoki yiqildi). Xabar allaqachon
+            // ro'yxatda turibdi, faqat biriktirmasi almashadi.
+            socket.mediaReady.collect { event ->
+                val columns = event.attachment?.toColumns() ?: return@collect
+                withContext(dispatchers.io) { q.setAttachment(columns, event.messageId) }
             }
         }
         launch {
@@ -174,7 +199,7 @@ class ChatRepositoryImpl(
 
     /**
      * `typing:stop` yo'qolib qolsa indikator abadiy osilib qolmasin — har `typing` hodisasi
-     * taymerni qaytadan boshlaydi (`chat.md` §11: ~5 soniya).
+     * taymerni qaytadan boshlaydi (`handoff/chat.md`: ~5 soniya).
      */
     private fun startTyping(conversationId: String) {
         typingIds.value = typingIds.value + conversationId
@@ -196,56 +221,7 @@ class ChatRepositoryImpl(
         when (val res = remote.conversations()) {
             is Resource.Success -> {
                 withContext(dispatchers.io) {
-                    q.transaction {
-                        res.data.items.forEach { item ->
-                            // Uchala kursor ham serverdan keladi (spec 2026-07-28) — avvalgi
-                            // "unread == 0 bo'lsa hammasi o'qilgan" taxmini kerak emas, va
-                            // ✓/✓✓ holati ilova qayta ochilganda ham tiklanadi.
-                            val readSeq = item.myReadSeq.toLong()
-                            q.insertConversationIfNew(
-                                id = item.conversation.id,
-                                type = item.conversation.type.name,
-                                lastMessageAt = item.conversation.lastMessageAt?.toEpochMilliseconds(),
-                                otherId = item.other.id,
-                                otherUsername = item.other.username,
-                                otherFullName = item.other.fullName,
-                                otherAvatarUrl = item.other.avatarUrl,
-                                otherOnline = if (item.other.online) 1L else 0L,
-                                otherLastSeenAt = item.other.lastSeenAt?.toEpochMilliseconds(),
-                                otherUniversityId = item.other.universityId,
-                                otherGender = item.other.gender?.name,
-                                otherCourseYear = item.other.courseYear?.value,
-                                lastMessageBody = item.lastMessage?.body,
-                                lastMessageSenderId = item.lastMessage?.senderId,
-                                unreadCount = item.unreadCount.toLong(),
-                                lastReadSeq = readSeq,
-                                otherReadSeq = item.peerReadSeq.toLong(),
-                                otherDeliveredSeq = item.peerDeliveredSeq.toLong(),
-                            )
-                            // Local ustunlarga (`archived`) tegmaydi.
-                            q.updateConversation(
-                                type = item.conversation.type.name,
-                                lastMessageAt = item.conversation.lastMessageAt?.toEpochMilliseconds(),
-                                otherId = item.other.id,
-                                otherUsername = item.other.username,
-                                otherFullName = item.other.fullName,
-                                otherAvatarUrl = item.other.avatarUrl,
-                                otherOnline = if (item.other.online) 1L else 0L,
-                                otherLastSeenAt = item.other.lastSeenAt?.toEpochMilliseconds(),
-                                otherUniversityId = item.other.universityId,
-                                otherGender = item.other.gender?.name,
-                                otherCourseYear = item.other.courseYear?.value,
-                                lastMessageBody = item.lastMessage?.body,
-                                lastMessageSenderId = item.lastMessage?.senderId,
-                                unreadCount = item.unreadCount.toLong(),
-                                lastReadSeq = readSeq,
-                                otherReadSeq = item.peerReadSeq.toLong(),
-                                otherDeliveredSeq = item.peerDeliveredSeq.toLong(),
-                                id = item.conversation.id,
-                            )
-                            item.lastMessage?.let { q.insert(it.toRow()) }
-                        }
-                    }
+                    q.transaction { res.data.items.forEach { storeConversation(it) } }
                 }
                 Resource.Success(Unit)
             }
@@ -253,10 +229,90 @@ class ChatRepositoryImpl(
             Resource.Loading -> Resource.Success(Unit)
         }
 
+    /** Bitta suhbat qatorini yangilaydi — butun ro'yxatni yuklamaslik uchun (§4b). */
+    private suspend fun refreshConversation(conversationId: String): Resource<Unit> =
+        when (val res = remote.conversation(conversationId)) {
+            is Resource.Success -> {
+                withContext(dispatchers.io) { q.transaction { storeConversation(res.data) } }
+                Resource.Success(Unit)
+            }
+            // Endpoint hali yo'q/xato bo'lsa eski yo'l ishlaydi: butun ro'yxat.
+            is Resource.Error -> refreshConversations()
+            Resource.Loading -> Resource.Success(Unit)
+        }
+
+    /**
+     * Serverdan kelgan suhbat qatorini keshga yozadi. Tranzaksiya ichida chaqiriladi.
+     *
+     * Local ustunlarga (`archived`) va kursorlarga tegilmaydi — ular WS orqali allaqachon
+     * oldinga ketgan bo'lishi mumkin.
+     */
+    private fun storeConversation(item: ConversationListItemDto) {
+        val me = currentUserId
+        val last = item.lastMessage
+        val lastDeleted = if (last?.deletedAt != null) 1L else 0L
+        // Uchala kursor ham serverdan keladi (spec 2026-07-28) — avvalgi "unread == 0 bo'lsa
+        // hammasi o'qilgan" taxmini kerak emas, va ✓/✓✓ holati ilova qayta ochilganda ham
+        // tiklanadi.
+        q.insertConversationIfNew(
+            id = item.conversation.id,
+            type = item.conversation.type.name,
+            lastMessageAt = item.conversation.lastMessageAt?.toEpochMilliseconds(),
+            otherId = item.other.id,
+            otherUsername = item.other.username,
+            otherFullName = item.other.fullName,
+            otherAvatarUrl = item.other.avatarUrl,
+            otherOnline = if (item.other.online) 1L else 0L,
+            otherLastSeenAt = item.other.lastSeenAt?.toEpochMilliseconds(),
+            otherUniversityId = item.other.universityId,
+            otherGender = item.other.gender?.name,
+            otherCourseYear = item.other.courseYear?.value,
+            lastMessageBody = last?.body,
+            lastMessageSenderId = last?.senderId,
+            lastMessageType = last?.type?.name,
+            lastMessageDeleted = lastDeleted,
+            unreadCount = item.unreadCount.toLong(),
+            lastReadSeq = item.myReadSeq.toLong(),
+            otherReadSeq = item.peerReadSeq.toLong(),
+            otherDeliveredSeq = item.peerDeliveredSeq.toLong(),
+        )
+        q.updateConversation(
+            type = item.conversation.type.name,
+            lastMessageAt = item.conversation.lastMessageAt?.toEpochMilliseconds(),
+            otherId = item.other.id,
+            otherUsername = item.other.username,
+            otherFullName = item.other.fullName,
+            otherAvatarUrl = item.other.avatarUrl,
+            otherOnline = if (item.other.online) 1L else 0L,
+            otherLastSeenAt = item.other.lastSeenAt?.toEpochMilliseconds(),
+            otherUniversityId = item.other.universityId,
+            otherGender = item.other.gender?.name,
+            otherCourseYear = item.other.courseYear?.value,
+            lastMessageBody = last?.body,
+            lastMessageSenderId = last?.senderId,
+            lastMessageType = last?.type?.name,
+            lastMessageDeleted = lastDeleted,
+            unreadCount = item.unreadCount.toLong(),
+            lastReadSeq = item.myReadSeq.toLong(),
+            otherReadSeq = item.peerReadSeq.toLong(),
+            otherDeliveredSeq = item.peerDeliveredSeq.toLong(),
+            id = item.conversation.id,
+        )
+        last?.let { q.insertOwn(it.toRow(), me) }
+    }
+
+    override suspend fun unreadCount(): Resource<UnreadCount> = when (val res = remote.unreadCount()) {
+        is Resource.Success -> Resource.Success(
+            UnreadCount(total = res.data.total, conversations = res.data.conversations),
+        )
+        is Resource.Error -> res
+        Resource.Loading -> Resource.Loading
+    }
+
     override suspend fun openDirect(studentId: String): Resource<String> {
         val res = remote.openDirect(studentId)
         // Yangi suhbat keshda yo'q — ro'yxatni yangilab, ikkinchi tomon ma'lumotini olamiz.
-        if (res is Resource.Success) refreshConversations()
+        if (res is Resource.Success) refreshConversation(res.data)
         return res
     }
 
@@ -286,8 +342,8 @@ class ChatRepositoryImpl(
         return when (val res = remote.messages(conversationId, before = oldest)) {
             is Resource.Success -> {
                 storeMessages(res.data.items.map { it.toRow() })
-                // `hasMore` — "taxminan": oxirgi sahifa aynan `size` ta bo'lsa ham `true`
-                // bo'lib qoladi. Bo'sh javob esa aniq tugaganini bildiradi.
+                // `hasMore` endi aniq: server `size + 1` ta o'qib, ortiqchasini tashlaydi
+                // (§17.5). Bo'sh javob esa baribir tugaganini bildiradi.
                 Resource.Success(res.data.items.isNotEmpty() && res.data.hasMore)
             }
             is Resource.Error -> res
@@ -297,17 +353,58 @@ class ChatRepositoryImpl(
 
     private suspend fun storeMessages(rows: List<MessageRow>) {
         if (rows.isEmpty()) return
-        withContext(dispatchers.io) { q.transaction { rows.forEach { q.insert(it) } } }
+        val me = currentUserId
+        withContext(dispatchers.io) { q.transaction { rows.forEach { q.insertOwn(it, me) } } }
     }
 
     // --- Yuborish ------------------------------------------------------------------------
 
-    override suspend fun send(conversationId: String, body: String): Resource<Unit> {
-        val text = body.trim()
-        if (text.isEmpty()) return errorOf(AppException.Validation("Xabar bo'sh."))
-        if (text.length > MAX_BODY_LENGTH) {
-            return errorOf(AppException.Validation("Xabar $MAX_BODY_LENGTH belgidan uzun bo'lmasin."))
+    override suspend fun send(conversationId: String, body: String): Resource<Unit> =
+        sendPayload(conversationId, SendPayload(type = MessageType.TEXT, body = body))
+
+    override suspend fun sendSticker(conversationId: String, sticker: Sticker): Resource<Unit> =
+        // Serverdagi stiker `stickerId` bilan ketadi (tana TAQIQLANGAN). Ilovaga kiritilgan
+        // ZAXIRA katalogning id'lari esa emojining o'zi — server ularni topmay
+        // `422 STICKER_NOT_FOUND` qaytarardi, shuning uchun ular oddiy `TEXT` bo'lib ketadi
+        // va ekranda baribir katta chiziladi (`EmojiText`).
+        if (sticker.isRemote) {
+            sendPayload(
+                conversationId,
+                SendPayload(
+                    type = MessageType.STICKER,
+                    stickerId = sticker.id,
+                    stickerEmoji = sticker.emoji,
+                    stickerUrl = sticker.url,
+                ),
+            )
+        } else {
+            sendPayload(conversationId, SendPayload(type = MessageType.TEXT, body = sticker.emoji))
         }
+
+    override suspend fun sendGif(conversationId: String, gif: GifRef): Resource<Unit> =
+        sendPayload(
+            conversationId,
+            SendPayload(
+                type = MessageType.GIF,
+                // Javobda kelgan obyekt AYNAN shu holda qaytariladi — `toJson()` uni
+                // `GifRefDto` serializatsiyasidan quradi, ya'ni maydon nomlari spec bilan
+                // bir xil qoladi (qo'lda yig'ilsa bitta xato nom 422 bo'lardi).
+                gif = gif.toJson(),
+                previewUrl = gif.url,
+                previewThumbUrl = gif.thumbUrl,
+                previewWidth = gif.width.toLong(),
+                previewHeight = gif.height.toLong(),
+            ),
+        )
+
+    /**
+     * Bitta xabarni optimistik qator bilan yuboradi.
+     *
+     * Qoidalar avval **klientda** tekshiriladi ([SendPayload.validate]) — `422` ni kutib
+     * o'tirsak xabar ekranda "yuborilmadi" bo'lib qolardi.
+     */
+    private suspend fun sendPayload(conversationId: String, payload: SendPayload): Resource<Unit> {
+        payload.validate()?.let { return errorOf(AppException.Validation(it)) }
         val me = currentUserId ?: return errorOf(AppException.Unauthorized())
 
         // Har xabar uchun YANGI kalit: noyoblik `(jo'natuvchi, clientMsgId)` bo'yicha
@@ -316,10 +413,7 @@ class ChatRepositoryImpl(
         val clientMsgId = randomClientMsgId()
         val now = Clock.System.now().toEpochMilliseconds()
         val localId = LOCAL_ID_PREFIX + clientMsgId
-
-        // Yakka emoji — stiker: foydalanuvchi qo'lda yozgani ham panelda tanlagani kabi
-        // katta qilib chiziladi (Telegram/WhatsApp qoidasi).
-        val type = MediaContent.detect(text)
+        val text = payload.wireBody.orEmpty()
 
         // Optimistik ko'rinish — foydalanuvchi xabarni darhol ko'radi.
         withContext(dispatchers.io) {
@@ -330,22 +424,31 @@ class ChatRepositoryImpl(
                         conversationId = conversationId,
                         senderId = me,
                         seq = 0L,
-                        type = type.name,
+                        type = payload.type.name,
                         body = text,
                         createdAt = now,
                         clientMsgId = clientMsgId,
                         status = MessageStatus.SENDING.name,
+                        albumId = payload.albumId,
+                        stickerId = payload.stickerId,
+                        stickerEmoji = payload.stickerEmoji,
+                        stickerUrl = payload.stickerUrl,
+                        // Havolasi oldindan ma'lum biriktirma (GIF) — server javobini
+                        // kutmasdan ko'rsatiladi. `status` yozilmaydi: mapper uni `READY`
+                        // deb oladi, `PROCESSING` esa faqat serverdan kelishi mumkin.
+                        attachmentUrl = payload.previewUrl,
+                        attachmentThumbUrl = payload.previewThumbUrl,
+                        attachmentWidth = payload.previewWidth,
+                        attachmentHeight = payload.previewHeight,
+                        attachmentKind = payload.previewUrl?.let { payload.type.name },
+                        attachmentIsAnimated = if (payload.type == MessageType.GIF) 1L else null,
                     ),
                 )
-                q.touchConversation(text, me, now, 0L, conversationId)
+                q.touchConversation(text, me, payload.type.name, now, 0L, conversationId)
             }
         }
-        return deliver(conversationId, text, clientMsgId, localId, type)
+        return deliver(conversationId, payload, clientMsgId, localId)
     }
-
-    override suspend fun sendSticker(conversationId: String, sticker: Sticker): Resource<Unit> =
-        // Tanasi — emojining o'zi: turini [MediaContent] aniqlaydi, ya'ni alohida yo'l kerak emas.
-        send(conversationId, sticker.emoji)
 
     override suspend fun sendImages(
         conversationId: String,
@@ -357,30 +460,35 @@ class ChatRepositoryImpl(
         }
         val me = currentUserId ?: return errorOf(AppException.Unauthorized())
 
-        // Bitta albom — ekranda bitta to'r bo'lib chiziladi.
-        val albumId = randomClientMsgId()
+        // Bitta albom — ekranda bitta to'r bo'lib chiziladi. Kalitni KLIENT generatsiya
+        // qiladi va endi server ham uni qaytaradi, ya'ni qabul qiluvchi ham to'r ko'radi.
+        val albumId = if (images.size > 1) randomClientMsgId() else null
 
         // 1-qadam: HAMMASI darhol ekranga chiqadi. Yuklash sekundlab davom etadi, foydalanuvchi
         // esa tanlagan rasmlarini shu zahoti ko'rishi kerak.
         val pending = images.map { image ->
             val clientMsgId = randomClientMsgId()
             val localId = LOCAL_ID_PREFIX + clientMsgId
+            val now = Clock.System.now().toEpochMilliseconds()
             withContext(dispatchers.io) {
-                q.insert(
-                    MessageRow(
-                        id = localId,
-                        conversationId = conversationId,
-                        senderId = me,
-                        seq = 0L,
-                        type = MessageType.IMAGE.name,
-                        // Havola hali yo'q — yuklangach [ChatQueries.setMessageMedia] to'ldiradi.
-                        body = "",
-                        createdAt = Clock.System.now().toEpochMilliseconds(),
-                        clientMsgId = clientMsgId,
-                        status = MessageStatus.SENDING.name,
-                        albumId = albumId,
-                    ),
-                )
+                q.transaction {
+                    q.insert(
+                        MessageRow(
+                            id = localId,
+                            conversationId = conversationId,
+                            senderId = me,
+                            seq = 0L,
+                            type = MessageType.IMAGE.name,
+                            // Media xabarda tana bo'sh — havola endi TANAGA yozilmaydi.
+                            body = "",
+                            createdAt = now,
+                            clientMsgId = clientMsgId,
+                            status = MessageStatus.SENDING.name,
+                            albumId = albumId,
+                        ),
+                    )
+                    q.touchConversation("", me, MessageType.IMAGE.name, now, 0L, conversationId)
+                }
             }
             localImages.update { it + (localId to image.bytes) }
             PendingImage(image, clientMsgId, localId)
@@ -410,46 +518,36 @@ class ChatRepositoryImpl(
         item: PendingImage,
         albumId: String?,
     ): Resource<Unit> {
-        val url = uploadOrNull(item.image)
-            ?: return fail(item.localId, "Rasm yuklanmadi — qayta urinib ko'ring")
-
-        // Tana endi havola: `message:new` o'z xabarimiz bo'lib qaytganda optimistik nusxa
-        // aynan shu matn bo'yicha topib o'chiriladi (`deleteSendingByBody`).
-        withContext(dispatchers.io) {
-            q.transaction {
-                q.setMessageMedia(url, url, null, item.localId)
-                q.touchConversation(
-                    url,
-                    currentUserId.orEmpty(),
-                    Clock.System.now().toEpochMilliseconds(),
-                    0L,
-                    conversationId,
-                )
-            }
+        val upload = remote.uploadAttachment(
+            conversationId = conversationId,
+            bytes = item.image.bytes,
+            fileName = item.image.fileName,
+            kind = ChatMediaKind.IMAGE,
+        )
+        val attachment = when (upload) {
+            is Resource.Success -> upload.data.toColumns()
+            is Resource.Error -> return fail(item.localId, upload.message, upload.error)
+            Resource.Loading -> return Resource.Success(Unit)
         }
+
+        // Biriktirma DARHOL keshga yoziladi: u **bir martalik**, ya'ni yuborish yiqilsa ham
+        // qayta urinishda fayl qaytadan yuklanmasligi kerak (`422 MEDIA_ALREADY_USED`).
+        withContext(dispatchers.io) { q.setAttachment(attachment, item.localId) }
+
         val result = deliver(
             conversationId = conversationId,
-            text = url,
+            payload = SendPayload(
+                type = MessageType.IMAGE,
+                mediaId = attachment.id,
+                albumId = albumId,
+            ),
             clientMsgId = item.clientMsgId,
             localId = item.localId,
-            type = MessageType.IMAGE,
-            albumId = albumId,
         )
         // Server havolasi bor — local nusxa endi kerak emas.
         localImages.update { it - item.localId }
         return result
     }
-
-    /**
-     * `POST /v1/media/upload` — rasm uchun **bugun ishlaydigan yagona** yo'l.
-     *
-     * ⚠️ `purpose` sifatida `LISTING` yuboriladi: backendda chat uchun alohida tur yo'q
-     * (`CHAT_MEDIA_AND_CALLS_BACKEND.md` §1.1 uni qo'shishni so'raydi). Bu faqat serverdagi
-     * papka nomiga ta'sir qiladi.
-     */
-    private suspend fun uploadOrNull(image: OutgoingImage): String? = runCatching {
-        media.upload(image.bytes, image.fileName, MediaPurpose.LISTING).url
-    }.getOrNull()?.takeIf { it.isNotBlank() }
 
     override suspend fun retry(messageId: String): Resource<Unit> {
         val message = withContext(dispatchers.io) {
@@ -462,23 +560,32 @@ class ChatRepositoryImpl(
         withContext(dispatchers.io) { q.setMessageStatus(MessageStatus.SENDING.name, message.id) }
 
         val type = parseEnum(message.type, MessageType.TEXT)
-        // Rasm yuklanmay qolgan bo'lsa tana bo'sh — avval yuklashni takrorlaymiz.
-        if (type == MessageType.IMAGE && message.body.isBlank()) {
+        // Fayl yuklanmay qolgan bo'lsa `attachmentId` bo'sh — avval yuklashni takrorlaymiz.
+        if (type == MessageType.IMAGE && message.attachmentId == null) {
             val bytes = localImages.value[message.id]
                 ?: return fail(message.id, "Rasm topilmadi — uni qaytadan tanlang")
             return uploadAndDeliver(
                 conversationId = message.conversationId,
-                item = PendingImage(OutgoingImage(bytes, RETRY_FILE_NAME), clientMsgId, message.id),
+                item = PendingImage(
+                    OutgoingImage(bytes, message.attachmentFileName ?: RETRY_FILE_NAME),
+                    clientMsgId,
+                    message.id,
+                ),
                 albumId = message.albumId,
             )
         }
         return deliver(
             conversationId = message.conversationId,
-            text = message.body,
+            payload = SendPayload(
+                type = type,
+                // Tana faqat matnli xabarda va rasm izohida bo'lishi mumkin.
+                body = message.body.takeIf { it.isNotEmpty() },
+                mediaId = message.attachmentId,
+                stickerId = message.stickerId,
+                albumId = message.albumId,
+            ),
             clientMsgId = clientMsgId,
             localId = message.id,
-            type = type,
-            albumId = message.albumId,
         )
     }
 
@@ -488,30 +595,29 @@ class ChatRepositoryImpl(
      */
     private suspend fun deliver(
         conversationId: String,
-        text: String,
+        payload: SendPayload,
         clientMsgId: String,
         localId: String,
-        type: MessageType,
-        albumId: String? = null,
     ): Resource<Unit> {
-        val ack = socket.send(conversationId, clientMsgId, text)
+        val ack = socket.send(
+            conversationId = conversationId,
+            clientMsgId = clientMsgId,
+            body = payload.wireBody,
+            // `type` doim yuboriladi: berilmasa server `TEXT` deb oladi va media xabar
+            // oddiy matnga aylanib qolardi.
+            type = payload.type.name,
+            mediaId = payload.mediaId,
+            stickerId = payload.stickerId,
+            albumId = payload.albumId,
+            gif = payload.gif,
+        )
         if (ack != null) {
             if (ack.isSent) {
-                replaceLocal(
-                    localId,
-                    MessageRow(
-                        id = ack.id!!,
-                        conversationId = conversationId,
-                        senderId = currentUserId.orEmpty(),
-                        seq = ack.seq!!.toLong(),
-                        type = type.name,
-                        body = text,
-                        createdAt = parseInstant(ack.createdAt).takeIf { it > 0L }
-                            ?: Clock.System.now().toEpochMilliseconds(),
-                        clientMsgId = clientMsgId,
-                        attachmentUrl = text.takeIf { type == MessageType.IMAGE },
-                        albumId = albumId,
-                    ),
+                promoteLocal(
+                    localId = localId,
+                    serverId = ack.id!!,
+                    seq = ack.seq!!.toLong(),
+                    createdAt = parseInstant(ack.createdAt).takeIf { it > 0L },
                 )
                 return Resource.Success(Unit)
             }
@@ -521,10 +627,9 @@ class ChatRepositoryImpl(
         }
 
         // WS ulanmagan / ack kelmadi → zaxira yo'l.
-        return when (val res = remote.send(conversationId, text, clientMsgId)) {
+        return when (val res = remote.send(conversationId, payload, clientMsgId)) {
             is Resource.Success -> {
-                // `albumId` serverdan kelmaydi — local guruhlash yo'qolmasin uchun qo'shamiz.
-                replaceLocal(localId, res.data.toRow(clientMsgId).copy(albumId = albumId))
+                replaceLocal(localId, res.data.toRow(clientMsgId))
                 Resource.Success(Unit)
             }
             is Resource.Error -> fail(localId, res.message, res.error)
@@ -532,7 +637,34 @@ class ChatRepositoryImpl(
         }
     }
 
-    /** Optimistik qatorni serverning haqiqiy (id + seq) qatoriga almashtiradi. */
+    /**
+     * Optimistik qatorni serverning haqiqiy `id`/`seq` iga ko'chiradi.
+     *
+     * Qator **qaytadan qurilmaydi**, o'sha qatorning o'zi ko'chiriladi: biriktirmaning
+     * metama'lumotlari (o'lchamlar, waveform, blurHash) WS ack'ida YO'Q, ya'ni yangi qator
+     * yasasak ular yo'qolardi va rasm ekranda kvadratga tushib qolardi.
+     *
+     * `message:new` biroz oldinroq kelgan bo'lsa optimistik qator allaqachon o'chirilgan —
+     * o'shanda qiladigan ish yo'q.
+     */
+    private suspend fun promoteLocal(localId: String, serverId: String, seq: Long, createdAt: Long?) {
+        withContext(dispatchers.io) {
+            q.transaction {
+                val local = q.selectMessageById(localId).executeAsOneOrNull() ?: return@transaction
+                q.deleteMessage(localId)
+                q.insert(
+                    local.toRow().copy(
+                        id = serverId,
+                        seq = seq,
+                        createdAt = createdAt ?: local.createdAt,
+                        status = MessageStatus.SENT.name,
+                    ),
+                )
+            }
+        }
+    }
+
+    /** Optimistik qatorni serverdan kelgan to'liq qator bilan almashtiradi (REST yo'li). */
     private suspend fun replaceLocal(localId: String, row: MessageRow) {
         withContext(dispatchers.io) {
             q.transaction {
@@ -547,6 +679,54 @@ class ChatRepositoryImpl(
         return Resource.Error(message, error?.cause, error)
     }
 
+    // --- O'chirish -----------------------------------------------------------------------
+
+    override suspend fun deleteMessage(messageId: String): Resource<Unit> {
+        // Hali yuborilmagan (optimistik) xabar serverda yo'q — uni oddiy o'chirsa bo'ladi.
+        if (messageId.startsWith(LOCAL_ID_PREFIX)) {
+            withContext(dispatchers.io) { q.deleteMessage(messageId) }
+            localImages.update { it - messageId }
+            return Resource.Success(Unit)
+        }
+        return when (val res = remote.deleteMessage(messageId)) {
+            is Resource.Success -> {
+                // WS `message:deleted` ham keladi, lekin uni kutib turmaymiz: ekran darhol
+                // yangilanishi kerak, hodisa esa aynan shu natijani takrorlaydi (idempotent).
+                applyDeleted(res.data.conversationId, res.data.id, res.data.seq)
+                Resource.Success(Unit)
+            }
+            is Resource.Error -> res
+            Resource.Loading -> Resource.Success(Unit)
+        }
+    }
+
+    /**
+     * Soft delete'ni keshga qo'llaydi — REST javobi va WS hodisasi uchun **bitta** yo'l.
+     *
+     * Qator o'chirilmaydi (`seq` — tarix va kursorlarning o'qi), faqat tanasi bo'shatiladi.
+     * Xabar o'qilmaganlar sanog'idan chiqadi: ko'rinmaydigan xabarni o'qib bo'lmaydi, aks
+     * holda badge abadiy yoqiq qolardi.
+     */
+    private suspend fun applyDeleted(conversationId: String, messageId: String, seq: Int) {
+        val now = Clock.System.now().toEpochMilliseconds()
+        withContext(dispatchers.io) {
+            q.transaction {
+                val row = q.selectMessageById(messageId).executeAsOneOrNull()
+                // Xabar keshda bo'lmasligi mumkin (tarix hali yuklanmagan) — sanoq baribir
+                // to'g'rilanadi, aks holda badge yolg'on ko'rsatardi.
+                if (row != null && row.deletedAt != null) return@transaction
+                q.setMessageDeleted(now, messageId)
+                if (row == null || row.senderId != currentUserId) {
+                    q.decrementUnreadForDeleted(conversationId, seq.toLong())
+                }
+                // Ro'yxatdagi ko'rinish ham tombstone'ga aylanadi — faqat oxirgi xabar bo'lsa.
+                val newest = q.maxSeq(conversationId).executeAsOneOrNull() ?: 0L
+                if (row == null || row.seq >= newest) q.setLastMessageDeleted(conversationId)
+            }
+        }
+        localImages.update { it - messageId }
+    }
+
     // --- Kursorlar -----------------------------------------------------------------------
 
     override suspend fun markRead(conversationId: String) {
@@ -554,14 +734,17 @@ class ChatRepositoryImpl(
         // Local holat darhol yangilanadi — badge tarmoqni kutmasin.
         withContext(dispatchers.io) { q.markRead(seq.toLong(), conversationId) }
         if (seq <= 0) return
-        // WS "eng yaxshi harakat" — javob qaytarmaydi; ulanmagan bo'lsa REST orqali.
-        if (!socket.markReadOrFalse(conversationId, seq)) remote.markRead(conversationId, seq)
+        // WS endi ack qaytaradi (§17.8) — ack kelmasa kursor yo'lda yo'qolgan, REST bilan
+        // qayta yuboramiz.
+        if (!socket.markRead(conversationId, seq)) remote.markRead(conversationId, seq)
     }
 
     override suspend fun markDelivered(conversationId: String) {
         val seq = maxSeq(conversationId)
-        // Yetkazildi kursorining REST varianti yo'q — faqat WS (chat.md §14).
-        if (seq > 0) socket.markDelivered(conversationId, seq)
+        if (seq <= 0) return
+        // REST zaxirasi 2026-07-29 dan bor (§17.6): busiz uzilgan ulanish jo'natuvchini
+        // abadiy bitta belgichada qoldirardi.
+        if (!socket.markDelivered(conversationId, seq)) remote.markDelivered(conversationId, seq)
     }
 
     override suspend fun setTyping(conversationId: String, typing: Boolean) {
@@ -581,11 +764,22 @@ class ChatRepositoryImpl(
     private suspend fun conversationCached(conversationId: String): Boolean =
         withContext(dispatchers.io) { q.selectConversation(conversationId).executeAsOneOrNull() != null }
 
-    /** WS ulangan bo'lsa yuboradi va `true` qaytaradi; aks holda `false` (REST zaxirasi). */
-    private suspend fun ChatSocket.markReadOrFalse(conversationId: String, seq: Int): Boolean {
-        if (!connected.value) return false
-        markRead(conversationId, seq)
-        return true
+    /**
+     * Serverdan kelgan xabarni yozadi va **o'zimizniki bo'lsa** unga mos optimistik qatorni
+     * olib tashlaydi.
+     *
+     * `message:new` ni o'tkazib yuborgan bo'lsak (uzilish, reconnect, ilova yopiq edi)
+     * optimistik `SENDING` qator aks holda abadiy dublikat bo'lib qolardi: serverning qatori
+     * boshqa `id` bilan keladi. Backend `clientMsgId` ni REST tarixida ham aynan shuning
+     * uchun qaytaradi (`handoff/chat.md`).
+     *
+     * Tranzaksiya ichida chaqirilishi kutiladi.
+     */
+    private fun ChatQueries.insertOwn(row: MessageRow, me: String?) {
+        row.clientMsgId?.takeIf { row.senderId == me }?.let { key ->
+            deleteSendingByClientMsgId(row.conversationId, key)
+        }
+        insert(row)
     }
 
     /** SQLDelight generatsiya qilgan uzun imzoni bitta joyda o'raymiz. */
@@ -599,11 +793,43 @@ class ChatRepositoryImpl(
         createdAt = row.createdAt,
         clientMsgId = row.clientMsgId,
         status = row.status,
+        deletedAt = row.deletedAt,
+        attachmentId = row.attachmentId,
         attachmentUrl = row.attachmentUrl,
         attachmentThumbUrl = row.attachmentThumbUrl,
         attachmentWidth = row.attachmentWidth,
         attachmentHeight = row.attachmentHeight,
+        attachmentKind = row.attachmentKind,
+        attachmentStatus = row.attachmentStatus,
+        attachmentMime = row.attachmentMime,
+        attachmentSizeBytes = row.attachmentSizeBytes,
+        attachmentDurationMs = row.attachmentDurationMs,
+        attachmentWaveform = row.attachmentWaveform,
+        attachmentFileName = row.attachmentFileName,
+        attachmentBlurHash = row.attachmentBlurHash,
+        attachmentIsAnimated = row.attachmentIsAnimated,
+        stickerId = row.stickerId,
+        stickerEmoji = row.stickerEmoji,
+        stickerUrl = row.stickerUrl,
         albumId = row.albumId,
+    )
+
+    private fun ChatQueries.setAttachment(columns: AttachmentColumns, messageId: String) = setMessageAttachment(
+        attachmentId = columns.id,
+        attachmentUrl = columns.url,
+        attachmentThumbUrl = columns.thumbUrl,
+        attachmentWidth = columns.width,
+        attachmentHeight = columns.height,
+        attachmentKind = columns.kind,
+        attachmentStatus = columns.status,
+        attachmentMime = columns.mimeType,
+        attachmentSizeBytes = columns.sizeBytes,
+        attachmentDurationMs = columns.durationMs,
+        attachmentWaveform = columns.waveform,
+        attachmentFileName = columns.fileName,
+        attachmentBlurHash = columns.blurHash,
+        attachmentIsAnimated = columns.isAnimated,
+        id = messageId,
     )
 
     /**
@@ -619,10 +845,9 @@ class ChatRepositoryImpl(
 
     private companion object {
         const val TYPING_TIMEOUT_MS = 5_000L
-        const val MAX_BODY_LENGTH = 4000
         const val LOCAL_ID_PREFIX = "local:"
 
-        /** Bir albomdagi rasmlar chegarasi — backend ham shu sonni kutadi (spec §3). */
+        /** Bir albomdagi rasmlar chegarasi — backend ham shu sonni kutadi (`422 ALBUM_TOO_LARGE`). */
         const val MAX_ALBUM_SIZE = 10
 
         /** Qayta yuborishda asl fayl nomi saqlanmagan — kengaytma MIME uchun yetarli. */

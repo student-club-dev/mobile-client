@@ -2,6 +2,7 @@ package dev.core.data.remote
 
 import dev.core.common.Resource
 import dev.core.data.dto.DiscountCategoryDto
+import dev.core.data.dto.DiscountGroupDto
 import dev.core.data.dto.DiscountOfferDto
 import dev.core.data.dto.DiscountsResponseDto
 import dev.core.domain.model.DiscountTag
@@ -17,6 +18,7 @@ import dev.core.domain.model.SuggestionKind
 import dev.core.domain.repository.RegionRepository
 import dev.core.network.generated.api.CatalogApi
 import dev.core.network.generated.api.DiscountsApi
+import dev.core.network.generated.model.CatalogGroupDto
 import dev.core.network.generated.model.CatalogGroupsRequestDto
 import dev.core.network.generated.model.CatalogTypeDto
 import dev.core.network.generated.model.CatalogTypesRequestDto
@@ -84,7 +86,8 @@ class ApiDiscountRemoteDataSource(
      * so'raydi, tafsilot esa emoji/rangni turdan oladi. Katalog kunlab o'zgarmaydi, shuning
      * uchun oddiy xotira keshi yetarli — ilova qayta ochilganda yangilanadi.
      */
-    private var cachedGroupKeys: List<String> = emptyList()
+    private var cachedGroups: List<CatalogGroupDto> = emptyList()
+    private val cachedGroupKeys: List<String> get() = cachedGroups.map { it.key }
     private var cachedTypes: Map<String, CatalogTypeDto> = emptyMap()
 
     /**
@@ -98,24 +101,25 @@ class ApiDiscountRemoteDataSource(
     override suspend fun fetchDiscounts(): Resource<DiscountsResponseDto> = safeCall {
         val types = loadTypes()
 
-        // Har bo'lakka teng ulush — jami [FEED_PAGE_SIZE] ta karta, biror guruh boshqasini
-        // siqib chiqarmaydi.
-        val chunks = cachedGroupKeys.chunked(MAX_GROUPS_PER_REQUEST)
-        val perChunk = (FEED_PAGE_SIZE / chunks.size.coerceAtLeast(1)).coerceAtLeast(1)
+        // HAR GURUH ALOHIDA so'raladi. Ilgari guruhlar 3 talik bo'lakda birga so'ralardi va
+        // "eng yangi" saralash bo'lakdagi bitta guruhga butun ulushni berib yuborardi: masalan
+        // `FOOD + SPORT + GAMES` so'rovidan 20 ta kartaning hammasi Sport bo'lib chiqib,
+        // Ovqatlanish va O'yin kartalari umuman kelmasdi — bosh ekranda o'sha bo'limlar bo'sh
+        // qolib yashirinardi ("Ovqatlar" ko'rinmasligining sababi shu edi).
         val cards = coroutineScope {
-            chunks.map { keys ->
+            cachedGroupKeys.map { key ->
                 async {
                     discounts.search(
                         SearchRequestDto(
                             mode = SearchRequestDto.Mode.LIST,
                             // Feed hech narsani yashirmaydi: chegirmali + oddiy e'lonlar birga.
                             filter = SearchFilterDto(
-                                groupKeys = keys,
+                                groupKeys = listOf(key),
                                 listingKind = SearchFilterDto.ListingKind.ALL,
                                 geo = geoFilter(),
                             ),
                             sort = SearchSortDto(by = SearchSortDto.By.NEWEST),
-                            page = SearchPageDto(number = 0, propertySize = perChunk),
+                            page = SearchPageDto(number = 0, propertySize = PER_GROUP_PAGE_SIZE),
                         ),
                     ).body().items
                 }
@@ -123,6 +127,8 @@ class ApiDiscountRemoteDataSource(
         }.flatten()
 
         DiscountsResponseDto(
+            // Bosh ekrandagi bo'limlar — aynan shu guruhlar, server tartibida.
+            groups = cachedGroups.map { it.toGroupDto() },
             categories = types.values.map { it.toCategoryDto() },
             // Emoji/rang kartada emas, tur ma'lumotida keladi — shu jadval orqali bog'lanadi.
             offers = cards.map { it.toOfferDto(types[it.businessType]) }.withFeatured(),
@@ -168,13 +174,13 @@ class ApiDiscountRemoteDataSource(
      * uchun 8 ta guruh bo'laklab so'raladi; natija 27 ta turdan iborat `key → tur` jadvali.
      */
     private suspend fun loadTypes(): Map<String, CatalogTypeDto> {
-        val groupKeys = catalog.getGroups(CatalogGroupsRequestDto()).body().map { it.key }
+        val groups = catalog.getGroups(CatalogGroupsRequestDto()).body().sortedBy { it.sortOrder }
         val types = coroutineScope {
-            groupKeys.chunked(MAX_GROUPS_PER_REQUEST).map { keys ->
+            groups.map { it.key }.chunked(MAX_GROUPS_PER_REQUEST).map { keys ->
                 async { catalog.getTypes(CatalogTypesRequestDto(groupKeys = keys)).body() }
             }.awaitAll()
         }.flatten()
-        cachedGroupKeys = groupKeys
+        cachedGroups = groups
         cachedTypes = types.associateBy { it.key }
         return cachedTypes
     }
@@ -231,8 +237,12 @@ class ApiDiscountRemoteDataSource(
  */
 private const val MAX_GROUPS_PER_REQUEST = 3
 
-/** Bitta sahifada tortiladigan e'lonlar soni — Home + "Chegirmalar" ekrani shundan ishlaydi. */
-private const val FEED_PAGE_SIZE = 60
+/**
+ * Bitta guruhdan tortiladigan e'lonlar soni — Home + "Chegirmalar" ekrani shundan ishlaydi.
+ * Kafolat: har bo'limga o'z ulushi tegadi (8 guruh × shu son). Bosh ekran bo'limi baribir
+ * 8 tadan ortig'ini ko'rsatmaydi, qolgani "Chegirmalar" ekranida qoladi.
+ */
+private const val PER_GROUP_PAGE_SIZE = 12
 
 /** Qidiruv qatorida ko'rsatiladigan takliflar soni (spec chegarasi — 20). */
 private const val SUGGEST_LIMIT = 8
@@ -243,18 +253,29 @@ private const val DEFAULT_EMOJI = "🎁"
 /** Kartadagi jins atributi (`catalog-seed` dagi `_gender` kaliti) — asosan kiyim uchun. */
 private const val GENDER_KEY = "_gender"
 
+private fun CatalogGroupDto.toGroupDto() = DiscountGroupDto(
+    key = key,
+    name = nameUz,
+    emoji = emoji ?: DEFAULT_EMOJI,
+    accent = accentColor.toAccent(),
+    sortOrder = sortOrder.toInt(),
+)
+
 private fun CatalogTypeDto.toCategoryDto() = DiscountCategoryDto(
     id = key,
     name = nameUz,
     emoji = emoji ?: DEFAULT_EMOJI,
     offerCount = listingsCount,
     accent = accentColor.toAccent(),
+    groupKey = groupKey,
 )
 
 private fun DiscountCardDto.toOfferDto(type: CatalogTypeDto?) = DiscountOfferDto(
     id = id,
     // Feed kategoriyasi = biznes turi, shuning uchun `DiscountCategoryDto.id` bilan bir xil kalit.
     categoryId = businessType,
+    // Bosh ekrandagi bo'lim. Kartada guruh yo'q — u biznes turi orqali aniqlanadi.
+    groupKey = type?.groupKey.orEmpty(),
     subcategory = categoryLabel,
     gender = attributes[GENDER_KEY].orEmpty(),
     merchant = businessName,

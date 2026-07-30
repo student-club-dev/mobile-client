@@ -4,7 +4,7 @@ import kotlinx.serialization.Serializable
 
 /**
  * E'lon API DTO'si (B4 offline-first shabloni). Real API spek kelganda maydon nomlarini
- * serverникiga moslang (@SerialName), oqim o'zgarmaydi.
+ * servernikiga moslang (@SerialName), oqim o'zgarmaydi.
  */
 @Serializable
 data class AdDto(

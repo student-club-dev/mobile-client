@@ -11,7 +11,7 @@ import kotlinx.coroutines.flow.Flow
 /**
  * Autentifikatsiya biznes-amallari — ViewModel faqat shu use-case'larni chaqiradi.
  *
- * Validatsiya shu yerda, bitta joyда: ekran ham, kelajakdagi boshqa chaqiruvchi ham bir xil
+ * Validatsiya shu yerda, bitta joyda: ekran ham, kelajakdagi boshqa chaqiruvchi ham bir xil
  * qoidaga bo'ysunadi. Backend qoidalari (`RegisterDto.password.minLength = 8`) bilan mos.
  */
 private const val MIN_PASSWORD_LENGTH = 8

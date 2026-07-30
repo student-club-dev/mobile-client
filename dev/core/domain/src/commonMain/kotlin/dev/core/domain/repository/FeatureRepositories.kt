@@ -2,6 +2,7 @@ package dev.core.domain.repository
 
 import dev.core.common.Resource
 import dev.core.domain.model.DiscountCategory
+import dev.core.domain.model.DiscountGroup
 import dev.core.domain.model.DiscountOffer
 import dev.core.domain.model.OfferDetail
 import dev.core.domain.model.OfferFilterSchema
@@ -10,6 +11,9 @@ import kotlinx.coroutines.flow.Flow
 
 /** Chegirmalar — kategoriyalar, takliflar, saqlangan takliflar. */
 interface DiscountRepository {
+    /** Bosh ekrandagi bo'limlar — katalog guruhlari, server tartibida. */
+    fun observeGroups(): Flow<List<DiscountGroup>>
+
     fun observeCategories(): Flow<List<DiscountCategory>>
 
     /** "Siz uchun" feed'i — barcha e'lonlar (chegirmali + chegirmasiz), UI o'zi filtrlaydi. */

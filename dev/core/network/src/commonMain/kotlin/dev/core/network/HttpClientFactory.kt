@@ -10,6 +10,7 @@ import io.ktor.client.HttpClientConfig
 import io.ktor.client.call.body
 import io.ktor.client.plugins.DefaultRequest
 import io.ktor.client.plugins.HttpTimeout
+import io.ktor.client.plugins.api.createClientPlugin
 import io.ktor.client.plugins.auth.Auth
 import io.ktor.client.plugins.auth.authProvider
 import io.ktor.client.plugins.auth.providers.BearerAuthProvider
@@ -24,6 +25,8 @@ import io.ktor.client.request.header
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
+import io.ktor.http.HttpHeaders
+import io.ktor.http.Url
 import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.Serializable
@@ -178,19 +181,50 @@ fun createWebSocketClient(): HttpClient = platformHttpClient(debugInterceptors =
  *   faqat qo'shimcha yiqilish yo'llarini ochardi.
  *
  * Bu yerda: **Chucker yo'q**, so'rov chegarasi kengroq (navbat o'ldirmaydi), plaginlar yo'q.
- * Sessiya tokeni oddiy sarlavha bilan qo'shiladi — kelajakda himoyalangan media havolalari
- * (`chat-upload`) uchun kerak bo'ladi, lekin `Auth` plaginining refresh mexanizmisiz:
- * o'nlab rasm bir vaqtda 401 olsa, u o'nlab refresh so'rovini boshlab yuborardi.
+ *
+ * ⚠️ Sessiya tokeni oddiy sarlavha bilan qo'shiladi va bu endi **majburiy**: chat
+ * biriktirmalari `GET /v1/media/{id}/raw` orqali beriladi, u esa suhbat a'zoligini
+ * tekshiradi — tokensiz so'rov `404` oladi (`handoff/api-changes.md` §4c). Sarlavha har
+ * so'rovda qaytadan o'qiladi, ya'ni kirish/chiqishdan keyin ham to'g'ri qoladi.
+ *
+ * ⚠️ ...lekin **faqat o'z serverimizga** ([NetworkConfig.baseUrl] xosti). Bu klient endi
+ * begona hostlardan ham rasm oladi — KLIPY GIF'lari (`static.klipy.com`) va Fluent Emoji
+ * stikerlari (`cdn.jsdelivr.net`). Sarlavha shartsiz qo'yilganda sessiya tokeni o'sha
+ * xizmatlarning jurnallariga tushardi; bu [createPublicHttpClient] da aytilgan qoidaning
+ * aynan buzilishi.
+ *
+ * `Auth` plagini (refresh) ataylab QO'YILMAGAN: o'nlab rasm bir vaqtda 401 olsa, u o'nlab
+ * refresh so'rovini boshlab yuborardi. Buning narxi — access token muddati o'tgan lahzada
+ * rasmlar bir marta yuklanmay qolishi mumkin; keyingi so'rov (ilovaning umumiy klienti
+ * tokenni yangilagach) ishlaydi.
  */
-fun createImageHttpClient(tokenStore: TokenStore): HttpClient =
-    platformHttpClient(debugInterceptors = false) {
+fun createImageHttpClient(tokenStore: TokenStore, config: NetworkConfig): HttpClient {
+    val apiHost = Url(config.baseUrl).host
+    return platformHttpClient(debugInterceptors = false) {
         install(HttpTimeout) {
             connectTimeoutMillis = CONNECT_TIMEOUT_MS
             socketTimeoutMillis = IMAGE_SOCKET_TIMEOUT_MS
             requestTimeoutMillis = IMAGE_REQUEST_TIMEOUT_MS
         }
-        defaultRequest {
-            tokenStore.tokens()?.accessToken?.let { header("Authorization", "Bearer $it") }
+        install(ownHostBearer(apiHost, tokenStore))
+    }
+}
+
+/**
+ * `Authorization` ni **faqat** [apiHost] ga qo'yadi.
+ *
+ * Nega `defaultRequest` emas: uning bloki so'rovning o'z `url` i bilan emas, bo'sh
+ * standart quruvchi bilan ishlaydi — u yerdan xostni bilib bo'lmaydi. `onRequest` esa
+ * yuborilayotgan haqiqiy so'rovni beradi.
+ */
+private fun ownHostBearer(apiHost: String, tokenStore: TokenStore) =
+    createClientPlugin("ImageAuthOwnHostOnly") {
+        onRequest { request, _ ->
+            if (request.url.host.equals(apiHost, ignoreCase = true)) {
+                tokenStore.tokens()?.accessToken?.let {
+                    request.header(HttpHeaders.Authorization, "Bearer $it")
+                }
+            }
         }
     }
 
@@ -214,8 +248,8 @@ fun createPublicHttpClient(): HttpClient = platformHttpClient {
  * Tarmoq kutish chegaralari.
  *
  * Ilgari umuman belgilanmagan edi va engine standartlari ishlardi — Android/OkHttp'da ~10 s,
- * iOS/Darwin'da esa **60 s**. Server javob bermasa foydalanuvchi shuncha vaqt kutардi; bu ayniqsa
- * xaritadan joy tanlashda seziladi, chunki u yerда zaxira geokoder birinchisi tugagachgina
+ * iOS/Darwin'da esa **60 s**. Server javob bermasa foydalanuvchi shuncha vaqt kutardi; bu ayniqsa
+ * xaritadan joy tanlashda seziladi, chunki u yerda zaxira geokoder birinchisi tugagachgina
  * boshlanadi.
  */
 private const val CONNECT_TIMEOUT_MS = 8_000L

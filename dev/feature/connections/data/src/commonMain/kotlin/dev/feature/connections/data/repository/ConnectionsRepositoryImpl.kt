@@ -11,6 +11,7 @@ import dev.core.network.response.safeCall
 import dev.feature.connections.data.mapper.toCourseYearDtoOrNull
 import dev.feature.connections.data.mapper.toDomain
 import dev.feature.connections.data.mapper.toDto
+import dev.feature.connections.domain.model.BlockedStudent
 import dev.feature.connections.domain.model.ConnectedStudent
 import dev.feature.connections.domain.model.Connection
 import dev.feature.connections.domain.model.ConnectionRequest
@@ -93,6 +94,14 @@ class ConnectionsRepositoryImpl(
 
     override suspend fun unblock(studentId: String): Resource<Unit> =
         safeCall(connectivity) { api.unblock(studentId).body() }
+
+    /**
+     * `GET /v1/blocks` — sahifa **1 dan** boshlanadi (bu bo'limdagi barcha ro'yxatlar kabi,
+     * feed'dagi 0 dan emas).
+     */
+    override suspend fun blocked(page: Int, size: Int): Resource<Page<BlockedStudent>> =
+        safeCall(connectivity) { api.blocksList(page = page, size = size).body() }
+            .map { it.toDomain() }
 
     override suspend fun report(
         reason: ReportReason,

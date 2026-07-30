@@ -68,11 +68,13 @@ import dev.core.uikit.components.scStyle
 import dev.core.uikit.media.rememberMultiImagePicker
 import dev.core.uikit.theme.Sc
 import dev.feature.chat.domain.model.ConversationItem
+import dev.feature.chat.domain.model.GifItem
 import dev.feature.chat.domain.model.Message
 import dev.feature.chat.domain.model.MessageStatus
 import dev.feature.chat.domain.model.MessageType
 import dev.feature.chat.domain.model.OutgoingImage
 import dev.feature.chat.domain.model.Sticker
+import dev.feature.chat.presentation.gif.ChatMediaPanel
 import dev.feature.connections.domain.model.ReportReason
 import kotlinx.coroutines.delay
 import org.koin.compose.viewmodel.koinViewModel
@@ -133,7 +135,9 @@ fun ChatScreen(
                 onSend = vm::send,
                 onSendImages = vm::sendImages,
                 onSendSticker = vm::sendSticker,
+                onSendGif = vm::sendGif,
                 onRetry = vm::retry,
+                onDeleteMessages = vm::deleteMessages,
                 onLoadOlder = vm::loadOlder,
                 onMarkRead = vm::markRead,
                 onDisconnect = { vm.disconnect(it) },
@@ -164,13 +168,20 @@ fun ChatScreen(
 }
 
 /**
- * Ro'yxatdagi qisqa ko'rinish. Rasm xabarining tanasi — uzun havola, stikerniki — emoji,
- * shuning uchun ular matn sifatida ko'rsatilmaydi.
+ * Ro'yxatdagi qisqa ko'rinish.
+ *
+ * Media xabarda tana **bo'sh** (server `body` ni faqat matn va izoh uchun to'ldiradi),
+ * shuning uchun ko'rinish turdan quriladi. Turi keshda saqlanadi (`lastMessageType`).
  */
 private fun Message?.preview(): String = when {
     this == null -> "Xabar yozing…"
+    deleted -> "Xabar o'chirildi"
     type == MessageType.IMAGE -> "📷 Rasm"
-    type == MessageType.STICKER -> "$body Stiker"
+    type == MessageType.GIF -> "GIF"
+    type == MessageType.VIDEO -> "🎬 Video"
+    type == MessageType.VOICE -> "🎤 Ovozli xabar"
+    type == MessageType.FILE -> "📎 Fayl"
+    type == MessageType.STICKER -> "${sticker?.emoji.orEmpty()} Stiker".trim()
     body.isBlank() -> "Xabar yozing…"
     else -> body
 }
@@ -375,7 +386,9 @@ private fun ChatThread(
     onSend: () -> Unit,
     onSendImages: (List<OutgoingImage>) -> Unit,
     onSendSticker: (Sticker) -> Unit,
+    onSendGif: (GifItem) -> Unit,
     onRetry: (List<String>) -> Unit,
+    onDeleteMessages: (List<String>) -> Unit,
     onLoadOlder: () -> Unit,
     onMarkRead: () -> Unit,
     onDisconnect: (String) -> Unit,
@@ -387,6 +400,7 @@ private fun ChatThread(
 ) {
     var messageMenu by remember { mutableStateOf<ChatMessageUi?>(null) }
     var reportMessageFor by remember { mutableStateOf<String?>(null) }
+    var deleteMessageFor by remember { mutableStateOf<ChatMessageUi?>(null) }
     var showMenu by remember { mutableStateOf(false) }
     var reportStudent by remember { mutableStateOf(false) }
     var confirmDisconnect by remember { mutableStateOf(false) }
@@ -499,6 +513,9 @@ private fun ChatThread(
             stickersOpen = stickersOpen,
             onToggleStickers = { stickersOpen = !stickersOpen },
             onPickSticker = onSendSticker,
+            // Panel tanlangandan keyin yopiladi: GIF/stiker yuborilgach ro'yxat pastga
+            // suriladi va ochiq panel yangi xabarni to'sib qo'yardi.
+            onPickGif = { stickersOpen = false; onSendGif(it) },
         )
     }
 
@@ -551,8 +568,14 @@ private fun ChatThread(
                             messageMenu = null
                         }
                     }
-                    // Xabarni o'chirish/tahrirlash endpointi yo'q (chat.md §14) — faqat shikoyat.
-                    if (!menuMessage.outgoing) {
+                    // `DELETE /v1/messages/{id}` — faqat O'Z xabaring. Tahrirlash hali yo'q.
+                    if (menuMessage.canDelete) {
+                        ActionRow(ScIcons.Close, "O'chirish", danger = true) {
+                            deleteMessageFor = menuMessage
+                            messageMenu = null
+                        }
+                    }
+                    if (!menuMessage.outgoing && !menuMessage.deleted) {
                         ActionRow(ScIcons.Bell, "Shikoyat qilish", danger = true) {
                             reportMessageFor = menuMessage.id
                             messageMenu = null
@@ -628,6 +651,19 @@ private fun ChatThread(
                 reportStudent = false
             },
             onDismiss = { reportStudent = false },
+        )
+    }
+
+    val deleteTarget = deleteMessageFor
+    if (deleteTarget != null) {
+        ConfirmDialog(
+            title = "Xabarni o'chirish",
+            // Xabar tarixdan yo'qolmaydi — o'rnida "o'chirilgan" izi qoladi, chunki `seq`
+            // butun tarix va o'qildi kursorlarining o'qi (`handoff/api-changes.md` §4b).
+            message = "Xabar ikkalangizda ham o'chadi. Uning o'rnida «Xabar o'chirildi» qoladi.",
+            confirmLabel = "O'chirish",
+            onConfirm = { onDeleteMessages(deleteTarget.messageIds); deleteMessageFor = null },
+            onDismiss = { deleteMessageFor = null },
         )
     }
 
@@ -781,9 +817,11 @@ private fun MessageBubble(
     onLongPress: () -> Unit,
     onOpenImage: (Int) -> Unit,
 ) {
-    when (message.type) {
-        MessageType.IMAGE -> ImageAlbumBubble(message, onOpen = onOpenImage, onLongPress = onLongPress)
-        MessageType.STICKER -> StickerBubble(message, onLongPress = onLongPress)
+    when {
+        // O'chirilgan xabar — turi qanday bo'lishidan qat'i nazar oddiy tombstone pufagi.
+        message.deleted -> TextBubble(message, onLongPress = onLongPress)
+        message.type == MessageType.IMAGE -> ImageAlbumBubble(message, onOpen = onOpenImage, onLongPress = onLongPress)
+        message.sticker != null -> StickerBubble(message, onLongPress = onLongPress)
         else -> TextBubble(message, onLongPress = onLongPress)
     }
 }
@@ -809,11 +847,14 @@ private fun TextBubble(message: ChatMessageUi, onLongPress: () -> Unit) {
                 .combinedClickable(onClick = {}, onLongClick = onLongPress)
                 .padding(start = 13.dp, end = 13.dp, top = 10.dp, bottom = 7.dp),
         ) {
-            ScText(
-                message.text, 15f, FontWeight.Medium,
-                if (message.outgoing) Color.White else Sc.Ink,
-                lineHeight = 21f,
-            )
+            // Tombstone xira va kursiv emas, shunchaki so'nikroq — u xabar emas, iz.
+            val textColor = when {
+                message.deleted && message.outgoing -> Color.White.copy(alpha = 0.75f)
+                message.deleted -> Sc.Muted
+                message.outgoing -> Color.White
+                else -> Sc.Ink
+            }
+            ScText(message.text, 15f, FontWeight.Medium, textColor, lineHeight = 21f)
             Spacer(Modifier.height(2.dp))
             MessageMeta(message, Modifier.align(Alignment.End), onDark = message.outgoing)
         }
@@ -837,6 +878,7 @@ private fun Composer(
     stickersOpen: Boolean,
     onToggleStickers: () -> Unit,
     onPickSticker: (Sticker) -> Unit,
+    onPickGif: (GifItem) -> Unit,
 ) {
     Column(Modifier.fillMaxWidth().background(Color.White).navigationBarsPadding()) {
         Box(Modifier.fillMaxWidth().height(1.dp).background(Sc.Border))
@@ -892,7 +934,9 @@ private fun Composer(
                 )
             }
         }
-        if (stickersOpen) StickerPanel(onPick = onPickSticker)
+        // Stikerlar va GIF bitta panelda, yorliqlar bilan: kompozitorda ikkinchi ikonaga
+        // joy yo'q va foydalanuvchi ikkalasini ham bir xil maqsadda ochadi.
+        if (stickersOpen) ChatMediaPanel(onPickSticker = onPickSticker, onPickGif = onPickGif)
     }
 }
 

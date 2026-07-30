@@ -95,7 +95,7 @@ class ApiAuthRepository(
         }
 
     /**
-     * Hisob backendда darhol ochiladi (spec shunday), lekin ILOVA uchun sessiya hali
+     * Hisob backendda darhol ochiladi (spec shunday), lekin ILOVA uchun sessiya hali
      * ochilmaydi: [authenticate] ga `persistSession = false` beramiz — tokenlar saqlanadi
      * (OTP so'rovlari uchun), local `UserEntity` esa YOZILMAYDI. Shuning uchun tasdiqlanmagan
      * foydalanuvchi ilovaga kira olmaydi ([completeRegistration] ni kuting).
@@ -143,7 +143,7 @@ class ApiAuthRepository(
      * Umumiy qism: tokenlarni saqlash → profil → local sessiya.
      *
      * [persistSession] `false` bo'lsa oxirgi qadam (local `UserEntity`) BAJARILMAYDI —
-     * ro'yxatdan o'tish oqimida sessiya SMS kod tasdiqlangunча "kutilmoqda" holatida turadi.
+     * ro'yxatdan o'tish oqimida sessiya SMS kod tasdiqlanguncha "kutilmoqda" holatida turadi.
      */
     private suspend fun authenticate(
         identifier: AuthIdentifier,

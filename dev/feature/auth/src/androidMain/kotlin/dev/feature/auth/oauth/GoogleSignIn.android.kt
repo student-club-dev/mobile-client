@@ -21,13 +21,13 @@ private const val TAG = "ScGoogleSignIn"
 /**
  * Android Google Sign-In — Credential Manager orqali.
  *
- * [webClientId] — Google Cloud'даgi **Web** (server) OAuth client ID. Ilova strings.xml da
+ * [webClientId] — Google Cloud'dagi **Web** (server) OAuth client ID. Ilova strings.xml da
  * `google_web_client_id` sifatida beriladi (androidApp moduli).
- * Ishlashi uchun Google Cloud Console'да ilova imzosining **SHA-1**i ham ro'yxatдан
+ * Ishlashi uchun Google Cloud Console'da ilova imzosining **SHA-1**i ham ro'yxatdan
  * o'tishi shart (debug va release uchun alohida).
  *
  * **Nega [GetSignInWithGoogleOption], `GetGoogleIdOption` emas:** ikkinchisi "one-tap"
- * oqimi — u qurilmада allaqachon kirgan hisoblarni pastdan kichik varaqда taklif qiladi va
+ * oqimi — u qurilmada allaqachon kirgan hisoblarni pastdan kichik varaqda taklif qiladi va
  * mos hisob topilmasa `NoCredentialException` bilan tugaydi, ya'ni foydalanuvchi **hisob
  * tanlay olmaydi**. `GetSignInWithGoogleOption` esa "Sign in with Google" tugmasi uchun
  * mo'ljallangan: har doim to'liq hisob tanlash oynasini ochadi va "boshqa hisob qo'shish"
@@ -43,7 +43,7 @@ actual class GoogleSignIn(
         // aniq sabab qaytariladi.
         if (webClientId.isBlank()) {
             return GoogleSignInResult.Failed(
-                "Google kirish sozlanmagan: strings.xml даgi google_web_client_id bo'sh",
+                "Google kirish sozlanmagan: strings.xml dagi google_web_client_id bo'sh",
             )
         }
 
@@ -65,10 +65,10 @@ actual class GoogleSignIn(
         } catch (e: GetCredentialCancellationException) {
             GoogleSignInResult.Cancelled
         } catch (e: NoCredentialException) {
-            GoogleSignInResult.Failed("Qurilmада Google hisob topilmadi. Sozlamalarда hisob qo'shing.")
+            GoogleSignInResult.Failed("Qurilmada Google hisob topilmadi. Sozlamalarda hisob qo'shing.")
         } catch (e: GetCredentialException) {
-            // Bu yerга ko'pincha noto'g'ri client ID yoki ro'yxatdан o'tmagan SHA-1 tushadi —
-            // asl xabar saqlanadi, chunki sababni faqat shundan bilish mumkin. Ekranда
+            // Bu yerga ko'pincha noto'g'ri client ID yoki ro'yxatdan o'tmagan SHA-1 tushadi —
+            // asl xabar saqlanadi, chunki sababni faqat shundan bilish mumkin. Ekranda
             // ko'rinadigan matn qisqartirilishi mumkin, shuning uchun logga ham yozamiz
             // (`adb logcat -s ScGoogleSignIn`) — `e.type` sozlama xatosini aniq ko'rsatadi.
             android.util.Log.w(TAG, "GetCredential xatosi: ${e.type} — ${e.message}", e)
@@ -81,7 +81,7 @@ actual class GoogleSignIn(
 actual fun rememberGoogleSignIn(): GoogleSignIn {
     val context = LocalContext.current
     val activity = remember(context) { context.findActivity() }
-    // Client ID ilova (androidApp) strings.xml da; modulдан R'siz o'qiymiz.
+    // Client ID ilova (androidApp) strings.xml da; moduldan R'siz o'qiymiz.
     val clientId = remember(context) {
         val resId = context.resources.getIdentifier("google_web_client_id", "string", context.packageName)
         if (resId != 0) context.getString(resId) else ""

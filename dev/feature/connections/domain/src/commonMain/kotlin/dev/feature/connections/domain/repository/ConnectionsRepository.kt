@@ -1,6 +1,7 @@
 package dev.feature.connections.domain.repository
 
 import dev.core.common.Resource
+import dev.feature.connections.domain.model.BlockedStudent
 import dev.feature.connections.domain.model.ConnectedStudent
 import dev.feature.connections.domain.model.Connection
 import dev.feature.connections.domain.model.ConnectionRequest
@@ -78,6 +79,17 @@ interface ConnectionsRepository {
 
     /** Blokni yechish (idempotent). ⚠️ Avvalgi bog'lanish **tiklanmaydi**. */
     suspend fun unblock(studentId: String): Resource<Unit>
+
+    /**
+     * Bloklaganlaringiz ro'yxati — `GET /v1/blocks`.
+     *
+     * **Faqat siz bloklaganlar** qaytadi; sizni kim bloklagani hech qachon ko'rsatilmaydi.
+     * Qaytgan qisqa profillarda presence (`online`/`lastSeenAt`) doim maskalangan.
+     *
+     * Keshlanmaydi: bu kamdan-kam ochiladigan ekran, local nusxasi esa blok yechilgandan keyin
+     * eskirib qolardi.
+     */
+    suspend fun blocked(page: Int = 1, size: Int = DEFAULT_PAGE_SIZE): Resource<Page<BlockedStudent>>
 
     /**
      * Shikoyat. [targetStudentId] **yoki** [messageId] — aynan bittasi berilishi shart.

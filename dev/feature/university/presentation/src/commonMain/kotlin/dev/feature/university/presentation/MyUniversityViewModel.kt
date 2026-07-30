@@ -64,8 +64,10 @@ class MyUniversityViewModel(
         val mates = if (uni != null) {
             students.filter { it.universityId == uni.id }.ifEmpty { students }
         } else emptyList()
-        val printShops = offers.filter { it.categoryId == "printerxona" }
-        val foods = offers.filter { it.categoryId == "ovqat" }
+        // Backend kaliti (`PRINTING`) va local seed kaliti (`printerxona`) — ikkalasi ham;
+        // ovqat esa butun katalog guruhi bo'yicha (`FOOD` — fast-food, milliy taomlar, somsa).
+        val printShops = offers.filter { it.categoryId == "PRINTING" || it.categoryId == "printerxona" }
+        val foods = offers.filter { it.groupKey == "FOOD" }
         MyUniversityUiState(university = uni, mates = mates, printShops = printShops, foods = foods, loading = false)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), MyUniversityUiState())
 
@@ -98,7 +100,7 @@ class MyUniversityViewModel(
         if (q.isBlank()) list.take(200)
         else list.filter { it.name.contains(q, ignoreCase = true) || it.city.contains(q, ignoreCase = true) }.take(200)
 
-    /** Universitetni tanlash — local DB'ga qo'shadi va profilга bog'laydi. */
+    /** Universitetni tanlash — local DB'ga qo'shadi va profilga bog'laydi. */
     fun selectUniversity(uni: University) {
         viewModelScope.launch {
             universityRepository.addUniversity(uni)

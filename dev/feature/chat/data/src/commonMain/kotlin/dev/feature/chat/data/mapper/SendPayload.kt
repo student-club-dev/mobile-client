@@ -1,0 +1,111 @@
+package dev.feature.chat.data.mapper
+
+import dev.feature.chat.domain.model.MessageType
+import kotlinx.serialization.json.JsonObject
+
+/**
+ * Yuboriladigan xabarning tanasi — WS `message:send` va REST `SendMessageDto` uchun **bitta**
+ * ko'rinish.
+ *
+ * Nega alohida klass: qoidalar ikkala yo'lda ham bir xil, lekin ikkita joyda takrorlansa
+ * ular albatta bir-biridan ajralib ketardi. Ustiga [validate] ni shu yerda sinab ko'rish
+ * mumkin — WS ham, REST ham kerak emas.
+ */
+internal data class SendPayload(
+    val type: MessageType,
+    val body: String? = null,
+    /** `POST /v1/media/chat-upload` qaytargan id. **Bir martalik**. */
+    val mediaId: String? = null,
+    val stickerId: String? = null,
+    val albumId: String? = null,
+    /** Qidiruvdan olingan GIF (`GifRefDto` shakli) — xom JSON, GIF moduliga bog'lanmaslik uchun. */
+    val gif: JsonObject? = null,
+    /**
+     * Optimistik qatorga yoziladigan stiker ko'rinishi — **tarmoqqa ketmaydi**.
+     *
+     * Server javobida stiker to'liq qaytadi, lekin unga qadar bir necha soniya o'tadi:
+     * usiz foydalanuvchi bosgan stiker o'rnida bo'sh pufak turardi.
+     */
+    val stickerEmoji: String? = null,
+    val stickerUrl: String? = null,
+    /**
+     * Optimistik qatorga yoziladigan biriktirma ko'rinishi — **tarmoqqa ketmaydi**.
+     *
+     * Qidiruvdan tanlangan GIF serverga umuman yuklanmaydi (havola bilan ketadi), ya'ni
+     * yuklanayotgan faylning local nusxasi ham yo'q: usiz javob kelguncha ekranda bo'sh
+     * pufak turardi. Maydonlar GIF'ga xos EMAS — havolasi oldindan ma'lum har qanday
+     * biriktirma shu yo'ldan o'tadi.
+     */
+    val previewUrl: String? = null,
+    val previewThumbUrl: String? = null,
+    val previewWidth: Long = 0,
+    val previewHeight: Long = 0,
+) {
+
+    /**
+     * Turga xos qoidalarni tekshiradi (`handoff/chat.md` dagi jadval). Xato bo'lsa —
+     * foydalanuvchiga ko'rsatiladigan matn, aks holda `null`.
+     *
+     * Nega klientda: `422` ni kutib o'tirish xabarni "yuborilmadi" holatiga tushirardi va
+     * foydalanuvchi sababini tushunmasdan qayta urinaverardi. Server baribir o'zi ham
+     * tekshiradi — bu uni almashtirmaydi, faqat tarmoqqa chiqmasdan javob beradi.
+     */
+    fun validate(): String? {
+        val text = body?.trim().orEmpty()
+        return when (type) {
+            MessageType.TEXT -> when {
+                text.isEmpty() -> "Xabar bo'sh."
+                text.length > MAX_BODY -> "Xabar $MAX_BODY belgidan uzun bo'lmasin."
+                mediaId != null || stickerId != null || gif != null ->
+                    "Matnli xabarga biriktirma qo'shib bo'lmaydi."
+                else -> null
+            }
+
+            MessageType.IMAGE, MessageType.VIDEO, MessageType.FILE -> when {
+                mediaId.isNullOrBlank() -> "Fayl yuklanmadi."
+                text.length > MAX_CAPTION -> "Izoh $MAX_CAPTION belgidan uzun bo'lmasin."
+                else -> null
+            }
+
+            // Ikkalasi ham bo'lishi ham, ikkalasi ham bo'lmasligi ham xato.
+            MessageType.GIF -> when {
+                mediaId.isNullOrBlank() == (gif == null) ->
+                    "GIF uchun yo yuklangan fayl, yo qidiruv natijasi kerak."
+                text.isNotEmpty() -> CAPTION_FORBIDDEN
+                else -> null
+            }
+
+            MessageType.VOICE -> when {
+                mediaId.isNullOrBlank() -> "Ovozli xabar yuklanmadi."
+                text.isNotEmpty() -> CAPTION_FORBIDDEN
+                else -> null
+            }
+
+            MessageType.STICKER -> when {
+                stickerId.isNullOrBlank() -> "Stiker topilmadi."
+                text.isNotEmpty() -> CAPTION_FORBIDDEN
+                else -> null
+            }
+
+            // `SYSTEM` ni faqat server yozadi, `CALL` esa hali yo'q — klient yuborsa 422.
+            MessageType.SYSTEM, MessageType.CALL -> "Bu turdagi xabarni yuborib bo'lmaydi."
+        }
+    }
+
+    /**
+     * Tarmoqqa ketadigan tana. Bo'sh matn `null` ga aylanadi: `GIF`/`VOICE`/`STICKER` da
+     * bo'sh satr ham izoh sifatida rad etilishi mumkin.
+     */
+    val wireBody: String? get() = body?.trim()?.takeIf { it.isNotEmpty() }
+
+    internal companion object {
+        const val MAX_BODY = 4000
+        const val MAX_CAPTION = 1024
+
+        /**
+         * `GIF`/`VOICE`/`STICKER` da izoh **ataylab** rad etiladi: uni chizadigan joy yo'q,
+         * ya'ni qabul qilsak foydalanuvchining matni jimgina yo'qolardi.
+         */
+        const val CAPTION_FORBIDDEN = "Bu turdagi xabarga izoh qo'shib bo'lmaydi."
+    }
+}

@@ -2,14 +2,21 @@ package dev.feature.chat.data.mapper
 
 import dev.core.database.sql.ConversationEntity
 import dev.core.database.sql.MessageEntity
+import dev.core.network.generated.model.AttachmentDto
 import dev.core.network.generated.model.MessageDto
+import dev.core.network.generated.model.MessageStickerDto
+import dev.feature.chat.data.realtime.WsAttachment
 import dev.feature.chat.data.realtime.WsMessage
+import dev.feature.chat.data.realtime.WsSticker
 import dev.feature.chat.domain.model.Attachment
 import dev.feature.chat.domain.model.Conversation
 import dev.feature.chat.domain.model.ConversationItem
 import dev.feature.chat.domain.model.ConversationType
+import dev.feature.chat.domain.model.MediaKind
+import dev.feature.chat.domain.model.MediaStatus
 import dev.feature.chat.domain.model.Message
 import dev.feature.chat.domain.model.MessageStatus
+import dev.feature.chat.domain.model.MessageSticker
 import dev.feature.chat.domain.model.MessageType
 import dev.feature.connections.domain.model.Gender
 import dev.feature.connections.domain.model.StudentSummary
@@ -36,22 +43,35 @@ internal fun ConversationEntity.toDomain(): ConversationItem = ConversationItem(
         lastSeenAt = otherLastSeenAt?.let(Instant::fromEpochMilliseconds),
     ),
     // Ro'yxat qatorida to'liq xabar kerak emas — matn, turi va kim yozgani yetarli.
-    // Turi shu yerda ham aniqlanadi, aks holda ro'yxatda rasm o'rniga uzun havola ko'rinardi.
-    lastMessage = lastMessageBody?.let { text ->
-        Message(
-            id = "$id-last",
-            conversationId = id,
-            senderId = lastMessageSenderId.orEmpty(),
-            seq = 0,
-            body = text,
-            createdAt = Instant.fromEpochMilliseconds(lastMessageAt ?: 0L),
-            type = MediaContent.detect(text),
-        )
+    // O'chirilgan xabar ham qator sifatida qoladi (tanasi bo'sh, `deletedAt` to'ldirilgan),
+    // aks holda ro'yxatda eski matn ko'rinib turardi.
+    lastMessage = if (lastMessageDeleted != 0L) {
+        lastMessageStub("", deleted = true)
+    } else {
+        lastMessageBody?.let { lastMessageStub(it, deleted = false) }
     },
     unreadCount = unreadCount.toInt(),
     otherReadSeq = otherReadSeq.toInt(),
     otherDeliveredSeq = otherDeliveredSeq.toInt(),
     archived = archived != 0L,
+)
+
+/**
+ * Ro'yxatdagi qisqa ko'rinish uchun "xabar".
+ *
+ * Turi endi **serverdan** keladi (`lastMessageType`) — media xabarda tana bo'sh, ya'ni
+ * usiz ro'yxatda "📷 Rasm" o'rniga bo'sh qator ko'rinardi. Eski keshdagi qatorlarda ustun
+ * `NULL`; o'shanda tur tanadan taxmin qilinadi (qarang [MediaContent]).
+ */
+private fun ConversationEntity.lastMessageStub(text: String, deleted: Boolean): Message = Message(
+    id = "$id-last",
+    conversationId = id,
+    senderId = lastMessageSenderId.orEmpty(),
+    seq = 0,
+    body = text,
+    createdAt = Instant.fromEpochMilliseconds(lastMessageAt ?: 0L),
+    type = lastMessageType?.let { parseEnum(it, MessageType.TEXT) } ?: MediaContent.detect(text),
+    deletedAt = if (deleted) Instant.fromEpochMilliseconds(lastMessageAt ?: 0L) else null,
 )
 
 internal fun MessageEntity.toDomain(): Message = Message(
@@ -64,20 +84,40 @@ internal fun MessageEntity.toDomain(): Message = Message(
     type = parseEnum(type, MessageType.TEXT),
     status = parseEnum(status, MessageStatus.SENT),
     clientMsgId = clientMsgId,
+    deletedAt = deletedAt?.let(Instant::fromEpochMilliseconds),
     attachment = attachmentUrl?.let { url ->
         Attachment(
+            id = attachmentId,
             url = url,
             thumbUrl = attachmentThumbUrl,
+            kind = attachmentKind?.let { parseEnum(it, MediaKind.IMAGE) } ?: MediaKind.IMAGE,
+            status = attachmentStatus?.let { parseEnum(it, MediaStatus.READY) } ?: MediaStatus.READY,
+            mimeType = attachmentMime,
             width = attachmentWidth.toInt(),
             height = attachmentHeight.toInt(),
+            sizeBytes = attachmentSizeBytes ?: 0L,
+            durationMs = attachmentDurationMs?.toInt() ?: 0,
+            waveform = decodeWaveform(attachmentWaveform),
+            fileName = attachmentFileName,
+            blurHash = attachmentBlurHash,
+            isAnimated = attachmentIsAnimated == 1L,
         )
+    },
+    sticker = stickerId?.let {
+        MessageSticker(id = it, emoji = stickerEmoji.orEmpty(), url = stickerUrl)
     },
     albumId = albumId,
 )
 
 // --- Server javoblari → kesh ustunlari ---------------------------------------------------
 
-/** Serverdan kelgan xabarning keshga yoziladigan ko'rinishi. */
+/**
+ * Serverdan kelgan xabarning keshga yoziladigan ko'rinishi.
+ *
+ * `MessageEntity` ning o'zi ishlatilmaydi: bu yerda **standart qiymatlar** kerak (optimistik
+ * qator o'nlab bo'sh ustunni qo'lda sanab o'tirmasin), generatsiya qilingan klassda esa
+ * ular yo'q.
+ */
 internal data class MessageRow(
     val id: String,
     val conversationId: String,
@@ -88,69 +128,189 @@ internal data class MessageRow(
     val createdAt: Long,
     val clientMsgId: String?,
     val status: String = MessageStatus.SENT.name,
+    val deletedAt: Long? = null,
+    val attachmentId: String? = null,
     val attachmentUrl: String? = null,
     val attachmentThumbUrl: String? = null,
     val attachmentWidth: Long = 0,
     val attachmentHeight: Long = 0,
+    val attachmentKind: String? = null,
+    val attachmentStatus: String? = null,
+    val attachmentMime: String? = null,
+    val attachmentSizeBytes: Long? = null,
+    val attachmentDurationMs: Long? = null,
+    val attachmentWaveform: String? = null,
+    val attachmentFileName: String? = null,
+    val attachmentBlurHash: String? = null,
+    val attachmentIsAnimated: Long? = null,
+    val stickerId: String? = null,
+    val stickerEmoji: String? = null,
+    val stickerUrl: String? = null,
     val albumId: String? = null,
 )
 
-// v1 da server faqat TEXT yozadi, lekin sxemada `body` nullable — bo'sh matn bilan qoplaymiz.
-internal fun MessageDto.toRow(clientMsgId: String? = null): MessageRow = messageRow(
+/** Keshdagi qator → yozish uchun qator (ack kelganda `id`/`seq` almashtiriladi). */
+internal fun MessageEntity.toRow(): MessageRow = MessageRow(
     id = id,
     conversationId = conversationId,
     senderId = senderId,
-    seq = seq.toLong(),
-    serverType = type.name,
-    body = body.orEmpty(),
-    createdAt = createdAt.toEpochMilliseconds(),
+    seq = seq,
+    type = type,
+    body = body,
+    createdAt = createdAt,
     clientMsgId = clientMsgId,
-)
-
-internal fun WsMessage.toRow(): MessageRow = messageRow(
-    id = id,
-    conversationId = conversationId,
-    senderId = senderId,
-    seq = seq.toLong(),
-    serverType = type,
-    body = body.orEmpty(),
-    createdAt = parseInstant(createdAt),
-    clientMsgId = null,
+    status = status,
+    deletedAt = deletedAt,
+    attachmentId = attachmentId,
+    attachmentUrl = attachmentUrl,
+    attachmentThumbUrl = attachmentThumbUrl,
+    attachmentWidth = attachmentWidth,
+    attachmentHeight = attachmentHeight,
+    attachmentKind = attachmentKind,
+    attachmentStatus = attachmentStatus,
+    attachmentMime = attachmentMime,
+    attachmentSizeBytes = attachmentSizeBytes,
+    attachmentDurationMs = attachmentDurationMs,
+    attachmentWaveform = attachmentWaveform,
+    attachmentFileName = attachmentFileName,
+    attachmentBlurHash = attachmentBlurHash,
+    attachmentIsAnimated = attachmentIsAnimated,
+    stickerId = stickerId,
+    stickerEmoji = stickerEmoji,
+    stickerUrl = stickerUrl,
+    albumId = albumId,
 )
 
 /**
- * Serverdan kelgan xabardan kesh qatorini quradi va **turini aniqlaydi**.
+ * REST javobidagi xabar → kesh qatori.
  *
- * Server `TEXT` dan boshqa tur bergan bo'lsa — unga ishonamiz (backend tipli xabarni
- * qo'shgani). Aks holda tana bo'yicha taxmin qilamiz: rasm havolasi → `IMAGE`, yakka
- * emoji → `STICKER` (qarang [MediaContent]).
+ * Tur endi **serverdan** keladi (`MessageDto.type`) — 2026-07-29 gacha u doim `TEXT` edi va
+ * rasm/stiker tanadan taxmin qilinardi; endi evristika kerak emas (`handoff/chat.md`).
+ *
+ * [fallbackClientMsgId] — biz endi yuborgan, javobi kelgan xabar uchun zaxira: server
+ * `clientMsgId` ni qaytarmasa ham optimistik nusxa topilishi kerak.
  */
-private fun messageRow(
-    id: String,
-    conversationId: String,
-    senderId: String,
-    seq: Long,
-    serverType: String,
-    body: String,
-    createdAt: Long,
-    clientMsgId: String?,
-): MessageRow {
-    val fromServer = parseEnum(serverType, MessageType.TEXT)
-    val type = if (fromServer != MessageType.TEXT) fromServer else MediaContent.detect(body)
-    return MessageRow(
-        id = id,
-        conversationId = conversationId,
-        senderId = senderId,
-        seq = seq,
-        type = type.name,
-        body = body,
-        createdAt = createdAt,
-        clientMsgId = clientMsgId,
-        // Rasmda tananing o'zi havola — biriktirma ham shu. Server o'lcham qaytarmaydi,
-        // shuning uchun kengligi/balandligi `0` bo'lib qoladi va UI kvadratga tushadi.
-        attachmentUrl = if (type == MessageType.IMAGE) MediaContent.imageUrlOrNull(body) else null,
+internal fun MessageDto.toRow(fallbackClientMsgId: String? = null): MessageRow = MessageRow(
+    id = id,
+    conversationId = conversationId,
+    senderId = senderId,
+    seq = seq.toLong(),
+    type = type.name,
+    body = body.orEmpty(),
+    createdAt = createdAt.toEpochMilliseconds(),
+    clientMsgId = clientMsgId ?: fallbackClientMsgId,
+    deletedAt = deletedAt?.toEpochMilliseconds(),
+    albumId = albumId,
+).withAttachment(attachment).withSticker(sticker)
+
+internal fun WsMessage.toRow(): MessageRow = MessageRow(
+    id = id,
+    conversationId = conversationId,
+    senderId = senderId,
+    seq = seq.toLong(),
+    type = type,
+    body = body.orEmpty(),
+    createdAt = parseInstant(createdAt),
+    clientMsgId = clientMsgId,
+    deletedAt = parseInstant(deletedAt).takeIf { it > 0L },
+    albumId = albumId,
+).withAttachment(attachment).withSticker(sticker)
+
+// --- Biriktirma --------------------------------------------------------------------------
+
+/**
+ * Biriktirmaning keshdagi ustunlari. REST va WS bir xil shaklni yuboradi, lekin
+ * generatsiya qilingan DTO va qo'lda yozilgan WS modeli ikki xil tip — shuning uchun
+ * ikkalasi ham shu oraliq ko'rinishga o'giriladi.
+ */
+internal data class AttachmentColumns(
+    val id: String,
+    val url: String,
+    val thumbUrl: String?,
+    val width: Long,
+    val height: Long,
+    val kind: String,
+    val status: String,
+    val mimeType: String?,
+    val sizeBytes: Long?,
+    val durationMs: Long?,
+    val waveform: String?,
+    val fileName: String?,
+    val blurHash: String?,
+    val isAnimated: Long,
+)
+
+internal fun AttachmentDto.toColumns(): AttachmentColumns = AttachmentColumns(
+    id = id,
+    url = url,
+    thumbUrl = thumbUrl,
+    width = width?.toLong() ?: 0L,
+    height = height?.toLong() ?: 0L,
+    kind = kind.name,
+    status = status.name,
+    mimeType = mimeType,
+    sizeBytes = sizeBytes.toLong(),
+    durationMs = durationMs?.toLong(),
+    waveform = encodeWaveform(waveform),
+    fileName = fileName,
+    blurHash = blurHash,
+    isAnimated = if (isAnimated) 1L else 0L,
+)
+
+internal fun WsAttachment.toColumns(): AttachmentColumns = AttachmentColumns(
+    id = id,
+    url = url,
+    thumbUrl = thumbUrl,
+    width = width?.toLong() ?: 0L,
+    height = height?.toLong() ?: 0L,
+    kind = kind,
+    status = status,
+    mimeType = mimeType,
+    sizeBytes = sizeBytes,
+    durationMs = durationMs?.toLong(),
+    waveform = encodeWaveform(waveform),
+    fileName = fileName,
+    blurHash = blurHash,
+    isAnimated = if (isAnimated) 1L else 0L,
+)
+
+private fun MessageRow.withAttachment(columns: AttachmentColumns?): MessageRow =
+    if (columns == null) this else copy(
+        attachmentId = columns.id,
+        attachmentUrl = columns.url,
+        attachmentThumbUrl = columns.thumbUrl,
+        attachmentWidth = columns.width,
+        attachmentHeight = columns.height,
+        attachmentKind = columns.kind,
+        attachmentStatus = columns.status,
+        attachmentMime = columns.mimeType,
+        attachmentSizeBytes = columns.sizeBytes,
+        attachmentDurationMs = columns.durationMs,
+        attachmentWaveform = columns.waveform,
+        attachmentFileName = columns.fileName,
+        attachmentBlurHash = columns.blurHash,
+        attachmentIsAnimated = columns.isAnimated,
     )
-}
+
+private fun MessageRow.withAttachment(dto: AttachmentDto?): MessageRow = withAttachment(dto?.toColumns())
+
+private fun MessageRow.withAttachment(dto: WsAttachment?): MessageRow = withAttachment(dto?.toColumns())
+
+private fun MessageRow.withSticker(dto: MessageStickerDto?): MessageRow =
+    if (dto == null) this else copy(stickerId = dto.id, stickerEmoji = dto.emoji, stickerUrl = dto.url)
+
+private fun MessageRow.withSticker(dto: WsSticker?): MessageRow =
+    if (dto == null) this else copy(stickerId = dto.id, stickerEmoji = dto.emoji, stickerUrl = dto.url)
+
+/**
+ * To'lqin shakli — `"12,40,88"`. JSON emas: qiymatlar oddiy sonlar va SQLDelight'da massiv
+ * ustuni yo'q, ya'ni serializator qo'shishning ma'nosi yo'q.
+ */
+internal fun encodeWaveform(values: List<Int>): String? =
+    values.takeIf { it.isNotEmpty() }?.joinToString(",")
+
+internal fun decodeWaveform(raw: String?): List<Int> =
+    raw?.split(',')?.mapNotNull { it.trim().toIntOrNull() }.orEmpty()
 
 /**
  * ISO-8601 → epoch ms. Server doim to'g'ri sana yuboradi, lekin parse xatosi butun suhbatni

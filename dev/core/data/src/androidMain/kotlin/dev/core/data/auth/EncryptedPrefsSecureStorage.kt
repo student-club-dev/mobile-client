@@ -11,8 +11,8 @@ import io.github.aakira.napier.Napier
 /**
  * Android'da xavfsiz ombor — **EncryptedSharedPreferences**.
  *
- * Kalit Android Keystore'да (apparat himoyasi bor qurilmalarda — TEE/StrongBox), qiymatlar esa
- * AES-256 bilan shifrlangan holda faylда yotadi: `root` bo'lmagan qurilmada boshqa ilova ham,
+ * Kalit Android Keystore'da (apparat himoyasi bor qurilmalarda — TEE/StrongBox), qiymatlar esa
+ * AES-256 bilan shifrlangan holda faylda yotadi: `root` bo'lmagan qurilmada boshqa ilova ham,
  * `adb backup` ham tokenni o'qiy olmaydi.
  */
 internal class EncryptedPrefsSecureStorage(
@@ -45,7 +45,7 @@ fun createSecureStorage(context: Context): SecureStorage {
     context.deleteSharedPreferences(PREFS_FILE)
     createPrefs(context)?.let { return EncryptedPrefsSecureStorage(it) }
 
-    Napier.e { "Xavfsiz ombor mavjud emas — sessiya faqat ilova ishlagunча saqlanadi" }
+    Napier.e { "Xavfsiz ombor mavjud emas — sessiya faqat ilova ishlaguncha saqlanadi" }
     return InMemorySecureStorage()
 }
 

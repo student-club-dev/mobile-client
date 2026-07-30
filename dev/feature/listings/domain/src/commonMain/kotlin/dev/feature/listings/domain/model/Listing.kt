@@ -15,7 +15,7 @@ import kotlin.math.sqrt
  *
  * Nega shunday: chegirma e'lonida "nechi kishi kerak", ijara e'lonida esa "promokod"
  * degan maydon ma'nosiz. Ularni bitta yassi modelga yig'ish — yarmi doim `null` turadigan
- * va qaysi biri qachon to'ldirilishi faqat kod o'qib bilинadigan model demakdir. Sealed
+ * va qaysi biri qachon to'ldirilishi faqat kod o'qib bilinadigan model demakdir. Sealed
  * tur esa kompilyator darajasida kafolat beradi: ijara e'lonini qurayotganda chegirma
  * maydonlariga umuman kirib bo'lmaydi.
  *

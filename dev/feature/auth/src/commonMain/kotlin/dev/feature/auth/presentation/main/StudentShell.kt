@@ -70,6 +70,7 @@ import dev.feature.listings.presentation.browse.ListingsBrowseScreen
 import dev.feature.listings.presentation.PostListingScreen
 import dev.feature.listings.presentation.detail.ListingDetailScreen
 import dev.feature.listings.presentation.platform.rememberPhoneCaller
+import dev.feature.connections.presentation.BlockedStudentsScreen
 import dev.feature.connections.presentation.ConnectionsScreen
 import dev.feature.connections.presentation.ConnectionsTab
 import dev.feature.notifications.presentation.NotificationsScreen
@@ -133,6 +134,9 @@ private const val CONNECTIONS = "connections"
 private const val NOTIFICATIONS = "notifications"
 private const val EDIT_PROFILE = "edit_profile"
 private const val SETTINGS = "settings"
+
+/** "Bloklanganlar" — Sozlamalar → Maxfiylik'dan ochiladi (tab emas, tafsilot ekrani). */
+private const val BLOCKED = "blocked"
 private const val CLUBS = "clubs"
 
 private val tabRoutes = StudentTab.entries.map { it.route }.toSet()
@@ -369,8 +373,10 @@ fun StudentShell(onLoggedOut: () -> Unit) {
                     onBack = { nav.popSafe() },
                     onEditProfile = { nav.navigateSafe(EDIT_PROFILE) },
                     onLoggedOut = onLoggedOut,
+                    onOpenBlocked = { nav.navigateSafe(BLOCKED) },
                 )
             }
+            composable(BLOCKED) { BlockedStudentsScreen(onBack = { nav.popSafe() }) }
         }
 
         // Klaviatura ochilganda pastki panel ko'rsatilmaydi: kontent klaviatura ustiga

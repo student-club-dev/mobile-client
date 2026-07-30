@@ -2,9 +2,11 @@ package dev.feature.chat.domain.repository
 
 import dev.core.common.Resource
 import dev.feature.chat.domain.model.ConversationItem
+import dev.feature.chat.domain.model.GifRef
 import dev.feature.chat.domain.model.Message
 import dev.feature.chat.domain.model.OutgoingImage
 import dev.feature.chat.domain.model.Sticker
+import dev.feature.chat.domain.model.UnreadCount
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -45,6 +47,14 @@ interface ChatRepository {
     suspend fun refreshConversations(): Resource<Unit>
 
     /**
+     * `GET /v1/conversations/unread-count` — tab badge'i uchun.
+     *
+     * Busiz butun suhbatlar ro'yxati faqat o'qilmaganlarni qo'shish uchun yuklanardi
+     * (`handoff/api-changes.md` §4b).
+     */
+    suspend fun unreadCount(): Resource<UnreadCount>
+
+    /**
      * `POST /v1/conversations` — suhbat ochadi yoki mavjudini qaytaradi (**idempotent**,
      * "bormi?" deb tekshirish shart emas). Qaytadi — `conversationId`.
      *
@@ -62,9 +72,10 @@ interface ChatRepository {
     suspend fun loadOlder(conversationId: String): Resource<Boolean>
 
     /**
-     * Xabar yuborish. Avval ekranda `SENDING` holatida ko'rinadi, so'ng WS `message:send`
-     * (ack bilan), u ishlamasa `POST /conversations/{id}/messages` orqali ketadi. Ikki yo'l
-     * ham bir xil `clientMsgId` ni ishlatadi — server takror xabar yaratmaydi (C6).
+     * Matnli xabar yuborish. Avval ekranda `SENDING` holatida ko'rinadi, so'ng WS
+     * `message:send` (ack bilan), u ishlamasa `POST /conversations/{id}/messages` orqali
+     * ketadi. Ikki yo'l ham bir xil `clientMsgId` ni ishlatadi — server takror xabar
+     * yaratmaydi (C6).
      */
     suspend fun send(conversationId: String, body: String): Resource<Unit>
 
@@ -74,20 +85,37 @@ interface ChatRepository {
      * Har rasm alohida xabar bo'ladi (`seq` — chatning tartib o'qi, uni buzib bo'lmaydi),
      * lekin bitta `albumId` bilan bog'lanadi va ekranda **bitta to'r** bo'lib chiziladi.
      *
-     * Oqim: ekranda darhol ko'rinadi (local nusxa) → `POST /v1/media/upload` → qaytgan
-     * havola oddiy xabar sifatida ketadi. Bittasi yiqilsa qolganlari yuborilaveradi;
-     * yiqilgani `FAILED` bo'lib qoladi va [retry] bilan qayta urinish mumkin.
-     *
-     * ⚠️ Backendda tipli media xabar yo'q, shuning uchun tanaga **rasm havolasi** yoziladi
-     * (`CHAT_MEDIA_AND_CALLS_BACKEND.md` §0). Qabul qiluvchi eski klient havolani ko'radi.
+     * Oqim (`handoff/chat.md`): ekranda darhol ko'rinadi (local nusxa) →
+     * `POST /v1/media/chat-upload` → qaytgan `mediaId` bilan `message:send { type: "IMAGE" }`.
+     * Bittasi yiqilsa qolganlari yuborilaveradi; yiqilgani `FAILED` bo'lib qoladi va
+     * [retry] bilan qayta urinish mumkin — fayl **qayta yuklanmaydi**, chunki biriktirma
+     * bir martalik (`422 MEDIA_ALREADY_USED`).
      */
     suspend fun sendImages(conversationId: String, images: List<OutgoingImage>): Resource<Unit>
 
     /**
-     * Stiker yuboradi. Tanasi — emojining o'zi, ya'ni stikerni qo'llab-quvvatlamaydigan
-     * klient ham uni **to'g'ri** ko'radi (shunchaki kichikroq).
+     * Stiker yuboradi.
+     *
+     * Ikki yo'l — stiker qayerdanligiga qarab (`Sticker.isRemote`):
+     * - **server katalogidan** (`GET /v1/stickers/packs`) → `type = STICKER` + `stickerId`,
+     *   tana **taqiqlangan**;
+     * - **ilovaga kiritilgan zaxira** katalogdan → oddiy `TEXT`, tanasi emojining o'zi.
+     *   Zaxira katalogning id'lari serverda yo'q va u `422 STICKER_NOT_FOUND` qaytarardi.
      */
     suspend fun sendSticker(conversationId: String, sticker: Sticker): Resource<Unit>
+
+    /**
+     * Qidiruvdan tanlangan GIF'ni yuboradi (`type = GIF` + `gif` obyekti).
+     *
+     * Fayl **yuklanmaydi** — provayderning havolasi serverga qaytariladi, shuning uchun
+     * `mediaId` yo'q va tana taqiqlangan. [gif] javobda kelgan holida uzatiladi: server uni
+     * domen oq ro'yxatidan o'tkazadi va har qanday o'zgarish `422 GIF_URL_NOT_ALLOWED`
+     * bo'lib qaytadi (`handoff/gif.md`).
+     *
+     * Foydalanuvchi o'zi yuklagan GIF esa boshqa yo'ldan — [sendImages] kabi `chat-upload`
+     * orqali ketadi va server uni ovozsiz MP4 ga o'giradi.
+     */
+    suspend fun sendGif(conversationId: String, gif: GifRef): Resource<Unit>
 
     /**
      * Hali yuklanayotgan rasmlarning **local nusxasi**: xabar id → fayl baytlari.
@@ -101,10 +129,23 @@ interface ChatRepository {
     /** Yuborilmagan (`FAILED`) xabarni **o'sha** `clientMsgId` bilan qayta yuboradi. */
     suspend fun retry(messageId: String): Resource<Unit>
 
+    /**
+     * `DELETE /v1/messages/{id}` — **o'z** xabaringizni o'chirish (soft delete).
+     *
+     * Qator o'chirilmaydi: `seq` joyida qoladi, tana bo'shatiladi, `deletedAt` to'ldiriladi
+     * va xabar o'qilmaganlar sanog'idan chiqadi. Tarixda tombstone bo'lib qoladi. Ikkala
+     * a'zoga WS `message:deleted` ketadi. **Idempotent** (`handoff/api-changes.md` §4b).
+     */
+    suspend fun deleteMessage(messageId: String): Resource<Unit>
+
     /** O'qildi kursorini suradi (eng yuqori ko'rilgan `seq`). */
     suspend fun markRead(conversationId: String)
 
-    /** Yetkazildi kursori — suhbat ochilganda bir marta (faqat WS, javob qaytmaydi). */
+    /**
+     * Yetkazildi kursori — suhbat ochilganda bir marta. WS ishlamasa
+     * `POST /v1/conversations/{id}/delivered` zaxirasi ishlatiladi (§17.6): busiz uzilgan
+     * ulanish jo'natuvchini abadiy bitta belgichada qoldirardi.
+     */
     suspend fun markDelivered(conversationId: String)
 
     /** "Yozmoqda" holatini yuboradi (best-effort, xato bermaydi). */

@@ -1,5 +1,5 @@
 -- Foydalanuvchi bildirishnomalari (Home qo'ng'iroq → Notifications ekrani).
--- Backend kelганда API'dan sinxronlanadi; tuzilma bir xil.
+-- Backend kelganda API'dan sinxronlanadi; tuzilma bir xil.
 CREATE TABLE NotificationEntity (
     id TEXT NOT NULL PRIMARY KEY,
     title TEXT NOT NULL,

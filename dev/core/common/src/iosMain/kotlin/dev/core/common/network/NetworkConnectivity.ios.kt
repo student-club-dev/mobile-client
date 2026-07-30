@@ -13,7 +13,7 @@ import platform.darwin.dispatch_queue_create
 
 /**
  * iOS internet holati — `NWPathMonitor` (Network framework).
- * Monitor fon navbatida ishlaydi va holat o'zgarganда [_online] ni yangilaydi.
+ * Monitor fon navbatida ishlaydi va holat o'zgarganda [_online] ni yangilaydi.
  */
 actual class NetworkConnectivity {
 

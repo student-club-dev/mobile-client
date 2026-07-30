@@ -3,6 +3,18 @@ package dev.core.domain.model
 /** Chegirma taklifining olish turi. */
 enum class DiscountTag { STUDENT_ID, PROMO_CODE }
 
+/**
+ * Katalog guruhi = bosh ekrandagi bitta bo'lim (Ovqatlanish, Sport, Ta'lim...).
+ * `POST /v1/catalog/groups` dan keladi — ro'yxat ham, tartib ham serverniki.
+ */
+data class DiscountGroup(
+    val key: String,      // "FOOD", "SPORT", "GAMES"...
+    val name: String,     // "Ovqatlanish" — bo'lim sarlavhasi
+    val emoji: String,
+    val accent: Long,
+    val sortOrder: Int,
+)
+
 /** "Siz uchun" bo'limi kategoriyasi = biznes turi (Ovqat, Kiyim, Game Club...). */
 data class DiscountCategory(
     val id: String,
@@ -10,6 +22,8 @@ data class DiscountCategory(
     val emoji: String,
     val offerCount: Int,
     val accent: Long,
+    /** Tur qaysi guruhda ([DiscountGroup.key]); `""` — noma'lum. */
+    val groupKey: String = "",
 )
 
 /**
@@ -19,6 +33,11 @@ data class DiscountCategory(
 data class DiscountOffer(
     val id: String,
     val categoryId: String,          // biznes turi id: "ovqat", "game", "kiyim"...
+    /**
+     * Katalog guruhi ([DiscountGroup.key]) — bosh ekranda qaysi bo'limga tushishini
+     * AYNAN shu maydon hal qiladi. `""` — guruhsiz, bo'limlarda ko'rinmaydi.
+     */
+    val groupKey: String = "",
     val subcategory: String = "",    // tur ichidagi bo'lim: "Pitsa", "PS5", "Tennis", "Polya"
     val gender: String = "",         // "MALE" | "FEMALE" | "" (asosan kiyim uchun)
     val merchant: String,            // "Evos", "Chopar"

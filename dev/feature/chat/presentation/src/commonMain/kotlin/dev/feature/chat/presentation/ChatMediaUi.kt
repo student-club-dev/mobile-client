@@ -39,14 +39,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil3.compose.AsyncImage
+import coil3.compose.AsyncImagePainter
 import dev.core.uikit.components.AppIcons
 import dev.core.uikit.components.ScIcons
 import dev.core.uikit.components.ScText
 import dev.core.uikit.media.toImageBitmapOrNull
 import dev.core.uikit.theme.Sc
 import dev.feature.chat.domain.model.MessageStatus
-import dev.feature.chat.domain.model.Sticker
-import dev.feature.chat.domain.model.StickerCatalog
 
 /** Pufakning eng katta kengligi — matnli xabar bilan bir xil. */
 private val BUBBLE_MAX_WIDTH = 280.dp
@@ -224,8 +223,42 @@ private fun ImageCell(image: ChatImageUi, onClick: () -> Unit, modifier: Modifie
 // ---------------------------------------------------------------------------
 
 /**
- * Stiker — **pufaksiz**, katta emoji. Vaqt va belgichalar pastida, foni yo'q
- * (Telegram/WhatsApp'dagi kabi).
+ * Stiker tasviri — yuklanmasa **emojining o'ziga** qaytadi.
+ *
+ * Zaxira katalogning tasvirlari CDN'da yotadi (`FluentEmoji`), ilovaga kiritilmagan. Tarmoq
+ * yo'q yoki CDN berkitilgan bo'lsa ular kelmaydi va bunda stiker **yo'qolmasligi** kerak:
+ * xabar tanasi baribir emojining o'zi, ya'ni tizim emojisi to'g'ri va to'liq zaxira.
+ *
+ * [modifier] faqat rasmga tegishli — emoji varianti matn sifatida o'z o'lchamida chiziladi.
+ */
+@Composable
+internal fun StickerImage(
+    emoji: String,
+    url: String?,
+    fallbackSize: Float,
+    modifier: Modifier = Modifier,
+) {
+    // `url` bo'yicha kalitlangan: ro'yxatdagi katak boshqa stikerga qayta ishlatilganda
+    // oldingisining xatosi yangisiga o'tib qolmasin.
+    var failed by remember(url) { mutableStateOf(false) }
+    if (url == null || failed) {
+        ScText(emoji, fallbackSize, FontWeight.Normal, Sc.Ink)
+        return
+    }
+    AsyncImage(
+        model = url,
+        contentDescription = emoji,
+        contentScale = ContentScale.Fit,
+        onState = { state -> if (state is AsyncImagePainter.State.Error) failed = true },
+        modifier = modifier,
+    )
+}
+
+/**
+ * Stiker — **pufaksiz**. Vaqt va belgichalar pastida, foni yo'q (Telegram/WhatsApp'dagi kabi).
+ *
+ * Tasvir server katalogidan yoki Fluent CDN'idan keladi; ikkalasi ham bo'lmasa emojining
+ * o'zi katta qilib chiziladi ([StickerImage]).
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -236,66 +269,20 @@ internal fun StickerBubble(message: ChatMessageUi, onLongPress: () -> Unit) {
             Modifier.combinedClickable(onClick = {}, onLongClick = onLongPress),
             horizontalAlignment = if (message.outgoing) Alignment.End else Alignment.Start,
         ) {
-            ScText(message.sticker.orEmpty(), STICKER_SIZE, FontWeight.Normal, Sc.Ink)
+            StickerImage(
+                emoji = message.sticker.orEmpty(),
+                url = message.stickerUrl,
+                fallbackSize = STICKER_SIZE,
+                modifier = Modifier.size(STICKER_IMAGE_SIZE),
+            )
             MessageMeta(message, Modifier.padding(top = 2.dp), onDark = false)
         }
     }
 }
 
-// ---------------------------------------------------------------------------
-// Stiker paneli
-// ---------------------------------------------------------------------------
-
-/**
- * Kompozitor ustidagi stiker paneli.
- *
- * Stikerlar **ilovaga kiritilgan** (backendda paketlar endpointi yo'q) va emoji sifatida
- * chiziladi — qarang [StickerCatalog].
- */
-@Composable
-internal fun StickerPanel(onPick: (Sticker) -> Unit) {
-    var packIndex by remember { mutableStateOf(0) }
-    val packs = StickerCatalog.packs
-    val pack = packs[packIndex.coerceIn(packs.indices)]
-
-    Column(Modifier.fillMaxWidth().height(260.dp).background(Sc.Card)) {
-        Box(Modifier.fillMaxWidth().height(1.dp).background(Sc.Border))
-
-        // Paket yorliqlari.
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            packs.forEachIndexed { index, item ->
-                val active = index == packIndex
-                Box(
-                    Modifier.size(38.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(if (active) Sc.Brand.copy(alpha = 0.14f) else Color.Transparent)
-                        .clickable { packIndex = index },
-                    contentAlignment = Alignment.Center,
-                ) { ScText(item.cover, 20f) }
-            }
-        }
-
-        LazyVerticalGrid(
-            columns = GridCells.Adaptive(56.dp),
-            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-            modifier = Modifier.fillMaxWidth().weight(1f),
-        ) {
-            items(pack.stickers, key = { it.id }) { sticker ->
-                Box(
-                    Modifier.aspectRatio(1f)
-                        .clip(RoundedCornerShape(12.dp))
-                        .clickable { onPick(sticker) },
-                    contentAlignment = Alignment.Center,
-                ) { ScText(sticker.emoji, 30f) }
-            }
-        }
-    }
-}
+// Eski `StickerPanel` (ilovaga kiritilgan emoji katalogi) olib tashlandi: uning o'rnini
+// `gif/ChatMediaPanel` egalladi — u serverdagi paketlarni (`GET /v1/stickers/packs`)
+// ko'rsatadi va katalog bo'sh/xato bo'lsa o'sha zaxira emoji katalogiga qaytadi.
 
 // ---------------------------------------------------------------------------
 // To'liq ekranli ko'rgich
@@ -314,7 +301,8 @@ internal fun ImageViewerDialog(images: List<ChatImageUi>, startIndex: Int, onDis
         properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
         Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.96f))) {
-            val url = current.url
+            // To'liq ekranda thumb (320px) emas, asl nusxa — aks holda rasm xira ko'rinardi.
+            val url = current.fullUrl ?: current.url
             val bytes = current.localBytes
             when {
                 url != null -> AsyncImage(
@@ -391,4 +379,8 @@ private fun ViewerButton(
 }
 
 private const val STICKER_SIZE = 58f
+
+/** Rasmli stiker — emoji varianti bilan taxminan bir xil ko'rinishda bo'lsin. */
+private val STICKER_IMAGE_SIZE = 120.dp
+
 private const val DEFAULT_ASPECT = 4f / 3f

@@ -116,9 +116,11 @@ fun HomeScreen(
             Modifier.fillMaxWidth().weight(1f).verticalScroll(scroll).padding(top = 22.dp),
             verticalArrangement = Arrangement.spacedBy(26.dp),
         ) {
-            OfferSection("Ovqatlar", "Kafe, restoran va oziq-ovqat", state.foodOffers, onOpenDiscounts)
-            OfferSection("Kiyim-kechak", "Talabalar uchun chegirmalar", state.clothingOffers, onOpenDiscounts)
-            OfferSection("Dam olish", "Barcha o'yin klublari va kino", state.leisureOffers, onOpenDiscounts)
+            // Bo'limlar ro'yxati backend katalogidan (`/v1/catalog/groups`) — ilovada qat'iy
+            // yozilmagan, tartib ham serverniki.
+            state.offerSections.forEach { section ->
+                OfferSection(section, onOpenDiscounts)
+            }
             TasksSection(state.tasks, onOpenTasks, onOpenListing)
             ClubsSection(state.clubs, onOpenClubs)
             RentalsSection(state.rentals, onOpenRentals, onOpenListing)
@@ -327,38 +329,32 @@ private fun PaddedHeader(
 }
 
 // ---------------------------------------------------------------------------
-// Chegirma bo'limlari — Ovqatlar / Kiyim-kechak / Dam olish
+// Chegirma bo'limlari — katalog guruhlari (Ovqatlanish, Sport, Ta'lim...)
 // ---------------------------------------------------------------------------
 
-private data class CategoryVisual(val icon: ImageVector, val tint: Color, val accent: Color)
+private data class CategoryVisual(val tint: Color, val accent: Color)
 
-/** Biznes turi id'siga qarab ikonka va rang (`listings.json` dagi `categoryId`). */
+/**
+ * Karta rangi e'lonning O'Z turidan keladi (`DiscountOfferEntity.bannerAccent` — backend'dagi
+ * `CatalogTypeDto.accentColor`), shuning uchun ilovada tur→rang jadvali yo'q: yangi biznes
+ * turi qo'shilsa ham karta o'z rangida chiziladi. Rang kelmagan bo'lsa — mavzuning asosiysi.
+ */
 @Composable
-private fun categoryVisual(categoryId: String): CategoryVisual = when (categoryId) {
-    "game" -> CategoryVisual(ScIcons.Gamepad, Sc.TintBlue, Sc.Brand)
-    "kino" -> CategoryVisual(ScIcons.Gamepad, Sc.TintViolet, Sc.Violet)
-    "ovqat" -> CategoryVisual(ScIcons.Coffee, Sc.TintOrange, Sc.Orange)
-    "market" -> CategoryVisual(ScIcons.Cart, Sc.TintGreen, Sc.Success)
-    "kiyim" -> CategoryVisual(ScIcons.Cart, Sc.TintViolet, Sc.Violet)
-    "kurslar" -> CategoryVisual(ScIcons.FileText, Sc.TintPink, Sc.Pink)
-    else -> CategoryVisual(ScIcons.Cart, Sc.TintAmber, Sc.Amber)
+private fun categoryVisual(accentArgb: Long): CategoryVisual {
+    val accent = if (accentArgb == 0L) Sc.Brand else Color(accentArgb.toULong().toLong())
+    // Fon — o'sha rangning yengil qatlami (mavzuga qarab ochroq/to'qroq ko'rinadi).
+    return CategoryVisual(tint = accent.copy(alpha = 0.14f), accent = accent)
 }
 
 /**
- * Bitta chegirma bo'limi — sarlavha + gorizontal lenta. Bo'limda e'lon bo'lmasa
- * umuman chizilmaydi (bo'sh sarlavha osilib qolmasin).
+ * Bitta chegirma bo'limi — sarlavha + gorizontal lenta. Sarlavha va rang katalog
+ * guruhidan keladi ([HomeOfferSection]); bo'sh bo'lim ViewModel'da tashlab yuboriladi.
  */
 @Composable
-private fun OfferSection(
-    title: String,
-    subtitle: String,
-    offers: List<DiscountOffer>,
-    onSeeAll: () -> Unit,
-) {
-    if (offers.isEmpty()) return
+private fun OfferSection(section: HomeOfferSection, onSeeAll: () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(13.dp)) {
-        PaddedHeader(title, subtitle, onAction = onSeeAll)
-        EdgeRow(offers.take(8), spacing = 12.dp) { _, offer -> OfferCard(offer, onSeeAll) }
+        PaddedHeader("${section.emoji} ${section.title}".trim(), onAction = onSeeAll)
+        EdgeRow(section.offers.take(8), spacing = 12.dp) { _, offer -> OfferCard(offer, onSeeAll) }
     }
 }
 
@@ -377,7 +373,7 @@ private val OfferCardWidth = 178.dp
  */
 @Composable
 private fun OfferCard(offer: DiscountOffer, onClick: () -> Unit) {
-    val visual = categoryVisual(offer.categoryId)
+    val visual = categoryVisual(offer.bannerAccent)
     Column(
         Modifier.width(OfferCardWidth).scCard(radius = 22.dp, elevation = 6.dp, onClick = onClick),
     ) {
@@ -418,7 +414,7 @@ private fun OfferImage(offer: DiscountOffer, visual: CategoryVisual) {
             if (offer.emoji.isNotBlank()) {
                 Text(offer.emoji, style = TextStyle(fontSize = 46.sp))
             } else {
-                Icon(visual.icon, null, tint = visual.accent, modifier = Modifier.size(40.dp))
+                Icon(ScIcons.Cart, null, tint = visual.accent, modifier = Modifier.size(40.dp))
             }
         }
         if (!offer.imageUrl.isNullOrBlank()) {
@@ -701,7 +697,7 @@ private val studentVisuals: List<Pair<Color, Color>>
  * Talabalar bloki: qidiruvga kirish + "Do'stlar" / "Kutilayotganlar" ga o'tish.
  *
  * Qidiruv maydoni bu yerda **ishlamaydi** — bosilganda `Connections` ekrani Qidiruv bo'limi
- * ochilgan holda kelади. Sabab: to'liq qidiruv (debounce, filtrlar, bog'lanish tugmalari,
+ * ochilgan holda keladi. Sabab: to'liq qidiruv (debounce, filtrlar, bog'lanish tugmalari,
  * "⋮" menyusi, blok/shikoyat) o'sha ekranda allaqachon bor, uni Home'da takrorlash ikki
  * nusxa kod bo'lardi.
  */

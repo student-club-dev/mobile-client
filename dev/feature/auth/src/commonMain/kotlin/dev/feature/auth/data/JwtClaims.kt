@@ -13,7 +13,7 @@ import kotlin.io.encoding.ExperimentalEncodingApi
  * local sessiya keshi esa aynan shu id bo'yicha yoziladi (`UserEntity.uid`).
  *
  * Bu **imzoni tekshirmaydi** va tekshirishi ham shart emas: tokenni serverning o'zi bergan,
- * klient undan faqat ma'lumot o'qiydi. Har qanday xatoда `null` qaytadi.
+ * klient undan faqat ma'lumot o'qiydi. Har qanday xatoda `null` qaytadi.
  */
 object JwtClaims {
 

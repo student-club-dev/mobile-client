@@ -21,7 +21,7 @@ enum class UserRole { STUDENT, BUSINESS, EMPLOYER, UNIVERSITY }
 /**
  * Kirish/ro'yxatdan o'tish identifikatori. Backend email va telefonni **alohida** maydonlarda
  * kutadi (`LoginDto.email` / `LoginDto.phoneNumber`), foydalanuvchi esa bitta maydonga yozadi —
- * shuning uchun ajratish domenда bo'ladi.
+ * shuning uchun ajratish domenda bo'ladi.
  */
 sealed interface AuthIdentifier {
 

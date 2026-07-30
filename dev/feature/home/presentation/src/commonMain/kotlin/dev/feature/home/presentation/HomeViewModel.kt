@@ -36,41 +36,17 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /**
- * Bosh ekrandagi uchta bo'lim qaysi biznes turlarini yig'adi.
+ * Bosh ekrandagi bitta chegirma bo'limi — katalog GURUHI (`POST /v1/catalog/groups`).
  *
- * MUHIM: `categoryId` ikki xil manbadan kelishi mumkin — local seed'da `"ovqat"`, `"game"`
- * kabi, backend'da esa katalog kaliti (`FAST_FOOD`, `NATIONAL_FOOD`, `GAMES`...). Shuning
- * uchun qat'iy ro'yxat emas, KALIT SO'Z bo'yicha moslashtiramiz: tur kaliti + turning nomi +
- * e'lonning bo'limi birga qidiriladi. Yangi tur qo'shilsa ham bo'lim o'zi topib oladi.
+ * Sarlavha, emoji va tartib — hammasi serverdan; ilovada bo'limlar ro'yxati qat'iy
+ * yozilmagan. Yangi guruh qo'shilsa yoki nomi o'zgarsa ilovaga tegish shart emas.
  */
-private val FOOD_KEYWORDS = listOf(
-    "food", "ovqat", "oziq", "kafe", "cafe", "restoran", "market", "pitsa", "pizza", "somsa", "palov",
+data class HomeOfferSection(
+    val key: String,
+    val title: String,
+    val emoji: String,
+    val offers: List<DiscountOffer>,
 )
-private val CLOTHING_KEYWORDS = listOf("kiyim", "cloth", "wear", "poyabzal", "obuv", "moda")
-private val LEISURE_KEYWORDS = listOf(
-    "game", "oyin", "o'yin", "kino", "cinema", "playstation", "bilyard", "billiard",
-    "dam olish", "ko'ngil", "kongil", "entertain",
-)
-
-/** E'lon qaysi bo'limga tushishini aniqlaydi (`null` — uchalasiga ham kirmaydi). */
-private fun homeSectionOf(offer: DiscountOffer, categoryNames: Map<String, String>): Int {
-    val key = buildString {
-        append(offer.categoryId).append(' ')
-        append(categoryNames[offer.categoryId].orEmpty()).append(' ')
-        append(offer.subcategory)
-    }.lowercase()
-    return when {
-        CLOTHING_KEYWORDS.any { it in key } -> SECTION_CLOTHING
-        LEISURE_KEYWORDS.any { it in key } -> SECTION_LEISURE
-        FOOD_KEYWORDS.any { it in key } -> SECTION_FOOD
-        else -> SECTION_NONE
-    }
-}
-
-private const val SECTION_NONE = 0
-private const val SECTION_FOOD = 1
-private const val SECTION_CLOTHING = 2
-private const val SECTION_LEISURE = 3
 
 /** Home (1p) ekranining holati — barchasi local DB'dan reaktiv. */
 data class HomeUiState(
@@ -79,12 +55,11 @@ data class HomeUiState(
     val avatarUrl: String? = null,
     val universityMonogram: String? = null,
     val courseLabel: String? = null,
-    /** "Ovqatlar" bo'limi — kafe/restoran va oziq-ovqat e'lonlari. */
-    val foodOffers: List<DiscountOffer> = emptyList(),
-    /** "Kiyim-kechak" bo'limi. */
-    val clothingOffers: List<DiscountOffer> = emptyList(),
-    /** "Dam olish" bo'limi — barcha o'yin klublari va kino/ko'ngilochar. */
-    val leisureOffers: List<DiscountOffer> = emptyList(),
+    /**
+     * Chegirma bo'limlari — katalog guruhlari (Ovqatlanish, Sport, Ta'lim...), server
+     * tartibida. E'loni yo'q guruh ro'yxatga umuman tushmaydi.
+     */
+    val offerSections: List<HomeOfferSection> = emptyList(),
     /** Faol ish e'lonlari ([ListingKind.JOB]) — "E'lonlar" bo'limidagi bilan bir xil manba. */
     val jobs: List<Listing> = emptyList(),
     /** Faol ijara e'lonlari ([ListingKind.RENTAL]) — sherik izlayotgan kvartiralar. */
@@ -189,18 +164,21 @@ class HomeViewModel(
     ) { jobs, rentals, tasks -> Triple(jobs, rentals, tasks) }
 
     private val content = combine(
-        discountRepository.observeCategories(),
+        discountRepository.observeGroups(),
         discountRepository.observeAllOffers(),
         listings,
         clubRepository.observeClubs(),
-    ) { categories, offers, (jobs, rentals, tasks), clubs ->
-        // Tur nomi ham kerak: backend kaliti (`NATIONAL_FOOD`) o'zi yetarli bo'lmasligi mumkin.
-        val names = categories.associate { it.id to it.name }
-        val grouped = offers.groupBy { homeSectionOf(it, names) }
+    ) { groups, offers, (jobs, rentals, tasks), clubs ->
+        // E'lon bo'limga `groupKey` bo'yicha AYNAN tushadi — nomidan taxmin qilinmaydi.
+        // Guruhlar allaqachon server tartibida (`selectGroups` — `ORDER BY sortOrder`).
+        val byGroup = offers.groupBy { it.groupKey }
         Content(
-            food = grouped[SECTION_FOOD].orEmpty(),
-            clothing = grouped[SECTION_CLOTHING].orEmpty(),
-            leisure = grouped[SECTION_LEISURE].orEmpty(),
+            sections = groups.mapNotNull { g ->
+                val list = byGroup[g.key].orEmpty()
+                // Bo'sh bo'lim chizilmaydi — sarlavha osilib qolmasin.
+                if (list.isEmpty()) null
+                else HomeOfferSection(g.key, g.name, g.emoji, list)
+            },
             jobs = jobs, rentals = rentals, tasks = tasks, clubs = clubs,
         )
     }
@@ -213,9 +191,7 @@ class HomeViewModel(
             avatarUrl = h.avatarUrl,
             universityMonogram = h.monogram,
             courseLabel = h.course,
-            foodOffers = c.food,
-            clothingOffers = c.clothing,
-            leisureOffers = c.leisure,
+            offerSections = c.sections,
             jobs = c.jobs,
             rentals = c.rentals,
             tasks = c.tasks,
@@ -302,9 +278,7 @@ class HomeViewModel(
         val course: String?,
     )
     private data class Content(
-        val food: List<DiscountOffer>,
-        val clothing: List<DiscountOffer>,
-        val leisure: List<DiscountOffer>,
+        val sections: List<HomeOfferSection>,
         val jobs: List<Listing>,
         val rentals: List<Listing>,
         val tasks: List<Listing>,

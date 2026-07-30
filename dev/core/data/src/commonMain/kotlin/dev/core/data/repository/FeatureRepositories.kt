@@ -11,6 +11,7 @@ import dev.core.data.mapper.toDomain
 import dev.core.data.mapper.toOfflineDetail
 import dev.core.database.sql.StudentClubDatabase
 import dev.core.domain.model.DiscountCategory
+import dev.core.domain.model.DiscountGroup
 import dev.core.domain.model.DiscountOffer
 import dev.core.domain.model.OfferDetail
 import dev.core.domain.model.OfferFilterSchema
@@ -29,6 +30,9 @@ class DiscountRepositoryImpl(
     private val syncEnabled: Boolean,
 ) : DiscountRepository {
     private val q get() = db.discountQueries
+
+    override fun observeGroups(): Flow<List<DiscountGroup>> =
+        q.selectGroups().asFlow().mapToList(dispatchers.io).map { r -> r.map { it.toDomain() } }
 
     override fun observeCategories(): Flow<List<DiscountCategory>> =
         q.selectCategories().asFlow().mapToList(dispatchers.io).map { r -> r.map { it.toDomain() } }
@@ -88,7 +92,7 @@ class DiscountRepositoryImpl(
     }
 
     /**
-     * Offline-first sinxronlash: backend'dan oladi, muvaffaqiyatда local DB'ni almashtiradi.
+     * Offline-first sinxronlash: backend'dan oladi, muvaffaqiyatda local DB'ni almashtiradi.
      * Xato/tarmoqsiz bo'lsa — DB'ga tegilmaydi (cache/seed saqlanadi). UI DB'ni kuzatgani
      * uchun yangilanish avtomatik ko'rinadi.
      */
@@ -103,14 +107,18 @@ class DiscountRepositoryImpl(
                 }
                 withContext(dispatchers.io) {
                     q.transaction {
+                        q.clearGroups()
                         q.clearCategories()
                         q.clearOffers()
+                        res.data.groups.forEach { g ->
+                            q.upsertGroup(g.key, g.name, g.emoji, g.accent, g.sortOrder.toLong())
+                        }
                         res.data.categories.forEach { c ->
-                            q.upsertCategory(c.id, c.name, c.emoji, c.offerCount.toLong(), c.accent)
+                            q.upsertCategory(c.id, c.name, c.emoji, c.offerCount.toLong(), c.accent, c.groupKey)
                         }
                         res.data.offers.forEach { o ->
                             q.upsertOffer(
-                                o.id, o.categoryId, o.subcategory, o.gender, o.merchant, o.title,
+                                o.id, o.categoryId, o.groupKey, o.subcategory, o.gender, o.merchant, o.title,
                                 if (o.isDiscount) 1L else 0L, o.discountPercent.toLong(),
                                 o.originalPrice, o.finalPrice, o.priceUnit,
                                 o.tag, o.promoCode, o.location, o.expiry, o.emoji, o.bannerAccent,

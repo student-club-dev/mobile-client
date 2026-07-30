@@ -9,7 +9,7 @@ import kotlin.concurrent.Volatile
  * [TokenStore] ning **xavfsiz** implementatsiyasi — tokenlar platformaning shifrlangan
  * omborida yotadi ([SecureStorage]: Android EncryptedSharedPreferences, iOS Keychain).
  *
- * [legacy] — eski, shifrlanmagan ombor ([SqlDelightTokenStore]). Birinchi murojaatда undagi
+ * [legacy] — eski, shifrlanmagan ombor ([SqlDelightTokenStore]). Birinchi murojaatda undagi
  * sessiya **bir marta** ko'chiriladi va eski yozuv o'chiriladi, shuning uchun yangilanishdan
  * keyin foydalanuvchi qaytadan kirishga majbur bo'lmaydi va ochiq token bazada qolmaydi.
  */
@@ -29,13 +29,13 @@ class SecureTokenStore(
     }
 
     override fun save(tokens: AuthTokens, userId: String?) {
-        // Yangi juftlik yozilganда ko'chirishning ma'nosi yo'q — eski yozuvni shunchaki tozalaymiz.
+        // Yangi juftlik yozilganda ko'chirishning ma'nosi yo'q — eski yozuvni shunchaki tozalaymiz.
         migrationDone = true
         legacy?.clear()
 
         secure.write(KEY_ACCESS, tokens.accessToken)
         secure.write(KEY_REFRESH, tokens.refreshToken)
-        // Token yangilanganда uid o'zgarmaydi — `null` kelsa avvalgisi qoladi.
+        // Token yangilanganda uid o'zgarmaydi — `null` kelsa avvalgisi qoladi.
         if (userId != null) secure.write(KEY_USER_ID, userId)
     }
 
@@ -55,7 +55,7 @@ class SecureTokenStore(
     /**
      * Eski ombordagi sessiyani bir marta ko'chiradi.
      *
-     * Ikki oqim bir vaqtда kirsa ham xavfsiz: ko'chirish **idempotent** (ayni qiymatlar
+     * Ikki oqim bir vaqtda kirsa ham xavfsiz: ko'chirish **idempotent** (ayni qiymatlar
      * qayta yoziladi), so'ng eski yozuv o'chiriladi.
      */
     private fun migrateIfNeeded() {

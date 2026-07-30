@@ -1,14 +1,30 @@
+-- Katalog GURUHI (`POST /v1/catalog/groups`) — bosh ekrandagi bo'limlar shu jadvaldan
+-- yasaladi: sarlavha, emoji, rang va tartib serverdan keladi, ilovada qat'iy ro'yxat yo'q.
+-- Guruh ichida biznes turlari turadi (`DiscountCategoryEntity.groupKey`).
+CREATE TABLE DiscountGroupEntity (
+    key TEXT NOT NULL PRIMARY KEY,
+    name TEXT NOT NULL,
+    emoji TEXT NOT NULL,
+    accent INTEGER NOT NULL,
+    sortOrder INTEGER NOT NULL
+);
+
 CREATE TABLE DiscountCategoryEntity (
     id TEXT NOT NULL PRIMARY KEY,
     name TEXT NOT NULL,
     emoji TEXT NOT NULL,
     offerCount INTEGER NOT NULL,
-    accent INTEGER NOT NULL
+    accent INTEGER NOT NULL,
+    -- Tur qaysi guruhga tegishli (`CatalogTypeDto.groupKey`). '' — noma'lum (eski kesh).
+    groupKey TEXT NOT NULL DEFAULT ''
 );
 
 CREATE TABLE DiscountOfferEntity (
     id TEXT NOT NULL PRIMARY KEY,
     categoryId TEXT NOT NULL,
+    -- E'lon qaysi bosh bo'limga tushishini AYNAN shu ustun hal qiladi (kalit so'z bilan
+    -- taxmin qilinmaydi). '' — guruhsiz, bosh ekranda ko'rinmaydi.
+    groupKey TEXT NOT NULL DEFAULT '',
     subcategory TEXT NOT NULL DEFAULT '',
     gender TEXT NOT NULL DEFAULT '',
     merchant TEXT NOT NULL,
@@ -35,6 +51,9 @@ CREATE TABLE SavedDiscountEntity (
     offerId TEXT NOT NULL PRIMARY KEY
 );
 
+selectGroups:
+SELECT * FROM DiscountGroupEntity ORDER BY sortOrder;
+
 selectCategories:
 SELECT * FROM DiscountCategoryEntity;
 
@@ -57,22 +76,29 @@ INNER JOIN SavedDiscountEntity s ON s.offerId = o.id;
 countCategories:
 SELECT count(*) FROM DiscountCategoryEntity;
 
-upsertCategory:
-INSERT OR REPLACE INTO DiscountCategoryEntity(id, name, emoji, offerCount, accent)
+upsertGroup:
+INSERT OR REPLACE INTO DiscountGroupEntity(key, name, emoji, accent, sortOrder)
 VALUES (?, ?, ?, ?, ?);
+
+upsertCategory:
+INSERT OR REPLACE INTO DiscountCategoryEntity(id, name, emoji, offerCount, accent, groupKey)
+VALUES (?, ?, ?, ?, ?, ?);
 
 upsertOffer:
 INSERT OR REPLACE INTO DiscountOfferEntity(
-    id, categoryId, subcategory, gender, merchant, title, isDiscount, discountPercent,
+    id, categoryId, groupKey, subcategory, gender, merchant, title, isDiscount, discountPercent,
     originalPrice, finalPrice, priceUnit, tag, promoCode, location, expiry, emoji, bannerAccent, featured, lat, lng,
     imageUrl
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 saveOffer:
 INSERT OR REPLACE INTO SavedDiscountEntity(offerId) VALUES (?);
 
 unsaveOffer:
 DELETE FROM SavedDiscountEntity WHERE offerId = ?;
+
+clearGroups:
+DELETE FROM DiscountGroupEntity;
 
 clearCategories:
 DELETE FROM DiscountCategoryEntity;

@@ -157,7 +157,7 @@ fun TaskForm(state: PostListingUiState, palette: AppPalette, vm: PostListingView
                 }
             }
 
-            // Manzil faqat yuzma-yuz ishда — onlayn topshiriqning joyi yo'q.
+            // Manzil faqat yuzma-yuz ishda — onlayn topshiriqning joyi yo'q.
             if (task.needsLocation) {
                 BranchesSection(state, palette, vm)
             }
