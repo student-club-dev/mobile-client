@@ -104,6 +104,9 @@ internal fun pickerMapHtml(center: MapPoint, dark: Boolean): String = """
       zoom: $MAP_PICKER_ZOOM,
       attributionControl: false
     });
+    // Ikki barmoq FAQAT kattalashtiradi/kichraytiradi — burish va egish o'chirilgan,
+    // aks holda xarita qiyshayib belgi ostidagi joy kutilmaganda o'zgarib ketardi.
+    ${mapLockRotationJs()}
     map.addControl(new maplibregl.AttributionControl({ compact: true }));
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'bottom-right');
 

@@ -29,3 +29,33 @@ internal const val MAP_DEFAULT_ZOOM = 13.5
 
 /** Joy tanlashda yaqinroq turamiz — uy raqami darajasida aniqlik kerak. */
 internal const val MAP_PICKER_ZOOM = 16.0
+
+/**
+ * Shu masshtabdan PASTDA marker yorliqlari (narx / do'kon nomi) yashiriladi va faqat pin
+ * ikonasi qoladi.
+ *
+ * Ataylab past qiymat: butun shahar ko'rinib turgan masshtabda ham yorliqlar o'qilsin
+ * (ustma-ust tushmasligi yorliqlarni yashirish bilan emas, yaqin e'lonlarni siljitilgan
+ * ustunga terish bilan hal qilinadi). Faqat viloyat/mamlakat ko'rinishida ular olib
+ * tashlanadi — u yerda o'nlab yorliq baribir o'qilmasdi.
+ */
+internal const val MAP_LABEL_ZOOM = 9.0
+
+/**
+ * Xaritani FAQAT surish va masshtablashga cheklaydi — burish va egish o'chiriladi.
+ *
+ * MapLibre'da ikki barmoq bir vaqtning o'zida uchta ishorani boshqaradi: zoom, burish
+ * (rotate) va egish (pitch). Foydalanuvchi shunchaki kattalashtirmoqchi bo'lganda barmoqlar
+ * bir necha gradusga qiyshaysa ham xarita aylanib yoki egilib ketardi — belgilar go'yo o'z
+ * joyidan chiqib boshqa yerga o'tayotgandek ko'rinardi. Kompas tugmasi yashirilgani uchun
+ * xarita aylanib qolgani bilinmasdi ham va uni tiklashning iloji yo'q edi.
+ *
+ * Shimoliy yo'nalish doim tepada qoladi — belgilar faqat masshtabga qarab yaqinlashadi
+ * yoki uzoqlashadi, boshqa hech qanday harakat yo'q.
+ */
+internal fun mapLockRotationJs(): String = """
+    map.dragRotate.disable();
+    map.touchZoomRotate.disableRotation();
+    if (map.touchPitch) map.touchPitch.disable();
+    map.keyboard.disableRotation();
+""".trimIndent()
