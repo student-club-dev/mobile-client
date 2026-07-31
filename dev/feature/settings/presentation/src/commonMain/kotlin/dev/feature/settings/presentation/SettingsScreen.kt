@@ -20,7 +20,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalBottomSheet
@@ -49,6 +48,7 @@ import dev.core.uikit.components.ScIcons
 import dev.core.uikit.components.ScText
 import dev.core.uikit.components.scCard
 import dev.core.uikit.components.scStyle
+import dev.core.uikit.components.ScShimmerList
 import dev.core.uikit.theme.Sc
 import dev.feature.profile.presentation.ProfileViewModel
 import dev.feature.settings.domain.model.ThemeMode
@@ -206,10 +206,12 @@ private fun RegionPickerSheet(
             RegionRow("Butun O'zbekiston", selected == null) { onSelect(null) }
 
             when {
-                picker.loading -> Box(
-                    Modifier.fillMaxWidth().padding(vertical = 24.dp),
-                    contentAlignment = Alignment.Center,
-                ) { CircularProgressIndicator(color = Sc.Brand) }
+                // Viloyat qatorlari kelguncha — o'sha qatorlarning skeleti.
+                picker.loading -> ScShimmerList(
+                    rows = 6,
+                    leading = false,
+                    modifier = Modifier.padding(vertical = 10.dp),
+                )
 
                 picker.error != null -> ScText(
                     picker.error, 13f, FontWeight.Medium, Sc.Danger,

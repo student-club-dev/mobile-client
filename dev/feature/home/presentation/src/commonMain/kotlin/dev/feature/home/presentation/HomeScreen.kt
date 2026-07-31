@@ -8,6 +8,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -32,6 +33,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import coil3.compose.AsyncImage
@@ -58,18 +60,16 @@ import dev.core.uikit.components.ScText
 import dev.core.uikit.components.scCard
 import dev.core.uikit.components.scSoftShadow
 import dev.core.uikit.components.scStyle
+import dev.core.uikit.components.ScNetworkImage
+import dev.core.uikit.components.ScShimmerLine
+import dev.core.uikit.components.ScShimmerCard
 import dev.core.uikit.theme.Sc
 import dev.core.domain.model.DiscountOffer
-import dev.core.domain.model.DiscountTag
 import dev.feature.clubs.domain.model.Club
 import dev.feature.listings.domain.model.Listing
 import dev.feature.listings.domain.model.formatSum
 import dev.feature.connections.domain.model.ConnectionView
 import dev.feature.connections.domain.model.SearchedStudent
-import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.toLocalDateTime
 import org.koin.compose.viewmodel.koinViewModel
 import androidx.compose.runtime.ReadOnlyComposable
 
@@ -85,7 +85,12 @@ fun HomeScreen(
     onOpenChat: () -> Unit = {},
     onOpenNotifications: () -> Unit = {},
     onOpenClubs: () -> Unit = {},
-    onOpenDiscounts: () -> Unit = {},
+    /**
+     * "Siz uchun" feed'i. Argument — katalog guruhi kaliti ([HomeOfferSection.key]): bo'lim
+     * sarlavhasidagi "Barchasi" AYNAN o'sha bo'limni (masalan "Ovqatlar") ochadi. `null` —
+     * filtrsiz butun feed.
+     */
+    onOpenDiscounts: (String?) -> Unit = {},
     onOpenJobs: () -> Unit = {},
     onOpenRentals: () -> Unit = {},
     onOpenTasks: () -> Unit = {},
@@ -116,6 +121,10 @@ fun HomeScreen(
             Modifier.fillMaxWidth().weight(1f).verticalScroll(scroll).padding(top = 22.dp),
             verticalArrangement = Arrangement.spacedBy(26.dp),
         ) {
+            // Birinchi yuklanish, keshda hech narsa yo'q — bo'limlar o'rniga skelet.
+            if (state.loading) {
+                HomeSkeleton()
+            }
             // Bo'limlar ro'yxati backend katalogidan (`/v1/catalog/groups`) — ilovada qat'iy
             // yozilmagan, tartib ham serverniki.
             state.offerSections.forEach { section ->
@@ -148,6 +157,36 @@ fun HomeScreen(
     }
 }
 
+/**
+ * Bosh ekranning skeleti: ikkita "bo'lim" — sarlavha qatori va gorizontal kartalar lentasi.
+ * Haqiqiy bo'limlar bilan bir xil o'lchamda, shuning uchun ma'lumot kelganda ekran
+ * joyidan sakramaydi.
+ */
+@Composable
+private fun HomeSkeleton() {
+    Column(verticalArrangement = Arrangement.spacedBy(26.dp)) {
+        repeat(2) {
+            Column(verticalArrangement = Arrangement.spacedBy(13.dp)) {
+                Box(Modifier.padding(horizontal = Sc.ScreenPadding)) {
+                    ScShimmerLine(0.42f, 17.dp)
+                }
+                Row(
+                    Modifier.fillMaxWidth().padding(horizontal = Sc.ScreenPadding),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    repeat(2) {
+                        ScShimmerCard(
+                            Modifier.width(OfferCardWidth),
+                            imageHeight = OfferImageHeight,
+                            radius = 22.dp,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Topbar — scroll'da kichrayadi
 // ---------------------------------------------------------------------------
@@ -176,28 +215,20 @@ private fun HomeHeader(
             horizontalArrangement = Arrangement.spacedBy(13.dp),
         ) {
             val avatarSize = lerp(54.dp, 40.dp, p)
-            Box(
-                Modifier.size(avatarSize).clip(RoundedCornerShape(lerp(20.dp, 14.dp, p)))
-                    .background(Color.White.copy(alpha = 0.22f)).clickable(onClick = onOpenProfile),
-                contentAlignment = Alignment.Center,
-            ) {
-                // Profil rasmi bo'lsa — o'sha; bo'lmasa ismning bosh harfi.
-                if (!state.avatarUrl.isNullOrBlank()) {
-                    AsyncImage(
-                        model = state.avatarUrl,
-                        contentDescription = "Profil rasmi",
-                        modifier = Modifier.size(avatarSize),
-                        contentScale = ContentScale.Crop,
-                    )
-                } else {
-                    ScText(
-                        state.userName.take(1).uppercase(),
-                        size = 22f - 5f * p,
-                        weight = FontWeight.ExtraBold,
-                        color = Color.White,
-                    )
-                }
-            }
+            // Ilovadagi yagona avatar komponenti: bosh harf DOIM orqada chiziladi, rasm
+            // uning ustiga tushadi. Ilgari bu yerda `AsyncImage` to'g'ridan-to'g'ri
+            // ishlatilardi va havola buzuq bo'lsa (masalan server rasmni 404 qaytarsa)
+            // avatar BO'SH kvadrat bo'lib qolardi.
+            ScAvatar(
+                name = state.userName,
+                size = avatarSize,
+                modifier = Modifier.clickable(onClick = onOpenProfile),
+                avatarUrl = state.avatarUrl,
+                fontSize = 22f - 5f * p,
+                background = Color.White.copy(alpha = 0.22f),
+                initialColor = Color.White,
+                shape = RoundedCornerShape(lerp(20.dp, 14.dp, p)),
+            )
             Column(Modifier.weight(1f)) {
                 // "Assalomu alaykum 👋" — siqilganda balandligi 0 ga tushadi.
                 CollapsingRow(p, fullHeight = 18.dp) {
@@ -349,27 +380,39 @@ private fun categoryVisual(accentArgb: Long): CategoryVisual {
 /**
  * Bitta chegirma bo'limi — sarlavha + gorizontal lenta. Sarlavha va rang katalog
  * guruhidan keladi ([HomeOfferSection]); bo'sh bo'lim ViewModel'da tashlab yuboriladi.
+ *
+ * "Barchasi" ham, kartaning o'zi ham feed'ni SHU bo'lim filtri bilan ochadi — foydalanuvchi
+ * "Ovqatlar" ni bosib, aralash "Siz uchun" ro'yxatiga tushib qolmasin.
  */
 @Composable
-private fun OfferSection(section: HomeOfferSection, onSeeAll: () -> Unit) {
+private fun OfferSection(section: HomeOfferSection, onSeeAll: (String?) -> Unit) {
+    val openSection = { onSeeAll(section.key) }
     Column(verticalArrangement = Arrangement.spacedBy(13.dp)) {
-        PaddedHeader("${section.emoji} ${section.title}".trim(), onAction = onSeeAll)
-        EdgeRow(section.offers.take(8), spacing = 12.dp) { _, offer -> OfferCard(offer, onSeeAll) }
+        PaddedHeader("${section.emoji} ${section.title}".trim(), onAction = openSection)
+        EdgeRow(section.offers.take(8), spacing = 12.dp) { _, offer ->
+            OfferCard(offer, openSection)
+        }
     }
 }
 
-/** Karta rasmining balandligi — kenglikka nisbatan ~4:3. */
-private val OfferImageHeight = 132.dp
+/** Karta o'lchami. Rasm — kartaning katta qismi; ostida faqat bitta qator (biznes nomi). */
+private val OfferImageHeight = 186.dp
 private val OfferCardWidth = 178.dp
 
 /**
- * "Siz uchun" e'loni kartasi: tepada RASM, ustida chegirma nishoni va tur yorlig'i
- * (kiyimda — "Futbolka", ovqatda — "Pitsa"), pastida do'kon nomi, e'lon nomi va
- * YASHIL narx.
+ * "Siz uchun" e'loni kartasi.
  *
- * Rasm ([DiscountOffer.imageUrl]) faqat backend feed'ida bor; local seed'da yo'q, shuning
- * uchun uning o'rniga turning rangli foni + emoji chiziladi — karta hech qachon bo'sh
- * kulrang to'rtburchak bo'lib qolmaydi.
+ * Ma'lumotlar RASM USTIDA: chap-tepada chegirma nishoni, pastda tur yorlig'i ("Pitsa"),
+ * narx va manzil. Rasm OSTIDA esa faqat **biznes nomi** qoladi.
+ *
+ * E'lon NOMI va tavsifi kartada YO'Q — ular tafsilot oynasida; kartada esa "nima,
+ * qanchaga, qayerda" ni turi, narxi va manzili aytadi.
+ *
+ * Matn o'qilishi uchun pastdan qora gradient (scrim) tushiriladi — u rasm ustida ham,
+ * emoji fon ustida ham matnni ajratib turadi.
+ *
+ * "Talaba ID / Promokod" yorlig'i va amal qilish muddati ATAYLAB yo'q — ular tafsilot
+ * oynasida; lentadagi karta bir qarashda "nima, qanchaga, qayerda" ni ko'rsatadi.
  */
 @Composable
 private fun OfferCard(offer: DiscountOffer, onClick: () -> Unit) {
@@ -377,81 +420,92 @@ private fun OfferCard(offer: DiscountOffer, onClick: () -> Unit) {
     Column(
         Modifier.width(OfferCardWidth).scCard(radius = 22.dp, elevation = 6.dp, onClick = onClick),
     ) {
-        OfferImage(offer, visual)
-        Column(
-            Modifier.padding(horizontal = 12.dp, vertical = 11.dp),
-            verticalArrangement = Arrangement.spacedBy(7.dp),
-        ) {
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                ScText(offer.merchant, 11.5f, FontWeight.Bold, visual.accent, maxLines = 1)
-                // `minLines = 2` — lentadagi kartalar bir xil balandlikda tursin (bir qatorli
-                // nom bilan ikki qatorli nom yonma-yon kelganda qator "arralanib" ketmasin).
-                Text(
-                    offer.title,
-                    style = scStyle(14.5f, FontWeight.ExtraBold, Sc.Ink, lineHeight = 18f, letterSpacing = -0.2f),
-                    minLines = 2,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
+        Box(Modifier.fillMaxWidth().height(OfferImageHeight)) {
+            OfferImage(offer, visual)
+            OfferScrim()
+
+            if (offer.isDiscount && offer.discountPercent > 0) {
+                Box(
+                    Modifier.align(Alignment.TopStart).padding(9.dp)
+                        .clip(RoundedCornerShape(11.dp)).background(Sc.buttonBrush)
+                        .padding(horizontal = 9.dp, vertical = 5.dp),
+                ) {
+                    ScText("−${offer.discountPercent}%", 12f, FontWeight.ExtraBold, Color.White, maxLines = 1)
+                }
             }
-            OfferPrice(offer)
-            val tag = if (offer.tag == DiscountTag.STUDENT_ID) "Talaba ID" else "Promokod"
-            ScText(
-                listOfNotNull(tag, offer.location, offer.expiry).joinToString(" · "),
-                11f, FontWeight.SemiBold, Sc.MutedLight, maxLines = 1,
-            )
+
+            Column(
+                Modifier.align(Alignment.BottomStart).padding(horizontal = 11.dp, vertical = 11.dp),
+                verticalArrangement = Arrangement.spacedBy(3.dp),
+            ) {
+                // Tur yorlig'i — kiyimda aynan shu "Futbolka / Ko'ylak / Poyabzal" ni ko'rsatadi.
+                // Nomning USTIDA: tor kartada tepadagi chegirma nishoni bilan to'qnashib,
+                // kesilib qolardi.
+                val type = offer.typeLabel()
+                if (type.isNotBlank()) {
+                    Box(
+                        Modifier.clip(RoundedCornerShape(9.dp))
+                            .background(Color.White.copy(alpha = 0.94f))
+                            .padding(horizontal = 8.dp, vertical = 3.dp),
+                    ) {
+                        // Oq yorliq fon rasmidan qat'i nazar oq — matn ham doim to'q.
+                        ScText(type, 10.5f, FontWeight.ExtraBold, InkOnLight, maxLines = 1)
+                    }
+                }
+                OfferPrice(offer)
+                offer.location?.takeIf { it.isNotBlank() }?.let { location ->
+                    ScText("📍 $location", 10.5f, FontWeight.SemiBold, Color.White.copy(alpha = 0.78f), maxLines = 1)
+                }
+            }
         }
+
+        // Rasm ostidagi yagona qator — biznes nomi.
+        ScText(
+            offer.merchant, 12f, FontWeight.Bold, visual.accent,
+            Modifier.padding(horizontal = 12.dp, vertical = 10.dp), maxLines = 1,
+        )
     }
 }
 
-/** Kartaning rasm qismi: rasm (yoki emoji), chegirma nishoni va tur yorlig'i. */
+/**
+ * Matn ostidagi qorayish. Yuqori yarmi shaffof — rasm ko'rinib turadi; pastga borgan sari
+ * to'qlashadi, shunda oq matn HAR QANDAY rasmda (och rasmda ham) o'qiladi.
+ */
+@Composable
+private fun BoxScope.OfferScrim() {
+    Box(
+        Modifier.matchParentSize().background(
+            Brush.verticalGradient(
+                0f to Color.Transparent,
+                0.42f to Color.Black.copy(alpha = 0.12f),
+                1f to Color.Black.copy(alpha = 0.82f),
+            ),
+        ),
+    )
+}
+
+/** Kartaning rasm qismi — rasm (yoki emoji fon). */
 @Composable
 private fun OfferImage(offer: DiscountOffer, visual: CategoryVisual) {
-    Box(Modifier.fillMaxWidth().height(OfferImageHeight).background(visual.tint)) {
-        // Emoji DOIM chiziladi, rasm esa uning ustiga tushadi — yuklanayotganda ham,
-        // havola buzuq bo'lganda ham karta bo'sh qolmaydi (ScAvatar bilan bir xil usul).
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            if (offer.emoji.isNotBlank()) {
-                Text(offer.emoji, style = TextStyle(fontSize = 46.sp))
-            } else {
-                Icon(ScIcons.Cart, null, tint = visual.accent, modifier = Modifier.size(40.dp))
-            }
-        }
-        if (!offer.imageUrl.isNullOrBlank()) {
-            AsyncImage(
-                model = offer.imageUrl,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize(),
-            )
-        }
-
-        if (offer.isDiscount && offer.discountPercent > 0) {
-            Box(
-                Modifier.align(Alignment.TopStart).padding(9.dp)
-                    .clip(RoundedCornerShape(11.dp)).background(Sc.buttonBrush)
-                    .padding(horizontal = 9.dp, vertical = 5.dp),
-            ) {
-                ScText("−${offer.discountPercent}%", 12f, FontWeight.ExtraBold, Color.White, maxLines = 1)
-            }
-        }
-
-        // Tur yorlig'i — kiyimda aynan shu "Futbolka / Ko'ylak / Poyabzal" ni ko'rsatadi.
-        val type = offer.typeLabel()
-        if (type.isNotBlank()) {
-            Box(
-                Modifier.align(Alignment.BottomStart).padding(9.dp)
-                    .clip(RoundedCornerShape(10.dp)).background(Color.White.copy(alpha = 0.94f))
-                    .padding(horizontal = 9.dp, vertical = 4.dp),
-            ) {
-                // Oq yorliq fon rasmidan qat'i nazar oq bo'lgani uchun matn ham doim to'q.
-                ScText(type, 11f, FontWeight.ExtraBold, InkOnLight, maxLines = 1)
+    Box(Modifier.fillMaxSize().background(visual.tint)) {
+        // Rasm yuklanayotganda kulrang shimmer turadi; havola yo'q yoki buzuq bo'lsa —
+        // turning emoji si (karta hech qachon bo'sh qolmaydi).
+        ScNetworkImage(
+            url = offer.imageUrl,
+            modifier = Modifier.fillMaxSize(),
+        ) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                if (offer.emoji.isNotBlank()) {
+                    Text(offer.emoji, style = TextStyle(fontSize = 52.sp))
+                } else {
+                    Icon(ScIcons.Cart, null, tint = visual.accent, modifier = Modifier.size(40.dp))
+                }
             }
         }
     }
 }
 
-/** Narx qatori — chegirmali narx YASHIL, ustidan chizilgan eski narx va o'lchov birligi. */
+/** Narx qatori — rasm ustida, shuning uchun oq; eski narx ustidan chizilgan holda yonida. */
 @Composable
 private fun OfferPrice(offer: DiscountOffer) {
     if (offer.effectivePrice <= 0) return
@@ -460,19 +514,19 @@ private fun OfferPrice(offer: DiscountOffer) {
         horizontalArrangement = Arrangement.spacedBy(5.dp),
     ) {
         ScText(
-            "${offer.effectivePrice.spaced()} so'm", 15.5f, FontWeight.ExtraBold, Sc.Success,
+            "${offer.effectivePrice.spaced()} so'm", 15.5f, FontWeight.ExtraBold, Color.White,
             letterSpacing = -0.2f, maxLines = 1,
         )
         if (offer.isDiscount && offer.originalPrice > offer.finalPrice) {
             Text(
                 offer.originalPrice.spaced(),
-                style = scStyle(11f, FontWeight.SemiBold, Sc.MutedLight)
+                style = scStyle(11f, FontWeight.SemiBold, Color.White.copy(alpha = 0.7f))
                     .copy(textDecoration = TextDecoration.LineThrough),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
         } else if (offer.priceUnit.isNotBlank()) {
-            ScText("/ ${offer.priceUnit}", 11f, FontWeight.SemiBold, Sc.MutedLight, maxLines = 1)
+            ScText("/ ${offer.priceUnit}", 11f, FontWeight.SemiBold, Color.White.copy(alpha = 0.7f), maxLines = 1)
         }
     }
 }
@@ -531,33 +585,16 @@ private fun TaskCard(listing: Listing, onOpen: (String) -> Unit) {
         horizontalArrangement = Arrangement.spacedBy(13.dp),
     ) {
         ScIconTile(Sc.TintPink, size = 52.dp, radius = 18.dp) { ScGlyph(book, 26.dp) }
+        // Nom + narx + manzil. Muddat chipi va tavsif kartadan olib tashlangan —
+        // ular e'lon tafsilotida (chegirma kartalari bilan bir xil qoida).
         Column(Modifier.weight(1f)) {
-            Row(
-                verticalAlignment = Alignment.Top,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                ScText(
-                    listing.title,
-                    15.5f,
-                    FontWeight.ExtraBold,
-                    Sc.Ink,
-                    Modifier.weight(1f),
-                    maxLines = 1
-                )
-                deadlineLabel(listing.taskDetails?.deadline)?.let { deadline ->
-                    Box(
-                        Modifier.clip(RoundedCornerShape(10.dp)).background(Sc.TintPink)
-                            .padding(horizontal = 9.dp, vertical = 4.dp),
-                    ) { ScText(deadline, 11f, FontWeight.Bold, Sc.PinkDeep, maxLines = 1) }
-                }
-            }
-            val summary = listing.taskDetails?.summary().orEmpty()
-            if (summary.isNotBlank()) {
-                Spacer(Modifier.height(3.dp))
-                ScText(summary, 12.5f, FontWeight.Medium, Sc.Muted, maxLines = 1)
-            }
+            ScText(listing.title, 15.5f, FontWeight.ExtraBold, Sc.Ink, maxLines = 1)
             Spacer(Modifier.height(7.dp))
             ScText(listing.priceLabel(), 14.5f, FontWeight.ExtraBold, Sc.Success, maxLines = 1)
+            listing.locationLabel()?.let { location ->
+                Spacer(Modifier.height(3.dp))
+                ScText("📍 $location", 11.5f, FontWeight.SemiBold, Sc.MutedLight, maxLines = 1)
+            }
         }
     }
 }
@@ -611,17 +648,16 @@ private fun RentalsSection(rentals: List<Listing>, onSeeAll: () -> Unit, onOpen:
                 Modifier.width(250.dp).scCard(radius = 26.dp, onClick = { onOpen(listing.id) })
                     .padding(16.dp),
             ) {
+                // Nom + narx + manzil; xonalar/sherik tavsifi tafsilotda qoladi.
                 ScIconTile(Sc.TintOrange, size = 50.dp, radius = 18.dp) { ScGlyph(house, 26.dp) }
                 Spacer(Modifier.height(14.dp))
                 ScText(listing.title, 16f, FontWeight.ExtraBold, Sc.Ink, maxLines = 1)
-                val meta = listing.rentalDetails?.summary()?.takeIf { it.isNotBlank() }
-                    ?: listing.branches.firstOrNull()?.address.orEmpty()
-                if (meta.isNotBlank()) {
-                    Spacer(Modifier.height(5.dp))
-                    ScText(meta, 12.5f, FontWeight.Medium, Sc.Muted, lineHeight = 19f, maxLines = 2)
-                }
                 Spacer(Modifier.height(10.dp))
                 ScText(listing.rentLabel(), 15f, FontWeight.ExtraBold, Sc.Success, maxLines = 1)
+                listing.locationLabel()?.let { location ->
+                    Spacer(Modifier.height(4.dp))
+                    ScText("📍 $location", 11.5f, FontWeight.SemiBold, Sc.MutedLight, maxLines = 1)
+                }
             }
         }
     }
@@ -655,17 +691,9 @@ private fun JobsSection(jobs: List<Listing>, onSeeAll: () -> Unit, onOpen: (Stri
                             modifier = Modifier.size(26.dp)
                         )
                     }
+                    // Nom + maosh + manzil; kompaniya nomi va kategoriya tafsilotda.
                     Column(Modifier.weight(1f)) {
                         ScText(listing.title, 15.5f, FontWeight.ExtraBold, Sc.Ink, maxLines = 1)
-                        val meta = listOfNotNull(
-                            listing.branches.firstOrNull()?.address,
-                            listing.jobDetails?.companyName?.takeIf { it.isNotBlank() },
-                            listing.categoryLabel,
-                        ).joinToString(" · ")
-                        if (meta.isNotBlank()) {
-                            Spacer(Modifier.height(3.dp))
-                            ScText(meta, 12.5f, FontWeight.Medium, Sc.Muted, maxLines = 1)
-                        }
                         Spacer(Modifier.height(7.dp))
                         ScText(
                             listing.salaryLabel(),
@@ -674,6 +702,10 @@ private fun JobsSection(jobs: List<Listing>, onSeeAll: () -> Unit, onOpen: (Stri
                             Sc.Success,
                             maxLines = 1
                         )
+                        listing.locationLabel()?.let { location ->
+                            Spacer(Modifier.height(3.dp))
+                            ScText("📍 $location", 11.5f, FontWeight.SemiBold, Sc.MutedLight, maxLines = 1)
+                        }
                     }
                 }
             }
@@ -835,6 +867,13 @@ private fun StudentsSection(
 // Matn yordamchilari
 // ---------------------------------------------------------------------------
 
+/**
+ * Kartadagi manzil — birinchi filial manzili. Manzil ko'rsatilmagan e'londa `null`
+ * (qator umuman chizilmaydi).
+ */
+private fun Listing.locationLabel(): String? =
+    branches.firstOrNull()?.address?.takeIf { it.isNotBlank() }
+
 /** "50 000 so'm" yoki "Kelishilgan". */
 private fun Listing.priceLabel(): String =
     if (isNegotiable) "Kelishilgan" else "${price.formatSum()} so'm"
@@ -855,22 +894,3 @@ private fun Listing.salaryLabel(): String {
     return listOfNotNull("$amount so'm", suffix).joinToString(" / ")
 }
 
-/**
- * Muddat yorlig'i: "Bugun 18:00", "Ertaga 12:00", "5 kundan keyin" yoki "24.12".
- * O'tib ketgan muddat ko'rsatilmaydi.
- */
-private fun deadlineLabel(deadline: Long?): String? {
-    if (deadline == null) return null
-    val zone = TimeZone.currentSystemDefault()
-    val at = Instant.fromEpochMilliseconds(deadline).toLocalDateTime(zone)
-    val today = Clock.System.now().toLocalDateTime(zone).date
-    val days = at.date.toEpochDays() - today.toEpochDays()
-    val time = "${at.hour.toString().padStart(2, '0')}:${at.minute.toString().padStart(2, '0')}"
-    return when {
-        days < 0 -> null
-        days == 0 -> "Bugun $time"
-        days == 1 -> "Ertaga $time"
-        days in 2..13 -> "$days kundan keyin"
-        else -> "${at.date.dayOfMonth}.${at.date.monthNumber}"
-    }
-}

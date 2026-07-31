@@ -22,7 +22,6 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -45,6 +44,7 @@ import dev.core.uikit.components.ScIcons
 import dev.core.uikit.components.ScText
 import dev.core.uikit.media.toImageBitmapOrNull
 import dev.core.uikit.theme.Sc
+import dev.core.uikit.components.scShimmerSweep
 import dev.feature.chat.domain.model.MessageStatus
 
 /** Pufakning eng katta kengligi — matnli xabar bilan bir xil. */
@@ -180,7 +180,7 @@ internal fun ImageAlbumBubble(
 
 /**
  * Bitta katak. Yuklanayotgan rasmda serverda havola yo'q — tanlangan faylning **local
- * nusxasi** ko'rsatiladi va ustiga aylanma indikator qo'yiladi.
+ * nusxasi** ko'rsatiladi va ustidan shimmer to'lqini yuradi.
  */
 @Composable
 private fun ImageCell(image: ChatImageUi, onClick: () -> Unit, modifier: Modifier = Modifier) {
@@ -211,9 +211,13 @@ private fun ImageCell(image: ChatImageUi, onClick: () -> Unit, modifier: Modifie
                 }
             }
         }
+        // Yuklanayotganda: local nusxa ko'rinib turadi, ustidan shimmer to'lqini o'tadi.
         if (image.loading) {
-            Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.25f)))
-            CircularProgressIndicator(Modifier.size(26.dp), color = Color.White, strokeWidth = 2.5.dp)
+            Box(
+                Modifier.fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.22f))
+                    .scShimmerSweep(RoundedCornerShape(14.dp)),
+            )
         }
     }
 }

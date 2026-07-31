@@ -18,7 +18,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -45,6 +44,8 @@ import dev.core.uikit.components.ScIcons
 import dev.core.uikit.components.ScText
 import dev.core.uikit.components.scCard
 import dev.core.uikit.components.scStyle
+import dev.core.uikit.components.ScShimmerList
+import dev.core.uikit.components.ScShimmerFooter
 import dev.core.uikit.theme.Sc
 import dev.feature.connections.domain.model.BlockedStudent
 import kotlinx.coroutines.delay
@@ -104,7 +105,11 @@ fun BlockedStudentsScreen(
 
             val error = state.error
             when {
-                state.loading && state.items.isEmpty() -> Hint("Yuklanmoqda…")
+                // Birinchi yuklanish — qatorlarning skeleti (matnli "Yuklanmoqda…" emas).
+                state.loading && state.items.isEmpty() -> ScShimmerList(
+                    rows = 6,
+                    modifier = Modifier.padding(horizontal = Sc.ScreenPadding),
+                )
 
                 error != null && state.items.isEmpty() -> ErrorBlock(error, vm::refresh)
 
@@ -135,10 +140,7 @@ fun BlockedStudentsScreen(
                     }
                     if (state.loadingMore) {
                         item(key = "loading_more") {
-                            Box(
-                                Modifier.fillMaxWidth().padding(vertical = 14.dp),
-                                contentAlignment = Alignment.Center,
-                            ) { CircularProgressIndicator(color = Sc.Brand, modifier = Modifier.size(22.dp)) }
+                            ScShimmerFooter()
                         }
                     }
                     item(key = "bottom_space") { Spacer(Modifier.height(24.dp)) }

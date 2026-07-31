@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.core.uikit.components.ScText
 import dev.core.uikit.theme.Sc
+import dev.core.uikit.components.ScShimmerGrid
 import dev.feature.chat.domain.model.GifItem
 import dev.feature.chat.domain.model.Sticker
 import dev.feature.chat.presentation.StickerImage
@@ -118,7 +119,19 @@ fun RemoteStickerPanel(
     val state by vm.state.collectAsStateWithLifecycle()
     var packIndex by remember { mutableStateOf(0) }
     val packs = state.packs
-    if (packs.isEmpty()) return
+    if (packs.isEmpty()) {
+        // Katalog kelguncha panel bo'sh ochilib qolmasin — kataklarning skeleti.
+        if (state.loading) {
+            ScShimmerGrid(
+                columns = 5,
+                rows = 4,
+                spacing = 6.dp,
+                cellHeight = 52.dp,
+                modifier = modifier.fillMaxWidth().height(PANEL_HEIGHT).padding(vertical = 8.dp),
+            )
+        }
+        return
+    }
     val pack = packs[packIndex.coerceIn(packs.indices)]
 
     Column(modifier.fillMaxWidth().height(PANEL_HEIGHT)) {

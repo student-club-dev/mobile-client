@@ -6,6 +6,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
@@ -71,6 +72,7 @@ fun MapLinkButton(
  *
  * @param markers ekrandagi joriy (filtrlangan) natija — xarita ro'yxat bilan bir xil bo'lishi shart
  * @param topBarExtras orqaga tugmasidan keyingi qism (odatda qidiruv maydoni + Filter tugmasi)
+ * @param belowTopBar panel ostidagi qator (odatda kategoriya chiplari); natija soni undan keyin chiziladi
  * @param detail marker bosilganda pastda chiqadigan karta; bo'sh qoldirilsa hech narsa chiqmaydi
  */
 @Composable
@@ -84,6 +86,7 @@ fun OffersMapOverlay(
     bottomInset: Int = 16,
     onMarkerTap: (String) -> Unit = {},
     topBarExtras: @Composable RowScope.() -> Unit = {},
+    belowTopBar: @Composable () -> Unit = {},
     detail: @Composable BoxScope.() -> Unit = {},
 ) {
     // Xarita to'liq ekran (full-bleed) — ustki panel ustida suzadi, kulrang band yo'q.
@@ -98,29 +101,40 @@ fun OffersMapOverlay(
             onMarkerTap = onMarkerTap,
         )
 
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = 16.dp).scTopInset(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(9.dp),
+        // Panel, chiplar va natija soni — bitta ustunda: chiplar qo'shilganda son
+        // ularning ostiga suriladi (ilgari qat'iy `top = 108.dp` edi va ustma-ust tushardi).
+        Column(
+            Modifier.align(Alignment.TopCenter).fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Box(
-                Modifier.size(46.dp).clip(RoundedCornerShape(13.dp)).background(palette.glass)
-                    .border(1.dp, palette.border, RoundedCornerShape(13.dp)).clickable(onClick = onClose),
-                contentAlignment = Alignment.Center,
-            ) { Icon(AppIcons.ArrowLeft, "Yopish", tint = palette.ink, modifier = Modifier.size(18.dp)) }
-            topBarExtras()
-        }
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 16.dp).scTopInset(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(9.dp),
+            ) {
+                Box(
+                    Modifier.size(46.dp).clip(RoundedCornerShape(13.dp)).background(palette.glass)
+                        .border(1.dp, palette.border, RoundedCornerShape(13.dp)).clickable(onClick = onClose),
+                    contentAlignment = Alignment.Center,
+                ) { Icon(AppIcons.ArrowLeft, "Yopish", tint = palette.ink, modifier = Modifier.size(18.dp)) }
+                topBarExtras()
+            }
 
-        // Natija soni (panel ostida) — filtr xaritaga ham tegishli ekanini ko'rsatadi.
-        Box(
-            Modifier.align(Alignment.TopCenter).padding(top = 108.dp).clip(RoundedCornerShape(11.dp))
-                .background(palette.ink.copy(alpha = 0.82f)).padding(horizontal = 12.dp, vertical = 6.dp),
-        ) {
-            Text(
-                if (markers.isEmpty()) "Bu shartlarga mos e'lon topilmadi"
-                else "${markers.size} ta e'lon xaritada",
-                style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.5f.sp, fontWeight = FontWeight.Bold, color = Color.White),
-            )
+            belowTopBar()
+
+            // Natija soni — filtr xaritaga ham tegishli ekanini ko'rsatadi.
+            Box(
+                Modifier.padding(top = 10.dp).clip(RoundedCornerShape(11.dp))
+                    .background(palette.ink.copy(alpha = 0.82f)).padding(horizontal = 12.dp, vertical = 6.dp),
+            ) {
+                Text(
+                    // Marker soni EMAS, e'lonlar soni: bitta marker ortida bir biznesning
+                    // bir nechta e'loni turishi mumkin.
+                    if (markers.isEmpty()) "Bu shartlarga mos e'lon topilmadi"
+                    else "${markers.sumOf { it.count }} ta e'lon xaritada",
+                    style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.5f.sp, fontWeight = FontWeight.Bold, color = Color.White),
+                )
+            }
         }
 
         detail()

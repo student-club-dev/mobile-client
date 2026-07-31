@@ -30,6 +30,9 @@ import kotlin.math.sin
  * O'lchamlar va gradient yordamchisi mavzuga bog'liq emas — ular oddiy `val`.
  */
 object Sc {
+    /** Joriy mavzu to'q (dark) mi — och/to'q uchun turli qiymat kerak bo'lganda. */
+    val IsDark: Boolean @Composable @ReadOnlyComposable get() = LocalScColors.current.dark
+
     // --- Brend -------------------------------------------------------------
     val Brand: Color @Composable @ReadOnlyComposable get() = LocalScColors.current.brand
     val BrandDark: Color @Composable @ReadOnlyComposable get() = LocalScColors.current.brandDark

@@ -250,7 +250,12 @@ fun StudentShell(onLoggedOut: () -> Unit) {
                     onOpenChat = { selectTab(StudentTab.CHAT.route) },
                     onOpenNotifications = { nav.navigateSafe(NOTIFICATIONS) },
                     onOpenClubs = { nav.navigateSafe(CLUBS) },
-                    onOpenDiscounts = { nav.navigateSafe(DISCOUNTS) },
+                    // Bo'lim kaliti bilan — "Ovqatlar → Barchasi" aynan Ovqatlar ekranini ochadi.
+                    // Kalitsiz (yoki noma'lum bo'lsa) — odatdagi "Siz uchun" feed'i.
+                    onOpenDiscounts = { groupKey ->
+                        val key = encodeArg(groupKey)
+                        nav.navigateSafe(if (key == null) DISCOUNTS else "$DISCOUNTS?group=$key")
+                    },
                     // Ikkalasi ham o'sha ekran, lekin darrov kerakli tab ochilgan holda.
                     onOpenJobs = { openListingsKind(ListingKind.JOB) },
                     onOpenRentals = { openListingsKind(ListingKind.RENTAL) },
@@ -267,9 +272,18 @@ fun StudentShell(onLoggedOut: () -> Unit) {
                 enterTransition = TabEnter, exitTransition = TabExit,
                 popEnterTransition = TabEnter, popExitTransition = TabExit,
             ) { MyUniversityScreen() }
-            composable(DISCOUNTS) {
+            composable(
                 // "Siz uchun" — Home'dan ochiladi (endi pastki tab emas). Orqaga qaytadi.
-                DiscountsScreen(onBack = { nav.popSafe() })
+                // `?group=` — Home'dagi bo'lim ("Ovqatlar") tugmasidan; bo'sh bo'lsa butun feed.
+                route = "$DISCOUNTS?group={group}",
+                arguments = listOf(
+                    navArgument("group") { type = NavType.StringType; nullable = true; defaultValue = null },
+                ),
+            ) { entry ->
+                DiscountsScreen(
+                    onBack = { nav.popSafe() },
+                    initialGroupKey = entry.arguments?.getString("group"),
+                )
             }
             // Ijara / Xizmatlar / Ish e'lonlari — uchalasi bitta ekranda, tepadagi tab bilan.
             // `kind` argumenti Home'dan konkret bo'limga o'tish uchun (masalan to'g'ridan-to'g'ri

@@ -44,6 +44,9 @@ kotlin {
             implementation(libs.sqldelight.runtime)
             implementation(libs.sqldelight.coroutines)
 
+            // "Siz uchun" feed kartalaridagi e'lon rasmlari (`DiscountOffer.imageUrl`).
+            implementation(libs.coil.compose)
+
             implementation(libs.androidx.navigation.compose)
             implementation(projects.dev.core.navigation)
             implementation(libs.kotlinx.datetime)

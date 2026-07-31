@@ -15,15 +15,19 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -34,20 +38,22 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import coil3.compose.AsyncImage
 import dev.core.domain.model.DiscountOffer
 import dev.core.domain.model.DiscountTag
-import dev.core.domain.model.OfferSuggestion
-import dev.core.domain.model.SuggestionKind
 import dev.core.uikit.components.AppFontFamily
 import dev.core.uikit.components.ScCircleButton
 import dev.core.uikit.components.ScHeader
@@ -57,6 +63,10 @@ import dev.core.uikit.components.ScIcons
 import dev.core.uikit.theme.Sc
 import dev.core.uikit.components.AppIcons
 import dev.core.uikit.components.GlassTextField
+import dev.core.uikit.components.ScShimmerCard
+import dev.core.uikit.components.ScShimmerList
+import dev.core.uikit.components.ScNetworkImage
+import dev.core.uikit.components.ScSearchOverlay
 import dev.core.uikit.theme.AppPalette
 import dev.core.uikit.theme.appPalette
 import dev.feature.listings.presentation.NearbyDiscountsSection
@@ -67,26 +77,56 @@ import dev.core.uikit.map.markersCenter
 import kotlinx.coroutines.delay
 import org.koin.compose.viewmodel.koinViewModel
 
+/**
+ * "Siz uchun" feed.
+ *
+ * [initialGroupKey] berilsa ekran o'sha katalog bo'limi bilan ochiladi (Home'dagi
+ * "🍕 Ovqatlar → Barchasi"): sarlavha bo'lim nomiga aylanadi va filtr shu bo'limga
+ * qo'yiladi — foydalanuvchi uni Filter'dan o'zgartira oladi.
+ */
 @Composable
-fun DiscountsScreen(vm: DiscountsViewModel = koinViewModel(), onBack: (() -> Unit)? = null) {
+fun DiscountsScreen(
+    vm: DiscountsViewModel = koinViewModel(),
+    onBack: (() -> Unit)? = null,
+    initialGroupKey: String? = null,
+) {
     val palette = appPalette
+    // Faqat ekran ochilganda: keyin foydalanuvchi Filter'da bo'limni o'zgartirsa
+    // (kalit o'zgarmagani uchun) qayta tiklanmaydi.
+    LaunchedEffect(initialGroupKey) { vm.openGroup(initialGroupKey) }
     val state by vm.state.collectAsStateWithLifecycle()
     val filterState by vm.filterState.collectAsStateWithLifecycle()
     val suggestions by vm.suggestions.collectAsStateWithLifecycle()
     val detail by vm.detail.collectAsStateWithLifecycle()
     var showFilter by remember { mutableStateOf(false) }
     var showMap by remember { mutableStateOf(false) }
+    var showSearch by remember { mutableStateOf(false) }
 
     Box(Modifier.fillMaxSize()) {
         FeedContent(
-            state, suggestions, palette, vm,
+            state, palette, vm,
             onBack = onBack,
             onOpenFilter = { vm.openFilter(); showFilter = true },
             onOpenMap = { showMap = true },
+            onOpenSearch = { showSearch = true },
         )
+        // Qidiruv — klaviatura ustidagi suzuvchi maydon (E'lonlar ekranidagi bilan bir xil).
+        // Server takliflari (`/v1/discounts/suggest`) maydon ostidagi tasmaga chiqadi.
+        if (showSearch) {
+            ScSearchOverlay(
+                query = state.query,
+                onQuery = vm::onQuery,
+                onClose = { showSearch = false },
+                placeholder = "Do'kon yoki e'lon qidiring",
+                suggestions = suggestions.map { it.label },
+                onSuggestionPick = { label ->
+                    suggestions.firstOrNull { it.label == label }?.let(vm::onSuggestionPicked)
+                },
+            )
+        }
         if (showMap) {
             MapOverlay(
-                state, palette, vm,
+                state, filterState, palette, vm,
                 onClose = { showMap = false },
                 onOpenFilter = { vm.openFilter(); showFilter = true },
             )
@@ -117,43 +157,57 @@ fun DiscountsScreen(vm: DiscountsViewModel = koinViewModel(), onBack: (() -> Uni
 @Composable
 private fun FeedContent(
     state: DiscountsUiState,
-    suggestions: List<OfferSuggestion>,
     palette: AppPalette,
     vm: DiscountsViewModel,
     onBack: (() -> Unit)?,
     onOpenFilter: () -> Unit,
     onOpenMap: () -> Unit,
+    onOpenSearch: () -> Unit,
 ) {
     Column(Modifier.fillMaxSize().background(Sc.Bg)) {
         ScHeader {
             Row(
                 Modifier.fillMaxWidth().padding(top = 18.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(13.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 if (onBack != null) {
                     ScCircleButton(ScIcons.ChevronLeft, onBack, contentDescription = "Orqaga")
                 }
                 Column(Modifier.weight(1f)) {
-                    ScHeaderTitle("Siz uchun", size = 26f)
+                    // Home'dan bo'lim bilan kelinsa — sarlavha o'sha bo'lim ("🍕 Ovqatlar").
+                    val group = state.group
+                    val title = group?.let { "${it.emoji} ${it.name}".trim() } ?: "Siz uchun"
+                    // 26f da "🍽 Ovqatlanish" ikkita tugma yonida sig'may kesilardi.
+                    ScHeaderTitle(title, size = 21f)
                     Spacer(Modifier.height(3.dp))
-                    ScHeaderSubtitle("${state.totalCount} ta e'lon — chegirmali va oddiy takliflar.")
+                    // Sarlavha yonida ikkita tugma turgani uchun izoh QISQA: uzun matn
+                    // ikki qatorga tushib, topbarni cho'zib yuborardi.
+                    ScHeaderSubtitle(
+                        if (group == null) "${state.totalCount} ta e'lon — chegirma va takliflar"
+                        else "${state.totalCount} ta e'lon",
+                    )
                 }
+                // Qidiruv — klaviatura ustidagi suzuvchi maydonni ochadi. Qidiruv matni
+                // bor bo'lsa tugmada nuqta yonadi (natijalar filtrlanganini bildiradi).
+                ScCircleButton(
+                    ScIcons.Search,
+                    onClick = onOpenSearch,
+                    contentDescription = "Qidiruv",
+                    badge = state.query.isNotBlank(),
+                    badgeColor = Sc.Brand,
+                )
+                // Filtr: faol filtr bo'lsa tugmada nuqta yonadi (soni Filter ekranida).
+                ScCircleButton(
+                    ScIcons.Filter,
+                    onClick = onOpenFilter,
+                    contentDescription = "Filter",
+                    badge = state.activeFilterCount > 0,
+                    badgeColor = Sc.Brand,
+                )
             }
         }
         Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(top = 16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-                Box(Modifier.weight(1f)) {
-                    GlassTextField(state.query, vm::onQuery, "Do'kon yoki e'lon qidiring", leading = AppIcons.Search, height = 46)
-                }
-                FilterButton(state.activeFilterCount, palette, onOpenFilter)
-            }
-            // Server takliflari — yozayotganda qatorning tagida chiqadi (`/v1/discounts/suggest`).
-            if (suggestions.isNotEmpty()) {
-                Spacer(Modifier.height(8.dp))
-                SuggestionList(suggestions, palette, vm::onSuggestionPicked)
-            }
-            Spacer(Modifier.height(9.dp))
             MapLinkButton(palette, onOpenMap)
         }
 
@@ -175,8 +229,15 @@ private fun FeedContent(
 
             if (state.offers.isEmpty()) {
                 item {
-                    Box(Modifier.fillMaxWidth().padding(top = 40.dp), contentAlignment = Alignment.Center) {
-                        Text("Bu filtr bo'yicha e'lon topilmadi.", style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.sp, color = palette.inkFaint))
+                    // Yuklanayotganda — kartalarning skeleti; tugagach "topilmadi".
+                    if (state.loading) {
+                        Column(verticalArrangement = Arrangement.spacedBy(11.dp)) {
+                            repeat(3) { ScShimmerCard() }
+                        }
+                    } else {
+                        Box(Modifier.fillMaxWidth().padding(top = 40.dp), contentAlignment = Alignment.Center) {
+                            Text("Bu filtr bo'yicha e'lon topilmadi.", style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.sp, color = palette.inkFaint))
+                        }
                     }
                 }
             }
@@ -206,152 +267,219 @@ private fun FilterButton(activeCount: Int, palette: AppPalette, onClick: () -> U
 }
 
 // ---------------------------------------------------------------------------
-// Qidiruv takliflari (`POST /v1/discounts/suggest`)
-// ---------------------------------------------------------------------------
-@Composable
-private fun SuggestionList(
-    suggestions: List<OfferSuggestion>,
-    palette: AppPalette,
-    onPick: (OfferSuggestion) -> Unit,
-) {
-    Column(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(13.dp)).background(palette.glassStrong)
-            .border(1.dp, palette.border, RoundedCornerShape(13.dp)),
-    ) {
-        suggestions.forEach { s ->
-            Row(
-                Modifier.fillMaxWidth().clickable { onPick(s) }.padding(horizontal = 12.dp, vertical = 9.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Text(s.kind.icon(), style = TextStyle(fontSize = 13.sp))
-                Text(
-                    s.label,
-                    style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = palette.ink),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
-                )
-                Text(
-                    "${s.count}",
-                    style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.5f.sp, color = palette.inkFaint),
-                )
-            }
-        }
-    }
-}
-
-/** Taklif turi — bir qarashda ajratish uchun kichik belgi. */
-private fun SuggestionKind.icon(): String = when (this) {
-    SuggestionKind.TYPE -> "🏷"
-    SuggestionKind.CATEGORY -> "📂"
-    SuggestionKind.BUSINESS -> "🏪"
-    SuggestionKind.LISTING -> "🔎"
-}
-
-// ---------------------------------------------------------------------------
 // Xarita overlay — barcha (filtrlangan) e'lonlar narx markerlari bilan
 // ---------------------------------------------------------------------------
 @Composable
 private fun MapOverlay(
     state: DiscountsUiState,
+    filterState: FilterDraftState,
     palette: AppPalette,
     vm: DiscountsViewModel,
     onClose: () -> Unit,
     onOpenFilter: () -> Unit,
 ) {
+    // Bo'lim ("Lavash", "Ko'k somsa"...) variantlari serverdan (`/v1/catalog/filter-schema`).
+    // Filter ekrani ochilmagan bo'lsa sxema hali yo'q — shu yerda bir marta tortiladi.
+    LaunchedEffect(Unit) { vm.ensureSchema() }
+
     val located = state.offers.filter { it.hasLocation }
-    val markers = located.map { o ->
+    // Bir do'konning bir nechta e'loni bir xil nuqtada turadi — narx pufaklari ustma-ust
+    // tushmasligi uchun ular bitta markerga yig'iladi (yorliqda biznes nomi + soni).
+    val groups = remember(located) { located.groupBy { it.businessKey() }.values.toList() }
+    val markers = groups.map { group ->
+        val first = group.first()
         OfferMarker(
-            id = o.id, lat = o.lat, lng = o.lng,
-            label = "${o.effectivePrice.priceShort()} so'm",
-            colorHex = hexRgb(o.bannerAccent),
-            highlight = o.isDiscount,
+            // Guruh markeri bosilganda uning BIRINCHI e'loni id'si qaytadi — pastdagi
+            // ro'yxat shu orqali guruhni topadi.
+            id = first.id,
+            lat = first.lat, lng = first.lng,
+            label = if (group.size > 1) first.merchant else "${first.effectivePrice.priceShort()} so'm",
+            colorHex = hexRgb(first.bannerAccent),
+            highlight = group.any { it.isDiscount },
+            count = group.size,
         )
     }
 
-    var selectedId by remember { mutableStateOf<String?>(null) }
-    val selected = located.firstOrNull { it.id == selectedId }
+    // Bosilgan pin ichidagi e'lon id'lari. Xarita yaqin turgan bir nechta biznesni bitta
+    // pinga qo'shishi mumkin, shuning uchun bittadan ko'p bo'lishi normal.
+    var selectedIds by remember { mutableStateOf<List<String>>(emptyList()) }
+    val selectedOffers = remember(selectedIds, groups) {
+        // Har bir id o'z biznes guruhini olib keladi — varaqda o'sha do'konning hamma
+        // (filtrga mos) e'lonlari ko'rinsin.
+        selectedIds.flatMap { id -> groups.firstOrNull { g -> g.any { it.id == id } }.orEmpty() }
+            .distinctBy { it.id }
+    }
 
     OffersMapOverlay(
         markers = markers,
         palette = palette,
         onClose = onClose,
         center = markersCenter(markers),
-        onMarkerTap = { selectedId = it },
+        onMarkerTap = { ids -> selectedIds = ids.split(",").filter { it.isNotBlank() } },
         topBarExtras = {
             Box(Modifier.weight(1f)) {
                 GlassTextField(state.query, vm::onQuery, "Do'kon yoki e'lon qidiring", leading = AppIcons.Search, height = 46)
             }
             FilterButton(state.activeFilterCount, palette, onOpenFilter)
         },
-        detail = {
-            // Marker bosilganda — tafsilot kartasi (pastda)
-            if (selected != null) {
-                MarkerDetailCard(
-                    offer = selected,
-                    saved = state.savedIds.contains(selected.id),
-                    palette = palette,
-                    onToggleSaved = vm::toggleSaved,
-                    onClose = { selectedId = null },
-                    modifier = Modifier.align(Alignment.BottomCenter).padding(12.dp),
-                )
-            }
+        belowTopBar = {
+            // Kategoriya chiplari — bosilganda markerlar DARHOL filtrlanadi (ro'yxat ham).
+            MapCategoryChips(
+                categories = filterState.availableSubcategories,
+                counts = filterState.subcategoryCounts,
+                selected = state.subcategories.firstOrNull(),
+                palette = palette,
+                onSelect = vm::selectSubcategory,
+            )
         },
     )
+
+    // Marker bosilganda — modal bottom sheet: ichida "Siz uchun" feed'idagi KATTA kartalar
+    // (bir biznesning bir nechta e'loni bo'lsa hammasi ro'yxat bo'lib chiqadi).
+    if (selectedOffers.isNotEmpty()) {
+        MapOffersSheet(
+            offers = selectedOffers,
+            savedIds = state.savedIds,
+            palette = palette,
+            onToggleSaved = vm::toggleSaved,
+            onOpen = { id ->
+                selectedIds = emptyList()
+                vm.openOffer(id)
+            },
+            onDismiss = { selectedIds = emptyList() },
+        )
+    }
 }
 
-// Xaritada marker bosilganda chiqadigan kengaytirilgan e'lon kartasi.
+/**
+ * Xaritadagi nuqta bosilganda ochiladigan modal varaq.
+ *
+ * Kartalar feed'dagi bilan AYNAN bir xil ([DiscountOfferCard] / [RegularOfferCard]) —
+ * foydalanuvchi xaritada ham, ro'yxatda ham bitta ko'rinishni ko'radi. Bir biznesning
+ * bir nechta e'loni bo'lsa, tepada uning nomi va soni turadi.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun MarkerDetailCard(
-    offer: DiscountOffer,
-    saved: Boolean,
+private fun MapOffersSheet(
+    offers: List<DiscountOffer>,
+    savedIds: Set<String>,
     palette: AppPalette,
     onToggleSaved: (DiscountOffer, Boolean) -> Unit,
-    onClose: () -> Unit,
-    modifier: Modifier = Modifier,
+    onOpen: (String) -> Unit,
+    onDismiss: () -> Unit,
 ) {
-    val accent = Color(offer.bannerAccent)
-    val clipboard = LocalClipboardManager.current
-    var copied by remember(offer.id) { mutableStateOf(false) }
-    LaunchedEffect(copied) { if (copied) { delay(1500); copied = false } }
-
-    Column(
-        modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(palette.glassStrong).border(1.dp, palette.border, RoundedCornerShape(18.dp)).padding(14.dp),
-        verticalArrangement = Arrangement.spacedBy(9.dp),
+    val first = offers.first()
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = Sc.Bg,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = offers.size > 1),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(11.dp)) {
-            Box(Modifier.size(48.dp).clip(RoundedCornerShape(13.dp)).background(accent.copy(alpha = 0.16f)), contentAlignment = Alignment.Center) {
-                Text(offer.emoji, style = TextStyle(fontSize = 24.sp))
-            }
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text("${offer.merchant} — ${offer.title}", style = TextStyle(fontFamily = AppFontFamily, fontSize = 14.sp, fontWeight = FontWeight.ExtraBold, color = palette.ink), maxLines = 2, overflow = TextOverflow.Ellipsis)
-                if (offer.subcategory.isNotBlank()) {
-                    Text(offer.subcategory, style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = accent))
+        Column(
+            Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            // Sarlavha: bitta do'konning e'lonlari bo'lsa — uning nomi; pin bir nechta
+            // do'konni birlashtirgan bo'lsa — nechta do'kon ekani.
+            val merchants = offers.map { it.merchant }.distinct()
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(11.dp)) {
+                OfferThumb(first, Color(first.bannerAccent), size = 42.dp)
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(
+                        if (merchants.size == 1) first.merchant else "${merchants.size} ta do'kon",
+                        style = TextStyle(fontFamily = AppFontFamily, fontSize = 16.sp, fontWeight = FontWeight.ExtraBold, color = palette.ink),
+                        maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        listOfNotNull("${offers.size} ta e'lon", first.location.takeIf { merchants.size == 1 })
+                            .joinToString(" · "),
+                        style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.sp, color = palette.inkFaint),
+                        maxLines = 1,
+                    )
                 }
             }
-            Box(
-                Modifier.size(30.dp).clip(RoundedCornerShape(9.dp)).background(palette.glass).clickable(onClick = onClose),
-                contentAlignment = Alignment.Center,
-            ) { Text("✕", style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.sp, fontWeight = FontWeight.Black, color = palette.inkMuted)) }
-        }
 
-        // Narx
-        Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-            Text("${offer.effectivePrice.sum()} so'm", style = TextStyle(fontFamily = AppFontFamily, fontSize = 16.sp, fontWeight = FontWeight.Black, color = if (offer.isDiscount) accent else palette.ink))
-            if (offer.isDiscount && offer.originalPrice > offer.finalPrice) {
-                Text("${offer.originalPrice.sum()}", style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.sp, color = palette.inkFaint, textDecoration = TextDecoration.LineThrough))
-                Box(Modifier.clip(RoundedCornerShape(8.dp)).background(accent).padding(horizontal = 8.dp, vertical = 3.dp)) {
-                    Text("−${offer.discountPercent}%", style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.sp, fontWeight = FontWeight.Black, color = Color.White))
+            // Ro'yxat uzun bo'lsa varaq ichida varaqlanadi.
+            LazyColumn(
+                Modifier.fillMaxWidth().heightIn(max = 520.dp),
+                verticalArrangement = Arrangement.spacedBy(11.dp),
+            ) {
+                items(offers, key = { it.id }) { offer ->
+                    val saved = savedIds.contains(offer.id)
+                    if (offer.isDiscount) {
+                        DiscountOfferCard(offer, saved, palette, onToggleSaved) { onOpen(offer.id) }
+                    } else {
+                        RegularOfferCard(offer, saved, palette, onToggleSaved) { onOpen(offer.id) }
+                    }
                 }
             }
-            Text("/ ${offer.priceUnit}", style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.sp, color = palette.inkFaint))
         }
+    }
+}
 
-        OfferTagRow(offer, saved, palette, clipboard, copied, onCopy = { copied = true }, onToggleSaved = onToggleSaved)
+/**
+ * Marker guruhining kaliti — bitta biznesning bitta nuqtasi.
+ *
+ * Do'kon nomi bilan birga KOORDINATA ham kalitga kiradi: bir tarmoqning turli filiallari
+ * xaritada alohida nuqta bo'lib qolishi kerak. Koordinata ~11 m aniqlikda yaxlitlanadi —
+ * bir bino ichidagi kichik farqlar bitta nuqtaga yig'ilsin.
+ */
+private fun DiscountOffer.businessKey(): String {
+    fun round(v: Double): Long = (v * 10_000).toLong()
+    return "$merchant@${round(lat)},${round(lng)}"
+}
 
-        val meta = listOfNotNull(offer.location?.let { "📍 $it" }, offer.expiry).joinToString(" · ")
-        if (meta.isNotBlank()) Text(meta, style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.sp, color = palette.inkFaint))
+/**
+ * Xarita ustidagi kategoriya chiplari ("Hammasi · Lavash 3 · Ko'k somsa 1 …").
+ *
+ * Ro'yxat serverdan keladi (`/v1/catalog/filter-schema` → `categories`), sonlar ham
+ * o'shanikidir — shuning uchun "0 natija" beradigan chip ko'rinmaydi.
+ *
+ * Tanlov DARHOL qo'llanadi: markerlar ham, ostidagi ro'yxat ham bir vaqtda filtrlanadi.
+ */
+@Composable
+private fun MapCategoryChips(
+    categories: List<String>,
+    counts: Map<String, Int>,
+    selected: String?,
+    palette: AppPalette,
+    onSelect: (String?) -> Unit,
+) {
+    if (categories.isEmpty()) return
+    LazyRow(
+        Modifier.fillMaxWidth().padding(top = 10.dp),
+        contentPadding = PaddingValues(horizontal = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        item {
+            MapChip("Hammasi", selected == null, palette) { onSelect(null) }
+        }
+        items(categories, key = { it }) { category ->
+            MapChip(category.withCount(counts[category]), category == selected, palette) {
+                // Ikkinchi marta bosilsa — tanlov bekor bo'ladi.
+                onSelect(if (category == selected) null else category)
+            }
+        }
+    }
+}
+
+/** Xarita ustidagi chip — fon xarita bo'lgani uchun to'liq qorong'i/oq (shaffof emas). */
+@Composable
+private fun MapChip(label: String, selected: Boolean, palette: AppPalette, onClick: () -> Unit) {
+    Box(
+        Modifier.clip(RoundedCornerShape(11.dp))
+            .background(if (selected) palette.primary else palette.glassStrong)
+            .border(1.dp, if (selected) palette.primary else palette.border, RoundedCornerShape(11.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 13.dp, vertical = 8.dp),
+    ) {
+        Text(
+            label,
+            style = TextStyle(
+                fontFamily = AppFontFamily, fontSize = 12.5f.sp, fontWeight = FontWeight.Bold,
+                color = if (selected) Color.White else palette.ink,
+            ),
+            maxLines = 1,
+        )
     }
 }
 
@@ -408,6 +536,19 @@ private fun FilterScreen(
             // Joylashuv — boshqa filtrlardan farqli: tanlangan zahoti so'rovga ketadi
             // (`filter.geo.regionIds`) va feed qayta tortiladi.
             RegionSelect(vm, palette)
+
+            // Katalog bo'limi — bosh ekrandagi bo'limlar ("Ovqatlar", "Sport"). Home'dan
+            // "Barchasi" bilan kelinganda shu yerda tanlangan bo'lib turadi.
+            if (fs.groups.isNotEmpty()) {
+                FilterSection("Katalog bo'limi", palette) {
+                    CategoryPill("Barchasi", null, d.groupKey == null, palette) { vm.onDraftGroup(null) }
+                    fs.groups.forEach { g ->
+                        CategoryPill(
+                            "${g.emoji} ${g.name}".trim(), g.accent, d.groupKey == g.key, palette,
+                        ) { vm.onDraftGroup(g.key) }
+                    }
+                }
+            }
 
             // Biznes turi
             FilterSection("Biznes turi", palette) {
@@ -513,10 +654,8 @@ private fun RegionSelect(vm: DiscountsViewModel, palette: AppPalette) {
         if (expanded) {
             Spacer(Modifier.size(8.dp))
             when {
-                picker.loading -> Box(
-                    Modifier.fillMaxWidth().padding(vertical = 16.dp),
-                    contentAlignment = Alignment.Center,
-                ) { CircularProgressIndicator(color = palette.primary, modifier = Modifier.size(26.dp)) }
+                // Viloyat qatorlari o'rniga o'shalarning skeleti.
+                picker.loading -> ScShimmerList(rows = 5, leading = false, spacing = 10.dp)
 
                 picker.error != null -> Text(
                     picker.error.orEmpty(),
@@ -608,7 +747,106 @@ private fun CategoryPill(label: String, accent: Long?, selected: Boolean, palett
 }
 
 // ---------------------------------------------------------------------------
-// Chegirmali e'lon kartasi — rangli banner + eski/yangi narx
+// Karta rasmi
+// ---------------------------------------------------------------------------
+
+/** Feed kartasi bannerining balandligi — Home kartalaridagidek ~kenglikka nisbatan past. */
+private val BannerHeight = 150.dp
+
+/**
+ * Chegirmali karta banneri: e'lon RASMI (`DiscountOffer.imageUrl`) va uning USTIDAGI
+ * ma'lumot — chegirma nishoni, tur yorlig'i, narx va manzil. E'lon nomi/tavsifi kartada
+ * YO'Q (ular tafsilot oynasida).
+ *
+ * Rasm kelguncha kulrang shimmer, havola yo'q/buzuq bo'lsa — turning emoji si; banner
+ * hech qachon bo'sh qolmaydi. Matn o'qilishi uchun pastdan qora gradient tushiriladi.
+ */
+@Composable
+private fun OfferBanner(offer: DiscountOffer, accent: Color, saved: Boolean, onToggleSaved: () -> Unit) {
+    Box(Modifier.fillMaxWidth().height(BannerHeight).background(accent.copy(alpha = 0.16f))) {
+        ScNetworkImage(url = offer.imageUrl, modifier = Modifier.fillMaxSize()) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text(offer.emoji, style = TextStyle(fontSize = 46.sp))
+            }
+        }
+        // Matn ostidagi qorayish — och rasmda ham oq matn o'qiladi.
+        Box(
+            Modifier.matchParentSize().background(
+                Brush.verticalGradient(
+                    0f to Color.Transparent,
+                    0.40f to Color.Black.copy(alpha = 0.12f),
+                    1f to Color.Black.copy(alpha = 0.82f),
+                ),
+            ),
+        )
+
+        if (offer.discountPercent > 0) {
+            Box(
+                Modifier.align(Alignment.TopStart).padding(10.dp).clip(RoundedCornerShape(11.dp))
+                    .background(accent).padding(horizontal = 11.dp, vertical = 6.dp),
+            ) {
+                Text("−${offer.discountPercent}%", style = TextStyle(fontFamily = AppFontFamily, fontSize = 15.sp, fontWeight = FontWeight.Black, color = Color.White))
+            }
+        }
+
+        // Saqlash — rasmning o'ng-tepasida (pastda endi matn turadi).
+        Icon(
+            AppIcons.Bookmark, "Saqlash",
+            tint = if (saved) accent else Color.White,
+            modifier = Modifier.align(Alignment.TopEnd).padding(12.dp).size(22.dp)
+                .clickable(onClick = onToggleSaved),
+        )
+
+        Column(
+            Modifier.align(Alignment.BottomStart).padding(horizontal = 12.dp, vertical = 11.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            // Yorliq foni doim oq (rasm ustida ham o'qilsin), shuning uchun matn ham to'q.
+            if (offer.subcategory.isNotBlank()) {
+                Box(
+                    Modifier.clip(RoundedCornerShape(10.dp))
+                        .background(Color.White.copy(alpha = 0.94f))
+                        .padding(horizontal = 9.dp, vertical = 4.dp),
+                ) {
+                    Text(offer.subcategory, style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, color = InkOnLight))
+                }
+            }
+            if (offer.originalPrice > 0) {
+                Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                    Text("${offer.finalPrice.sum()} so'm", style = TextStyle(fontFamily = AppFontFamily, fontSize = 16.sp, fontWeight = FontWeight.Black, color = Color.White))
+                    Text("${offer.originalPrice.sum()}", style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.5f.sp, color = Color.White.copy(alpha = 0.7f), textDecoration = TextDecoration.LineThrough))
+                    Text("/ ${offer.priceUnit}", style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.sp, color = Color.White.copy(alpha = 0.7f)))
+                }
+            }
+            offer.location?.takeIf { it.isNotBlank() }?.let { location ->
+                Text(
+                    "📍 $location",
+                    style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.sp, color = Color.White.copy(alpha = 0.78f)),
+                    maxLines = 1,
+                )
+            }
+        }
+    }
+}
+
+/** Oddiy (chegirmasiz) kartadagi kichik plitka — rasm bo'lsa rasm, bo'lmasa emoji. */
+@Composable
+private fun OfferThumb(offer: DiscountOffer, accent: Color, size: Dp = 52.dp) {
+    val shape = RoundedCornerShape(13.dp)
+    Box(Modifier.size(size).clip(shape).background(accent.copy(alpha = 0.12f))) {
+        ScNetworkImage(url = offer.imageUrl, modifier = Modifier.fillMaxSize(), shape = shape) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text(offer.emoji, style = TextStyle(fontSize = 24.sp))
+            }
+        }
+    }
+}
+
+/** Oq yorliq ustidagi matn — mavzudan qat'i nazar to'q (fon doim oq). */
+private val InkOnLight = Color(0xFF0F2A43)
+
+// ---------------------------------------------------------------------------
+// Chegirmali e'lon kartasi — rasmli banner + eski/yangi narx
 // ---------------------------------------------------------------------------
 @Composable
 private fun DiscountOfferCard(
@@ -619,41 +857,17 @@ private fun DiscountOfferCard(
     onOpen: () -> Unit,
 ) {
     val accent = Color(offer.bannerAccent)
-    val clipboard = LocalClipboardManager.current
-    var copied by remember(offer.id) { mutableStateOf(false) }
-    LaunchedEffect(copied) { if (copied) { delay(1500); copied = false } }
 
     Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(palette.glass).border(1.dp, palette.border, RoundedCornerShape(18.dp)).clickable(onClick = onOpen)) {
-        Box(Modifier.fillMaxWidth().height(64.dp).background(accent.copy(alpha = 0.16f)).padding(horizontal = 14.dp), contentAlignment = Alignment.CenterStart) {
-            Text(offer.emoji, style = TextStyle(fontSize = 30.sp))
-            if (offer.subcategory.isNotBlank()) {
-                Box(Modifier.align(Alignment.BottomStart).padding(bottom = 8.dp, start = 42.dp)) {
-                    Text(offer.subcategory, style = TextStyle(fontFamily = AppFontFamily, fontSize = 10.5f.sp, fontWeight = FontWeight.Bold, color = accent))
-                }
-            }
-            Box(
-                Modifier.align(Alignment.CenterEnd).clip(RoundedCornerShape(10.dp)).background(accent).padding(horizontal = 11.dp, vertical = 6.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text("−${offer.discountPercent}%", style = TextStyle(fontFamily = AppFontFamily, fontSize = 15.sp, fontWeight = FontWeight.Black, color = Color.White))
-            }
-        }
-        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("${offer.merchant} — ${offer.title}", style = TextStyle(fontFamily = AppFontFamily, fontSize = 14.sp, fontWeight = FontWeight.ExtraBold, color = palette.ink), maxLines = 1, overflow = TextOverflow.Ellipsis)
-
-            if (offer.originalPrice > 0) {
-                Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                    Text("${offer.finalPrice.sum()} so'm", style = TextStyle(fontFamily = AppFontFamily, fontSize = 15.sp, fontWeight = FontWeight.Black, color = accent))
-                    Text("${offer.originalPrice.sum()}", style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.5f.sp, color = palette.inkFaint, textDecoration = TextDecoration.LineThrough))
-                    Text("/ ${offer.priceUnit}", style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.sp, color = palette.inkFaint))
-                }
-            }
-
-            OfferTagRow(offer, saved, palette, clipboard, copied, onCopy = { copied = true }, onToggleSaved = onToggleSaved)
-
-            val meta = listOfNotNull(offer.location?.let { "📍 $it" }, offer.expiry).joinToString(" · ")
-            if (meta.isNotBlank()) Text(meta, style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.sp, color = palette.inkFaint))
-        }
+        // E'lon ma'lumoti rasm USTIDA; rasm ostida faqat biznes nomi qoladi.
+        OfferBanner(offer, accent, saved) { onToggleSaved(offer, saved) }
+        Text(
+            offer.merchant,
+            style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, color = palette.ink),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 11.dp),
+        )
     }
 }
 
@@ -674,11 +888,10 @@ private fun RegularOfferCard(
         horizontalArrangement = Arrangement.spacedBy(11.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(Modifier.size(52.dp).clip(RoundedCornerShape(13.dp)).background(accent.copy(alpha = 0.12f)), contentAlignment = Alignment.Center) {
-            Text(offer.emoji, style = TextStyle(fontSize = 24.sp))
-        }
+        OfferThumb(offer, accent)
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-            Text("${offer.merchant} — ${offer.title}", style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.5f.sp, fontWeight = FontWeight.ExtraBold, color = palette.ink), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            // Faqat biznes nomi — e'lon nomi kartada ko'rsatilmaydi.
+            Text(offer.merchant, style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.5f.sp, fontWeight = FontWeight.ExtraBold, color = palette.ink), maxLines = 1, overflow = TextOverflow.Ellipsis)
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 if (offer.subcategory.isNotBlank()) {
                     Box(Modifier.clip(RoundedCornerShape(7.dp)).background(accent.copy(alpha = 0.12f)).padding(horizontal = 7.dp, vertical = 2.dp)) {

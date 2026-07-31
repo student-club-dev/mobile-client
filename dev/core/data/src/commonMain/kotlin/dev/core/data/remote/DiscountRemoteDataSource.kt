@@ -1,6 +1,7 @@
 package dev.core.data.remote
 
 import dev.core.common.Resource
+import dev.core.data.dto.DiscountOfferDto
 import dev.core.data.dto.DiscountsResponseDto
 import dev.core.domain.model.OfferDetail
 import dev.core.domain.model.OfferFilterSchema
@@ -29,6 +30,9 @@ interface DiscountRemoteDataSource {
 
     /** Qidiruv avtoto'ldirishi (`POST /v1/discounts/suggest`). */
     suspend fun suggest(query: String): Resource<List<OfferSuggestion>>
+
+    /** Bitta guruhning e'lonlari — bo'lim ekrani uchun kattaroq sahifa bilan. */
+    suspend fun fetchGroupOffers(groupKey: String): Resource<List<DiscountOfferDto>>
 
     /** Filtr ekrani sxemasi (`POST /v1/catalog/filter-schema`). */
     suspend fun fetchFilterSchema(typeKeys: List<String>): Resource<OfferFilterSchema>

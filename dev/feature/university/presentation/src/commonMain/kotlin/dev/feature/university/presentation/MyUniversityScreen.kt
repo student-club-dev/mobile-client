@@ -25,7 +25,6 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -57,6 +56,9 @@ import dev.core.uikit.components.ScSoftButton
 import dev.core.uikit.components.ScText
 import dev.core.uikit.components.scCard
 import dev.core.uikit.components.scStyle
+import dev.core.uikit.components.ScShimmerBox
+import dev.core.uikit.components.ScShimmerLine
+import dev.core.uikit.components.ScShimmerList
 import dev.core.uikit.map.MapPoint
 import dev.core.uikit.map.OfferMarker
 import dev.core.uikit.map.OffersMap
@@ -262,16 +264,21 @@ private fun EmptyUniversity(loading: Boolean, modifier: Modifier = Modifier) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
+        // Yuklanayotganda kartaning O'ZI skelet bo'ladi: plitka + ikki qator matn.
+        if (loading) {
+            ScShimmerBox(Modifier.size(66.dp), RoundedCornerShape(20.dp))
+            ScShimmerLine(0.55f, 15.dp)
+            ScShimmerLine(0.75f, 11.dp)
+            return@Column
+        }
         ScIconTile(Sc.TintBlue, size = 66.dp, radius = 20.dp) {
             Icon(ScIcons.CapBadge, null, tint = Sc.Brand, modifier = Modifier.size(30.dp))
         }
-        ScText(if (loading) "Yuklanmoqda…" else "Universitet tanlanmagan", 17f, FontWeight.ExtraBold, Sc.Ink)
-        if (!loading) {
-            ScText(
-                "Yuqoridagi \"Universitetlar\" tugmasidan universitetingizni tanlang.",
-                13f, FontWeight.Medium, Sc.Muted, lineHeight = 19f,
-            )
-        }
+        ScText("Universitet tanlanmagan", 17f, FontWeight.ExtraBold, Sc.Ink)
+        ScText(
+            "Yuqoridagi \"Universitetlar\" tugmasidan universitetingizni tanlang.",
+            13f, FontWeight.Medium, Sc.Muted, lineHeight = 19f,
+        )
     }
 }
 
@@ -416,7 +423,12 @@ private fun UniversitySheet(
             }
             Box(Modifier.fillMaxWidth().weight(1f, fill = false)) {
                 when {
-                    picker.loading -> CenterNote { CircularProgressIndicator(color = Sc.Brand) }
+                    // Universitet qatorlarining skeleti (chapda monogramma plitkasi bor).
+                    picker.loading -> ScShimmerList(
+                        rows = 6,
+                        modifier = Modifier.padding(horizontal = 22.dp, vertical = 4.dp),
+                        rowHeight = 46.dp,
+                    )
                     picker.error != null -> CenterNote {
                         ScText("Ro'yxatni yuklab bo'lmadi.\nInternetni tekshiring.", 13f, FontWeight.Medium, Sc.Muted)
                     }

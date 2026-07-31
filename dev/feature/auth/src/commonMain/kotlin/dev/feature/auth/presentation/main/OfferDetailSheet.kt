@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -44,6 +43,8 @@ import dev.core.domain.model.OfferDetail
 import dev.core.uikit.components.AppFontFamily
 import dev.core.uikit.components.AppIcons
 import dev.core.uikit.components.scTopInset
+import dev.core.uikit.components.ScShimmerBox
+import dev.core.uikit.components.ScShimmerLine
 import dev.core.uikit.theme.AppPalette
 import kotlinx.coroutines.delay
 
@@ -90,8 +91,17 @@ fun OfferDetailSheet(
         }
 
         when {
-            state.loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = palette.primary)
+            // Tafsilot kelguncha — o'sha tafsilotning skeleti (banner + matn qatorlari),
+            // shunda ma'lumot kelganda oyna ichi sakramaydi.
+            state.loading -> Column(
+                Modifier.fillMaxSize().padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                ScShimmerBox(Modifier.fillMaxWidth().height(150.dp), RoundedCornerShape(18.dp))
+                ScShimmerLine(0.65f, 16.dp)
+                ScShimmerLine(0.4f, 13.dp)
+                ScShimmerLine(0.85f, 11.dp)
+                ScShimmerLine(0.7f, 11.dp)
             }
             state.detail != null -> DetailBody(state.detail, palette)
             else -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {

@@ -48,6 +48,7 @@ import dev.core.uikit.components.ScIcons
 import dev.core.uikit.components.ScText
 import dev.core.uikit.components.scCard
 import dev.core.uikit.components.scStyle
+import dev.core.uikit.components.ScShimmerList
 import dev.core.uikit.theme.Sc
 import dev.feature.connections.domain.model.ConnectionRequest
 import dev.feature.connections.domain.model.ConnectionView
@@ -262,7 +263,11 @@ private fun SearchSection(
         FilterBar(state, vm)
         Spacer(Modifier.height(12.dp))
         when {
-            state.searching && state.results.isEmpty() -> Hint("Yuklanmoqda…")
+            // Qidiruv natijalari o'rniga — o'sha qatorlarning skeleti.
+            state.searching && state.results.isEmpty() -> ScShimmerList(
+                rows = 6,
+                modifier = Modifier.padding(horizontal = Sc.ScreenPadding),
+            )
             state.searched && state.results.isEmpty() -> Hint(
                 if (state.query.isNotBlank()) {
                     // Qidiruv `firstName` va `lastName` ni ALOHIDA tekshiradi — to'liq ism ishlamaydi.
@@ -417,8 +422,12 @@ private fun ConnectedSection(
     modifier: Modifier = Modifier,
 ) {
     if (state.connections.isEmpty()) {
-        Box(modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
-            Hint(if (state.loading) "Yuklanmoqda…" else "Hali bog'lanmagansiz.\n\"Qidiruv\" bo'limidan do'st toping.")
+        if (state.loading) {
+            ScShimmerList(rows = 6, modifier = modifier.padding(horizontal = Sc.ScreenPadding))
+        } else {
+            Box(modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
+                Hint("Hali bog'lanmagansiz.\n\"Qidiruv\" bo'limidan do'st toping.")
+            }
         }
         return
     }

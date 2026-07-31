@@ -79,6 +79,12 @@ data class HomeUiState(
     val allStudents: List<SearchedStudent> = emptyList(),
     val clubs: List<Club> = emptyList(),
     val hasUnreadNotifications: Boolean = false,
+    /**
+     * Birinchi yuklanish tugamagan va ko'rsatadigan bo'lim yo'q — ekran o'rniga skelet
+     * (shimmer) chiziladi. Keshda ma'lumot bo'lsa `false`: tayyor kontent ustiga skelet
+     * qo'yilmaydi.
+     */
+    val loading: Boolean = false,
 )
 
 class HomeViewModel(
@@ -105,6 +111,9 @@ class HomeViewModel(
     /** Universitetim talabalari — xuddi shu sababga ko'ra (oqim yo'q) qo'lda yuklanadi. */
     private val _universityStudents = MutableStateFlow<List<SearchedStudent>>(emptyList())
 
+    /** Birinchi chegirma `refresh()` i tugaguncha `true` — Home skeletini shu boshqaradi. */
+    private val refreshing = MutableStateFlow(true)
+
     init {
         refreshStudents()
         // Offline-first: universitetlarni backend'dan sinxronlashga urinamiz.
@@ -127,7 +136,9 @@ class HomeViewModel(
                     runCatching {
                         regionRepository.syncWithUniversity(universityId, addressOf(universityId))
                     }
-                    discountRepository.refresh()
+                    runCatching { discountRepository.refresh() }
+                    // Xatoda ham bayroq tushadi — aks holda skelet abadiy qolib ketardi.
+                    refreshing.value = false
                     loadUniversityStudents(universityId)
                 }
         }
@@ -168,7 +179,8 @@ class HomeViewModel(
         discountRepository.observeAllOffers(),
         listings,
         clubRepository.observeClubs(),
-    ) { groups, offers, (jobs, rentals, tasks), clubs ->
+        refreshing,
+    ) { groups, offers, (jobs, rentals, tasks), clubs, loading ->
         // E'lon bo'limga `groupKey` bo'yicha AYNAN tushadi — nomidan taxmin qilinmaydi.
         // Guruhlar allaqachon server tartibida (`selectGroups` — `ORDER BY sortOrder`).
         val byGroup = offers.groupBy { it.groupKey }
@@ -180,6 +192,9 @@ class HomeViewModel(
                 else HomeOfferSection(g.key, g.name, g.emoji, list)
             },
             jobs = jobs, rentals = rentals, tasks = tasks, clubs = clubs,
+            // Skelet faqat KO'RSATADIGAN HECH NARSA yo'q bo'lganda: keshdagi e'lonlar
+            // bo'lsa ekran darrov to'ladi va yangilanish jimgina bo'ladi.
+            loading = loading && offers.isEmpty() && jobs.isEmpty() && rentals.isEmpty() && tasks.isEmpty(),
         )
     }
 
@@ -202,6 +217,7 @@ class HomeViewModel(
             },
             clubs = c.clubs,
             hasUnreadNotifications = unread > 0,
+            loading = c.loading,
         )
     }
         .catch { emit(HomeUiState()) }
@@ -283,6 +299,7 @@ class HomeViewModel(
         val rentals: List<Listing>,
         val tasks: List<Listing>,
         val clubs: List<Club>,
+        val loading: Boolean = false,
     )
 }
 

@@ -44,6 +44,7 @@ import dev.core.uikit.components.AppIcons
 import dev.core.uikit.media.toImageBitmapOrNull
 import dev.core.uikit.theme.AppPalette
 import dev.core.uikit.theme.appPalette
+import dev.core.uikit.components.ScShimmerBox
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 
@@ -282,7 +283,8 @@ fun AddImageTile(onClick: () -> Unit, loading: Boolean, palette: AppPalette = ap
         contentAlignment = Alignment.Center,
     ) {
         if (loading) {
-            Text("...", style = TextStyle(fontFamily = AppFontFamily, fontSize = 16.sp, color = palette.inkFaint))
+            // Rasm yuklanmoqda — plitkaning o'zi skelet bo'lib turadi.
+            ScShimmerBox(Modifier.fillMaxSize(), RoundedCornerShape(14.dp))
         } else {
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Icon(AppIcons.ImageIcon, null, tint = palette.inkFaint, modifier = Modifier.size(20.dp))

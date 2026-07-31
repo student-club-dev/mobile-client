@@ -137,5 +137,36 @@ class DiscountRepositoryImpl(
             Resource.Loading -> Resource.Success(Unit)
         }
     }
+
+    /**
+     * Bitta bo'limning e'lonlari. Umumiy [refresh] dan farqi — keshni TOZALAMAYDI: faqat
+     * kelgan yozuvlar ustiga yoziladi, shuning uchun boshqa bo'limlar joyida qoladi va
+     * ekran "miltillamaydi".
+     */
+    override suspend fun refreshGroup(groupKey: String): Resource<Unit> {
+        if (!syncEnabled) return Resource.Success(Unit)
+        return when (val res = remote.fetchGroupOffers(groupKey)) {
+            is Resource.Success -> {
+                if (res.data.isEmpty()) return Resource.Success(Unit)
+                withContext(dispatchers.io) {
+                    q.transaction {
+                        res.data.forEach { o ->
+                            q.upsertOffer(
+                                o.id, o.categoryId, o.groupKey, o.subcategory, o.gender, o.merchant, o.title,
+                                if (o.isDiscount) 1L else 0L, o.discountPercent.toLong(),
+                                o.originalPrice, o.finalPrice, o.priceUnit,
+                                o.tag, o.promoCode, o.location, o.expiry, o.emoji, o.bannerAccent,
+                                if (o.featured) 1L else 0L, o.lat, o.lng, o.imageUrl,
+                            )
+                            if (o.saved) q.saveOffer(o.id) else q.unsaveOffer(o.id)
+                        }
+                    }
+                }
+                Resource.Success(Unit)
+            }
+            is Resource.Error -> res
+            Resource.Loading -> Resource.Success(Unit)
+        }
+    }
 }
 

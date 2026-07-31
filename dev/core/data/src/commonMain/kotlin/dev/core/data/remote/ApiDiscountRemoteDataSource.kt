@@ -135,6 +135,26 @@ class ApiDiscountRemoteDataSource(
         )
     }
 
+    /**
+     * Bitta guruhning e'lonlari (bo'lim ekrani uchun). Umumiy feed'dan farqi — faqat SHU
+     * guruh so'raladi va sahifa kattaroq ([GROUP_PAGE_SIZE]).
+     */
+    override suspend fun fetchGroupOffers(groupKey: String): Resource<List<DiscountOfferDto>> = safeCall {
+        val types = cachedTypes.ifEmpty { loadTypes() }
+        discounts.search(
+            SearchRequestDto(
+                mode = SearchRequestDto.Mode.LIST,
+                filter = SearchFilterDto(
+                    groupKeys = listOf(groupKey),
+                    listingKind = SearchFilterDto.ListingKind.ALL,
+                    geo = geoFilter(),
+                ),
+                sort = SearchSortDto(by = SearchSortDto.By.NEWEST),
+                page = SearchPageDto(number = 0, propertySize = GROUP_PAGE_SIZE),
+            ),
+        ).body().items.map { it.toOfferDto(types[it.businessType]) }
+    }
+
     override suspend fun setFavorite(listingId: String, saved: Boolean): Resource<Boolean> =
         safeCall { discounts.toggle(FavoriteToggleRequestDto(listingId = listingId, saved = saved)).body().saved }
 
@@ -243,6 +263,17 @@ private const val MAX_GROUPS_PER_REQUEST = 3
  * 8 tadan ortig'ini ko'rsatmaydi, qolgani "Chegirmalar" ekranida qoladi.
  */
 private const val PER_GROUP_PAGE_SIZE = 12
+
+/**
+ * Bitta BO'LIM ekrani ochilganda o'sha guruhdan tortiladigan e'lonlar soni.
+ *
+ * Bosh ekran uchun 12 ta yetarli, lekin "Ovqatlanish" ekranida ro'yxat ham, xarita ham
+ * shu keshdan ishlaydi — 12 ta bilan chegaralansa e'lonlar yo'qolib qolgandek ko'rinardi.
+ *
+ * 50 — SERVER CHEGARASI: kattaroq so'rov `422 PAGE_SIZE_EXCEEDED` bilan qaytadi
+ * ("Bir sahifada ko'pi bilan 50 ta e'lon"), ya'ni bo'lim umuman yangilanmay qolardi.
+ */
+private const val GROUP_PAGE_SIZE = 50
 
 /** Qidiruv qatorida ko'rsatiladigan takliflar soni (spec chegarasi — 20). */
 private const val SUGGEST_LIMIT = 8

@@ -18,7 +18,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -51,6 +50,7 @@ import dev.core.uikit.components.FieldLabel
 import dev.core.uikit.components.GlassTextField
 import dev.core.uikit.components.PrimaryButton
 import dev.core.uikit.components.ScreenTitle
+import dev.core.uikit.components.ScShimmerList
 import dev.feature.auth.presentation.flow.AuthFlowState
 import dev.feature.auth.presentation.flow.AuthFlowViewModel
 import dev.feature.auth.presentation.flow.CourseYear
@@ -305,9 +305,8 @@ fun UniversityPickerScreen(
         Spacer(Modifier.height(8.dp))
 
         if (picker.loading) {
-            Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = palette.primary)
-            }
+            // Universitet qatorlarining skeleti — ro'yxat kelganda joy o'zgarmaydi.
+            ScShimmerList(rows = 6, leading = false, modifier = Modifier.weight(1f), spacing = 10.dp)
         } else {
             LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(picker.results, key = { it.id }) { uni ->

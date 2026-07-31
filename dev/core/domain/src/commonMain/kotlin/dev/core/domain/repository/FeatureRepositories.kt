@@ -34,6 +34,15 @@ interface DiscountRepository {
     suspend fun suggest(query: String): Resource<List<OfferSuggestion>>
 
     /**
+     * BITTA bo'limning (katalog guruhi) e'lonlarini to'liqroq tortadi.
+     *
+     * Umumiy [refresh] bosh ekran uchun har guruhdan atigi bir nechtasini oladi — bo'lim
+     * ekrani ochilganda esa hammasi kerak (ro'yxat ham, xarita ham shu manbadan). Keshdagi
+     * boshqa guruhlarga TEGILMAYDI, faqat shu guruh yozuvlari yangilanadi.
+     */
+    suspend fun refreshGroup(groupKey: String): Resource<Unit>
+
+    /**
      * Filtr ekrani sxemasi. [typeKeys] berilsa — faqat o'sha biznes turlari doirasida
      * (bo'limlar va sonlar shunga qarab toraytiriladi).
      */

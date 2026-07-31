@@ -20,7 +20,6 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -41,6 +40,8 @@ import dev.core.uikit.components.ScIcons
 import dev.core.uikit.components.ScSoftButton
 import dev.core.uikit.components.ScText
 import dev.core.uikit.components.scStyle
+import dev.core.uikit.components.ScShimmerGrid
+import dev.core.uikit.components.ScShimmerFooter
 import dev.core.uikit.theme.Sc
 import dev.feature.chat.domain.model.GifItem
 import dev.feature.chat.domain.model.GifProvider
@@ -103,7 +104,14 @@ fun GifPanel(
         Box(Modifier.fillMaxWidth().weight(1f)) {
             val error = state.error
             when {
-                state.loading -> CenterProgress()
+                // Kataklarning skeleti — GIF'lar kelganda to'r joyidan siljimaydi.
+                state.loading -> ScShimmerGrid(
+                    columns = GRID_COLUMNS,
+                    rows = 4,
+                    spacing = 6.dp,
+                    cellHeight = 88.dp,
+                    modifier = Modifier.padding(vertical = 2.dp),
+                )
 
                 error != null -> GifErrorView(
                     message = error.userMessage,
@@ -131,9 +139,7 @@ fun GifPanel(
                     }
                     if (state.loadingMore) {
                         item(span = { GridItemSpan(GRID_COLUMNS) }) {
-                            Box(Modifier.fillMaxWidth().height(48.dp), Alignment.Center) {
-                                CircularProgressIndicator(Modifier.size(20.dp), Sc.Brand, strokeWidth = 2.dp)
-                            }
+                            ScShimmerFooter(Modifier.height(48.dp))
                         }
                     }
                 }
@@ -253,13 +259,6 @@ private fun GifErrorView(message: String, retriable: Boolean, onRetry: () -> Uni
                 fontSize = 13.5f,
             )
         }
-    }
-}
-
-@Composable
-private fun CenterProgress() {
-    Box(Modifier.fillMaxSize(), Alignment.Center) {
-        CircularProgressIndicator(Modifier.size(24.dp), Sc.Brand, strokeWidth = 2.dp)
     }
 }
 
