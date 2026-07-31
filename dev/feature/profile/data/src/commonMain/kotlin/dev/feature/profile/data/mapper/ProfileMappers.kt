@@ -4,9 +4,12 @@ import dev.core.database.sql.ProfileEntity
 import dev.core.network.generated.model.CourseYearDto
 import dev.core.network.generated.model.GenderDto
 import dev.core.network.generated.model.LastSeenVisibilityDto
+import dev.core.network.generated.model.PhoneVisibilityDto
+import dev.core.network.generated.model.ProfilePhotoDto
 import dev.core.network.generated.model.ProfileRoleDto
 import dev.core.network.generated.model.UpdateProfileDto
 import dev.core.network.generated.model.UserProfileDto
+import dev.feature.profile.domain.model.ProfilePhoto
 import dev.feature.profile.domain.model.UserProfile
 
 // ---------------------------------------------------------------------------
@@ -24,6 +27,8 @@ fun ProfileEntity.toDomain(): UserProfile = UserProfile(
     courseYear = courseYear,
     gender = gender,
     lastSeenVisibility = lastSeenVisibility,
+    phoneVisibility = phoneVisibility,
+    bio = bio,
     avatarUrl = avatarUrl,
     businessName = businessName,
     businessType = businessType,
@@ -45,6 +50,8 @@ fun UserProfileDto.toDomain(): UserProfile = UserProfile(
     courseYear = courseYear?.value,
     gender = gender?.value,
     lastSeenVisibility = lastSeenVisibility?.value,
+    phoneVisibility = phoneVisibility?.value,
+    bio = bio,
     avatarUrl = avatarUrl,
 )
 
@@ -59,7 +66,18 @@ fun UserProfile.toUpdateRequest(): UpdateProfileDto = UpdateProfileDto(
     courseYear = courseYear?.toCourseYearDto(),
     gender = gender?.toGenderDto(),
     lastSeenVisibility = lastSeenVisibility?.toLastSeenVisibilityDto(),
+    phoneVisibility = phoneVisibility?.toPhoneVisibilityDto(),
+    // Bo'sh satr — "tozalash" (server shunday tushunadi), `null` esa "tegilmasin".
+    bio = bio,
     avatarUrl = avatarUrl,
+)
+
+fun ProfilePhotoDto.toDomain(): ProfilePhoto = ProfilePhoto(
+    id = id,
+    url = url,
+    thumbUrl = thumbUrl,
+    width = width ?: 0,
+    height = height ?: 0,
 )
 
 /** Domen `String` -> generatsiya qilingan enum. Noma'lum qiymat bo'lsa `null` (server default'i qoladi). */
@@ -74,3 +92,6 @@ private fun String.toGenderDto(): GenderDto? =
 
 private fun String.toLastSeenVisibilityDto(): LastSeenVisibilityDto? =
     LastSeenVisibilityDto.entries.firstOrNull { it.value == this }
+
+private fun String.toPhoneVisibilityDto(): PhoneVisibilityDto? =
+    PhoneVisibilityDto.entries.firstOrNull { it.value == this }

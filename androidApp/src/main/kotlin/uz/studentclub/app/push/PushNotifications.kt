@@ -14,7 +14,7 @@ import uz.studentclub.app.R
 /**
  * Push bildirishnomalarini ko'rsatish (Android).
  *
- * Server yuboradigan tana — `chat.md` §10:
+ * Server yuboradigan tana — `03-WEBSOCKET.md` §10:
  * ```jsonc
  * { "title": "Yangi xabar", "body": "<matn>", "data": { "conversationId": "cnv_01H8X" } }
  * ```

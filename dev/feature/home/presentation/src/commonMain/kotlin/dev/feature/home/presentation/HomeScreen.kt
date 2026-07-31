@@ -64,6 +64,10 @@ import dev.core.uikit.components.ScNetworkImage
 import dev.core.uikit.components.ScShimmerLine
 import dev.core.uikit.components.ScShimmerCard
 import dev.core.uikit.theme.Sc
+import dev.feature.stories.presentation.StoriesCollapsed
+import dev.feature.stories.presentation.StoriesRow
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import dev.core.domain.model.DiscountOffer
 import dev.feature.clubs.domain.model.Club
 import dev.feature.listings.domain.model.Listing
@@ -78,6 +82,9 @@ private val ScEasing = CubicBezierEasing(0.4f, 0f, 0.2f, 1f)
 
 /** Shu masofadan ortiq scroll qilinganda topbar siqiladi (maketda `scrollTop > 36`). */
 private val CondenseThreshold = 36.dp
+
+/** Topbardagi yig'ilgan story to'plamining eni — 3 ta ustma-ust doira + oraliq. */
+private val CollapsedStoriesWidth = 78.dp
 
 @Composable
 fun HomeScreen(
@@ -115,12 +122,27 @@ fun HomeScreen(
         if (condensed) 1f else 0f, tween(300, easing = ScEasing), label = "condense"
     )
 
+    val scope = rememberCoroutineScope()
+
     Column(Modifier.fillMaxSize().background(Sc.Bg)) {
-        HomeHeader(state, p, onOpenProfile, onOpenChat, onOpenNotifications)
+        HomeHeader(
+            state = state,
+            p = p,
+            onOpenProfile = onOpenProfile,
+            onOpenChat = onOpenChat,
+            onOpenNotifications = onOpenNotifications,
+            // Yig'ilgan to'plam bosilsa — lenta yana ko'rinsin.
+            onOpenStories = { scope.launch { scroll.animateScrollTo(0) } },
+        )
         Column(
             Modifier.fillMaxWidth().weight(1f).verticalScroll(scroll).padding(top = 22.dp),
             verticalArrangement = Arrangement.spacedBy(26.dp),
         ) {
+            // Story lentasi — eng tepada, bo'limlardan oldin (`handoff/07-STORIES.md` §2).
+            // O'z holatini o'zi boshqaradi: lenta bo'sh bo'lsa ham «Lavham» katakchasi
+            // qoladi, ya'ni bu yerda shart tekshirilmaydi.
+            StoriesRow(myName = state.userName, myAvatarUrl = state.avatarUrl)
+
             // Birinchi yuklanish, keshda hech narsa yo'q — bo'limlar o'rniga skelet.
             if (state.loading) {
                 HomeSkeleton()
@@ -203,6 +225,7 @@ private fun HomeHeader(
     onOpenProfile: () -> Unit,
     onOpenChat: () -> Unit,
     onOpenNotifications: () -> Unit,
+    onOpenStories: () -> Unit,
 ) {
     val fade = 1f - p
     ScHeader(
@@ -215,20 +238,40 @@ private fun HomeHeader(
             horizontalArrangement = Arrangement.spacedBy(13.dp),
         ) {
             val avatarSize = lerp(54.dp, 40.dp, p)
-            // Ilovadagi yagona avatar komponenti: bosh harf DOIM orqada chiziladi, rasm
-            // uning ustiga tushadi. Ilgari bu yerda `AsyncImage` to'g'ridan-to'g'ri
-            // ishlatilardi va havola buzuq bo'lsa (masalan server rasmni 404 qaytarsa)
-            // avatar BO'SH kvadrat bo'lib qolardi.
-            ScAvatar(
-                name = state.userName,
-                size = avatarSize,
-                modifier = Modifier.clickable(onClick = onOpenProfile),
-                avatarUrl = state.avatarUrl,
-                fontSize = 22f - 5f * p,
-                background = Color.White.copy(alpha = 0.22f),
-                initialColor = Color.White,
-                shape = RoundedCornerShape(lerp(20.dp, 14.dp, p)),
-            )
+            // Avatar va uning yonidagi yig'ilgan story to'plami bitta bo'lak: shunda
+            // tashqi qatorning 13dp oralig'i to'plam ko'rinmaganda ham qo'shilmaydi.
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                // Ilovadagi yagona avatar komponenti: bosh harf DOIM orqada chiziladi, rasm
+                // uning ustiga tushadi. Ilgari bu yerda `AsyncImage` to'g'ridan-to'g'ri
+                // ishlatilardi va havola buzuq bo'lsa (masalan server rasmni 404 qaytarsa)
+                // avatar BO'SH kvadrat bo'lib qolardi.
+                ScAvatar(
+                    name = state.userName,
+                    size = avatarSize,
+                    modifier = Modifier.clickable(onClick = onOpenProfile),
+                    avatarUrl = state.avatarUrl,
+                    fontSize = 22f - 5f * p,
+                    background = Color.White.copy(alpha = 0.22f),
+                    initialColor = Color.White,
+                    shape = RoundedCornerShape(lerp(20.dp, 14.dp, p)),
+                )
+                // Topbar siqilganda lenta ekrandan chiqib ketadi — o'shanda uning o'rnini
+                // Telegramdagidek kichik, ustma-ust tushgan avatarlar egallaydi.
+                Box(
+                    Modifier.width(lerp(0.dp, CollapsedStoriesWidth, p)).clipToBounds().alpha(p),
+                    contentAlignment = Alignment.CenterStart,
+                ) {
+                    StoriesCollapsed(
+                        myName = state.userName,
+                        myAvatarUrl = state.avatarUrl,
+                        onClick = onOpenStories,
+                        modifier = Modifier.padding(start = 10.dp),
+                        // Ko'k gradient ustida halqa oq bo'lishi kerak — brend ko'ki fonda
+                        // yo'qolib ketardi.
+                        ringBrush = Brush.linearGradient(listOf(Color.White, Color.White)),
+                    )
+                }
+            }
             Column(Modifier.weight(1f)) {
                 // "Assalomu alaykum 👋" — siqilganda balandligi 0 ga tushadi.
                 CollapsingRow(p, fullHeight = 18.dp) {

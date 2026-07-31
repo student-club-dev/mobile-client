@@ -9,7 +9,7 @@ import kotlin.test.assertNull
 
 /**
  * Socket.IO / Engine.IO ramkalari — qo'lda yozilgan protokol, shuning uchun har bir shakl
- * shu yerda qotirilgan. Manba: handoff `chat.md` §7–§9 (WS Swagger'da YO'Q).
+ * shu yerda qotirilgan. Manba: handoff `03-WEBSOCKET.md` §7–§9 (WS Swagger'da YO'Q).
  */
 class SocketIoProtocolTest {
 

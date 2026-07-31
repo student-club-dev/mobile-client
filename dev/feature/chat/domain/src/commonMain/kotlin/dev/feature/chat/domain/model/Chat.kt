@@ -7,7 +7,7 @@ import kotlinx.datetime.Instant
 enum class ConversationType { DIRECT, GROUP }
 
 /**
- * Xabar turi — **serverdan keladi** (`MessageDto.type`, `handoff/chat.md`).
+ * Xabar turi — **serverdan keladi** (`MessageDto.type`, `handoff/03-WEBSOCKET.md`).
  *
  * 2026-07-29 gacha backend faqat `TEXT` yozardi va rasm/stiker klient tomonida tanadan
  * taxmin qilinardi. Endi tipli xabar to'liq ishlaydi va evristika faqat **eski keshdagi**
@@ -19,7 +19,7 @@ enum class ConversationType { DIRECT, GROUP }
 enum class MessageType { TEXT, IMAGE, GIF, VIDEO, VOICE, FILE, STICKER, CALL, SYSTEM }
 
 /**
- * Xabar bilan nima ketayotgani — `handoff/chat.md` dagi jadval.
+ * Xabar bilan nima ketayotgani — `handoff/03-WEBSOCKET.md` dagi jadval.
  *
  * Bu qoidalar **klientda** tekshiriladi: `422` ni kutib o'tirish foydalanuvchining
  * xabarini "yuborilmadi" holatiga tushirardi, holbuki xatoni yuborishdan oldin ham
@@ -117,7 +117,7 @@ data class Message(
     /**
      * Xabar o'chirilgan vaqti (`DELETE /v1/messages/{id}`). `null` emas bo'lsa — bu
      * **tombstone**: qator `seq` i bilan tarixda qoladi, lekin tanasi ham, biriktirmasi
-     * ham yo'q va u o'qilmaganlar sanog'iga kirmaydi (`handoff/api-changes.md` §4b).
+     * ham yo'q va u o'qilmaganlar sanog'iga kirmaydi (`handoff/02-API-CHANGES.md` §4b).
      */
     val deletedAt: Instant? = null,
     /** `IMAGE`/`GIF`/`VIDEO`/`VOICE`/`FILE` da to'ladi; qolganlarida doim `null`. */
@@ -139,7 +139,7 @@ data class Message(
  * Media biriktirmasi — `MessageDto.attachment` ning ko'zgusi.
  *
  * [url] **himoyalangan**: `GET /v1/media/{id}/raw` suhbat a'zoligini tekshiradi, ya'ni
- * havolani ochish uchun ham `Bearer` token kerak (`handoff/api-changes.md` §4c). Rasm
+ * havolani ochish uchun ham `Bearer` token kerak (`handoff/02-API-CHANGES.md` §4c). Rasm
  * yuklovchi (Coil) shuning uchun tokenli klientdan foydalanadi.
  */
 data class Attachment(
@@ -184,6 +184,24 @@ data class MessageSticker(
     val height: Int = 0,
 )
 
+/**
+ * Ketayotgan biriktirmaning holati — xabar ekranda ko'rinib turibdi, fayl esa hali yo'lda.
+ *
+ * Serverda bunday tushuncha yo'q va keshga ham yozilmaydi: yuklash bir necha soniya davom
+ * etadi, ilova qayta ishga tushsa esa yarim ketgan faylni davom ettirib bo'lmaydi (server
+ * `Range` bilan yuklashni qo'llamaydi) — shuning uchun holat faqat xotirada yashaydi.
+ *
+ * [fileName] va [sizeBytes] **yuklovchidan** olinadi, keshdan emas: yakka biriktirmali
+ * xabarning qatori yuklash tugagunicha bo'sh turadi (`attachment` faqat javob bilan
+ * keladi), pufakda esa nom va hajm shu vaqtning o'zida kerak.
+ */
+data class UploadState(
+    /** `0f..1f`. `null` — hajm noma'lum, UI aylanma halqa ko'rsatadi. */
+    val progress: Float? = null,
+    val fileName: String? = null,
+    val sizeBytes: Long = 0,
+)
+
 /** `GET /v1/conversations/unread-count` — tab badge'i uchun ikkala hisoblagich. */
 data class UnreadCount(
     /** O'qilmagan xabarlar soni (o'chirilganlar hisobga olinmaydi). */
@@ -196,4 +214,19 @@ data class UnreadCount(
 class OutgoingImage(
     val bytes: ByteArray,
     val fileName: String,
-)
+) {
+    /**
+     * Galereyadan tanlangan fayl **GIF**mi.
+     *
+     * Tizim tanlagichi GIF'ni ham "rasm" deb qaytaradi, lekin server uchun bu boshqa tur:
+     * `kind = GIF` bilan yuklangan fayl ovozsiz MP4 ga o'giriladi (~20 barobar yengil) va
+     * xabar `type = GIF` bo'ladi. Kengaytma bo'yicha aniqlanadi — bu faqat **ko'rsatma**,
+     * server turni baribir faylning baytlaridan aniqlaydi.
+     */
+    val isGif: Boolean
+        get() = fileName.substringAfterLast('.', "").equals("gif", ignoreCase = true)
+
+    /** Shu fayl uchun xabar turi. */
+    val messageType: MessageType
+        get() = if (isGif) MessageType.GIF else MessageType.IMAGE
+}

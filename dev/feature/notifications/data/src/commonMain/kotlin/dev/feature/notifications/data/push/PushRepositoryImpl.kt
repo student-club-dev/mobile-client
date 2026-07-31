@@ -37,7 +37,7 @@ class PushRepositoryImpl(
     private var refreshJob: Job? = null
 
     override suspend fun register(): Resource<Unit> {
-        // Token yo'q — bu xato emas, shunchaki push ishlamaydi (chat.md §10).
+        // Token yo'q — bu xato emas, shunchaki push ishlamaydi (03-WEBSOCKET.md §10).
         val token = tokenSource.currentToken() ?: return Resource.Success(Unit)
         return send(token)
     }

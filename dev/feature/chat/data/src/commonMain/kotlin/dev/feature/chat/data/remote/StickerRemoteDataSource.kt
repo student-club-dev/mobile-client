@@ -12,7 +12,7 @@ import io.ktor.client.plugins.ResponseException
  *
  * Butun katalog **bitta javobda** keladi (~200 KB), shuning uchun u keshlanadi va keyingi
  * so'rovda `If-None-Match` bilan tekshiriladi: o'zgarmagan katalog **304** va **tanasiz**
- * javob beradi (`api-changes.md` §4c).
+ * javob beradi (`02-API-CHANGES.md` §4c).
  */
 class StickerRemoteDataSource(
     private val api: ChatApi,

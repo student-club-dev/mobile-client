@@ -3,7 +3,7 @@ package dev.feature.chat.domain.model
 import dev.core.common.Resource
 
 /**
- * GIF qidiruvining **ajratilishi shart** bo'lgan xatolari (`gif.md` jadvali).
+ * GIF qidiruvining **ajratilishi shart** bo'lgan xatolari (`04-GIF-INTEGRATION.md` jadvali).
  *
  * Nega alohida tur, `AppException` emas: `AppException` — `sealed`, ya'ni unga boshqa moduldan
  * yangi voris qo'shib bo'lmaydi. Ikkalasi ham 429 bo'lgan ikki xatoni esa **farqlash shart**:
@@ -40,6 +40,19 @@ enum class GifErrorKind(val userMessage: String, val retriable: Boolean) {
     PROVIDER_UNAVAILABLE(
         "GIF qidiruvi hozir ishlamayapti. Keyinroq urinib ko'ring.",
         retriable = true,
+    ),
+
+    /**
+     * `503 …_PROVIDER_ERROR` — provayder kaliti bu deploymentda **umuman sozlanmagan**.
+     *
+     * [PROVIDER_UNAVAILABLE] dan farqi: bu o'zi o'tib ketmaydi, ya'ni qayta urinish mantiqsiz.
+     * Stiker paneli buni ko'rib **qidiruv maydonini yashiradi** va katalogi bilan ishlayveradi
+     * (`handoff/06-STICKER-SEARCH.md` §5). GIF panelida esa yashiriladigan katalog yo'q,
+     * shuning uchun u xato matnini ko'rsatadi.
+     */
+    PROVIDER_NOT_CONFIGURED(
+        "GIF qidiruvi bu ilovada sozlanmagan.",
+        retriable = false,
     ),
 
     /** Internet yo'q / so'rov uzildi. */

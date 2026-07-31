@@ -7,7 +7,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
 /**
- * `handoff/chat.md` dagi jadval — turga xos qoidalar.
+ * `handoff/03-WEBSOCKET.md` dagi jadval — turga xos qoidalar.
  *
  * Nega klientda tekshiriladi: server `422` qaytarsa xabar ekranda "yuborilmadi" bo'lib
  * qolardi va foydalanuvchi sababini bilmasdan qayta urinaverardi.
@@ -75,6 +75,28 @@ class SendPayloadTest {
     }
 
     @Test
+    fun stickerTakesCatalogIdOrSearchResultButNotBoth() {
+        val sticker = stickerRef()
+        assertNull(SendPayload(MessageType.STICKER, stickerId = "st_1").validate())
+        assertNull(SendPayload(MessageType.STICKER, sticker = sticker).validate())
+        // Ikkalasi birga — server buni `422 STICKER_SOURCE_AMBIGUOUS` deb rad etadi,
+        // shuning uchun tarmoqqa umuman chiqmaydi.
+        assertEquals(
+            SendPayload.STICKER_SOURCE_AMBIGUOUS,
+            SendPayload(MessageType.STICKER, stickerId = "st_1", sticker = sticker).validate(),
+        )
+        assertEquals(
+            SendPayload.CAPTION_FORBIDDEN,
+            SendPayload(MessageType.STICKER, sticker = sticker, body = "izoh").validate(),
+        )
+    }
+
+    @Test
+    fun textCannotCarryASearchedSticker() {
+        assertNotNull(SendPayload(MessageType.TEXT, body = "salom", sticker = stickerRef()).validate())
+    }
+
+    @Test
     fun systemAndCallCannotBeSent() {
         // `SYSTEM` ni faqat server yozadi, `CALL` esa hali umuman yo'q.
         assertNotNull(SendPayload(MessageType.SYSTEM, body = "x").validate())
@@ -95,5 +117,14 @@ class SendPayloadTest {
         put("thumbUrl", kotlinx.serialization.json.JsonPrimitive("https://media.klipy.com/a.png"))
         put("width", kotlinx.serialization.json.JsonPrimitive(498))
         put("height", kotlinx.serialization.json.JsonPrimitive(280))
+    }
+
+    private fun stickerRef() = kotlinx.serialization.json.buildJsonObject {
+        put("provider", kotlinx.serialization.json.JsonPrimitive("KLIPY"))
+        put("externalId", kotlinx.serialization.json.JsonPrimitive("st_klipy_1"))
+        put("url", kotlinx.serialization.json.JsonPrimitive("https://static.klipy.com/a.webp"))
+        put("thumbUrl", kotlinx.serialization.json.JsonPrimitive("https://static.klipy.com/a_s.webp"))
+        put("width", kotlinx.serialization.json.JsonPrimitive(512))
+        put("height", kotlinx.serialization.json.JsonPrimitive(512))
     }
 }

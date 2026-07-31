@@ -5,6 +5,8 @@ import dev.core.network.generated.model.AttachmentDto
 import dev.core.network.generated.model.MediaUploadResponseDto
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
+import io.ktor.client.plugins.onUpload
+import io.ktor.client.request.HttpRequestBuilder
 import io.ktor.client.request.forms.FormBuilder
 import io.ktor.client.request.forms.MultiPartFormDataContent
 import io.ktor.client.request.forms.formData
@@ -25,9 +27,31 @@ enum class MediaPurpose { LOGO, COVER, LISTING }
  *
  * Server turni **faylning baytlaridan** aniqlaydi va `kind` ni faqat limitlar hamda
  * ishlov berish yo'lini tanlash uchun ishlatadi (IMAGE 12 MB · GIF 20 MB · VIDEO 64 MB ·
- * VOICE 16 MB · FILE 48 MB — `handoff/api-changes.md` §4c).
+ * VOICE 16 MB · FILE 48 MB — `handoff/02-API-CHANGES.md` §4c).
  */
-enum class ChatMediaKind { IMAGE, GIF, VIDEO, VOICE, FILE }
+enum class ChatMediaKind {
+    IMAGE, GIF, VIDEO, VOICE, FILE,
+
+    /**
+     * Profil rasmi (12 MB · jpeg/png/webp/heic/heif) — `handoff/08-PROFILE.md` §2.
+     * Chat biriktirmasi emas, shuning uchun `conversationId` **yuborilmaydi**.
+     */
+    PROFILE_PHOTO,
+
+    /** Story rasmi (12 MB) — `handoff/07-STORIES.md` §1. `conversationId` yo'q. */
+    STORY_IMAGE,
+
+    /** Story videosi (48 MB, **≤ 30 s**) — uzunroq bo'lsa `422 MEDIA_TOO_LONG`. */
+    STORY_VIDEO;
+
+    /**
+     * Suhbatga bog'liqmi. `false` bo'lganlarda `conversationId` **yuborilmasligi** kerak:
+     * story va profil rasmi hech qanday suhbatga tegishli emas, ruxsatni server o'zi
+     * (sessiya egasi bo'yicha) tekshiradi.
+     */
+    val needsConversation: Boolean
+        get() = this !in setOf(PROFILE_PHOTO, STORY_IMAGE, STORY_VIDEO)
+}
 
 /**
  * Rasm yuklash (`POST /v1/media/upload`) — **qo'lda** yozilgan, generatsiya qilingan
@@ -56,7 +80,9 @@ class MediaUploader(
         bytes: ByteArray,
         fileName: String,
         purpose: MediaPurpose,
+        onProgress: UploadProgress? = null,
     ): MediaUploadResponseDto = client.post(config.baseUrl + PATH) {
+        trackUpload(onProgress)
         setBody(
             MultiPartFormDataContent(
                 formData {
@@ -68,11 +94,14 @@ class MediaUploader(
     }.body()
 
     /**
-     * `POST /v1/media/chat-upload` — chat biriktirmasi (`handoff/chat.md`, "Yuborish oqimi").
+     * `POST /v1/media/chat-upload` — chat biriktirmasi (`handoff/03-WEBSOCKET.md`, "Yuborish oqimi").
      *
-     * [conversationId] **majburiy** va aynan u ruxsat tekshiruvi: a'zo bo'lmasangiz,
-     * bog'lanish uzilgan yoki bloklangan bo'lsangiz `403 NOT_CONNECTED`. Shu bilan server
-     * begona odam uchun fayl xostingiga aylanmaydi.
+     * [conversationId] chat biriktirmalari uchun **majburiy** va aynan u ruxsat tekshiruvi:
+     * a'zo bo'lmasangiz, bog'lanish uzilgan yoki bloklangan bo'lsangiz `403 NOT_CONNECTED`.
+     * Shu bilan server begona odam uchun fayl xostingiga aylanmaydi.
+     *
+     * Story va profil rasmida ([ChatMediaKind.needsConversation] `false`) suhbat yo'q —
+     * o'sha yerda `null` qoldiriladi.
      *
      * Javob — to'liq [AttachmentDto]; uning `id` si keyin `message:send { mediaId }` da
      * ishlatiladi va **bir martalik**: ikkinchi marta yuborilsa `422 MEDIA_ALREADY_USED`.
@@ -85,14 +114,20 @@ class MediaUploader(
         bytes: ByteArray,
         fileName: String,
         kind: ChatMediaKind,
-        conversationId: String,
+        conversationId: String? = null,
+        onProgress: UploadProgress? = null,
     ): AttachmentDto = client.post(config.baseUrl + CHAT_PATH) {
+        trackUpload(onProgress)
         setBody(
             MultiPartFormDataContent(
                 formData {
                     filePart(bytes, fileName)
                     append("kind", kind.name)
-                    append("conversationId", conversationId)
+                    // Story va profil rasmida suhbat yo'q — maydon yuborilsa ham server uni
+                    // e'tiborsiz qoldiradi, lekin yubormaslik niyatni aniqroq bildiradi.
+                    if (kind.needsConversation && conversationId != null) {
+                        append("conversationId", conversationId)
+                    }
                 },
             ),
         )
@@ -114,11 +149,42 @@ class MediaUploader(
             },
         )
 
+    /**
+     * Yuborilgan baytlarni `0f..1f` ga o'giradi va [onProgress] ga uzatadi.
+     *
+     * ⚠️ **Hech qachon `1f` bermaydi** ([MAX_REPORTED]): oxirgi bayt soketga yozilgani —
+     * serverning faylni qabul qilib, javob bergani EMAS. Katta videoda ular orasida bir
+     * necha soniya bo'ladi (server transkodlash navbatiga qo'yadi) va `100%` ni erta
+     * ko'rsatsak, foydalanuvchi tugadi deb o'ylab ekranni yopardi. `100%` — javob kelganda,
+     * chaqiruvchining ishi.
+     *
+     * Hajm noma'lum bo'lsa (`contentLength == null`) hodisa **tashlab yuboriladi**: bunda
+     * foizni hisoblab bo'lmaydi va UI aniqlanmagan (aylanma) halqaga tushadi.
+     */
+    private fun HttpRequestBuilder.trackUpload(onProgress: UploadProgress?) {
+        if (onProgress == null) return
+        onUpload { sent, total ->
+            if (total != null && total > 0) {
+                onProgress((sent.toFloat() / total).coerceIn(0f, MAX_REPORTED))
+            }
+        }
+    }
+
     private companion object {
         const val PATH = "media/upload"
         const val CHAT_PATH = "media/chat-upload"
+
+        const val MAX_REPORTED = 0.99f
     }
 }
+
+/**
+ * Yuklash jarayoni — `0f..1f`.
+ *
+ * Ktor uni **yuborayotgan korutin ichida** chaqiradi, ya'ni tez va bloklamaydigan bo'lishi
+ * kerak: ichida `StateFlow` yangilashdan boshqa ish qilmang.
+ */
+typealias UploadProgress = (Float) -> Unit
 
 /**
  * Fayl kengaytmasidan MIME turi.

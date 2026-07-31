@@ -8,7 +8,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
 /**
- * WS `message:new` endi to'liq `MessageDto` shaklida keladi (`handoff/chat.md`) — biriktirma,
+ * WS `message:new` endi to'liq `MessageDto` shaklida keladi (`handoff/03-WEBSOCKET.md`) — biriktirma,
  * stiker, `albumId` va `deletedAt` bilan. Bu test aynan shu maydonlarning keshga tushishini
  * tekshiradi: ular yo'qolsa ovozli xabarning to'lqin shakli va rasm nisbati oflayn rejimda
  * qayta ochilganda g'oyib bo'lardi.

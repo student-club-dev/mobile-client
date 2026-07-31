@@ -7,7 +7,7 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
- * GIF xatolarini ajratish (`gif.md` jadvali).
+ * GIF xatolarini ajratish (`04-GIF-INTEGRATION.md` jadvali).
  *
  * Eng muhimi — **ikkita 429**: biri provayder kvotasi (kutish kerak), ikkinchisi bizning
  * chegara (foydalanuvchini sekinlashtirish). Ular bir xil statusda keladi, ya'ni faqat
@@ -32,10 +32,10 @@ class GifErrorTest {
     @Test
     fun `502 va 503 — provayder ishlamayapti`() {
         assertEquals(GifErrorKind.PROVIDER_UNAVAILABLE, gifErrorKindOf(502, "GIF_PROVIDER_ERROR"))
-        assertEquals(GifErrorKind.PROVIDER_UNAVAILABLE, gifErrorKindOf(503, "GIF_PROVIDER_ERROR"))
+        assertEquals(GifErrorKind.PROVIDER_NOT_CONFIGURED, gifErrorKindOf(503, "GIF_PROVIDER_ERROR"))
         // Kod kelmasa ham status yetarli.
         assertEquals(GifErrorKind.PROVIDER_UNAVAILABLE, gifErrorKindOf(502, null))
-        assertEquals(GifErrorKind.PROVIDER_UNAVAILABLE, gifErrorKindOf(503, null))
+        assertEquals(GifErrorKind.PROVIDER_NOT_CONFIGURED, gifErrorKindOf(503, null))
     }
 
     @Test

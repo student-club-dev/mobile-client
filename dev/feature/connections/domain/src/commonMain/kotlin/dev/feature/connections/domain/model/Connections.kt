@@ -30,6 +30,26 @@ data class StudentSummary(
     val courseYear: String? = null,
     val online: Boolean = false,
     val lastSeenAt: Instant? = null,
+    /**
+     * Profil rasmlari, tartib bo'yicha. **Birinchi element doim [avatarUrl] ga teng**
+     * (`handoff/08-PROFILE.md` §3).
+     *
+     * Bo'sh ro'yxat — rasm qo'ymagan talaba; o'shanda [avatarUrl] ham `null` bo'lishi mumkin
+     * va bosh harf ko'rsatiladi. Maydon **hech qachon `null` emas**.
+     */
+    val photos: List<StudentPhoto> = emptyList(),
+    /**
+     * Tarjimayi hol, 140 belgigacha. Havola, `@handle` va telefon raqami **serverda rad
+     * etiladi**, ya'ni bu yerda doim oddiy matn — link detection kerak emas.
+     */
+    val bio: String? = null,
+    /**
+     * E.164 formatdagi raqam yoki `null`.
+     *
+     * ⚠️ Sukut sozlama `NOBODY`, ya'ni **ko'pchilikda `null` bo'ladi**. `null` bo'lsa qatorni
+     * umuman chizmang — bo'sh "Telefon: —" foyda bermaydi (`handoff/08-PROFILE.md` §3).
+     */
+    val phoneNumber: String? = null,
 ) {
     /** Ekranda ko'rsatiladigan nom: to'liq ism → `@username` → umumiy zaxira. */
     val displayName: String
@@ -40,6 +60,25 @@ data class StudentSummary(
     /** Avatar o'rnidagi harf. */
     val initial: String
         get() = displayName.trimStart('@').firstOrNull()?.uppercase() ?: "?"
+}
+
+/**
+ * Profil rasmi — qisqa profildagi va o'z profilimizdagi rasm bir xil shaklda.
+ *
+ * [url] **token bilan** so'raladi (`Authorization: Bearer`), ya'ni uni oddiy `Image.load`
+ * bilan ochib bo'lmaydi — ilovaning rasm klienti sarlavhani o'zi qo'yadi
+ * (`createImageHttpClient`).
+ */
+data class StudentPhoto(
+    val id: String,
+    val url: String,
+    /** Kichik nusxa; kelmasa [url] ning o'zi ishlatiladi. */
+    val thumbUrl: String? = null,
+    val width: Int = 0,
+    val height: Int = 0,
+) {
+    /** Ro'yxatda ko'rsatiladigan havola — kichik nusxa bo'lsa o'sha. */
+    val previewUrl: String get() = thumbUrl?.takeIf { it.isNotBlank() } ?: url
 }
 
 /**

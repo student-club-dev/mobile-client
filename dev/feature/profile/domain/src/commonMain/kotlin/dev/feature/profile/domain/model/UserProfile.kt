@@ -26,7 +26,25 @@ data class UserProfile(
      * `null` — server sukut qiymatini ("CONNECTIONS") qo'llaydi.
      */
     val lastSeenVisibility: String? = null,
-    /** Profil rasmi — `POST /v1/profile/me/avatar` qaytargan ochiq URL. */
+    /**
+     * Raqamni kim ko'radi: "EVERYONE" | "CONNECTIONS" | "NOBODY".
+     *
+     * ⚠️ Server sukuti — **`NOBODY`** (`lastSeenVisibility` niki esa `CONNECTIONS`):
+     * talabalar raqamini ko'rsatishga rozilik bermagan va ochiq sukut spam qo'ng'iroqqa
+     * olib kelardi (`handoff/08-PROFILE.md` §4). Ikkala sozlama **mustaqil**.
+     */
+    val phoneVisibility: String? = null,
+    /**
+     * Tarjimayi hol — 140 belgi. Havola, `@handle` va 7+ raqamli ketma-ketlik serverda
+     * rad etiladi (`422 BIO_NOT_ALLOWED`), shuning uchun klientda ham oldindan tekshiriladi
+     * ([bioRejectionReason]).
+     */
+    val bio: String? = null,
+    /**
+     * Profil rasmi — endi **hosila maydon**: har doim `photos[0].url` ga teng
+     * (`handoff/08-PROFILE.md` §1). Rasm qo'shilganda, asosiy qilinganda yoki o'chirilganda
+     * server ikkalasini bitta tranzaksiyada yangilaydi, ya'ni u hech qachon eskirmaydi.
+     */
     val avatarUrl: String? = null,
     // Biznes egasi (rol == "BUSINESS") — universitet/kurs o'rniga shu maydonlar to'ldiriladi.
     val businessName: String? = null,
@@ -41,4 +59,69 @@ data class UserProfile(
     /** Profil to'ldirilgan hisoblanadimi (kamida ism yoki universitet bor). */
     val isComplete: Boolean
         get() = !firstName.isNullOrBlank() || !universityId.isNullOrBlank()
+
+    companion object {
+        /** Tarjimayi hol chegarasi — serverdagi bilan bir xil. */
+        const val MAX_BIO = 140
+    }
 }
+
+/**
+ * Bitta profil rasmi (`handoff/08-PROFILE.md` §2).
+ *
+ * [url] **token bilan** so'raladi; ilovaning rasm klienti `Authorization` sarlavhasini
+ * o'z xostimizga o'zi qo'yadi (`createImageHttpClient`).
+ */
+data class ProfilePhoto(
+    val id: String,
+    val url: String,
+    val thumbUrl: String? = null,
+    val width: Int = 0,
+    val height: Int = 0,
+) {
+    /** To'rda ko'rsatiladigan havola — kichik nusxa bo'lsa o'sha. */
+    val previewUrl: String get() = thumbUrl?.takeIf { it.isNotBlank() } ?: url
+
+    companion object {
+        /** Server chegarasi — oshsa `422 PHOTO_LIMIT_REACHED`. */
+        const val MAX_PHOTOS = 6
+    }
+}
+
+/**
+ * Tarjimayi holni **yuborishdan oldin** tekshiradi. `null` — yaroqli.
+ *
+ * Nega klientda ham: server baribir `422 BIO_NOT_ALLOWED` beradi, lekin foydalanuvchi buni
+ * faqat «Saqlash» bosgandan keyin ko'rardi. Hujjat ham shuni tavsiya qiladi — "yozayotganda
+ * ogohlantiring, saqlashda kutmang" (`handoff/08-PROFILE.md` §5).
+ *
+ * Qoidalar serverdagi bilan bir xil: havola, `t.me/…`, `@kanal`, yalang'och domen va
+ * **7+ raqam** (ajratgichlar hisobga olinmaydi, ya'ni `+998 90 123 45 67` ham rad etiladi).
+ */
+fun bioRejectionReason(raw: String): String? {
+    val bio = raw.trim()
+    if (bio.isEmpty()) return null
+    if (bio.length > UserProfile.MAX_BIO) {
+        return "Tarjimayi hol ${UserProfile.MAX_BIO} belgidan uzun bo'lmasin."
+    }
+
+    val lower = bio.lowercase()
+    val hasLink = lower.contains("http://") || lower.contains("https://") ||
+        lower.contains("t.me/") || lower.contains("@") ||
+        // Yalang'och domen: `arzonkiyim.uz` — nuqta va tanish zona.
+        BARE_DOMAIN.containsMatchIn(lower)
+    if (hasLink) {
+        return "Tarjimayi holda havola yoki foydalanuvchi nomi bo'lishi mumkin emas."
+    }
+
+    // Ajratgichlar tashlanadi — `+998 90 123 45 67` 12 xonali ketma-ketlikka aylanadi.
+    if (bio.count { it.isDigit() } >= MIN_PHONE_DIGITS) {
+        return "Tarjimayi holda telefon raqami bo'lishi mumkin emas."
+    }
+    return null
+}
+
+private val BARE_DOMAIN = Regex("[a-z0-9-]+\\.(uz|com|ru|net|org|io|me|co)\\b")
+
+/** Serverdagi qoida: 7 va undan ortiq raqam — telefon deb hisoblanadi. */
+private const val MIN_PHONE_DIGITS = 7

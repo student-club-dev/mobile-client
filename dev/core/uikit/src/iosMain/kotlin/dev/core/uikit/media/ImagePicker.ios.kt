@@ -9,6 +9,7 @@ import kotlinx.cinterop.addressOf
 import kotlinx.cinterop.usePinned
 import org.jetbrains.skia.Image
 import platform.Foundation.NSData
+import platform.Foundation.NSItemProvider
 import platform.PhotosUI.PHPickerConfiguration
 import platform.PhotosUI.PHPickerFilter
 import platform.PhotosUI.PHPickerResult
@@ -22,6 +23,26 @@ import platform.posix.memcpy
 
 /** Har qanday rasm formati — PHPicker shu identifikator bo'yicha ma'lumot beradi. */
 private const val UTI_IMAGE = "public.image"
+
+/** GIF ning UTI'si — PHPicker uni `public.image` ostida qaytaradi, turini alohida so'raymiz. */
+private const val UTI_GIF = "com.compuserve.gif"
+private const val UTI_PNG = "public.png"
+private const val UTI_WEBP = "org.webmproject.webp"
+
+/**
+ * Tanlangan elementning kengaytmasi.
+ *
+ * ⚠️ **GIF alohida muhim.** PHPicker GIF'ni ham oddiy rasm sifatida beradi, lekin chat
+ * qatlami aynan kengaytmaga qarab uni `kind = GIF` bilan yuklaydi (server uni ovozsiz MP4
+ * ga o'giradi, ~20 barobar yengil). Ilgari bu yerda hamma narsa `jpg` deb atalardi va GIF
+ * jimgina oddiy rasmga aylanib, **animatsiyasini yo'qotardi**.
+ */
+private fun NSItemProvider.pickedExtension(): String = when {
+    hasItemConformingToTypeIdentifier(UTI_GIF) -> "gif"
+    hasItemConformingToTypeIdentifier(UTI_PNG) -> "png"
+    hasItemConformingToTypeIdentifier(UTI_WEBP) -> "webp"
+    else -> "jpg"
+}
 
 @Composable
 actual fun rememberImagePicker(onResult: (PickedImage?) -> Unit): ImagePicker {
@@ -59,7 +80,7 @@ private class PhotoPickerDelegate : NSObject(), PHPickerViewControllerDelegatePr
         }
 
         provider.loadDataRepresentationForTypeIdentifier(UTI_IMAGE) { data, _ ->
-            val picked = data?.toByteArray()?.let { PickedImage(it, "image.jpg") }
+            val picked = data?.toByteArray()?.let { PickedImage(it, "image." + provider.pickedExtension()) }
             // Callback fon oqimida keladi — UI holatiga faqat asosiy oqimdan tegamiz.
             dispatch_async(dispatch_get_main_queue()) { onResult(picked) }
         }
@@ -114,7 +135,8 @@ private class MultiPhotoPickerDelegate : NSObject(), PHPickerViewControllerDeleg
 
         providers.forEachIndexed { index, provider ->
             provider.loadDataRepresentationForTypeIdentifier(UTI_IMAGE) { data, _ ->
-                val image = data?.toByteArray()?.let { PickedImage(it, "image_$index.jpg") }
+                val image = data?.toByteArray()
+                    ?.let { PickedImage(it, "image_$index." + provider.pickedExtension()) }
                 // Yig'ish ham, callback ham FAQAT asosiy oqimda: `remaining` ustida poyga
                 // bo'lmaydi va atomik hisoblagich kerak emas.
                 dispatch_async(dispatch_get_main_queue()) {

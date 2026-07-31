@@ -14,12 +14,15 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
- * Teskari geokodlash — **OpenStreetMap Nominatim** (tekin, API kalit talab qilmaydi).
+ * **Zaxira** geokoder — OpenStreetMap Nominatim (tekin, API kalit talab qilmaydi).
  *
- * Backend yoqilganda `POST /v1/geo/reverse-geocode` (Yandex Geocoder proksisi) o'rniga
- * qo'yiladi — u O'zbekiston manzillarida aniqroq. Nominatim'ning foydalanish qoidasi
- * `User-Agent` ni talab qiladi va soniyasiga 1 so'rovdan ko'p yubormaslikni so'raydi;
- * bizda so'rov faqat foydalanuvchi xaritada nuqta tanlaganda ketadi, shuning uchun yetarli.
+ * ⚠️ Bu **asosiy yo'l emas**: manzil endi o'z backendimizdan olinadi
+ * ([ApiGeoRepository]) — u Yandex Geocoder'ni proksi qiladi, O'zbekiston manzillarida
+ * aniqroq va `regionId`/`districtId` ni tayyor beradi. Bu klass faqat backend `503`
+ * qaytarganda (provayder kaliti sozlanmagan deployment) ishga tushadi.
+ *
+ * Nominatim'ning foydalanish qoidasi `User-Agent` ni talab qiladi va soniyasiga 1 so'rovdan
+ * ko'p yubormaslikni so'raydi — zaxira sifatida bu chegara amalda hech qachon urilmaydi.
  *
  * MUHIM: bu klient ilovaning umumiy Ktor klienti EMAS — u har so'rovga Firebase Bearer
  * tokenini qo'shadi va bazaviy manzili `api.studentclub.uz`. Nominatim'ga o'z klienti kerak.

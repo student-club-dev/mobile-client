@@ -12,6 +12,7 @@ import dev.core.database.sql.ChatQueries
 import dev.core.database.sql.StudentClubDatabase
 import dev.core.network.generated.model.ConversationListItemDto
 import dev.core.network.media.ChatMediaKind
+import dev.core.network.media.UploadProgress
 import dev.feature.chat.data.mapper.AttachmentColumns
 import dev.feature.chat.data.mapper.MessageRow
 import dev.feature.chat.data.mapper.SendPayload
@@ -30,7 +31,9 @@ import dev.feature.chat.domain.model.MessageStatus
 import dev.feature.chat.domain.model.MessageType
 import dev.feature.chat.domain.model.OutgoingImage
 import dev.feature.chat.domain.model.Sticker
+import dev.feature.chat.domain.model.StickerRef
 import dev.feature.chat.domain.model.UnreadCount
+import dev.feature.chat.domain.model.UploadState
 import dev.feature.chat.domain.repository.ChatRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -51,7 +54,7 @@ import kotlin.random.Random
  * Oqim: ikkala manba ham SQLDelight keshiga yozadi, UI esa faqat keshni kuzatadi. Shuning
  * uchun ekran tarmoqqa bog'liq emas va WS uzilib-ulanganda qayta chizilmaydi.
  *
- * Tartib o'qi — **`seq`** (`handoff/chat.md`): tarix `?before=`, qayta ulanish `?after=`,
+ * Tartib o'qi — **`seq`** (`handoff/03-WEBSOCKET.md`): tarix `?before=`, qayta ulanish `?after=`,
  * o'qildi kursori ham shu.
  *
  * Media oqimi (2026-07-29 kontrakti): `POST /v1/media/chat-upload` → `mediaId` →
@@ -64,6 +67,11 @@ class ChatRepositoryImpl(
     private val remote: ChatRemoteDataSource,
     private val socket: ChatSocket,
     private val tokenStore: TokenStore,
+    /**
+     * API origin'i — biriktirma havolalarini to'liq holga keltirish uchun (`MediaUrl`).
+     * Serverdan ular nisbiy keladi va video/ovoz pleyeri bunday havolani ocholmaydi.
+     */
+    private val apiOrigin: String,
 ) : ChatRepository {
 
     private val q: ChatQueries get() = db.chatQueries
@@ -74,6 +82,13 @@ class ChatRepositoryImpl(
      * o'zi ko'rinadi, keyin serverdagi havolaga almashadi.
      */
     private val localImages = MutableStateFlow<Map<String, ByteArray>>(emptyMap())
+
+    /**
+     * Hozir ketayotgan biriktirmalar (xabar id → foiz). Faqat xotirada: yarim ketgan
+     * yuklashni ilova qayta ishga tushgach davom ettirib bo'lmaydi, ya'ni bu holatni
+     * keshda saqlashning ma'nosi yo'q.
+     */
+    private val uploads = MutableStateFlow<Map<String, UploadState>>(emptyMap())
 
     /** WS hodisalarini keshga yozuvchi kolektorlar shu qamrovda yashaydi. */
     private val scope = CoroutineScope(SupervisorJob() + dispatchers.io)
@@ -98,7 +113,8 @@ class ChatRepositoryImpl(
         q.selectConversation(conversationId).asFlow().mapToOneOrNull(dispatchers.io).map { it?.toDomain() }
 
     override fun observeMessages(conversationId: String): Flow<List<Message>> =
-        q.selectMessages(conversationId).asFlow().mapToList(dispatchers.io).map { rows -> rows.map { it.toDomain() } }
+        q.selectMessages(conversationId).asFlow().mapToList(dispatchers.io)
+            .map { rows -> rows.map { it.toDomain(apiOrigin) } }
 
     override fun observeTyping(conversationId: String): Flow<Boolean> =
         typingIds.map { conversationId in it }
@@ -106,6 +122,8 @@ class ChatRepositoryImpl(
     override fun observeRealtimeConnected(): Flow<Boolean> = socket.connected
 
     override fun observeLocalImages(): Flow<Map<String, ByteArray>> = localImages
+
+    override fun observeUploads(): Flow<Map<String, UploadState>> = uploads
 
     // --- Real-time -----------------------------------------------------------------------
 
@@ -199,7 +217,7 @@ class ChatRepositoryImpl(
 
     /**
      * `typing:stop` yo'qolib qolsa indikator abadiy osilib qolmasin — har `typing` hodisasi
-     * taymerni qaytadan boshlaydi (`handoff/chat.md`: ~5 soniya).
+     * taymerni qaytadan boshlaydi (`handoff/03-WEBSOCKET.md`: ~5 soniya).
      */
     private fun startTyping(conversationId: String) {
         typingIds.value = typingIds.value + conversationId
@@ -381,6 +399,21 @@ class ChatRepositoryImpl(
             sendPayload(conversationId, SendPayload(type = MessageType.TEXT, body = sticker.emoji))
         }
 
+    override suspend fun sendStickerRef(conversationId: String, sticker: StickerRef): Resource<Unit> =
+        sendPayload(
+            conversationId,
+            SendPayload(
+                type = MessageType.STICKER,
+                // Javobda kelgan obyekt AYNAN shu holda qaytariladi — server uni domen oq
+                // ro'yxatidan o'tkazadi (`422 STICKER_URL_NOT_ALLOWED`).
+                sticker = sticker.toJson(),
+                // Optimistik qatorga — server javobini kutmasdan ko'rsatish uchun. `emoji`
+                // yo'q (bu personaj stikeri, emoji o'rnini bosuvchi belgi emas), shuning
+                // uchun faqat tasvir havolasi yoziladi.
+                stickerUrl = sticker.url,
+            ),
+        )
+
     override suspend fun sendGif(conversationId: String, gif: GifRef): Resource<Unit> =
         sendPayload(
             conversationId,
@@ -462,7 +495,10 @@ class ChatRepositoryImpl(
 
         // Bitta albom — ekranda bitta to'r bo'lib chiziladi. Kalitni KLIENT generatsiya
         // qiladi va endi server ham uni qaytaradi, ya'ni qabul qiluvchi ham to'r ko'radi.
-        val albumId = if (images.size > 1) randomClientMsgId() else null
+        //
+        // ⚠️ GIF albomga KIRMAYDI: u alohida tur (`type = GIF`) va server uni ovozsiz MP4
+        // ga o'giradi, ya'ni rasmlar to'ri bilan bir katakda tursa maket buzilardi.
+        val albumId = if (images.count { !it.isGif } > 1) randomClientMsgId() else null
 
         // 1-qadam: HAMMASI darhol ekranga chiqadi. Yuklash sekundlab davom etadi, foydalanuvchi
         // esa tanlagan rasmlarini shu zahoti ko'rishi kerak.
@@ -478,16 +514,16 @@ class ChatRepositoryImpl(
                             conversationId = conversationId,
                             senderId = me,
                             seq = 0L,
-                            type = MessageType.IMAGE.name,
+                            type = image.messageType.name,
                             // Media xabarda tana bo'sh — havola endi TANAGA yozilmaydi.
                             body = "",
                             createdAt = now,
                             clientMsgId = clientMsgId,
                             status = MessageStatus.SENDING.name,
-                            albumId = albumId,
+                            albumId = if (image.isGif) null else albumId,
                         ),
                     )
-                    q.touchConversation("", me, MessageType.IMAGE.name, now, 0L, conversationId)
+                    q.touchConversation("", me, image.messageType.name, now, 0L, conversationId)
                 }
             }
             localImages.update { it + (localId to image.bytes) }
@@ -518,12 +554,18 @@ class ChatRepositoryImpl(
         item: PendingImage,
         albumId: String?,
     ): Resource<Unit> {
-        val upload = remote.uploadAttachment(
-            conversationId = conversationId,
-            bytes = item.image.bytes,
-            fileName = item.image.fileName,
-            kind = ChatMediaKind.IMAGE,
-        )
+        val upload = tracked(item.localId, item.image.fileName, item.image.bytes.size.toLong()) { onProgress ->
+            remote.uploadAttachment(
+                conversationId = conversationId,
+                bytes = item.image.bytes,
+                fileName = item.image.fileName,
+                // Foydalanuvchining O'Z GIF'i — server uni ovozsiz MP4 ga o'giradi (~20 barobar
+                // yengil). Qidiruvdan tanlangan GIF esa umuman yuklanmaydi, u `gif` obyekti
+                // bilan havola sifatida ketadi (`sendGif`).
+                kind = if (item.image.isGif) ChatMediaKind.GIF else ChatMediaKind.IMAGE,
+                onProgress = onProgress,
+            )
+        }
         val attachment = when (upload) {
             is Resource.Success -> upload.data.toColumns()
             is Resource.Error -> return fail(item.localId, upload.message, upload.error)
@@ -537,9 +579,9 @@ class ChatRepositoryImpl(
         val result = deliver(
             conversationId = conversationId,
             payload = SendPayload(
-                type = MessageType.IMAGE,
+                type = item.image.messageType,
                 mediaId = attachment.id,
-                albumId = albumId,
+                albumId = if (item.image.isGif) null else albumId,
             ),
             clientMsgId = item.clientMsgId,
             localId = item.localId,
@@ -547,6 +589,86 @@ class ChatRepositoryImpl(
         // Server havolasi bor — local nusxa endi kerak emas.
         localImages.update { it - item.localId }
         return result
+    }
+
+    override suspend fun sendFile(conversationId: String, bytes: ByteArray, fileName: String) =
+        sendSingleAttachment(conversationId, bytes, fileName, ChatMediaKind.FILE, MessageType.FILE)
+
+    override suspend fun sendVideo(conversationId: String, bytes: ByteArray, fileName: String) =
+        sendSingleAttachment(conversationId, bytes, fileName, ChatMediaKind.VIDEO, MessageType.VIDEO)
+
+    override suspend fun sendVoice(conversationId: String, bytes: ByteArray, fileName: String) =
+        sendSingleAttachment(conversationId, bytes, fileName, ChatMediaKind.VOICE, MessageType.VOICE)
+
+    /**
+     * Yakka biriktirmali xabar: yuklash → `message:send { mediaId }`.
+     *
+     * Rasm oqimidan ([sendImages]) farqi — albom yo'q va **local nusxa saqlanmaydi**:
+     * fayl/video/ovozni yuklanguncha ekranda ko'rsatadigan joy yo'q (rasmda esa tanlangan
+     * kadr darhol chiziladi). Shuning uchun optimistik qator biriktirmasiz turadi va
+     * yuklash tugagach to'ladi.
+     */
+    private suspend fun sendSingleAttachment(
+        conversationId: String,
+        bytes: ByteArray,
+        fileName: String,
+        kind: ChatMediaKind,
+        type: MessageType,
+    ): Resource<Unit> {
+        val me = currentUserId ?: return errorOf(AppException.Unauthorized())
+        val clientMsgId = randomClientMsgId()
+        val localId = LOCAL_ID_PREFIX + clientMsgId
+        val now = Clock.System.now().toEpochMilliseconds()
+
+        withContext(dispatchers.io) {
+            q.transaction {
+                q.insert(
+                    MessageRow(
+                        id = localId,
+                        conversationId = conversationId,
+                        senderId = me,
+                        seq = 0L,
+                        type = type.name,
+                        body = "",
+                        createdAt = now,
+                        clientMsgId = clientMsgId,
+                        status = MessageStatus.SENDING.name,
+                        // Nom va hajm DARHOL yoziladi: yuklash tugagunicha biriktirma
+                        // qatorda yo'q, pufak esa ularsiz "Fayl" deb turardi. Qayta
+                        // urinishda ham asl nom shu yerdan olinadi.
+                        attachmentFileName = fileName,
+                        attachmentSizeBytes = bytes.size.toLong(),
+                    ),
+                )
+                q.touchConversation("", me, type.name, now, 0L, conversationId)
+            }
+        }
+
+        val upload = tracked(localId, fileName, bytes.size.toLong()) { onProgress ->
+            remote.uploadAttachment(
+                conversationId = conversationId,
+                bytes = bytes,
+                fileName = fileName,
+                kind = kind,
+                onProgress = onProgress,
+            )
+        }
+        val attachment = when (upload) {
+            is Resource.Success -> upload.data.toColumns()
+            is Resource.Error -> return fail(localId, upload.message, upload.error)
+            Resource.Loading -> return Resource.Success(Unit)
+        }
+
+        // Biriktirma DARHOL keshga yoziladi: `mediaId` **bir martalik**, ya'ni yuborish
+        // yiqilsa ham qayta urinishda fayl qaytadan yuklanmasligi kerak.
+        withContext(dispatchers.io) { q.setAttachment(attachment, localId) }
+
+        return deliver(
+            conversationId = conversationId,
+            payload = SendPayload(type = type, mediaId = attachment.id),
+            clientMsgId = clientMsgId,
+            localId = localId,
+        )
     }
 
     override suspend fun retry(messageId: String): Resource<Unit> {
@@ -610,6 +732,7 @@ class ChatRepositoryImpl(
             stickerId = payload.stickerId,
             albumId = payload.albumId,
             gif = payload.gif,
+            sticker = payload.sticker,
         )
         if (ack != null) {
             if (ack.isSent) {
@@ -700,6 +823,73 @@ class ChatRepositoryImpl(
         }
     }
 
+    override suspend fun deleteMessages(messageIds: List<String>, forEveryone: Boolean): Resource<Unit> {
+        if (messageIds.isEmpty()) return Resource.Success(Unit)
+        return if (forEveryone) deleteForEveryone(messageIds) else hideForMe(messageIds)
+    }
+
+    /**
+     * Har bir xabar uchun alohida so'rov — backendda ko'p o'chirish endpointi yo'q
+     * (`CHAT_SELECTION_AND_HISTORY_BACKEND.md` §A2). Ketma-ket ketadi: parallel yuborilsa
+     * 50 ta tanlangan xabar serverga bir vaqtda 50 ta so'rov bo'lib urilardi.
+     *
+     * Yiqilgani boshqalarni to'xtatmaydi — foydalanuvchi o'chirilganini ko'radi va
+     * qolganini qayta urinishi mumkin.
+     */
+    private suspend fun deleteForEveryone(messageIds: List<String>): Resource<Unit> {
+        var firstError: Resource.Error? = null
+        messageIds.forEach { id ->
+            val res = deleteMessage(id)
+            if (res is Resource.Error && firstError == null) firstError = res
+        }
+        return firstError ?: Resource.Success(Unit)
+    }
+
+    /**
+     * «Faqat menda o'chirish» — serverga bormaydi.
+     *
+     * Yuborilmagan (optimistik) qatorlar **haqiqatan** o'chiriladi: ular serverda yo'q va
+     * yashirilgani ekranda ko'rinmay, `FAILED` bo'lib keshda abadiy qolib ketardi.
+     */
+    private suspend fun hideForMe(messageIds: List<String>): Resource<Unit> {
+        val now = Clock.System.now().toEpochMilliseconds()
+        withContext(dispatchers.io) {
+            q.transaction {
+                val rows = messageIds.mapNotNull { q.selectMessageById(it).executeAsOneOrNull() }
+                val (local, remoteRows) = rows.partition { it.id.startsWith(LOCAL_ID_PREFIX) }
+                if (local.isNotEmpty()) q.deleteMessages(local.map { it.id })
+                if (remoteRows.isNotEmpty()) q.hideMessages(now, remoteRows.map { it.id })
+                // Ko'rinmaydigan xabarni o'qib bo'lmaydi — busiz badge abadiy yonib turardi.
+                remoteRows.filter { it.senderId != currentUserId && it.deletedAt == null }
+                    .forEach { q.decrementUnreadForDeleted(it.conversationId, it.seq) }
+                rows.map { it.conversationId }.distinct().forEach { refreshPreview(it) }
+            }
+        }
+        localImages.update { it - messageIds.toSet() }
+        return Resource.Success(Unit)
+    }
+
+    /**
+     * Suhbatlar ro'yxatidagi ko'rinishni keshdan qayta hisoblaydi.
+     *
+     * Oxirgi xabar yashirilganda `ConversationEntity` dagi nusxa eskirib qoladi va ro'yxatda
+     * chatda **ko'rinmaydigan** matn turib qolardi. Hech nima qolmasa qator "Xabar yozing…"
+     * holatiga tushadi.
+     *
+     * Tranzaksiya ichida chaqirilishi kutiladi.
+     */
+    private fun refreshPreview(conversationId: String) {
+        val last = q.selectLastVisibleMessage(conversationId).executeAsOneOrNull()
+        q.setLastMessagePreview(
+            lastMessageBody = last?.body,
+            lastMessageSenderId = last?.senderId,
+            lastMessageType = last?.type,
+            lastMessageDeleted = if (last?.deletedAt != null) 1L else 0L,
+            lastMessageAt = last?.createdAt,
+            id = conversationId,
+        )
+    }
+
     /**
      * Soft delete'ni keshga qo'llaydi — REST javobi va WS hodisasi uchun **bitta** yo'l.
      *
@@ -771,7 +961,7 @@ class ChatRepositoryImpl(
      * `message:new` ni o'tkazib yuborgan bo'lsak (uzilish, reconnect, ilova yopiq edi)
      * optimistik `SENDING` qator aks holda abadiy dublikat bo'lib qolardi: serverning qatori
      * boshqa `id` bilan keladi. Backend `clientMsgId` ni REST tarixida ham aynan shuning
-     * uchun qaytaradi (`handoff/chat.md`).
+     * uchun qaytaradi (`handoff/03-WEBSOCKET.md`).
      *
      * Tranzaksiya ichida chaqirilishi kutiladi.
      */
@@ -833,6 +1023,40 @@ class ChatRepositoryImpl(
     )
 
     /**
+     * Yuklashni [uploads] da ko'rsatib turadi: boshida `0%`, keyin foiz, oxirida — **har
+     * qanday holatda** o'chiriladi.
+     *
+     * `finally` shart: yuklash yiqilsa (tarmoq uzildi, `413`, bekor qilindi) yozuv qolib
+     * ketsa, xabar `FAILED` bo'lib turgani holda ekranda halqa abadiy aylanardi.
+     *
+     * Foiz **butun qadam bilan** yangilanadi ([PROGRESS_STEP]): Ktor har bufer bo'shaganda
+     * xabar beradi va 60 MB video uchun bu minglab qayta chizish degani.
+     */
+    private suspend fun <T> tracked(
+        localId: String,
+        fileName: String,
+        sizeBytes: Long,
+        block: suspend (UploadProgress) -> T,
+    ): T {
+        uploads.update { it + (localId to UploadState(0f, fileName, sizeBytes)) }
+        return try {
+            block { fraction ->
+                uploads.update { current ->
+                    val state = current[localId] ?: return@update current
+                    val shown = state.progress ?: 0f
+                    if (fraction - shown < PROGRESS_STEP) {
+                        current
+                    } else {
+                        current + (localId to state.copy(progress = fraction))
+                    }
+                }
+            }
+        } finally {
+            uploads.update { it - localId }
+        }
+    }
+
+    /**
      * `clientMsgId` **global noyob** bo'lishi shart. `kotlin.uuid` hali eksperimental,
      * shuning uchun vaqt + ikkita tasodifiy 64-bitli son — amalda takrorlanmaydi.
      */
@@ -852,5 +1076,8 @@ class ChatRepositoryImpl(
 
         /** Qayta yuborishda asl fayl nomi saqlanmagan — kengaytma MIME uchun yetarli. */
         const val RETRY_FILE_NAME = "image.jpg"
+
+        /** Foiz shundan kam o'zgargan bo'lsa qayta chizmaymiz — 1% yetarlicha silliq. */
+        const val PROGRESS_STEP = 0.01f
     }
 }

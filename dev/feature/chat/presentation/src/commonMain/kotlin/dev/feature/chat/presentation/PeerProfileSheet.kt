@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
@@ -65,8 +66,11 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
 /** Profil ekranidagi bo'limlar — Telegram maketidagi tartibda. */
+/**
+ * ⚠️ «Postlar» **ataylab yo'q** (`handoff/08-PROFILE.md` §7): ilovada post tushunchasi yo'q,
+ * backend `GET /v1/students/{id}/listings` ni ham qo'shmadi. Bo'sh tab chalg'itardi.
+ */
 private enum class ProfileTab(val label: String) {
-    POSTS("Postlar"),
     MEDIA("Media"),
     FILES("Fayllar"),
     LINKS("Havolalar"),
@@ -78,9 +82,9 @@ private enum class ProfileTab(val label: String) {
  * Avatar ikki holatda: odatda **markazda kichik doira**, bosilganda esa butun kenglikni
  * egallaydigan **katta rasm** (ustida gradient va ism). Telegram ham aynan shunday ishlaydi.
  *
- * ⚠️ Ma'lumotning bir qismini backend **bermaydi** — telefon raqami va tarjimayi hol
- * `StudentSummaryDto` da yo'q, «Postlar» va «Fayllar» uchun esa tushunchaning o'zi yo'q.
- * Ular «tez orada» holatida turadi; talablar `STORY_AND_PROFILE_BACKEND.md` da.
+ * Tarjimayi hol, telefon raqami va rasmlar to'plami `StudentSummaryDto` dan keladi
+ * (`handoff/08-PROFILE.md` §3). Telefon ko'pincha `null` bo'ladi — sukut sozlama `NOBODY`,
+ * o'shanda qator umuman chizilmaydi.
  */
 @Composable
 internal fun PeerProfileSheet(
@@ -88,9 +92,13 @@ internal fun PeerProfileSheet(
     typing: Boolean,
     realtime: Boolean,
     /** Suhbatdagi rasmlar — «Media» bo'limi, yangidan eskiga. */
-    photos: List<ChatImageUi>,
+    photos: List<ChatMediaItem>,
     /** Xabarlardan ajratib olingan havolalar — «Havolalar» bo'limi. */
     links: List<ChatLinkUi>,
+    /** Suhbatda yuborilgan hujjatlar — «Fayllar» bo'limi, yangidan eskiga. */
+    files: List<ChatMessageUi>,
+    /** Fayl qatori bosildi — yuklab olish / ochish. */
+    onOpenFile: (ChatMessageUi) -> Unit,
     universityName: String?,
     onClose: () -> Unit,
     onDisconnect: () -> Unit,
@@ -101,7 +109,15 @@ internal fun PeerProfileSheet(
     var viewer by remember { mutableStateOf<Int?>(null) }
     var tab by remember { mutableStateOf(ProfileTab.MEDIA) }
     val student = conversation.other
-    val hasPhoto = !student.avatarUrl.isNullOrBlank()
+    /**
+     * Profil rasmlari — `photos` bo'sh bo'lsa eskicha `avatarUrl` ga tushamiz. Ikkalasi ham
+     * bo'lmasa bosh harf ko'rinadi (`handoff/08-PROFILE.md` §3).
+     */
+    val profilePhotos = remember(student.photos, student.avatarUrl) {
+        student.photos.map { it.url }.ifEmpty { listOfNotNull(student.avatarUrl?.takeIf { it.isNotBlank() }) }
+    }
+    var photoIndex by remember(profilePhotos) { mutableStateOf(0) }
+    val hasPhoto = profilePhotos.isNotEmpty()
 
     val status = when {
         typing -> "yozmoqda…"
@@ -196,11 +212,11 @@ internal fun PeerProfileSheet(
                 ProfileHeader(
                     name = student.displayName,
                     status = status,
-                    avatarUrl = student.avatarUrl,
+                    avatarUrl = profilePhotos.getOrNull(photoIndex),
                     height = with(density) { headerPx.toDp() },
                     progress = progress,
-                    // Backend bitta rasm beradi; ro'yxat kelganda chiziqchalar ko'payadi.
-                    photoCount = 1,
+                    photoCount = profilePhotos.size,
+                    photoIndex = photoIndex,
                     onClose = onClose,
                     onAvatarClick = {
                         when {
@@ -208,6 +224,15 @@ internal fun PeerProfileSheet(
                             // Yig'ilgan holatda bosish — yoyadi; yoyilganda — to'liq ekran.
                             progress < 1f -> snapTo(maxPx)
                             else -> viewer = AVATAR_VIEWER
+                        }
+                    },
+                    // Telegramdagidek: yoyilgan rasmning chap/o'ng yarmiga tegish keyingi
+                    // rasmga o'tkazadi. Surish (`swipe`) ishlatilmadi — sarlavhaning o'zi
+                    // vertikal `nestedScroll` da yashaydi va ikkala jest to'qnashardi.
+                    onStep = { forward ->
+                        if (profilePhotos.size > 1) {
+                            photoIndex = (photoIndex + if (forward) 1 else profilePhotos.size - 1) %
+                                profilePhotos.size
                         }
                     },
                 )
@@ -237,9 +262,13 @@ internal fun PeerProfileSheet(
                         student.username?.takeIf { it.isNotBlank() }?.let {
                             InfoRow("@$it", "Foydalanuvchi nomi")
                         }
-                        // Backend suhbatdoshning raqamini ham, bio'sini ham bermaydi.
-                        InfoRow(null, "Mobil raqam")
-                        InfoRow(null, "Tarjimayi hol")
+                        // ⚠️ `null` bo'lsa qator UMUMAN chizilmaydi: telefon sukut bo'yicha
+                        // `NOBODY` (ya'ni ko'pchilikda yo'q) va bo'sh "Telefon: —" qatori
+                        // foyda bermaydi (`handoff/08-PROFILE.md` §3).
+                        student.phoneNumber?.let { InfoRow(it, "Mobil raqam") }
+                        // Bio'da havola/raqam serverda rad etiladi — oddiy matn sifatida
+                        // chizamiz, link detection kerak emas.
+                        student.bio?.let { InfoRow(it, "Tarjimayi hol") }
                         universityName?.let { InfoRow(it, "Universitet") }
                         student.courseYear?.let { InfoRow(it.courseLabel(), "Kurs") }
                         student.gender?.let {
@@ -262,8 +291,11 @@ internal fun PeerProfileSheet(
                             LinkList(links)
                         }
                         // Ikkalasi ham backendga bog'liq — `STORY_AND_PROFILE_BACKEND.md`.
-                        ProfileTab.POSTS -> EmptySection("Postlar tez orada")
-                        ProfileTab.FILES -> EmptySection("Fayl yuborish tez orada")
+                        ProfileTab.FILES -> if (files.isEmpty()) {
+                            EmptySection("Bu suhbatda fayl yuborilmagan")
+                        } else {
+                            FileList(files, onOpen = onOpenFile)
+                        }
                     }
 
                     // --- Amallar -------------------------------------------------------
@@ -281,8 +313,8 @@ internal fun PeerProfileSheet(
     val openIndex = viewer
     if (openIndex == AVATAR_VIEWER) {
         ImageViewerDialog(
-            images = listOf(ChatImageUi("avatar", student.avatarUrl, null, null)),
-            startIndex = 0,
+            images = profilePhotos.mapIndexed { index, url -> ChatMediaItem("photo-$index", url, null, null) },
+            startIndex = photoIndex.coerceIn(0, (profilePhotos.size - 1).coerceAtLeast(0)),
             onDismiss = { viewer = null },
         )
     } else if (openIndex != null) {
@@ -314,8 +346,10 @@ private fun ProfileHeader(
     height: Dp,
     progress: Float,
     photoCount: Int,
+    photoIndex: Int,
     onClose: () -> Unit,
     onAvatarClick: () -> Unit,
+    onStep: (forward: Boolean) -> Unit,
 ) {
     Box(Modifier.fillMaxWidth().height(height)) {
         // Brend gradienti — rasm yoyilgani sari so'nadi.
@@ -345,6 +379,22 @@ private fun ProfileHeader(
             }
         }
 
+        // Yoyilgan rasmda chap/o'ng tegish zonalari — Telegramdagidek rasmlar orasida
+        // yurish. Faqat bir nechta rasm bo'lganda va faqat to'liq yoyilganda: yig'ilgan
+        // holatda avatar kichkina va bosish uni yoyishi kerak (`onAvatarClick`).
+        if (photoCount > 1 && progress > 0.99f) {
+            Row(Modifier.fillMaxSize()) {
+                Box(
+                    Modifier.weight(1f).fillMaxHeight()
+                        .clickable(indication = null, interactionSource = null) { onStep(false) },
+                )
+                Box(
+                    Modifier.weight(1f).fillMaxHeight()
+                        .clickable(indication = null, interactionSource = null) { onStep(true) },
+                )
+            }
+        }
+
         // Rasm ustidagi gradient — tugmalar va ism har qanday rasmda o'qilsin.
         if (progress > 0f) {
             Box(
@@ -361,7 +411,7 @@ private fun ProfileHeader(
 
         Column(Modifier.statusBarsPadding().padding(horizontal = 12.dp, vertical = 6.dp)) {
             if (photoCount > 1) {
-                PhotoDashes(count = photoCount, current = 0, alpha = progress)
+                PhotoDashes(count = photoCount, current = photoIndex, alpha = progress)
                 Spacer(Modifier.height(8.dp))
             }
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -488,7 +538,7 @@ private fun TabBar(selected: ProfileTab, onSelect: (ProfileTab) -> Unit) {
 }
 
 @Composable
-private fun PhotoGrid(photos: List<ChatImageUi>, onOpen: (Int) -> Unit) {
+private fun PhotoGrid(photos: List<ChatMediaItem>, onOpen: (Int) -> Unit) {
     // Ichki to'r o'zi aylanmaydi — balandligi qatorlar soniga qarab hisoblanadi, aks holda
     // tashqi `verticalScroll` bilan ziddiyat chiqadi.
     val rows = (photos.size + PHOTO_COLUMNS - 1) / PHOTO_COLUMNS
@@ -533,6 +583,42 @@ private fun LinkList(links: List<ChatLinkUi>) {
                     ScText(link.host, 14f, FontWeight.Bold, Sc.Ink, maxLines = 1)
                     Spacer(Modifier.height(2.dp))
                     ScText(link.url, 12f, FontWeight.Medium, Sc.MutedLight, maxLines = 1)
+                }
+            }
+        }
+    }
+}
+
+/**
+ * «Fayllar» bo'limi — chatdagi `FILE` xabarlari.
+ *
+ * Ovoz va video bu yerga **kirmaydi**: ular alohida turlar va ro'yxatda butunlay boshqacha
+ * ko'rinishi kerak (to'lqin, poster) — bitta qatorga tiqishtirish faqat chalkashtirardi.
+ */
+@Composable
+private fun FileList(files: List<ChatMessageUi>, onOpen: (ChatMessageUi) -> Unit) {
+    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(Sc.Card)) {
+        files.forEach { message ->
+            val file = message.attachment ?: return@forEach
+            Row(
+                Modifier.fillMaxWidth()
+                    .clickable { onOpen(message) }
+                    .padding(horizontal = 14.dp, vertical = 11.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(11.dp),
+            ) {
+                Box(
+                    Modifier.size(36.dp).clip(RoundedCornerShape(11.dp)).background(Sc.TintBlue),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(ScIcons.Paperclip, null, tint = Sc.Brand, modifier = Modifier.size(17.dp))
+                }
+                Column(Modifier.weight(1f)) {
+                    ScText(file.fileName ?: "Fayl", 14f, FontWeight.Bold, Sc.Ink, maxLines = 1)
+                    val size = ChatFormat.fileSize(file.sizeBytes)
+                    if (size.isNotEmpty()) {
+                        ScText(size, 11.5f, FontWeight.Medium, Sc.Muted, maxLines = 1)
+                    }
                 }
             }
         }

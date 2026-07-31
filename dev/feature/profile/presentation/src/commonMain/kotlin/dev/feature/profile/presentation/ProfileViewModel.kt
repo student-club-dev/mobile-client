@@ -13,16 +13,24 @@ import dev.feature.jobs.domain.repository.JobRepository
 import dev.feature.university.domain.repository.UniversityRepository
 import dev.core.domain.usecase.LogoutUseCase
 import dev.core.domain.usecase.ObserveCurrentUserUseCase
+import dev.feature.profile.domain.model.ProfilePhoto
 import dev.feature.profile.domain.model.UserProfile
+import dev.feature.profile.domain.usecase.AddProfilePhotoUseCase
+import dev.feature.profile.domain.usecase.DeleteProfilePhotoUseCase
 import dev.feature.profile.domain.usecase.ObserveProfileUseCase
+import dev.feature.profile.domain.usecase.ProfilePhotosUseCase
 import dev.feature.profile.domain.usecase.RefreshProfileUseCase
 import dev.feature.profile.domain.usecase.SaveProfileUseCase
+import dev.feature.profile.domain.usecase.SetMainProfilePhotoUseCase
 import dev.feature.profile.domain.usecase.UploadAvatarUseCase
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /** Profil (1z) ekranining holati. */
@@ -40,6 +48,28 @@ data class ProfileUiState(
     val universities: List<University> = emptyList(),
 )
 
+/**
+ * Profil rasmlari to'plamining holati (`handoff/08-PROFILE.md` §2).
+ *
+ * Profilning o'zidan **alohida**: rasmlar local keshda saqlanmaydi (ular faqat tahrirlash
+ * ekranida kerak), profil esa offline-first oqimda yashaydi.
+ */
+data class ProfilePhotosState(
+    val items: List<ProfilePhoto> = emptyList(),
+    val loading: Boolean = false,
+    /** Yuklanayotgan rasm bormi — qo'shish tugmasi shu vaqt o'chiriladi. */
+    val uploading: Boolean = false,
+    /**
+     * Yuklash foizi (`0f..1f`). Fayl ketib bo'lgach `null`: server rasmni qabul qilib,
+     * profilni yangilashi qancha davom etishini oldindan bilib bo'lmaydi.
+     */
+    val progress: Float? = null,
+    val error: String? = null,
+) {
+    /** Yana rasm qo'shish mumkinmi (server chegarasi — 6 ta). */
+    val canAdd: Boolean get() = items.size < ProfilePhoto.MAX_PHOTOS && !uploading
+}
+
 class ProfileViewModel(
     observeCurrentUserUseCase: ObserveCurrentUserUseCase,
     observeProfileUseCase: ObserveProfileUseCase,
@@ -51,7 +81,16 @@ class ProfileViewModel(
     private val saveProfileUseCase: SaveProfileUseCase,
     private val refreshProfileUseCase: RefreshProfileUseCase,
     private val uploadAvatarUseCase: UploadAvatarUseCase,
+    private val profilePhotosUseCase: ProfilePhotosUseCase,
+    private val addProfilePhotoUseCase: AddProfilePhotoUseCase,
+    private val setMainProfilePhotoUseCase: SetMainProfilePhotoUseCase,
+    private val deleteProfilePhotoUseCase: DeleteProfilePhotoUseCase,
 ) : ViewModel() {
+
+    private val _photos = MutableStateFlow(ProfilePhotosState())
+
+    /** Profil rasmlari — tahrirlash ekrani uchun. */
+    val photos: StateFlow<ProfilePhotosState> = _photos.asStateFlow()
 
     init {
         // Offline-first: ekran ochilishi bilan fon rejimida masofaviy manbadan
@@ -128,6 +167,87 @@ class ProfileViewModel(
         }
     }
 
+    // --- Profil rasmlari ------------------------------------------------------------------
+
+    /** Ro'yxatni yuklaydi (tahrirlash ekrani ochilganda). */
+    fun loadPhotos() {
+        if (_photos.value.loading) return
+        _photos.update { it.copy(loading = true, error = null) }
+        viewModelScope.launch {
+            when (val res = profilePhotosUseCase()) {
+                is Resource.Success -> _photos.update { it.copy(items = res.data, loading = false) }
+                is Resource.Error -> _photos.update { it.copy(loading = false, error = res.message) }
+                else -> _photos.update { it.copy(loading = false) }
+            }
+        }
+    }
+
+    /**
+     * Rasm qo'shadi — u **birinchi o'ringa** tushadi va avatar bo'ladi.
+     *
+     * Javobdagi bitta rasmni ro'yxat boshiga qo'yish o'rniga butun ro'yxat qayta
+     * o'qiladi: server tartibni o'zi belgilaydi va uni klientda taxmin qilish
+     * (ayniqsa chegaraga yetganda) xatoga olib kelardi.
+     */
+    fun addPhoto(bytes: ByteArray, fileName: String) {
+        if (!_photos.value.canAdd) return
+        _photos.update { it.copy(uploading = true, progress = 0f, error = null) }
+        viewModelScope.launch {
+            val result = addProfilePhotoUseCase(bytes, fileName) { fraction ->
+                _photos.update { current ->
+                    when {
+                        // Fayl to'liq ketdi — server qabul qilmoqda, foiz o'rniga aylanma halqa.
+                        fraction >= UPLOAD_DONE -> current.copy(progress = null)
+                        // Ktor har bufer bo'shaganda xabar beradi — 1% dan kichik
+                        // o'zgarishda ekran qayta chizilmaydi.
+                        fraction - (current.progress ?: 0f) < PROGRESS_STEP -> current
+                        else -> current.copy(progress = fraction)
+                    }
+                }
+            }
+            when (result) {
+                is Resource.Success -> {
+                    _photos.update { it.copy(uploading = false, progress = null) }
+                    loadPhotos()
+                }
+                is Resource.Error -> _photos.update {
+                    it.copy(uploading = false, progress = null, error = result.message)
+                }
+                else -> _photos.update { it.copy(uploading = false, progress = null) }
+            }
+        }
+    }
+
+    fun setMainPhoto(photoId: String) {
+        viewModelScope.launch {
+            when (val res = setMainProfilePhotoUseCase(photoId)) {
+                is Resource.Error -> _photos.update { it.copy(error = res.message) }
+                else -> loadPhotos()
+            }
+        }
+    }
+
+    fun deletePhoto(photoId: String) {
+        viewModelScope.launch {
+            when (val res = deleteProfilePhotoUseCase(photoId)) {
+                is Resource.Error -> _photos.update { it.copy(error = res.message) }
+                else -> loadPhotos()
+            }
+        }
+    }
+
+    /**
+     * Telefon raqamini kim ko'radi: `EVERYONE` | `CONNECTIONS` | `NOBODY`.
+     *
+     * `lastSeenVisibility` dan **mustaqil** sozlama; sukut — `NOBODY`
+     * (`handoff/08-PROFILE.md` §4).
+     */
+    fun setPhoneVisibility(value: String) {
+        val current = state.value.profile ?: return
+        if (current.phoneVisibility == value) return
+        viewModelScope.launch { saveProfileUseCase(current.copy(phoneVisibility = value)) }
+    }
+
     /**
      * "Oxirgi ko'rilgan" maxfiyligi: `EVERYONE` | `CONNECTIONS` | `NOBODY`.
      *
@@ -154,6 +274,14 @@ class ProfileViewModel(
                 else -> onResult(null)
             }
         }
+    }
+
+    private companion object {
+        /** Foiz shundan kam o'zgarsa ekran qayta chizilmaydi. */
+        const val PROGRESS_STEP = 0.01f
+
+        /** `MediaUploader` fayl to'liq ketganda aynan shu qiymatni beradi. */
+        const val UPLOAD_DONE = 0.99f
     }
 
     private data class Header(

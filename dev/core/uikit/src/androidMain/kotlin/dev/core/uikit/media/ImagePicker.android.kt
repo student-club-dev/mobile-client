@@ -33,8 +33,7 @@ actual fun rememberImagePicker(onResult: (PickedImage?) -> Unit): ImagePicker {
                 runCatching {
                     val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
                         ?: return@runCatching null
-                    val ext = if (context.contentResolver.getType(uri) == "image/png") "png" else "jpg"
-                    PickedImage(bytes = bytes, fileName = "image.$ext")
+                    PickedImage(bytes = bytes, fileName = "image." + context.pickedExtension(uri))
                 }.getOrNull()
             }
             onResult(picked)
@@ -97,12 +96,23 @@ actual fun rememberMultiImagePicker(
 
 private fun Context.readImage(uri: Uri): PickedImage? {
     val bytes = contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: return null
-    val ext = when (contentResolver.getType(uri)) {
-        "image/png" -> "png"
-        "image/webp" -> "webp"
-        else -> "jpg"
-    }
-    return PickedImage(bytes = bytes, fileName = "image.$ext")
+    return PickedImage(bytes = bytes, fileName = "image." + pickedExtension(uri))
+}
+
+/**
+ * Tanlangan faylning kengaytmasi — MIME turi bo'yicha.
+ *
+ * ⚠️ **GIF alohida muhim.** Tizim tanlagichi GIF'ni ham oddiy rasm deb qaytaradi, lekin
+ * chat qatlami aynan kengaytmaga qarab uni `kind = GIF` bilan yuklaydi (server uni ovozsiz
+ * MP4 ga o'giradi, ~20 barobar yengil). Ilgari bu yerda hamma narsa `jpg` deb atalardi va
+ * GIF jimgina oddiy rasmga aylanib, **animatsiyasini yo'qotardi**.
+ */
+private fun Context.pickedExtension(uri: Uri): String = when (contentResolver.getType(uri)) {
+    "image/png" -> "png"
+    "image/webp" -> "webp"
+    "image/gif" -> "gif"
+    "image/heic" -> "heic"
+    else -> "jpg"
 }
 
 actual fun ByteArray.toImageBitmapOrNull(): ImageBitmap? =

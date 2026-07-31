@@ -4,11 +4,13 @@ import dev.core.common.auth.TokenStore
 import dev.core.network.NetworkConfig
 import dev.core.network.createWebSocketClient
 import dev.core.network.generated.api.ChatApi
+import dev.core.network.media.apiOrigin
 import dev.core.network.ws.SocketIoClient
 import dev.feature.chat.data.realtime.ChatSocket
 import dev.feature.chat.data.remote.ChatRemoteDataSource
 import dev.feature.chat.data.remote.GifRemoteDataSource
 import dev.feature.chat.data.remote.StickerRemoteDataSource
+import dev.feature.chat.data.remote.StickerSearchRemoteDataSource
 import dev.feature.chat.data.repository.ChatRepositoryImpl
 import dev.feature.chat.data.repository.GifRepositoryImpl
 import dev.feature.chat.data.repository.StickerRepositoryImpl
@@ -28,7 +30,7 @@ import org.koin.dsl.module
 
 /**
  * Chat feature'ining barcha qatlamlari (domain / data / presentation) — to'liq backendda:
- * REST `/v1/conversations…` + WebSocket `/chat` (handoff `chat.md`).
+ * REST `/v1/conversations…` + WebSocket `/chat` (handoff `03-WEBSOCKET.md`).
  *
  * Bayroq YO'Q: local demo suhbatlar olib tashlangan, ma'lumot faqat serverdan keladi
  * (SQLDelight — offline o'qish uchun kesh).
@@ -73,6 +75,9 @@ fun chatModule() = module {
             remote = get(),
             socket = get(),
             tokenStore = get(),
+            // Biriktirma havolalari serverdan NISBIY keladi — video/ovoz pleyeri uchun
+            // ular to'liq bo'lishi shart (qarang `MediaUrl`).
+            apiOrigin = get<NetworkConfig>().apiOrigin,
         )
     }
 
@@ -81,8 +86,9 @@ fun chatModule() = module {
     // (qidiruv, katalog, kesh) chatning offline-first keshiga umuman tegmaydi.
     single { GifRemoteDataSource(api = get(), connectivity = get()) }
     single { StickerRemoteDataSource(api = get(), connectivity = get()) }
+    single { StickerSearchRemoteDataSource(api = get(), connectivity = get()) }
     single<GifRepository> { GifRepositoryImpl(remote = get()) }
-    single<StickerRepository> { StickerRepositoryImpl(remote = get()) }
+    single<StickerRepository> { StickerRepositoryImpl(remote = get(), search = get()) }
 
     viewModelOf(::ChatViewModel)
     viewModelOf(::GifPanelViewModel)

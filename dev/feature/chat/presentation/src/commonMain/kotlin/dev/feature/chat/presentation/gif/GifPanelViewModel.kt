@@ -29,7 +29,7 @@ data class GifPanelState(
     val error: GifErrorKind? = null,
     /**
      * Atribut belgisi shu maydondan tanlanadi va **doim ko'rsatiladi** — hatto natija
-     * kelmagan yoki xato bo'lgan holatda ham (shartnomaviy talab, `gif.md`).
+     * kelmagan yoki xato bo'lgan holatda ham (shartnomaviy talab, `04-GIF-INTEGRATION.md`).
      */
     val provider: GifProvider = GifProvider.KLIPY,
     /**
@@ -45,7 +45,7 @@ data class GifPanelState(
 /**
  * GIF qidiruv panelining ViewModel'i.
  *
- * Ikkita narsani ataylab qattiq ushlaydi (`gif.md`, "test kaliti — soatiga 100 ta so'rov,
+ * Ikkita narsani ataylab qattiq ushlaydi (`04-GIF-INTEGRATION.md`, "test kaliti — soatiga 100 ta so'rov,
  * GLOBAL"):
  *
  * 1. **Debounce** — har bosilgan harf so'rov yubormaydi ([DEBOUNCE_MS]).

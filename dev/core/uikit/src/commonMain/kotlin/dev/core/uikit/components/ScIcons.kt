@@ -20,6 +20,7 @@ import dev.core.uikit.generated.resources.ic_check_double
 import dev.core.uikit.generated.resources.ic_chevron_right
 import dev.core.uikit.generated.resources.ic_chevron_updown
 import dev.core.uikit.generated.resources.ic_close
+import dev.core.uikit.generated.resources.ic_copy
 import dev.core.uikit.generated.resources.ic_debate
 import dev.core.uikit.generated.resources.ic_emoji
 import dev.core.uikit.generated.resources.ic_filter
@@ -38,6 +39,7 @@ import dev.core.uikit.generated.resources.ic_search
 import dev.core.uikit.generated.resources.ic_send_enter
 import dev.core.uikit.generated.resources.ic_tag
 import dev.core.uikit.generated.resources.ic_tools
+import dev.core.uikit.generated.resources.ic_trash
 import dev.core.uikit.generated.resources.ic_university
 import dev.core.uikit.generated.resources.ic_university_badge
 import dev.core.uikit.generated.resources.ic_users
@@ -130,6 +132,12 @@ object ScIcons {
 
     /** Arxiv — dizaynda yo'q, ilovaning o'z funksiyasi; to'plam uslubida chizilgan. */
     val Archive: ImageVector @Composable get() = vectorResource(Res.drawable.ic_archive)
+
+    /** O'chirish — chatdagi belgilash paneli. To'plamda yo'q, uslubi bo'yicha chizilgan. */
+    val Trash: ImageVector @Composable get() = vectorResource(Res.drawable.ic_trash)
+
+    /** Nusxa olish — chatdagi belgilash paneli. */
+    val Copy: ImageVector @Composable get() = vectorResource(Res.drawable.ic_copy)
 
     /** Pitsa bo'lagi ("Ovqatlar") — ko'p rangli, [ScGlyph] bilan chiziladi. */
     val Pizza: ImageVector @Composable get() = vectorResource(Res.drawable.ic_pizza)

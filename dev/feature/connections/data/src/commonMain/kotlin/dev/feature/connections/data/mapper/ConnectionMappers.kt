@@ -14,6 +14,7 @@ import dev.core.network.generated.model.RequestItemDto
 import dev.core.network.generated.model.RequestItemPageDto
 import dev.core.network.generated.model.SearchResultDto
 import dev.core.network.generated.model.SearchResultPageDto
+import dev.core.network.generated.model.StudentPhotoDto
 import dev.core.network.generated.model.StudentSortDto
 import dev.core.network.generated.model.StudentSummaryDto
 import dev.feature.connections.domain.model.BlockedStudent
@@ -26,6 +27,7 @@ import dev.feature.connections.domain.model.Gender
 import dev.feature.connections.domain.model.Page
 import dev.feature.connections.domain.model.ReportReason
 import dev.feature.connections.domain.model.SearchedStudent
+import dev.feature.connections.domain.model.StudentPhoto
 import dev.feature.connections.domain.model.StudentSort
 import dev.feature.connections.domain.model.StudentSummary
 
@@ -42,6 +44,17 @@ fun StudentSummaryDto.toDomain(): StudentSummary = StudentSummary(
     courseYear = courseYear?.value,
     online = online,
     lastSeenAt = lastSeenAt,
+    photos = photos.map { it.toDomain() },
+    bio = bio?.takeIf { it.isNotBlank() },
+    phoneNumber = phoneNumber?.takeIf { it.isNotBlank() },
+)
+
+fun StudentPhotoDto.toDomain(): StudentPhoto = StudentPhoto(
+    id = id,
+    url = url,
+    thumbUrl = thumbUrl,
+    width = width ?: 0,
+    height = height ?: 0,
 )
 
 fun SearchResultDto.toDomain(): SearchedStudent = SearchedStudent(
@@ -55,6 +68,9 @@ fun SearchResultDto.toDomain(): SearchedStudent = SearchedStudent(
         courseYear = courseYear?.value,
         online = online,
         lastSeenAt = lastSeenAt,
+        photos = photos.map { it.toDomain() },
+        bio = bio?.takeIf { it.isNotBlank() },
+        phoneNumber = phoneNumber?.takeIf { it.isNotBlank() },
     ),
     connectionStatus = connectionStatus.toDomain(),
 )

@@ -9,6 +9,7 @@ import dev.core.network.generated.model.AttachmentDto
 import dev.core.network.generated.model.ConversationListItemDto
 import dev.core.network.generated.model.ConversationPageDto
 import dev.core.network.generated.model.GifRefDto
+import dev.core.network.generated.model.StickerRefDto
 import dev.core.network.generated.model.MarkDeliveredDto
 import dev.core.network.generated.model.MarkReadDto
 import dev.core.network.generated.model.MessageDto
@@ -19,6 +20,7 @@ import dev.core.network.generated.model.SendMessageDto
 import dev.core.network.generated.model.UnreadCountDto
 import dev.core.network.media.ChatMediaKind
 import dev.core.network.media.MediaUploader
+import dev.core.network.media.UploadProgress
 import dev.core.network.response.safeCall
 import dev.feature.chat.data.mapper.SendPayload
 import dev.feature.chat.data.mapper.parseEnum
@@ -26,7 +28,7 @@ import dev.feature.chat.domain.model.MessageType
 import kotlinx.serialization.json.Json
 
 /**
- * Chat REST qatlami — generatsiya qilingan [ChatApi] ustida (`handoff/chat.md`).
+ * Chat REST qatlami — generatsiya qilingan [ChatApi] ustida (`handoff/03-WEBSOCKET.md`).
  *
  * WS ishlaganda ham REST kerak: tarix (`?before=`), qayta ulanishda yetishib olish
  * (`?after=`), ro'yxat, **xabar yuborishning zaxira yo'li** va kursorlarning zaxirasi.
@@ -45,7 +47,7 @@ class ChatRemoteDataSource(
      * `GET /v1/conversations/{id}` — ro'yxatdagi qator bilan **aynan bir xil shakl**.
      *
      * Push bosilganda yoki notanish suhbatdan xabar kelganda butun ro'yxatni qayta
-     * yuklamaslik uchun (`handoff/api-changes.md` §4b).
+     * yuklamaslik uchun (`handoff/02-API-CHANGES.md` §4b).
      */
     suspend fun conversation(conversationId: String): Resource<ConversationListItemDto> =
         safeCall(connectivity) { api.one(conversationId).body() }
@@ -83,8 +85,16 @@ class ChatRemoteDataSource(
         bytes: ByteArray,
         fileName: String,
         kind: ChatMediaKind,
+        /** Yuborilgan baytlar ulushi (`0f..1f`) — ekrandagi foiz halqasi uchun. */
+        onProgress: UploadProgress? = null,
     ): Resource<AttachmentDto> = safeCall(connectivity) {
-        media.chatUpload(bytes = bytes, fileName = fileName, kind = kind, conversationId = conversationId)
+        media.chatUpload(
+            bytes = bytes,
+            fileName = fileName,
+            kind = kind,
+            conversationId = conversationId,
+            onProgress = onProgress,
+        )
     }.withMediaServerMessage()
 
     /**
@@ -106,6 +116,7 @@ class ChatRemoteDataSource(
                 mediaId = payload.mediaId,
                 gif = payload.gif?.let { json.decodeFromJsonElement(gifSerializer, it) },
                 stickerId = payload.stickerId,
+                sticker = payload.sticker?.let { json.decodeFromJsonElement(stickerSerializer, it) },
                 albumId = payload.albumId,
                 clientMsgId = clientMsgId,
             ),
@@ -137,11 +148,12 @@ class ChatRemoteDataSource(
         const val MESSAGES_PAGE_SIZE = 30
 
         /**
-         * GIF qidiruv natijasi xom `JsonObject` sifatida keladi (GIF paneli alohida
+         * GIF/stiker qidiruv natijasi xom `JsonObject` sifatida keladi (panellar alohida
          * modulda), REST esa tiplangan DTO kutadi — shu yerda o'giriladi.
          */
         val json = Json { ignoreUnknownKeys = true; isLenient = true }
         val gifSerializer = GifRefDto.serializer()
+        val stickerSerializer = StickerRefDto.serializer()
     }
 }
 

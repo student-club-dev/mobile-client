@@ -14,6 +14,8 @@ import dev.feature.chat.domain.model.MessageStatus
 import dev.feature.chat.domain.model.MessageType
 import dev.feature.chat.domain.model.OutgoingImage
 import dev.feature.chat.domain.model.Sticker
+import dev.feature.chat.domain.model.StickerSearchItem
+import dev.feature.chat.domain.model.UploadState
 import dev.feature.chat.domain.repository.ChatRepository
 import dev.feature.connections.domain.model.ReportReason
 import dev.feature.connections.domain.repository.ConnectionsRepository
@@ -34,14 +36,18 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /**
- * Albomdagi (yoki yakka) bitta rasm.
+ * Albomdagi (yoki yakka) bitta media — **rasm ham, video ham**.
+ *
+ * Telegramdagidek: bir martada yuborilgan rasm va videolar **bitta mozaikada** turadi va
+ * ikkalasi ham bir xil katakda chiziladi (videoda ustiga o'ynatish belgisi va davomiyligi
+ * qo'shiladi). Shuning uchun ular alohida tur emas — bitta model, [video] bayrog'i bilan.
  *
  * `@Immutable` — Compose `ByteArray` ni beqaror deb biladi va busiz HAR BIR xabar pufagi
  * ota qayta chizilganda o'zi ham qayta chizilardi (uzun suhbatda bu sezilarli sekinlik).
  * Va'da bajariladi: baytlar massivi yaratilgandan keyin O'ZGARTIRILMAYDI.
  */
 @Immutable
-data class ChatImageUi(
+data class ChatMediaItem(
     /** Qaysi xabarga tegishli — bosilganda/qayta yuborilganda kerak. */
     val messageId: String,
     /**
@@ -57,9 +63,61 @@ data class ChatImageUi(
      * ekranga cho'zsak xira ko'rinardi. Berilmasa [url] ning o'zi ishlatiladi.
      */
     val fullUrl: String? = url,
+    /**
+     * Yuklash foizi (`0f..1f`) — **faqat hozir ketayotgan** rasmda. Yuklanmayotgan
+     * (yoki allaqachon yuklangan) rasmda `null`.
+     *
+     * Albomdagi har rasm o'z foizini ko'rsatadi: ular ketma-ket yuklanadi, ya'ni bir
+     * vaqtda faqat bittasida halqa aylanadi — Telegramdagidek.
+     */
+    val uploadProgress: Float? = null,
+    /** Yuklanmoqda: havola hali yo'q, foiz esa hali kelmagan bo'lishi mumkin. */
+    val uploading: Boolean = false,
+    /** Video — katakda o'ynatish belgisi va davomiyligi ko'rsatiladi, bosilsa pleyer ochiladi. */
+    val video: Boolean = false,
+    /** Video davomiyligi. Rasmda `0`. */
+    val durationMs: Int = 0,
+    /** Server videoni hali transkod qilmoqda — poster bor, o'zi hali yo'q. */
+    val processing: Boolean = false,
 ) {
     val loading: Boolean get() = url == null
 }
+
+/**
+ * Rasm bo'lmagan biriktirma — fayl, ovozli xabar yoki video.
+ *
+ * Rasmlar ([ChatMediaItem]) dan alohida: ular albomga yig'iladi va to'r bo'lib chiziladi,
+ * bular esa har doim **yakka** va har biri o'z pufagida ko'rinadi.
+ */
+@Immutable
+data class ChatAttachmentUi(
+    /** Serverdagi medianing to'liq havolasi — **token bilan** so'raladi. */
+    val url: String,
+    val thumbUrl: String? = null,
+    /** `FILE` da asl nom; bo'lmasa umumiy "Fayl". */
+    val fileName: String? = null,
+    val sizeBytes: Long = 0,
+    val durationMs: Int = 0,
+    /** Ovozli xabarning 48 nuqtali to'lqini (`0..100`). Boshqa turlarda bo'sh. */
+    val waveform: List<Int> = emptyList(),
+    /** Video hali transkodlanmoqda — poster bor, o'zi hali yo'q. */
+    val processing: Boolean = false,
+    val aspectRatio: Float? = null,
+)
+
+/**
+ * Ketayotgan biriktirma — pufak o'rnida foiz halqasi chiziladi.
+ *
+ * Nom va hajm **yuklovchidan** keladi, keshdan emas: fayl/video/ovozning biriktirmasi
+ * javob bilan birga keladi, ya'ni yuklash davomida qatorda u yo'q.
+ */
+@Immutable
+data class ChatUploadUi(
+    /** `0f..1f`; `null` — hajm noma'lum, halqa aylanma bo'lib chiziladi. */
+    val progress: Float?,
+    val fileName: String?,
+    val sizeBytes: Long,
+)
 
 /** Profil ekranidagi «Havolalar» bo'limi uchun bitta havola. */
 @Immutable
@@ -89,7 +147,7 @@ data class ChatMessageUi(
      * Rasm(lar). Bir martada yuborilganlari **bitta** qatorga yig'iladi va to'r bo'lib
      * chiziladi — shuning uchun ro'yxatda ular yakka xabar sifatida ko'rinmaydi.
      */
-    val images: List<ChatImageUi> = emptyList(),
+    val images: List<ChatMediaItem> = emptyList(),
     /**
      * Katta chiziladigan emoji — `STICKER` da stikerning emojisi, `TEXT` da esa faqat
      * emojidan iborat qisqa xabar (Telegram/WhatsApp qoidasi, qarang [EmojiText]).
@@ -102,13 +160,22 @@ data class ChatMessageUi(
     val stickerUrl: String? = null,
     /**
      * Xabar o'chirilgan — o'rniga tombstone chiziladi. Qator tarixda **qoladi**: `seq` —
-     * tarix va o'qildi kursorlarining o'qi (`handoff/api-changes.md` §4b).
+     * tarix va o'qildi kursorlarining o'qi (`handoff/02-API-CHANGES.md` §4b).
      */
     val deleted: Boolean = false,
     /** O'z xabarimizni o'chirish mumkin (`DELETE /v1/messages/{id}`). */
     val canDelete: Boolean = false,
     /** Albomdagi barcha xabar id'lari — qayta yuborish hammasiga tegishli. */
     val messageIds: List<String> = listOf(id),
+    /** `FILE` / `VOICE` / `VIDEO` biriktirmasi. Qolgan turlarda `null`. */
+    val attachment: ChatAttachmentUi? = null,
+    /**
+     * Fayl hozir ketmoqda — `null` bo'lmasa pufak o'rniga foiz ko'rsatiladi.
+     *
+     * Rasm albomida ishlatilmaydi: u yerda har katak o'z foizini chizadi
+     * ([ChatMediaItem.uploadProgress]).
+     */
+    val upload: ChatUploadUi? = null,
 )
 
 data class ChatUiState(
@@ -141,12 +208,20 @@ data class ChatUiState(
      * Suhbatdagi barcha rasmlar — profil ekranidagi «Umumiy media» to'ri, yangidan eskiga.
      * Alohida so'rov kerak emas: [messages] allaqachon butun keshni qamraydi.
      */
-    val photos: List<ChatImageUi>
+    val photos: List<ChatMediaItem>
         get() = messages.asReversed()
             .filter { it.type == MessageType.IMAGE && !it.deleted }
             .flatMap { it.images.asReversed() }
             // Hali yuklanmagani (havolasiz) to'rda ko'rsatilmaydi.
             .filter { it.url != null }
+
+    /**
+     * Suhbatdagi barcha fayllar — profil ekranidagi «Fayllar» bo'limi, yangidan eskiga.
+     * Ovoz va video bu yerga kirmaydi: ular alohida turlar va ro'yxatda boshqacha ko'rinadi.
+     */
+    val files: List<ChatMessageUi>
+        get() = messages.asReversed()
+            .filter { it.type == MessageType.FILE && !it.deleted && it.attachment != null }
 
     /** Matnli xabarlardagi havolalar — «Havolalar» bo'limi, yangidan eskiga. */
     val links: List<ChatLinkUi>
@@ -160,6 +235,28 @@ data class ChatUiState(
     val peerUniversity: String?
         get() = selected?.other?.universityId?.let { universityNames[it] }
 }
+
+/**
+ * Mozaikada (albom to'rida) chiziladigan turlar — rasm, GIF va **video**.
+ *
+ * Telegramdagidek: bir martada tanlangan rasm va videolar bitta to'r bo'lib ko'rinadi va
+ * kataklari bir xil — farqi faqat videoda o'ynatish belgisi va davomiyligi bo'lishida.
+ *
+ * ⚠️ GIF katakda **statik kadr**: `url` — ovozsiz MP4, uni ro'yxatda o'ynatish o'nlab
+ * dekoderni bir vaqtda ochardi. Bosilganda pleyerda to'liq ochiladi.
+ */
+private val MEDIA_GRID = setOf(MessageType.IMAGE, MessageType.GIF, MessageType.VIDEO)
+
+/**
+ * Albomga qo'shiladigan turlar — rasm va video.
+ *
+ * GIF **kirmaydi**: server uni ovozsiz MP4 ga o'giradi va u odatda yakka, o'z nisbatida
+ * yuboriladi; to'r katagiga kesib qo'yilsa GIF'ning ma'nosi yo'qolardi.
+ */
+private val ALBUM_LIKE = setOf(MessageType.IMAGE, MessageType.VIDEO)
+
+/** O'z pufagida chiziladigan biriktirma turlari — mozaikaga yig'ilmaydi. */
+private val ATTACHMENT_LIKE = setOf(MessageType.FILE, MessageType.VOICE)
 
 /** Matndagi `http(s)://…` bo'laklari. Tinish belgilari havolaga yopishib qolmasin. */
 private fun String.extractLinks(): List<String> = split(' ', '\n', '\t')
@@ -189,7 +286,7 @@ class ChatViewModel(
     private val chatRepository: ChatRepository,
     private val connectionsRepository: ConnectionsRepository,
     universityRepository: UniversityRepository,
-    tokenStore: TokenStore,
+    private val tokenStore: TokenStore,
 ) : ViewModel() {
 
     private val myId: String? = tokenStore.userId()
@@ -249,10 +346,12 @@ class ChatViewModel(
             typingFlow,
             chatRepository.observeRealtimeConnected(),
             extra,
-            combine(chatRepository.observeLocalImages(), universityNames) { local, unis ->
-                local to unis
-            },
-        ) { d, typing, rt, e, (local, unis) -> Rest(d, typing, rt, e, local, unis) },
+            combine(
+                chatRepository.observeLocalImages(),
+                universityNames,
+                chatRepository.observeUploads(),
+            ) { local, unis, uploads -> Triple(local, unis, uploads) },
+        ) { d, typing, rt, e, (local, unis, uploads) -> Rest(d, typing, rt, e, local, unis, uploads) },
     ) { conversations, archived, id, messages, rest ->
         val selected = (conversations + archived).firstOrNull { it.id == id }
         ChatUiState(
@@ -263,6 +362,7 @@ class ChatViewModel(
                 otherReadSeq = selected?.otherReadSeq ?: 0,
                 otherDeliveredSeq = selected?.otherDeliveredSeq ?: 0,
                 localImages = rest.localImages,
+                uploads = rest.uploads,
             ),
             draft = rest.draft,
             peerTyping = rest.typing,
@@ -285,6 +385,7 @@ class ChatViewModel(
         val extra: ExtraState,
         val localImages: Map<String, ByteArray>,
         val universityNames: Map<String, String>,
+        val uploads: Map<String, UploadState>,
     )
 
     /**
@@ -297,6 +398,7 @@ class ChatViewModel(
         otherReadSeq: Int,
         otherDeliveredSeq: Int,
         localImages: Map<String, ByteArray>,
+        uploads: Map<String, UploadState>,
     ): List<ChatMessageUi> {
         val groups = groupAlbums()
         return groups.mapIndexed { index, group ->
@@ -324,9 +426,13 @@ class ChatViewModel(
                 },
                 // O'chirilgan media ham oddiy tombstone bo'lib chiziladi — havolasi yo'q.
                 type = if (head.deleted) MessageType.TEXT else head.type,
-                images = if (head.type == MessageType.IMAGE && !head.deleted) {
+                // ⚠️ `GIF` ham shu ro'yxatga tushadi: u ham bitta tasvirli biriktirma va
+                // xuddi rasm kabi chiziladi. Busiz GIF xabari hech qaysi pufakka tushmay,
+                // ekranda BO'SH pufak bo'lib qolardi (tanasi taqiqlangan).
+                images = if (head.type in MEDIA_GRID && !head.deleted) {
                     group.map { m ->
-                        ChatImageUi(
+                        val upload = uploads[m.id]
+                        ChatMediaItem(
                             messageId = m.id,
                             // Biriktirma URL'i himoyalangan (`/v1/media/{id}/raw`) — rasm
                             // yuklovchi tokenli klientdan foydalanadi (`createImageHttpClient`).
@@ -334,11 +440,37 @@ class ChatViewModel(
                             localBytes = localImages[m.id],
                             aspectRatio = m.attachment?.aspectRatio,
                             fullUrl = m.attachment?.url?.takeIf { it.isNotBlank() },
+                            uploadProgress = upload?.progress,
+                            uploading = upload != null,
+                            // GIF ham pleyerda ochiladi (u ovozsiz MP4), lekin katakda
+                            // davomiylik ko'rsatilmaydi — u yerda soniya sanashning ma'nosi yo'q.
+                            video = m.type == MessageType.VIDEO || m.type == MessageType.GIF,
+                            durationMs = if (m.type == MessageType.VIDEO) {
+                                m.attachment?.durationMs ?: 0
+                            } else {
+                                0
+                            },
+                            processing = m.attachment?.processing == true,
                         )
                     }
                 } else {
                     emptyList()
                 },
+                // Rasm bo'lmagan biriktirmalar — har biri o'z pufagida.
+                attachment = head.attachment
+                    ?.takeIf { head.type in ATTACHMENT_LIKE && !head.deleted }
+                    ?.let { media ->
+                        ChatAttachmentUi(
+                            url = media.url,
+                            thumbUrl = media.thumbUrl,
+                            fileName = media.fileName,
+                            sizeBytes = media.sizeBytes,
+                            durationMs = media.durationMs,
+                            waveform = media.waveform,
+                            processing = media.processing,
+                            aspectRatio = media.aspectRatio,
+                        )
+                    },
                 sticker = head.bigEmojiOrNull(),
                 // Server tasviri bo'lmasa — Fluent 3D. Bu **qo'lda yozilgan** emojiga ham
                 // tegishli: yakka emoji baribir katta chizilardi, endi u tizim glifi emas,
@@ -350,6 +482,11 @@ class ChatViewModel(
                 // Faqat o'z xabarimizni, faqat serverga yetib borganini va faqat bir marta.
                 canDelete = outgoing && !head.deleted && head.seq > 0,
                 messageIds = group.map { it.id },
+                // Rasm to'ri o'z foizini katak-katak chizadi — bu yerda faqat yakka
+                // biriktirmalar (fayl/video/ovoz) qoladi.
+                upload = uploads[head.id]
+                    ?.takeIf { head.type in ATTACHMENT_LIKE }
+                    ?.let { ChatUploadUi(it.progress, it.fileName, it.sizeBytes) },
             )
         }
     }
@@ -359,7 +496,7 @@ class ChatViewModel(
      * bo'lsa esa stikerning emojisi olinadi.
      *
      * Qo'lda yozilgan emoji endi **hech qachon** `STICKER` bo'lib qaytmaydi: yangi
-     * kontraktda stiker `stickerId` bilan ketadi va tana taqiqlangan (`handoff/chat.md`).
+     * kontraktda stiker `stickerId` bilan ketadi va tana taqiqlangan (`handoff/03-WEBSOCKET.md`).
      * Katta chizish shuning uchun sof ko'rsatish qaroriga aylandi.
      */
     private fun Message.bigEmojiOrNull(): String? = when {
@@ -383,8 +520,10 @@ class ChatViewModel(
             val previous = current?.last()
             val joins = previous != null &&
                 current.size < MAX_ALBUM_SIZE &&
-                message.type == MessageType.IMAGE &&
-                previous.type == MessageType.IMAGE &&
+                // Rasm va video ARALASH albomga tushadi (Telegramdagidek) — ular bitta
+                // tanlovda yuborilgan bo'lsa `albumId` ham bitta bo'ladi.
+                message.type in ALBUM_LIKE &&
+                previous.type in ALBUM_LIKE &&
                 // Tombstone alohida qator bo'lib qoladi — u to'rga qo'shilmaydi.
                 !message.deleted && !previous.deleted &&
                 message.senderId == previous.senderId &&
@@ -397,7 +536,12 @@ class ChatViewModel(
     private fun sameAlbum(a: Message, b: Message): Boolean = when {
         // Kamida bittasida kalit bor — u holda FAQAT kalit hal qiladi.
         a.albumId != null || b.albumId != null -> a.albumId == b.albumId
-        else -> (b.createdAt - a.createdAt).inWholeSeconds <= ALBUM_WINDOW_SECONDS
+        // Kalitsiz zaxira — faqat RASMLAR uchun (eski kesh qatorlari). Videoni vaqt
+        // oynasiga qarab qo'shsak, ketma-ket yuborilgan mustaqil ikki fayl ham bitta
+        // to'rga tushib qolardi: albom kalitini endi server beradi, taxminga hojat yo'q.
+        a.type == MessageType.IMAGE && b.type == MessageType.IMAGE ->
+            (b.createdAt - a.createdAt).inWholeSeconds <= ALBUM_WINDOW_SECONDS
+        else -> false
     }
 
     /** Albomning umumiy holati: yiqilgani bo'lsa `FAILED`, yuborilayotgani bo'lsa `SENDING`. */
@@ -499,7 +643,7 @@ class ChatViewModel(
             typingActive = true
             viewModelScope.launch { chatRepository.setTyping(id, true) }
         }
-        // 3 soniya jimlikdan keyin — `typing:stop` (chat.md §11).
+        // 3 soniya jimlikdan keyin — `typing:stop` (03-WEBSOCKET.md §11).
         typingStopJob?.cancel()
         typingStopJob = viewModelScope.launch {
             delay(TYPING_IDLE_MS)
@@ -542,6 +686,42 @@ class ChatViewModel(
         }
     }
 
+    /** Hujjat yuborish (`kind = FILE`). */
+    fun sendFile(bytes: ByteArray, fileName: String) {
+        val id = selectedId.value ?: return
+        stopTyping()
+        viewModelScope.launch {
+            when (val res = chatRepository.sendFile(id, bytes, fileName)) {
+                is Resource.Error -> extra.update { it.copy(message = res.message) }
+                else -> Unit
+            }
+        }
+    }
+
+    /** Video yuborish (`kind = VIDEO`). Server kerak bo'lsa transkod qiladi. */
+    fun sendVideo(bytes: ByteArray, fileName: String) {
+        val id = selectedId.value ?: return
+        stopTyping()
+        viewModelScope.launch {
+            when (val res = chatRepository.sendVideo(id, bytes, fileName)) {
+                is Resource.Error -> extra.update { it.copy(message = res.message) }
+                else -> Unit
+            }
+        }
+    }
+
+    /** Ovozli xabar (`kind = VOICE`). To'lqin va davomiylikni server hisoblaydi. */
+    fun sendVoice(bytes: ByteArray, fileName: String) {
+        val id = selectedId.value ?: return
+        stopTyping()
+        viewModelScope.launch {
+            when (val res = chatRepository.sendVoice(id, bytes, fileName)) {
+                is Resource.Error -> extra.update { it.copy(message = res.message) }
+                else -> Unit
+            }
+        }
+    }
+
     fun sendSticker(sticker: Sticker) {
         val id = selectedId.value ?: return
         stopTyping()
@@ -554,8 +734,23 @@ class ChatViewModel(
     }
 
     /**
+     * Qidiruvdan tanlangan **provayder stikeri** (KLIPY). Katalogdagi stikerdan farqi —
+     * `stickerId` emas, `sticker` obyekti bilan ketadi (`handoff/06-STICKER-SEARCH.md` §2).
+     */
+    fun sendStickerRef(item: StickerSearchItem) {
+        val id = selectedId.value ?: return
+        stopTyping()
+        viewModelScope.launch {
+            when (val res = chatRepository.sendStickerRef(id, item.toRef())) {
+                is Resource.Error -> extra.update { it.copy(message = res.message) }
+                else -> Unit
+            }
+        }
+    }
+
+    /**
      * Qidiruvdan tanlangan GIF. Fayl yuklanmaydi — provayder havolasi serverga
-     * **o'zgartirilmasdan** qaytariladi (`handoff/gif.md`).
+     * **o'zgartirilmasdan** qaytariladi (`handoff/04-GIF-INTEGRATION.md`).
      */
     fun sendGif(gif: GifItem) {
         val id = selectedId.value ?: return
@@ -584,17 +779,20 @@ class ChatViewModel(
     }
 
     /**
-     * Xabarni o'chirish — **soft delete**: qator tarixda tombstone bo'lib qoladi, ikkala
-     * a'zoga WS `message:deleted` ketadi (`handoff/api-changes.md` §4b).
+     * Belgilangan xabarlarni o'chirish — Telegram'dagi ikki qamrov bilan.
      *
-     * Albomda bir nechta xabar bor — hammasi o'chiriladi, chunki ekranda ular bitta to'r.
+     * - [forEveryone] = `true` — **soft delete**: qator tarixda tombstone bo'lib qoladi,
+     *   ikkala a'zoga WS `message:deleted` ketadi (`handoff/02-API-CHANGES.md` §4b).
+     *   Faqat o'z xabaringga qo'llanadi.
+     * - [forEveryone] = `false` — xabar **faqat shu qurilmada** yashiriladi.
+     *
+     * Albomda bir nechta xabar bor — ro'yxatga ularning hammasi tushadi, chunki ekranda
+     * ular bitta to'r.
      */
-    fun deleteMessages(messageIds: List<String>) = viewModelScope.launch {
-        messageIds.forEach { id ->
-            when (val res = chatRepository.deleteMessage(id)) {
-                is Resource.Error -> extra.update { it.copy(message = res.message) }
-                else -> Unit
-            }
+    fun deleteMessages(messageIds: List<String>, forEveryone: Boolean) = viewModelScope.launch {
+        when (val res = chatRepository.deleteMessages(messageIds, forEveryone)) {
+            is Resource.Error -> extra.update { it.copy(message = res.message) }
+            else -> Unit
         }
     }
 
@@ -655,6 +853,16 @@ class ChatViewModel(
         }
         extra.update { it.copy(message = text) }
     }
+
+    /**
+     * Media so'rovlari uchun sarlavhalar.
+     *
+     * Chat biriktirmalari `GET /v1/media/{id}/raw` orqali beriladi va u **suhbat a'zoligini
+     * tekshiradi** — tokensiz so'rov `404` oladi. Rasm yuklovchi (Coil) buni o'zi qo'yadi,
+     * ovoz/video pleyerlari esa alohida — ular shu xaritani oladi.
+     */
+    fun mediaHeaders(): Map<String, String> =
+        tokenStore.tokens()?.accessToken?.let { mapOf("Authorization" to "Bearer $it") }.orEmpty()
 
     /** Hali tayyor bo'lmagan amal uchun bir martalik xabar («tez orada»). */
     fun showMessage(text: String) = extra.update { it.copy(message = text) }

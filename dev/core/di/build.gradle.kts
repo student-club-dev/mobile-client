@@ -30,6 +30,8 @@ kotlin {
             // connectionsModule() — "Do'stlar" (Connections). chatModule() undan foydalanadi.
             api(projects.dev.feature.connections.presentation)
             api(projects.dev.feature.chat.presentation)
+            // storiesModule() — 24 soatlik lavhalar (bosh ekrandagi lenta + viewer).
+            api(projects.dev.feature.stories.presentation)
             api(projects.dev.feature.home.presentation)
             api(libs.koin.core)
             implementation(libs.ktor.client.core)

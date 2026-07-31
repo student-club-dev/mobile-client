@@ -1,0 +1,16 @@
+-- v24 -> v25 — boyitilgan profil (`handoff/08-PROFILE.md`).
+--
+-- Ikkita yangi maydon profilga qo'shildi:
+--   `bio`             — tarjimayi hol (140 belgi). Havola/telefon SERVERDA rad etiladi.
+--   `phoneVisibility` — raqamni kim ko'radi. Sukut `NOBODY`, ya'ni ochilmagan holat
+--                       xavfsiz tomonda: ilgari bu sozlamaning o'zi yo'q edi va raqam
+--                       hech kimga ko'rinmasdi, endi ham shunday qoladi.
+--
+-- ⚠️ `lastSeenVisibility` bilan ADASHTIRMANG: ikkalasi mustaqil — presence ochiq, raqam
+-- yopiq bo'lishi mumkin va aksincha.
+--
+-- Migratsiya FAQAT QO'SHADI. Ustunlar nullable: eski qatorlarda `NULL` qoladi va keyingi
+-- `refresh()` ularni serverdagi qiymat bilan to'ldiradi.
+
+ALTER TABLE ProfileEntity ADD COLUMN bio TEXT;
+ALTER TABLE ProfileEntity ADD COLUMN phoneVisibility TEXT;

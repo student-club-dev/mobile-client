@@ -21,6 +21,14 @@ internal data class SendPayload(
     /** Qidiruvdan olingan GIF (`GifRefDto` shakli) — xom JSON, GIF moduliga bog'lanmaslik uchun. */
     val gif: JsonObject? = null,
     /**
+     * Qidiruvdan olingan **provayder stikeri** (`handoff/06-STICKER-SEARCH.md` §2) — xom JSON.
+     *
+     * [stickerId] bilan **birga yuborilmaydi**: biri server katalogidagi qatorga, ikkinchisi
+     * begona CDN'dagi tasvirga ishora qiladi va server ikkalasini birga ko'rsa
+     * `422 STICKER_SOURCE_AMBIGUOUS` qaytaradi.
+     */
+    val sticker: JsonObject? = null,
+    /**
      * Optimistik qatorga yoziladigan stiker ko'rinishi — **tarmoqqa ketmaydi**.
      *
      * Server javobida stiker to'liq qaytadi, lekin unga qadar bir necha soniya o'tadi:
@@ -43,7 +51,7 @@ internal data class SendPayload(
 ) {
 
     /**
-     * Turga xos qoidalarni tekshiradi (`handoff/chat.md` dagi jadval). Xato bo'lsa —
+     * Turga xos qoidalarni tekshiradi (`handoff/03-WEBSOCKET.md` dagi jadval). Xato bo'lsa —
      * foydalanuvchiga ko'rsatiladigan matn, aks holda `null`.
      *
      * Nega klientda: `422` ni kutib o'tirish xabarni "yuborilmadi" holatiga tushirardi va
@@ -56,7 +64,7 @@ internal data class SendPayload(
             MessageType.TEXT -> when {
                 text.isEmpty() -> "Xabar bo'sh."
                 text.length > MAX_BODY -> "Xabar $MAX_BODY belgidan uzun bo'lmasin."
-                mediaId != null || stickerId != null || gif != null ->
+                mediaId != null || stickerId != null || gif != null || sticker != null ->
                     "Matnli xabarga biriktirma qo'shib bo'lmaydi."
                 else -> null
             }
@@ -81,8 +89,12 @@ internal data class SendPayload(
                 else -> null
             }
 
+            // GIF'dagi o'sha qoida: manba ikkitadan biri bo'lsin — server katalogidagi
+            // `stickerId` yoki qidiruvdan kelgan `sticker` obyekti. Ikkalasi birga
+            // `422 STICKER_SOURCE_AMBIGUOUS`, ikkalasi ham yo'q — `422 VALIDATION_ERROR`.
             MessageType.STICKER -> when {
-                stickerId.isNullOrBlank() -> "Stiker topilmadi."
+                stickerId.isNullOrBlank() == (sticker == null) ->
+                    if (sticker != null) STICKER_SOURCE_AMBIGUOUS else "Stiker topilmadi."
                 text.isNotEmpty() -> CAPTION_FORBIDDEN
                 else -> null
             }
@@ -107,5 +119,12 @@ internal data class SendPayload(
          * ya'ni qabul qilsak foydalanuvchining matni jimgina yo'qolardi.
          */
         const val CAPTION_FORBIDDEN = "Bu turdagi xabarga izoh qo'shib bo'lmaydi."
+
+        /**
+         * Ikkala stiker manbasi birga berilgan — bu **klient xatosi**, foydalanuvchi
+         * tuzatadigan narsa emas. Matn baribir ko'rsatiladi (jimgina yutilsa xabar
+         * sababsiz yo'qolardi), lekin uni ko'rish — koddagi nuqson belgisi.
+         */
+        const val STICKER_SOURCE_AMBIGUOUS = "Stiker manbasi noaniq."
     }
 }

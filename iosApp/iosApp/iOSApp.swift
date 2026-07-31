@@ -34,7 +34,7 @@ struct iOSApp: App {
 }
 
 /**
- Oflayn push (`chat.md` §10).
+ Oflayn push (`03-WEBSOCKET.md` §10).
 
  Oqim: ruxsat so'raymiz → APNs'ga ro'yxatdan o'tamiz → token `IosPushBridge` orqali Kotlin'ga
  o'tadi va `POST /v1/devices` ga yoziladi. Bildirishnoma bosilganda `data.conversationId`

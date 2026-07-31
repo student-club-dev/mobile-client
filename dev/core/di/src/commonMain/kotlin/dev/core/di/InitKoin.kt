@@ -13,6 +13,7 @@ import dev.feature.chat.presentation.di.chatModule
 import dev.feature.connections.presentation.di.connectionsModule
 import dev.feature.home.presentation.di.homeModule
 import dev.feature.profile.presentation.di.profileModule
+import dev.feature.stories.presentation.di.storiesModule
 import io.github.aakira.napier.DebugAntilog
 import io.github.aakira.napier.Napier
 import org.koin.core.KoinApplication
@@ -40,6 +41,8 @@ fun appModules() = coreModules() +
     // Bog'lanishlar va chat — to'liq backendda (bayroqsiz): `Connections` + `Chat` bo'limlari.
     connectionsModule() +
     chatModule() +
+    // Story — chat bilan bir xil eshik (faqat bog'langanlar ko'radi).
+    storiesModule() +
     homeModule()
 
 /**

@@ -7,7 +7,7 @@ import kotlin.test.assertNull
 
 /**
  * Evristika endi **faqat eski kesh uchun zaxira**: yangi xabarlarda tur serverdan keladi
- * (`MessageDto.type`, `handoff/chat.md`). 22.sqm dan oldin yozilgan suhbat qatorlarida
+ * (`MessageDto.type`, `handoff/03-WEBSOCKET.md`). 22.sqm dan oldin yozilgan suhbat qatorlarida
  * `lastMessageType` bo'sh, shuning uchun ro'yxatdagi ko'rinish hali ham shundan foydalanadi.
  *
  * Ehtiyotkorlik talabi o'zgarmadi: oddiy matnni rasm deb o'ylab qolsa, foydalanuvchining

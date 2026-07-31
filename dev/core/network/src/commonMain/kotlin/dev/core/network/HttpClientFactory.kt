@@ -184,7 +184,7 @@ fun createWebSocketClient(): HttpClient = platformHttpClient(debugInterceptors =
  *
  * ⚠️ Sessiya tokeni oddiy sarlavha bilan qo'shiladi va bu endi **majburiy**: chat
  * biriktirmalari `GET /v1/media/{id}/raw` orqali beriladi, u esa suhbat a'zoligini
- * tekshiradi — tokensiz so'rov `404` oladi (`handoff/api-changes.md` §4c). Sarlavha har
+ * tekshiradi — tokensiz so'rov `404` oladi (`handoff/02-API-CHANGES.md` §4c). Sarlavha har
  * so'rovda qaytadan o'qiladi, ya'ni kirish/chiqishdan keyin ham to'g'ri qoladi.
  *
  * ⚠️ ...lekin **faqat o'z serverimizga** ([NetworkConfig.baseUrl] xosti). Bu klient endi

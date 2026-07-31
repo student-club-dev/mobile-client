@@ -5,7 +5,7 @@
 -- yerda turadi (`status = SENDING`), uning `seq` i vaqtincha 0 — ack kelganda haqiqiysiga
 -- almashadi.
 --
--- `archived` — **faqat local**: backendda arxivlash endpointi yo'q (chat.md §14).
+-- `archived` — **faqat local**: backendda arxivlash endpointi yo'q (03-WEBSOCKET.md §14).
 
 CREATE TABLE ConversationEntity (
     id TEXT NOT NULL PRIMARY KEY,
@@ -68,10 +68,10 @@ CREATE TABLE MessageEntity (
 
     -- Xabar o'chirilgan vaqti (epoch ms). Qator O'CHIRILMAYDI: `seq` — tarix, o'qildi va
     -- o'qilmaganlar arifmetikasining o'qi, uni yo'q qilish hammasida teshik qoldirardi
-    -- (`handoff/api-changes.md` §4b). Tanasi bo'shatiladi, ekranda tombstone chiziladi.
+    -- (`handoff/02-API-CHANGES.md` §4b). Tanasi bo'shatiladi, ekranda tombstone chiziladi.
     deletedAt INTEGER,
 
-    -- Media biriktirmasi — `MessageDto.attachment` ning ko'zgusi (`handoff/chat.md`).
+    -- Media biriktirmasi — `MessageDto.attachment` ning ko'zgusi (`handoff/03-WEBSOCKET.md`).
     -- `attachmentId` = server `mediaId`: biriktirma BIR MARTALIK, shuning uchun yiqilgan
     -- xabarni qayta yuborishda uni qaytadan yuklamaymiz (422 MEDIA_ALREADY_USED).
     attachmentId TEXT,
@@ -107,7 +107,17 @@ CREATE TABLE MessageEntity (
     -- (`MessageDto.albumId`) — ya'ni qabul qiluvchi tomonda ham to'g'ri to'r chiziladi.
     -- Eski keshdagi qatorlarda NULL bo'lishi mumkin; o'shanda albom qo'shni xabarlardan
     -- taxmin qilinadi (ChatViewModel).
-    albumId TEXT
+    albumId TEXT,
+
+    -- «Faqat menda o'chirish» (`scope = ME`) — xabar SHU QURILMADA ko'rinmaydi, serverda
+    -- va suhbatdoshda joyida qoladi. `deletedAt` dan farqi: tana ham, biriktirma ham
+    -- saqlanadi (server uni baribir qaytaradi) va suhbatdosh hech nima sezmaydi.
+    --
+    -- ⚠️ Vaqtinchalik: backendda `scope` va `message_hidden` jadvali yo'q
+    -- (`CHAT_SELECTION_AND_HISTORY_BACKEND.md` §A1). Shu sabab yashirish qurilmaga bog'liq —
+    -- ilova qayta o'rnatilsa xabarlar qaytadi. Server tayyor bo'lgach bu ustun uning
+    -- ko'zgusiga aylanadi.
+    hiddenAt INTEGER
 );
 
 CREATE INDEX message_conversation_idx ON MessageEntity(conversationId, seq);
@@ -185,7 +195,7 @@ setLastMessageDeleted:
 UPDATE ConversationEntity SET lastMessageBody = '', lastMessageDeleted = 1 WHERE id = ?;
 
 -- O'chirilgan xabar o'qilmaganlar sanog'idan chiqadi: ko'rinmaydigan xabarni o'qib
--- bo'lmaydi, aks holda badge abadiy yoqiq qolardi (`handoff/api-changes.md` §4b).
+-- bo'lmaydi, aks holda badge abadiy yoqiq qolardi (`handoff/02-API-CHANGES.md` §4b).
 -- Faqat hali o'qilmagan (`seq > lastReadSeq`) xabar sanoqni kamaytiradi.
 decrementUnreadForDeleted:
 UPDATE ConversationEntity
@@ -220,10 +230,21 @@ DELETE FROM ConversationEntity;
 -- --- Xabarlar ---------------------------------------------------------------------------
 
 -- Eskidan yangiga. Yuborilayotgani (`seq = 0`) eng oxirida.
+--
+-- «Faqat menda o'chirilgan» (`hiddenAt`) xabarlar chiqmaydi. Kursor so'rovlari
+-- (`minSeq`/`maxSeq`) esa ularni HISOBGA OLADI: yashirilgan xabar ham serverda bor va
+-- uni sinxronizatsiya oynasidan chiqarib tashlash tarixda teshik qoldirardi.
 selectMessages:
 SELECT * FROM MessageEntity
-WHERE conversationId = ?
+WHERE conversationId = ? AND hiddenAt IS NULL
 ORDER BY (seq = 0), seq ASC, createdAt ASC;
+
+-- Ro'yxatdagi ko'rinishni qayta hisoblash uchun: yashirilmagan eng oxirgi xabar.
+-- Hammasi yashirilgan bo'lsa hech nima qaytmaydi va suhbat "Xabar yozing…" holatiga tushadi.
+selectLastVisibleMessage:
+SELECT * FROM MessageEntity
+WHERE conversationId = ? AND hiddenAt IS NULL
+ORDER BY createdAt DESC, seq DESC LIMIT 1;
 
 -- Tarixni yuqoriga yuklash kursori (`?before=`). `min()`/`max()` o'rniga ORDER BY + LIMIT:
 -- agregat ustun SQLDelight'da qo'shimcha o'rov klass hosil qiladi, bu esa oddiy `Long?`.
@@ -237,14 +258,20 @@ SELECT seq FROM MessageEntity WHERE conversationId = ? ORDER BY seq DESC LIMIT 1
 selectMessageById:
 SELECT * FROM MessageEntity WHERE id = ?;
 
+-- `INSERT OR REPLACE` — qatorni O'CHIRIB qayta yozadi, ya'ni `hiddenAt` ham yo'qolardi va
+-- har bir tarix yangilanishida «menda o'chirilgan» xabarlar qaytib chiqardi. Shuning uchun
+-- ustun serverdan kelmaydi — mavjud qatordan qayta o'qiladi.
 upsertMessage:
 INSERT OR REPLACE INTO MessageEntity(
     id, conversationId, senderId, seq, type, body, createdAt, clientMsgId, status, deletedAt,
     attachmentId, attachmentUrl, attachmentThumbUrl, attachmentWidth, attachmentHeight,
     attachmentKind, attachmentStatus, attachmentMime, attachmentSizeBytes, attachmentDurationMs,
     attachmentWaveform, attachmentFileName, attachmentBlurHash, attachmentIsAnimated,
-    stickerId, stickerEmoji, stickerUrl, albumId
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+    stickerId, stickerEmoji, stickerUrl, albumId, hiddenAt
+) VALUES (
+    :id, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+    (SELECT hiddenAt FROM MessageEntity WHERE id = :id)
+);
 
 setMessageStatus:
 UPDATE MessageEntity SET status = ? WHERE id = ?;
@@ -286,15 +313,34 @@ UPDATE MessageEntity SET
     stickerUrl = NULL
 WHERE id = ?;
 
+-- «Faqat menda o'chirish»: qator ham, tanasi ham joyida qoladi, faqat ekranda ko'rinmaydi.
+-- Bir necha xabar bir zarbada belgilanadi, shuning uchun ro'yxat bilan (`IN ?`).
+hideMessages:
+UPDATE MessageEntity SET hiddenAt = ? WHERE id IN ?;
+
+-- Ro'yxatdagi ko'rinishni qayta yozadi — oxirgi xabar yashirilganda kerak.
+-- `touchConversation` dan farqi: o'qilmaganlar sanog'iga TEGMAYDI (yashirish yangi xabar
+-- kelgani emas) va tanani bo'shatib ham qo'yadi (hech nima qolmasa "Xabar yozing…").
+setLastMessagePreview:
+UPDATE ConversationEntity
+SET lastMessageBody = ?, lastMessageSenderId = ?, lastMessageType = ?,
+    lastMessageDeleted = ?, lastMessageAt = ?
+WHERE id = ?;
+
 -- Optimistik qator ack kelganda serverning haqiqiy id/seq'iga almashadi.
 deleteMessage:
 DELETE FROM MessageEntity WHERE id = ?;
+
+-- Yuborilmagan (optimistik) xabarlarni belgilab o'chirish — ular serverda yo'q, ya'ni
+-- yashirish emas, haqiqiy o'chirish kerak.
+deleteMessages:
+DELETE FROM MessageEntity WHERE id IN ?;
 
 -- `message:new` o'z xabarimiz bo'lib qaytganda optimistik nusxani olib tashlaydi (ack'dan
 -- OLDIN kelgan holat uchun — ack kelsa `deleteMessage` + `upsertMessage` shu ishni qiladi).
 --
 -- Moslik **`clientMsgId` bo'yicha**: backend 2026-07-29 dan uni `message:new` da
--- jo'natuvchining o'z qurilmalariga qaytaradi (`handoff/chat.md`). Avval moslik matn
+-- jo'natuvchining o'z qurilmalariga qaytaradi (`handoff/03-WEBSOCKET.md`). Avval moslik matn
 -- bo'yicha edi va ikki joyda buzilardi: ketma-ket ikkita bir xil matnda NOTO'G'RI qator
 -- o'chirilardi, media xabarda esa tana bo'sh bo'lib usul umuman ishlamasdi.
 --

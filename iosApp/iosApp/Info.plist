@@ -35,6 +35,10 @@
 	</array>
 	<key>CFBundleVersion</key>
 	<string>1</string>
+	<!-- Ovozli xabar yozish uchun mikrofon. Matn tizim so'rovida ko'rinadi, shuning uchun
+	     foydalanuvchi tilida va aniq sababni aytadi (App Store talabi). -->
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Suhbatda ovozli xabar yozib yuborish uchun mikrofonga ruxsat kerak.</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UIApplicationSceneManifest</key>

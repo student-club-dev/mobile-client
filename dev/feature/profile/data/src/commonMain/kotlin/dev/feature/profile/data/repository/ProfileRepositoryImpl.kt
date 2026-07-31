@@ -8,6 +8,7 @@ import dev.core.common.auth.TokenStore
 import dev.core.database.sql.StudentClubDatabase
 import dev.feature.profile.data.mapper.toDomain
 import dev.feature.profile.data.remote.ProfileRemoteDataSource
+import dev.feature.profile.domain.model.ProfilePhoto
 import dev.feature.profile.domain.model.UserProfile
 import dev.feature.profile.domain.repository.ProfileRepository
 import kotlinx.coroutines.flow.Flow
@@ -87,6 +88,28 @@ class ProfileRepositoryImpl(
         }
     }
 
+    // --- Profil rasmlari (`handoff/08-PROFILE.md` §2) --------------------------------------
+
+    override suspend fun photos(): Resource<List<ProfilePhoto>> = remote.photos()
+
+    /**
+     * Rasm qo'shilgach profil ham **yangilanadi**: `avatarUrl` — hosila maydon va server
+     * uni o'zi almashtiradi, ya'ni local keshdagi eski avatar noto'g'ri bo'lib qolardi.
+     * Shuning uchun muvaffaqiyatdan keyin `refresh()` chaqiriladi (bitta arzon so'rov).
+     */
+    override suspend fun addPhoto(
+        bytes: ByteArray,
+        fileName: String,
+        onProgress: ((Float) -> Unit)?,
+    ): Resource<ProfilePhoto> =
+        remote.addPhoto(bytes, fileName, onProgress).also { if (it is Resource.Success) refresh() }
+
+    override suspend fun makeMainPhoto(photoId: String): Resource<Unit> =
+        remote.makeMainPhoto(photoId).also { if (it is Resource.Success) refresh() }
+
+    override suspend fun deletePhoto(photoId: String): Resource<Unit> =
+        remote.deletePhoto(photoId).also { if (it is Resource.Success) refresh() }
+
     override suspend fun hasProfile(): Boolean {
         // Offline-first: kesh bo'lsa tarmoqni kutmaymiz.
         if (cachedProfile() != null) return true
@@ -122,6 +145,8 @@ class ProfileRepositoryImpl(
                 businessName = p.businessName,
                 businessType = p.businessType,
                 email = p.email,
+                bio = p.bio,
+                phoneVisibility = p.phoneVisibility,
             )
         }
     }

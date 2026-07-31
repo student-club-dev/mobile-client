@@ -134,6 +134,15 @@ fun SettingsScreen(
                 style = scStyle(12f, FontWeight.Medium, Sc.Muted, lineHeight = 17f),
                 modifier = Modifier.padding(horizontal = 6.dp),
             )
+
+            Spacer(Modifier.height(10.dp))
+            PhoneVisibilitySelector(state.profile?.phoneVisibility) { vm.setPhoneVisibility(it) }
+            Text(
+                "Telefon raqamingizni kim ko'rishi. Sukut bo'yicha — hech kim: raqam ochiq " +
+                    "bo'lsa notanish odamlardan qo'ng'iroq kelishi mumkin.",
+                style = scStyle(12f, FontWeight.Medium, Sc.Muted, lineHeight = 17f),
+                modifier = Modifier.padding(horizontal = 6.dp),
+            )
             // Ro'yxatda faqat foydalanuvchi bloklaganlari bo'ladi — ekranning o'zi ham shuni
             // yozadi, bu yerda esa tugma "kim meni bloklagan" degan kutuvni uyg'otmasligi kerak.
             SettingRow(
@@ -264,6 +273,42 @@ private fun LastSeenSelector(current: String?, onSelect: (String) -> Unit) {
         "NOBODY" to "Hech kim",
     )
     val selected = current ?: "CONNECTIONS"
+    Row(
+        Modifier.fillMaxWidth().scCard(radius = 18.dp).padding(5.dp),
+        horizontalArrangement = Arrangement.spacedBy(5.dp),
+    ) {
+        options.forEach { (value, label) ->
+            val active = value == selected
+            Box(
+                Modifier.weight(1f).height(38.dp)
+                    .clip(RoundedCornerShape(13.dp))
+                    .background(if (active) Sc.TintBlue else Color.Transparent)
+                    .clickable { onSelect(value) },
+                contentAlignment = Alignment.Center,
+            ) {
+                ScText(label, 13f, FontWeight.Bold, if (active) Sc.Brand else Sc.Muted, maxLines = 1)
+            }
+        }
+    }
+}
+
+/**
+ * Telefon raqami maxfiyligi (`PUT /v1/profile/me` → `phoneVisibility`).
+ *
+ * ⚠️ Server sukuti — **`NOBODY`** (`lastSeenVisibility` niki `CONNECTIONS`): talabalar
+ * raqamini ko'rsatishga rozilik bermagan (`handoff/08-PROFILE.md` §4). Shuning uchun profil
+ * hali yuklanmagan bo'lsa ham "Hech kim" faol ko'rinadi — bu yerda xavfsiz taxmin.
+ *
+ * Sozlama `lastSeenVisibility` dan **mustaqil**: presence ochiq, raqam yopiq bo'lishi mumkin.
+ */
+@Composable
+private fun PhoneVisibilitySelector(current: String?, onSelect: (String) -> Unit) {
+    val options = listOf(
+        "EVERYONE" to "Hamma",
+        "CONNECTIONS" to "Do'stlar",
+        "NOBODY" to "Hech kim",
+    )
+    val selected = current ?: "NOBODY"
     Row(
         Modifier.fillMaxWidth().scCard(radius = 18.dp).padding(5.dp),
         horizontalArrangement = Arrangement.spacedBy(5.dp),

@@ -6,9 +6,13 @@ import dev.feature.profile.data.remote.ApiProfileRemoteDataSource
 import dev.feature.profile.data.remote.ProfileRemoteDataSource
 import dev.feature.profile.data.repository.ProfileRepositoryImpl
 import dev.feature.profile.domain.repository.ProfileRepository
+import dev.feature.profile.domain.usecase.AddProfilePhotoUseCase
+import dev.feature.profile.domain.usecase.DeleteProfilePhotoUseCase
 import dev.feature.profile.domain.usecase.HasProfileUseCase
 import dev.feature.profile.domain.usecase.ObserveProfileUseCase
+import dev.feature.profile.domain.usecase.ProfilePhotosUseCase
 import dev.feature.profile.domain.usecase.RefreshProfileUseCase
+import dev.feature.profile.domain.usecase.SetMainProfilePhotoUseCase
 import dev.feature.profile.domain.usecase.SaveProfileUseCase
 import dev.feature.profile.domain.usecase.UploadAvatarUseCase
 import dev.feature.profile.presentation.ProfileViewModel
@@ -38,6 +42,10 @@ fun profileModule() = module {
     factory { HasProfileUseCase(get()) }
     factory { RefreshProfileUseCase(get()) }
     factory { UploadAvatarUseCase(get()) }
+    factory { ProfilePhotosUseCase(get()) }
+    factory { AddProfilePhotoUseCase(get()) }
+    factory { SetMainProfilePhotoUseCase(get()) }
+    factory { DeleteProfilePhotoUseCase(get()) }
 
     viewModelOf(::ProfileViewModel)
 }

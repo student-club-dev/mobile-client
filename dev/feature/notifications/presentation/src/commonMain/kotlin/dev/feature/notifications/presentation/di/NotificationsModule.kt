@@ -17,7 +17,7 @@ import org.koin.dsl.module
 
 /**
  * Bildirishnomalar: ilova ichidagi ro'yxat (local DB) **va** oflayn push
- * (`POST /v1/devices` — `chat.md` §10).
+ * (`POST /v1/devices` — `03-WEBSOCKET.md` §10).
  *
  * [PushRepositoryImpl] bir vaqtda [PushRepository] va [PushRegistrar] — ikkinchisini auth
  * qatlami sessiya ochilganda/yopilganda chaqiradi (auth push haqida hech nima bilmaydi,

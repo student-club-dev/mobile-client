@@ -24,6 +24,7 @@ import dev.core.data.seed.LocalDataSeeder
 import dev.core.di.IMAGE_CLIENT
 import dev.core.network.NetworkConfig
 import dev.core.network.media.MediaUrl
+import dev.core.network.media.apiOrigin
 import dev.core.uikit.generated.resources.Res
 import dev.core.uikit.theme.AppTheme
 import dev.feature.settings.domain.model.ThemeMode
@@ -50,7 +51,7 @@ private fun AppScaffold(content: @Composable () -> Unit) {
     // (qarang: `createImageHttpClient`).
     val httpClient = koinInject<HttpClient>(named(IMAGE_CLIENT))
     // API manzilining origin qismi (`/v1/` siz) — buzuq havolalarni tuzatish uchun.
-    val apiOrigin = koinInject<NetworkConfig>().baseUrl.substringBefore("/v1")
+    val apiOrigin = koinInject<NetworkConfig>().apiOrigin
     setSingletonImageLoaderFactory { context ->
         ImageLoader.Builder(context)
             .components {

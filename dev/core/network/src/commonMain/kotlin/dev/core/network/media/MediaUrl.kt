@@ -1,5 +1,15 @@
 package dev.core.network.media
 
+import dev.core.network.NetworkConfig
+
+/**
+ * API manzilining **origin** qismi — `https://api.studentclub.uz` (`/v1/` siz).
+ *
+ * [MediaUrl.normalize] ga aynan shu beriladi. Ilgari har chaqiruvchi buni o'zi
+ * `substringBefore("/v1")` bilan qirqib olardi; bitta joyda turgani xavfsizroq.
+ */
+val NetworkConfig.apiOrigin: String get() = baseUrl.substringBefore("/v1").trimEnd('/')
+
 /**
  * Serverdan kelgan **media havolasini tuzatadi**.
  *
@@ -18,6 +28,12 @@ package dev.core.network.media
  * ⚠️ Bu **vaqtinchalik himoya**: to'g'ri yechim — backend ochiq `https` havolasini
  * qaytarishi. Lekin bunday tuzatishsiz noto'g'ri sozlangan serverda **bitta ham rasm
  * ko'rinmaydi**, shuning uchun klient o'zini himoya qiladi.
+ *
+ * ⚠️ Rasmlar uchun buni Coil o'zining `Mapper` i orqali avtomatik qiladi, **video va ovoz
+ * esa Coil'dan o'tmaydi**: ExoPlayer/AVPlayer nisbiy yo'lni `file://` deb o'qiydi va
+ * "fayl topilmadi" bilan yiqiladi (ekranda esa jimgina qora ekran qoladi). Shuning uchun
+ * media havolalari **domen modeliga o'tayotganda** shu yerdan o'tkaziladi — o'shanda
+ * ekranlar allaqachon to'g'ri havola oladi.
  */
 object MediaUrl {
 

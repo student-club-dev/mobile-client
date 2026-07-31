@@ -63,6 +63,13 @@ class ConnectionsRepositoryImpl(
         ).body()
     }.map { it.toDomain() }
 
+    /**
+     * Generatorda `getOne`: `StudentsController_getOne` qisqartirilgan nomi. Javob —
+     * `SearchResultDto`, ya'ni ro'yxatdagi qator bilan bir xil (`handoff/08-PROFILE.md` §6).
+     */
+    override suspend fun student(studentId: String): Resource<SearchedStudent> =
+        safeCall(connectivity) { api.getOne(studentId).body() }.map { it.toDomain() }
+
     override suspend fun sendRequest(studentId: String): Resource<Connection> =
         safeCall(connectivity) {
             api.connectionsSend(SendConnectionRequestDto(addresseeId = studentId)).body()

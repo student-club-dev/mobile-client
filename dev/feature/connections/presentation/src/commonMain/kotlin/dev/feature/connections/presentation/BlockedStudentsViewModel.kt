@@ -43,7 +43,7 @@ data class BlockedUiState(
 }
 
 /**
- * **Bloklanganlar** ro'yxati — `GET /v1/blocks` (handoff: `api-changes.md` §4b).
+ * **Bloklanganlar** ro'yxati — `GET /v1/blocks` (handoff: `02-API-CHANGES.md` §4b).
  *
  * Ro'yxatda faqat FOYDALANUVCHI bloklaganlari bo'ladi; sizni kim bloklagani serverda ataylab
  * berilmaydi. Presence maydonlari maskalangan, shuning uchun ekranda "onlayn"/"oxirgi faollik"

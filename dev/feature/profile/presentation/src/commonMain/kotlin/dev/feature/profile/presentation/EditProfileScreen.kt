@@ -3,11 +3,16 @@ package dev.feature.profile.presentation
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -21,6 +26,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -30,6 +36,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -43,11 +50,16 @@ import dev.core.uikit.components.ScHeader
 import dev.core.uikit.components.ScHeaderTitle
 import dev.core.uikit.components.ScIcons
 import dev.core.uikit.components.ScText
+import dev.core.uikit.components.ScUploadRing
+import dev.core.uikit.components.scUploadPercent
 import dev.core.uikit.components.scCard
 import dev.core.uikit.media.rememberImagePicker
 import dev.core.uikit.media.toImageBitmapOrNull
+import coil3.compose.AsyncImage
 import dev.core.uikit.theme.Sc
+import dev.feature.profile.domain.model.ProfilePhoto
 import dev.feature.profile.domain.model.UserProfile
+import dev.feature.profile.domain.model.bioRejectionReason
 import dev.feature.profile.presentation.components.ProfileAvatar
 import dev.feature.university.domain.model.University
 import org.koin.compose.viewmodel.koinViewModel
@@ -72,6 +84,7 @@ private val genderOptions = listOf(
  * Profilni tahrirlash ekrani (A2/C2). Local keshdagi profilni prefill qiladi,
  * o'zgarishlarni [ProfileViewModel.saveProfile] orqali Firestore + local keshga yozadi.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun EditProfileScreen(onBack: () -> Unit, vm: ProfileViewModel = koinViewModel()) {
     val state by vm.state.collectAsStateWithLifecycle()
@@ -83,6 +96,7 @@ fun EditProfileScreen(onBack: () -> Unit, vm: ProfileViewModel = koinViewModel()
     var universityId by remember(profile) { mutableStateOf(profile?.universityId) }
     var courseYear by remember(profile) { mutableStateOf(profile?.courseYear) }
     var gender by remember(profile) { mutableStateOf(profile?.gender) }
+    var bio by remember(profile) { mutableStateOf(profile?.bio.orEmpty()) }
 
     var uniExpanded by remember { mutableStateOf(false) }
     var uniQuery by remember { mutableStateOf("") }
@@ -91,21 +105,22 @@ fun EditProfileScreen(onBack: () -> Unit, vm: ProfileViewModel = koinViewModel()
 
     // Avatar: tanlangan rasm darrov ko'rinadi, ayni paytda fon rejimida serverga yuklanadi.
     var avatarPreview by remember { mutableStateOf<ImageBitmap?>(null) }
-    var avatarUploading by remember { mutableStateOf(false) }
-    var avatarError by remember { mutableStateOf<String?>(null) }
 
+    val photos by vm.photos.collectAsStateWithLifecycle()
+
+    // Ekran ochilganda ro'yxatni bir marta o'qiymiz — rasmlar local keshda saqlanmaydi.
+    LaunchedEffect(Unit) { vm.loadPhotos() }
+
+    /**
+     * Rasm tanlangan — u **to'plamga** qo'shiladi va serverda **birinchi o'ringa** tushadi,
+     * ya'ni shu bilan avatar ham almashadi (`handoff/08-PROFILE.md` §2). Ilgari bu yerda
+     * alohida "avatar yuklash" chaqiruvi bor edi; endi u kerak emas — `avatarUrl` hosila
+     * maydon va uni server o'zi yangilaydi.
+     */
     val imagePicker = rememberImagePicker { picked ->
         if (picked == null) return@rememberImagePicker // bekor qilindi
-        avatarError = null
         avatarPreview = picked.bytes.toImageBitmapOrNull()
-        avatarUploading = true
-        vm.uploadAvatar(picked.bytes, picked.fileName) { err ->
-            avatarUploading = false
-            if (err != null) {
-                avatarError = err
-                avatarPreview = null // yuklanmadi — eski rasmga qaytamiz
-            }
-        }
+        vm.addPhoto(picked.bytes, picked.fileName)
     }
 
     Column(Modifier.fillMaxSize().background(Sc.Bg).verticalScroll(rememberScrollState())) {
@@ -128,19 +143,26 @@ fun EditProfileScreen(onBack: () -> Unit, vm: ProfileViewModel = koinViewModel()
             verticalArrangement = Arrangement.spacedBy(9.dp),
         ) {
             Box(contentAlignment = Alignment.BottomEnd) {
-                ProfileAvatar(
-                    name = state.name,
-                    size = 96.dp,
-                    fontSize = 36.sp,
-                    avatarUrl = profile?.avatarUrl,
-                    localPreview = avatarPreview,
-                    modifier = Modifier.clickable(enabled = !avatarUploading) { imagePicker.pick() },
-                )
+                Box(contentAlignment = Alignment.Center) {
+                    ProfileAvatar(
+                        name = state.name,
+                        size = 96.dp,
+                        fontSize = 36.sp,
+                        avatarUrl = profile?.avatarUrl,
+                        localPreview = avatarPreview,
+                        modifier = Modifier.clickable(enabled = photos.canAdd) { imagePicker.pick() },
+                    )
+                    // Tanlangan rasm ([avatarPreview]) darhol ko'rinadi, foiz esa uning
+                    // ustida aylanadi — Telegramdagidek.
+                    if (photos.uploading) {
+                        ScUploadRing(photos.progress, size = 96.dp, stroke = 3.dp)
+                    }
+                }
                 // Kamera nishoni
                 Box(
                     Modifier.size(31.dp).clip(CircleShape).background(Sc.Brand)
                         .border(2.dp, Sc.Bg, CircleShape)
-                        .clickable(enabled = !avatarUploading) { imagePicker.pick() },
+                        .clickable(enabled = photos.canAdd) { imagePicker.pick() },
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(AppIcons.Camera, "Rasmni o'zgartirish", tint = Color.White, modifier = Modifier.size(15.dp))
@@ -148,11 +170,30 @@ fun EditProfileScreen(onBack: () -> Unit, vm: ProfileViewModel = koinViewModel()
             }
 
             when {
-                avatarUploading -> ScText("Rasm yuklanmoqda...", 12.5f, FontWeight.SemiBold, Sc.Muted)
-                avatarError != null -> ScText(avatarError!!, 12.5f, FontWeight.SemiBold, Sc.Danger)
-                else -> ScText(
-                    "Rasmni o'zgartirish", 12.5f, FontWeight.Bold, Sc.Brand,
+                photos.uploading && photos.progress != null -> ScText(
+                    "Rasm yuklanmoqda ${scUploadPercent(photos.progress!!)}",
+                    12.5f, FontWeight.SemiBold, Sc.Muted,
+                )
+                // Fayl ketib bo'lgan — endi server rasmni saqlab, profilni yangilamoqda.
+                photos.uploading -> ScText("Rasm saqlanmoqda...", 12.5f, FontWeight.SemiBold, Sc.Muted)
+                photos.error != null -> ScText(photos.error!!, 12.5f, FontWeight.SemiBold, Sc.Danger)
+                photos.canAdd -> ScText(
+                    "Rasm qo'shish", 12.5f, FontWeight.Bold, Sc.Brand,
                     Modifier.clickable { imagePicker.pick() },
+                )
+                // Chegaraga yetildi — tugmani ko'rsatib turish faqat 422 ga olib borardi.
+                else -> ScText(
+                    "${ProfilePhoto.MAX_PHOTOS} tadan ko'p rasm bo'lmaydi",
+                    12.5f, FontWeight.SemiBold, Sc.Muted,
+                )
+            }
+
+            if (photos.items.isNotEmpty()) {
+                Spacer(Modifier.height(4.dp))
+                ProfilePhotoStrip(
+                    photos = photos.items,
+                    onMakeMain = vm::setMainPhoto,
+                    onDelete = vm::deletePhoto,
                 )
             }
         }
@@ -173,6 +214,27 @@ fun EditProfileScreen(onBack: () -> Unit, vm: ProfileViewModel = koinViewModel()
                 phone, { phone = it }, "+998 90 123 45 67",
                 leading = AppIcons.Phone,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+            )
+
+            // Tarjimayi hol — 140 belgi, havola/telefon TAQIQLANGAN.
+            FieldLabel("Tarjimayi hol")
+            GlassTextField(
+                bio,
+                { if (it.length <= UserProfile.MAX_BIO) bio = it },
+                "5/5 · Dasturiy injiniring",
+                leading = AppIcons.Pencil,
+            )
+            /**
+             * Xato **yozayotganda** ko'rsatiladi, saqlashda emas: server baribir
+             * `422 BIO_NOT_ALLOWED` beradi, lekin unga qadar foydalanuvchi butun formani
+             * to'ldirib bo'lardi (`handoff/08-PROFILE.md` §5).
+             */
+            val bioError = remember(bio) { bioRejectionReason(bio) }
+            ScText(
+                bioError ?: "${bio.length}/${UserProfile.MAX_BIO}",
+                11.5f,
+                FontWeight.Medium,
+                if (bioError != null) Sc.Danger else Sc.Muted,
             )
 
             // Universitet tanlash
@@ -260,6 +322,12 @@ fun EditProfileScreen(onBack: () -> Unit, vm: ProfileViewModel = koinViewModel()
                     if (saving) return@ScGradientButton
                     error = null
                     saving = true
+                    val bioError = bioRejectionReason(bio)
+                    if (bioError != null) {
+                        saving = false
+                        error = bioError
+                        return@ScGradientButton
+                    }
                     val updated = (profile ?: UserProfile()).copy(
                         firstName = firstName.trim().ifBlank { null },
                         lastName = lastName.trim().ifBlank { null },
@@ -267,6 +335,8 @@ fun EditProfileScreen(onBack: () -> Unit, vm: ProfileViewModel = koinViewModel()
                         universityId = universityId,
                         courseYear = courseYear,
                         gender = gender,
+                        // Bo'sh satr — serverda "tozalash" degani, `null` esa "tegilmasin".
+                        bio = bio.trim(),
                     )
                     vm.saveProfile(updated) { err ->
                         saving = false
@@ -277,6 +347,66 @@ fun EditProfileScreen(onBack: () -> Unit, vm: ProfileViewModel = koinViewModel()
             Spacer(Modifier.height(28.dp))
         }
     }
+}
+
+/**
+ * Profil rasmlari tasmasi — **birinchisi avatar** (`handoff/08-PROFILE.md` §2).
+ *
+ * Bosish — asosiy qilish, uzoq bosish — o'chirish. Nega uzoq bosish: har katakda alohida
+ * "×" tugmasi 64 dp li kvadratda barmoq uchun juda mayda bo'lardi va tasodifiy o'chirish
+ * xavfi tug'ilardi.
+ *
+ * Birinchi rasmda "Asosiy" yorlig'i turadi; uni bosish hech narsa qilmaydi (u allaqachon
+ * asosiy) — server ham shu holatda `PUT …/main` ni no-op deb qabul qiladi.
+ */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun ProfilePhotoStrip(
+    photos: List<ProfilePhoto>,
+    onMakeMain: (String) -> Unit,
+    onDelete: (String) -> Unit,
+) {
+    LazyRow(
+        Modifier.fillMaxWidth(),
+        contentPadding = PaddingValues(horizontal = Sc.ScreenPadding),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        itemsIndexed(photos, key = { _, item -> item.id }) { index, photo ->
+            val main = index == 0
+            Box(
+                Modifier.size(64.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(Sc.Chip)
+                    .combinedClickable(
+                        onClick = { if (!main) onMakeMain(photo.id) },
+                        onLongClick = { onDelete(photo.id) },
+                    ),
+            ) {
+                AsyncImage(
+                    model = photo.previewUrl,
+                    contentDescription = if (main) "Asosiy rasm" else "Profil rasmi",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+                if (main) {
+                    Box(
+                        Modifier.align(Alignment.BottomCenter)
+                            .fillMaxWidth()
+                            .background(Color.Black.copy(alpha = 0.45f)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        ScText("Asosiy", 9.5f, FontWeight.Bold, Color.White, maxLines = 1)
+                    }
+                }
+            }
+        }
+    }
+    ScText(
+        "Bosish — asosiy qilish, uzoq bosish — o'chirish",
+        11.5f,
+        FontWeight.Medium,
+        Sc.MutedLight,
+    )
 }
 
 @Composable

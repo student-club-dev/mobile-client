@@ -58,7 +58,7 @@ private const val GRID_COLUMNS = 2
 private const val PREFETCH_DISTANCE = 6
 
 /**
- * GIF qidiruv paneli (`gif.md`).
+ * GIF qidiruv paneli (`04-GIF-INTEGRATION.md`).
  *
  * Uch narsa ataylab shunday qilingan:
  *
@@ -95,9 +95,10 @@ fun GifPanel(
     Column(modifier.fillMaxWidth().height(PANEL_HEIGHT).background(Sc.Card)) {
         Box(Modifier.fillMaxWidth().height(1.dp).background(Sc.Border))
 
-        GifSearchField(
+        MediaSearchField(
             query = state.query,
             onQueryChange = vm::onQueryChange,
+            placeholder = "GIF qidirish…",
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
         )
 
@@ -113,13 +114,13 @@ fun GifPanel(
                     modifier = Modifier.padding(vertical = 2.dp),
                 )
 
-                error != null -> GifErrorView(
+                error != null -> MediaSearchErrorView(
                     message = error.userMessage,
                     retriable = error.retriable,
                     onRetry = vm::retry,
                 )
 
-                state.empty -> CenterText(
+                state.empty -> MediaSearchCenterText(
                     if (state.query.isBlank()) "GIF topilmadi." else "«${state.query}» bo'yicha GIF topilmadi.",
                 )
 
@@ -155,8 +156,12 @@ fun GifPanel(
  *
  * Provayder shartlari brend belgisini qidiruv panelida ko'rsatishni talab qiladi va
  * production kalitini olish uchun ular buni **ilova ichidagi ekran yozuvidan** tekshiradi
- * (`PENDING_ACTIONS.md`). Shuning uchun bu qator paneldan **hech qanday holatda
+ * (`PENDING_ACTIONS.md`). Shuning uchun bu qator GIF panelidan **hech qanday holatda
  * yashirilmaydi** — yuklanayotganda ham, xatoda ham, natija bo'lmasa ham.
+ *
+ * Stiker panelida esa u **qidiruv natijalari ko'rsatilayotganda** chiqadi
+ * (`handoff/06-STICKER-SEARCH.md` §3): paketlar KLIPY'niki emas — ular Fluent Emoji (MIT) yoki
+ * bizning server katalogimiz, ya'ni o'sha yerda KLIPY belgisi noto'g'ri atribut bo'lardi.
  *
  * Qaysi brend ko'rsatilishini javobdagi `provider` maydoni aytadi — hozir doim `KLIPY`.
  *
@@ -164,7 +169,7 @@ fun GifPanel(
  * shu matn o'rniga `Image` qo'yiladi, joyi va ko'rinish qoidasi o'zgarmaydi.
  */
 @Composable
-private fun ProviderAttribution(provider: GifProvider) {
+internal fun ProviderAttribution(provider: GifProvider) {
     Box(Modifier.fillMaxWidth().height(1.dp).background(Sc.Border))
     Row(
         Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 8.dp),
@@ -175,10 +180,12 @@ private fun ProviderAttribution(provider: GifProvider) {
     }
 }
 
+/** Qidiruv maydoni — GIF va stiker panellarida bir xil. */
 @Composable
-private fun GifSearchField(
+internal fun MediaSearchField(
     query: String,
     onQueryChange: (String) -> Unit,
+    placeholder: String,
     modifier: Modifier = Modifier,
 ) {
     Row(
@@ -193,7 +200,7 @@ private fun GifSearchField(
         Icon(ScIcons.Search, null, tint = Sc.Muted, modifier = Modifier.size(18.dp))
         Box(Modifier.weight(1f)) {
             if (query.isEmpty()) {
-                ScText("GIF qidirish…", 15f, FontWeight.Medium, Sc.NavIdle, maxLines = 1)
+                ScText(placeholder, 15f, FontWeight.Medium, Sc.NavIdle, maxLines = 1)
             }
             BasicTextField(
                 value = query,
@@ -243,7 +250,7 @@ private fun GifCell(gif: GifItem, onClick: () -> Unit) {
 }
 
 @Composable
-private fun GifErrorView(message: String, retriable: Boolean, onRetry: () -> Unit) {
+internal fun MediaSearchErrorView(message: String, retriable: Boolean, onRetry: () -> Unit) {
     Column(
         Modifier.fillMaxSize().padding(horizontal = 28.dp),
         verticalArrangement = Arrangement.Center,
@@ -263,7 +270,7 @@ private fun GifErrorView(message: String, retriable: Boolean, onRetry: () -> Uni
 }
 
 @Composable
-private fun CenterText(text: String) {
+internal fun MediaSearchCenterText(text: String) {
     Box(Modifier.fillMaxSize().padding(horizontal = 28.dp), Alignment.Center) {
         ScText(text, 13.5f, FontWeight.Medium, Sc.MutedLight)
     }

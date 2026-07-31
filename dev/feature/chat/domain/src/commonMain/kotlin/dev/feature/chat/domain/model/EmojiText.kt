@@ -6,7 +6,7 @@ package dev.feature.chat.domain.model
  *
  * Nega domenda: bu endi **tur aniqlash** emas. Backend 2026-07-29 dan tipli xabarni o'zi
  * qaytaradi, ya'ni qo'lda yozilgan emoji `TEXT` bo'lib ketadi va `STICKER` bo'lib qaytmaydi
- * (stiker uchun `stickerId` kerak, tana esa taqiqlangan — `handoff/chat.md`). Katta chizish
+ * (stiker uchun `stickerId` kerak, tana esa taqiqlangan — `handoff/03-WEBSOCKET.md`). Katta chizish
  * esa sof KO'RSATISH qarori bo'lib qoldi, shuning uchun u ekran qatlamiga kerak.
  *
  * Chegara tor: kamroq qamrasa xato arzon (emoji shunchaki kichikroq ko'rinadi), ortiqcha

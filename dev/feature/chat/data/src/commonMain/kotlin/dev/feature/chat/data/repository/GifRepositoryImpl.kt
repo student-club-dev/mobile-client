@@ -17,7 +17,7 @@ import kotlinx.datetime.Clock
  * GIF repository'si — qidiruv + **xotiradagi kesh**.
  *
  * Nega kesh shart: hozirgi kalit **soatiga 100 ta so'rov beradi va u GLOBAL** — ya'ni bitta
- * foydalanuvchining ortiqcha so'rovi butun ilovaning kvotasidan yeydi (`gif.md`). Panelni
+ * foydalanuvchining ortiqcha so'rovi butun ilovaning kvotasidan yeydi (`04-GIF-INTEGRATION.md`). Panelni
  * ochib-yopish, orqaga qaytish yoki bir xil so'zni qayta yozish **yangi so'rov qilmasligi**
  * kerak.
  *

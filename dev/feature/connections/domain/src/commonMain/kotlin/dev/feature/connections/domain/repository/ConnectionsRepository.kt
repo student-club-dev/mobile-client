@@ -41,6 +41,17 @@ interface ConnectionsRepository {
     ): Resource<Page<SearchedStudent>>
 
     /**
+     * **Bitta talaba** — `GET /v1/students/{id}` (`handoff/08-PROFILE.md` §6).
+     *
+     * Suhbat ochmasdan profilni ochish uchun. Javob ro'yxatdagi qatorning **aynan o'zi**
+     * ([SearchedStudent]), ya'ni `connectionStatus` ham ichida keladi va profil ekranidagi
+     * amal tugmalari qaysi holatda ekanini bilish uchun ikkinchi so'rov kerak emas.
+     *
+     * `404` — talaba yo'q, `403` — biri ikkinchisini bloklagan. O'z id'ingiz bilan ham ishlaydi.
+     */
+    suspend fun student(studentId: String): Resource<SearchedStudent>
+
+    /**
      * So'rov yuborish. Agar u odam sizga allaqachon so'rov yuborgan bo'lsa — javobda
      * `status = ACCEPTED` keladi, ya'ni **darhol bog'lanish** sodir bo'ldi (C1).
      *

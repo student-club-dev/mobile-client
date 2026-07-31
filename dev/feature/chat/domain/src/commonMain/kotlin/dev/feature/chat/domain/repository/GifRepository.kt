@@ -6,7 +6,7 @@ import dev.feature.chat.domain.model.GifLocale
 import dev.feature.chat.domain.model.GifPage
 
 /**
- * GIF qidiruvi (`gif.md`) — `ChatRepository` dan **ataylab alohida**: bu butunlay boshqa
+ * GIF qidiruvi (`04-GIF-INTEGRATION.md`) — `ChatRepository` dan **ataylab alohida**: bu butunlay boshqa
  * manba (tashqi provayder, o'z kvotasi va o'z xatolari) va suhbat holatiga umuman
  * bog'liq emas.
  */

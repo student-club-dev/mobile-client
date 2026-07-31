@@ -52,6 +52,33 @@ internal object ChatFormat {
         }
     }
 
+    /** `1:07` / `12:03` — ovozli xabar va video davomiyligi. */
+    fun duration(ms: Int): String {
+        val total = (ms / 1000).coerceAtLeast(0)
+        return "${total / 60}:${(total % 60).pad()}"
+    }
+
+    /**
+     * `348 KB` / `12.4 MB` — fayl hajmi.
+     *
+     * Baytlar ko'rsatilmaydi: chat chegarasi 48 MB va u yerda bayt aniqligining ma'nosi yo'q,
+     * uzun son esa qatorni keraksiz kengaytiradi.
+     */
+    fun fileSize(bytes: Long): String = when {
+        bytes <= 0 -> ""
+        bytes < KB -> "$bytes B"
+        bytes < MB -> "${bytes / KB} KB"
+        else -> {
+            val mb = bytes.toDouble() / MB
+            // Bitta kasr xonasi — "12.4 MB". Butun songa yaxlitlansa 0.6 MB "0 MB" bo'lardi.
+            val rounded = (mb * 10).toLong()
+            "${rounded / 10}.${rounded % 10} MB"
+        }
+    }
+
+    private const val KB = 1024L
+    private const val MB = 1024L * 1024L
+
     private fun Instant.date(): LocalDate = toLocalDateTime(zone).date
 
     private fun today(): LocalDate = Clock.System.now().toLocalDateTime(zone).date

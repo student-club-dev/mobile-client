@@ -14,7 +14,7 @@ import kotlinx.serialization.json.decodeFromJsonElement
 
 // ---------------------------------------------------------------------------
 // WS payload'lari — Swagger'da YO'Q (OpenAPI HTTP ni tasvirlaydi, hodisalarni emas).
-// Yagona manba: `handoff/chat.md`.
+// Yagona manba: `handoff/03-WEBSOCKET.md`.
 // ---------------------------------------------------------------------------
 
 /** `message:new` — yangi xabar (jo'natuvchining o'ziga ham keladi!). */
@@ -26,7 +26,7 @@ data class WsMessageNew(
 
 /**
  * WS ichidagi xabar — REST'dagi `MessageDto` bilan **aynan bir xil shakl**
- * (`handoff/chat.md`: "message:new → message to'liq MessageDto").
+ * (`handoff/03-WEBSOCKET.md`: "message:new → message to'liq MessageDto").
  *
  * ⚠️ [clientMsgId] **faqat jo'natuvchining o'z qurilmalariga** to'ldiriladi; qabul qiluvchiga
  * `null` keladi. Optimistik nusxani aynan shu maydon bo'yicha topamiz.
@@ -86,7 +86,7 @@ data class WsSticker(
 )
 
 /**
- * `message:deleted` — **ikkala** a'zoga ketadi (`handoff/api-changes.md` §4b).
+ * `message:deleted` — **ikkala** a'zoga ketadi (`handoff/02-API-CHANGES.md` §4b).
  *
  * Xabar tarixdan yo'qolmaydi: `seq` joyida qoladi, faqat tanasi bo'shatiladi va u
  * o'qilmaganlar sanog'idan chiqadi.
@@ -182,7 +182,7 @@ data class WsError(
 /**
  * Chat WebSocket kanali — [SocketIoClient] ustidagi **tiplangan** qatlam.
  *
- * Bu klass protokolni bilmaydi (u `SocketIoClient` da), faqat `handoff/chat.md` dagi hodisa
+ * Bu klass protokolni bilmaydi (u `SocketIoClient` da), faqat `handoff/03-WEBSOCKET.md` dagi hodisa
  * nomlari va payload'larni biladi.
  *
  * ⚠️ `typing:*` **ataylab ack qaytarmaydi** — ular efemer, yo'qolsa zarari yo'q.
@@ -212,7 +212,7 @@ class ChatSocket(private val socket: SocketIoClient) {
      *
      * Maydonlarning hammasi ixtiyoriy va **berilmagani umuman yuborilmaydi**: [type] siz
      * server xabarni `TEXT` deb oladi, ya'ni eski klient hech narsa o'zgartirmasdan
-     * ishlayveradi (`handoff/chat.md`, "type berilmasa TEXT"). Qaysi maydon qaysi tur
+     * ishlayveradi (`handoff/03-WEBSOCKET.md`, "type berilmasa TEXT"). Qaysi maydon qaysi tur
      * bilan ketishi — o'sha hujjatdagi jadval; tekshiruv chaqiruvchida (`SendPayload`).
      *
      * [gif] — qidiruvdan olingan GIF havolasi (`GifRefDto` shaklida). Xom `JsonObject`
@@ -227,6 +227,7 @@ class ChatSocket(private val socket: SocketIoClient) {
         stickerId: String? = null,
         albumId: String? = null,
         gif: JsonObject? = null,
+        sticker: JsonObject? = null,
     ): WsSendAck? {
         val ack = socket.emitWithAck(
             EVENT_MESSAGE_SEND,
@@ -239,6 +240,9 @@ class ChatSocket(private val socket: SocketIoClient) {
                 stickerId?.let { put("stickerId", JsonPrimitive(it)) }
                 albumId?.let { put("albumId", JsonPrimitive(it)) }
                 gif?.let { put("gif", it) }
+                // Qidiruvdan kelgan stiker — `stickerId` bilan BIRGA ketmaydi
+                // (`SendPayload.validate` buni oldindan to'sadi).
+                sticker?.let { put("sticker", it) }
             },
         ) ?: return null
         return runCatching { json.decodeFromJsonElement(WsSendAck.serializer(), ack) }.getOrNull()

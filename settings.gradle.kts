@@ -96,6 +96,11 @@ include(":dev:feature:connections:presentation")
 include(":dev:feature:chat:domain")
 include(":dev:feature:chat:data")
 include(":dev:feature:chat:presentation")
+// Story — 24 soatlik lavhalar. Eshik chat bilan bir xil: faqat bog'langanlar ko'radi.
+// Handoff: handoff/07-STORIES.md.
+include(":dev:feature:stories:domain")
+include(":dev:feature:stories:data")
+include(":dev:feature:stories:presentation")
 // Home — sof agregator ekran (o'z domeni/data'si yo'q; boshqa feature domenlaridan o'qiydi).
 include(":dev:feature:home:presentation")
 

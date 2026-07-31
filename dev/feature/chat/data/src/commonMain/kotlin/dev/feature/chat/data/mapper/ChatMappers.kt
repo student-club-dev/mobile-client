@@ -5,6 +5,7 @@ import dev.core.database.sql.MessageEntity
 import dev.core.network.generated.model.AttachmentDto
 import dev.core.network.generated.model.MessageDto
 import dev.core.network.generated.model.MessageStickerDto
+import dev.core.network.media.MediaUrl
 import dev.feature.chat.data.realtime.WsAttachment
 import dev.feature.chat.data.realtime.WsMessage
 import dev.feature.chat.data.realtime.WsSticker
@@ -74,7 +75,17 @@ private fun ConversationEntity.lastMessageStub(text: String, deleted: Boolean): 
     deletedAt = if (deleted) Instant.fromEpochMilliseconds(lastMessageAt ?: 0L) else null,
 )
 
-internal fun MessageEntity.toDomain(): Message = Message(
+/**
+ * [origin] — API origin'i (`https://api.studentclub.uz`); biriktirma havolalari shu bilan
+ * **to'liq** holga keltiriladi.
+ *
+ * ⚠️ Backend havolani nisbiy (`/v1/media/{id}/raw`) qaytaradi. Rasmda bu bilinmasdi —
+ * Coil o'z `Mapper` ida tuzatadi; **video va ovoz** esa Coil'dan o'tmaydi va pleyer nisbiy
+ * yo'lni local fayl deb ochishga urinib, "fayl topilmadi" bilan yiqilardi (foydalanuvchi
+ * esa faqat qora ekran ko'rardi). Shuning uchun tuzatish o'qish yo'lida: **keshda yotgan
+ * eski qatorlar ham** to'g'ri ko'rinadi.
+ */
+internal fun MessageEntity.toDomain(origin: String): Message = Message(
     id = id,
     conversationId = conversationId,
     senderId = senderId,
@@ -88,8 +99,8 @@ internal fun MessageEntity.toDomain(): Message = Message(
     attachment = attachmentUrl?.let { url ->
         Attachment(
             id = attachmentId,
-            url = url,
-            thumbUrl = attachmentThumbUrl,
+            url = MediaUrl.normalize(url, origin) ?: url,
+            thumbUrl = attachmentThumbUrl?.let { MediaUrl.normalize(it, origin) },
             kind = attachmentKind?.let { parseEnum(it, MediaKind.IMAGE) } ?: MediaKind.IMAGE,
             status = attachmentStatus?.let { parseEnum(it, MediaStatus.READY) } ?: MediaStatus.READY,
             mimeType = attachmentMime,
@@ -103,8 +114,18 @@ internal fun MessageEntity.toDomain(): Message = Message(
             isAnimated = attachmentIsAnimated == 1L,
         )
     },
-    sticker = stickerId?.let {
-        MessageSticker(id = it, emoji = stickerEmoji.orEmpty(), url = stickerUrl)
+    // `stickerId` YOKI `stickerUrl` — ikkalasidan biri yetadi. Qidiruvdan yuborilgan
+    // provayder stikerining optimistik qatorida `stickerId` YO'Q (u server katalogida yo'q,
+    // `handoff/06-STICKER-SEARCH.md` §2), faqat havolasi bor — shartga uni ham qo'shmasak,
+    // server javobi kelgunicha pufak bo'sh turardi.
+    sticker = (stickerId ?: stickerUrl)?.let {
+        MessageSticker(
+            id = stickerId.orEmpty(),
+            emoji = stickerEmoji.orEmpty(),
+            // Stiker tasviri o'z serverimizdan ham, provayderdan ham kelishi mumkin —
+            // `normalize` begona (to'liq) havolaga tegmaydi.
+            url = stickerUrl?.let { url -> MediaUrl.normalize(url, origin) },
+        )
     },
     albumId = albumId,
 )
@@ -185,7 +206,7 @@ internal fun MessageEntity.toRow(): MessageRow = MessageRow(
  * REST javobidagi xabar → kesh qatori.
  *
  * Tur endi **serverdan** keladi (`MessageDto.type`) — 2026-07-29 gacha u doim `TEXT` edi va
- * rasm/stiker tanadan taxmin qilinardi; endi evristika kerak emas (`handoff/chat.md`).
+ * rasm/stiker tanadan taxmin qilinardi; endi evristika kerak emas (`handoff/03-WEBSOCKET.md`).
  *
  * [fallbackClientMsgId] — biz endi yuborgan, javobi kelgan xabar uchun zaxira: server
  * `clientMsgId` ni qaytarmasa ham optimistik nusxa topilishi kerak.
@@ -297,10 +318,10 @@ private fun MessageRow.withAttachment(dto: AttachmentDto?): MessageRow = withAtt
 private fun MessageRow.withAttachment(dto: WsAttachment?): MessageRow = withAttachment(dto?.toColumns())
 
 private fun MessageRow.withSticker(dto: MessageStickerDto?): MessageRow =
-    if (dto == null) this else copy(stickerId = dto.id, stickerEmoji = dto.emoji, stickerUrl = dto.url)
+    if (dto == null) this else copy(stickerId = dto.id, stickerEmoji = dto.emoji.orEmpty(), stickerUrl = dto.url)
 
 private fun MessageRow.withSticker(dto: WsSticker?): MessageRow =
-    if (dto == null) this else copy(stickerId = dto.id, stickerEmoji = dto.emoji, stickerUrl = dto.url)
+    if (dto == null) this else copy(stickerId = dto.id, stickerEmoji = dto.emoji.orEmpty(), stickerUrl = dto.url)
 
 /**
  * To'lqin shakli — `"12,40,88"`. JSON emas: qiymatlar oddiy sonlar va SQLDelight'da massiv

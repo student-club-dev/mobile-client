@@ -32,6 +32,13 @@ kotlin {
             implementation(libs.androidx.activity.compose)
             // ContextCompat.checkSelfPermission — `map/UserLocation`.
             implementation(libs.androidx.core.ktx)
+            // Video pleyer (`media/VideoPlayer`) — ExoPlayer + tayyor `PlayerView`.
+            implementation(libs.androidx.media3.exoplayer)
+            implementation(libs.androidx.media3.ui)
+            // `LocalLifecycleOwner` — ekran fonga ketganda videoni to'xtatish uchun.
+            // Compose'dan tranzitiv kelishiga tayanmaymiz: bu API lifecycle 2.8+ da,
+            // `androidx.lifecycle.compose` paketiga ko'chgan.
+            implementation(libs.androidx.lifecycle.runtimeCompose)
         }
     }
 }

@@ -3,7 +3,7 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
 
-    <!-- Oflayn push (chat.md §10). Android 13+ da bu ruxsat ish vaqtida so'raladi
+    <!-- Oflayn push (03-WEBSOCKET.md §10). Android 13+ da bu ruxsat ish vaqtida so'raladi
          (`MainActivity`); berilmasa ilova ishlayveradi, faqat bildirishnoma ko'rinmaydi. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
@@ -12,6 +12,11 @@
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-feature android:name="android.hardware.location" android:required="false" />
+
+    <!-- Chatdagi ovozli xabar. Ruxsat ish vaqtida, mikrofon tugmasi bosilganda so'raladi
+         (`uikit/media/AudioRecorder`); berilmasa ilova ishlayveradi, faqat ovoz yozilmaydi. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-feature android:name="android.hardware.microphone" android:required="false" />
 
     <application
         android:name=".StudentClubApp"

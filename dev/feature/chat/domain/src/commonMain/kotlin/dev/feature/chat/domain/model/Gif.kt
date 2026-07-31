@@ -1,7 +1,7 @@
 package dev.feature.chat.domain.model
 
 /**
- * GIF provayderi — javobdagi `provider` maydoni (`gif.md`).
+ * GIF provayderi — javobdagi `provider` maydoni (`04-GIF-INTEGRATION.md`).
  *
  * Bu **faqat brend nomi emas**: panelda ko'rsatiladigan atribut belgisi aynan shu maydondan
  * tanlanadi va uni ko'rsatish **shartnomaviy majburiyat**. Provayder almashsa (bir oyda ikki
@@ -21,7 +21,7 @@ enum class GifProvider(val attribution: String) {
     }
 }
 
-/** Qidiruv tili — `uz_UZ` odatiy (`gif.md`). */
+/** Qidiruv tili — `uz_UZ` odatiy (`04-GIF-INTEGRATION.md`). */
 enum class GifLocale(val wire: String) {
     UZ("uz_UZ"),
     RU("ru_RU"),
@@ -65,7 +65,7 @@ data class GifItem(
 
 /**
  * `message:send` dagi `gif` obyekti — qidiruvdan tanlangan GIF **yuklanmaydi**, javobda
- * kelgan maydonlar aynan shu holda serverga qaytariladi (`gif.md`).
+ * kelgan maydonlar aynan shu holda serverga qaytariladi (`04-GIF-INTEGRATION.md`).
  *
  * ⚠️ [url] ni **o'zgartirmang** (qisqartirish, `http`→`https`, xostni almashtirish ham):
  * server uni domen oq ro'yxatidan o'tkazadi va har qanday o'zgarish `422 GIF_URL_NOT_ALLOWED`

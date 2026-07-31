@@ -23,8 +23,10 @@ data class PlaceSuggestion(
  * Geokodlash — xaritadagi nuqtadan manzil olish va manzil bo'yicha joy qidirish.
  * Shu sabab foydalanuvchi manzilni **qo'lda yozmaydi**: yo xaritadan tanlaydi, yo qidiradi.
  *
- * Backendsiz rejimda OpenStreetMap Nominatim (tekin) ishlatiladi; backend yoqilganda
- * `POST /v1/geo/reverse-geocode` va `/v1/geo/geocode` (Yandex Geocoder proksisi) o'rniga qo'yiladi.
+ * Manba — **o'z backendimiz**: `POST /v1/geo/reverse-geocode` va `POST /v1/geo/geocode`
+ * (Yandex Geocoder proksisi). Ular `regionId`/`districtId` ni ham qaytaradi, ya'ni viloyat
+ * va tumanni nom bo'yicha taxmin qilish kerak emas. Backend `503` bersa (provayder kaliti
+ * sozlanmagan) OpenStreetMap Nominatim zaxira sifatida ishlaydi.
  */
 interface GeoRepository {
 

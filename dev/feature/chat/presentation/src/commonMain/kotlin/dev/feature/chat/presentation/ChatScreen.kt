@@ -6,6 +6,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.awaitLongPressOrCancellation
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -23,14 +27,17 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -42,7 +49,9 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -50,9 +59,18 @@ import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerInputScope
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.core.uikit.components.AppIcons
 import dev.core.uikit.components.ScAvatar
@@ -66,6 +84,11 @@ import dev.core.uikit.components.StatusBarAppearance
 import dev.core.uikit.components.scCard
 import dev.core.uikit.components.scStyle
 import dev.core.uikit.media.rememberMultiImagePicker
+import dev.core.uikit.media.ScVideoPlayer
+import dev.core.uikit.media.rememberAudioPlayer
+import dev.core.uikit.media.rememberAudioRecorder
+import dev.core.uikit.media.rememberVideoPicker
+import dev.core.uikit.media.rememberFilePicker
 import dev.core.uikit.theme.Sc
 import dev.feature.chat.domain.model.ConversationItem
 import dev.feature.chat.domain.model.GifItem
@@ -74,6 +97,7 @@ import dev.feature.chat.domain.model.MessageStatus
 import dev.feature.chat.domain.model.MessageType
 import dev.feature.chat.domain.model.OutgoingImage
 import dev.feature.chat.domain.model.Sticker
+import dev.feature.chat.domain.model.StickerSearchItem
 import dev.feature.chat.presentation.gif.ChatMediaPanel
 import dev.feature.connections.domain.model.ReportReason
 import kotlinx.coroutines.delay
@@ -87,7 +111,7 @@ import org.koin.compose.viewmodel.koinViewModel
  *
  * [openStudentId] berilsa (Do'stlar ekranidan "Xabar" bosilganda) suhbat darhol ochiladi:
  * `POST /v1/conversations` idempotent, shuning uchun mavjudini qidirish shart emas.
- * [openConversationId] — push bosilganda keladi (`data.conversationId`, `chat.md` §10).
+ * [openConversationId] — push bosilganda keladi (`data.conversationId`, `03-WEBSOCKET.md` §10).
  */
 @Composable
 fun ChatScreen(
@@ -135,6 +159,7 @@ fun ChatScreen(
                 onSend = vm::send,
                 onSendImages = vm::sendImages,
                 onSendSticker = vm::sendSticker,
+                onSendStickerRef = vm::sendStickerRef,
                 onSendGif = vm::sendGif,
                 onRetry = vm::retry,
                 onDeleteMessages = vm::deleteMessages,
@@ -144,6 +169,13 @@ fun ChatScreen(
                 onBlock = { vm.block(it) },
                 onReportStudent = { id, reason, note -> vm.reportStudent(id, reason, note) },
                 onReportMessage = { id, reason, note -> vm.reportMessage(id, reason, note) },
+                // Pleyer va yuklab olish keyingi qadamda ulanadi (platforma komponentlari
+                // tayyor bo'lgach) — hozircha foydalanuvchi bo'sh bosishdan xabardor bo'lsin.
+                onSendFile = vm::sendFile,
+                onSendVideo = vm::sendVideo,
+                onSendVoice = vm::sendVoice,
+                // Sarlavha har kompozitsiyada qayta o'qiladi — token yangilangach ham to'g'ri.
+                mediaHeaders = vm.mediaHeaders(),
                 onSoon = vm::showMessage,
             )
         }
@@ -386,21 +418,38 @@ private fun ChatThread(
     onSend: () -> Unit,
     onSendImages: (List<OutgoingImage>) -> Unit,
     onSendSticker: (Sticker) -> Unit,
+    onSendStickerRef: (StickerSearchItem) -> Unit,
     onSendGif: (GifItem) -> Unit,
     onRetry: (List<String>) -> Unit,
-    onDeleteMessages: (List<String>) -> Unit,
+    /** Belgilangan xabarlarni o'chirish; ikkinchi argument — suhbatdoshda ham o'chsinmi. */
+    onDeleteMessages: (List<String>, Boolean) -> Unit,
     onLoadOlder: () -> Unit,
     onMarkRead: () -> Unit,
     onDisconnect: (String) -> Unit,
     onBlock: (String) -> Unit,
     onReportStudent: (String, ReportReason, String?) -> Unit,
     onReportMessage: (String, ReportReason, String?) -> Unit,
+    onSendFile: (ByteArray, String) -> Unit,
+    onSendVideo: (ByteArray, String) -> Unit,
+    onSendVoice: (ByteArray, String) -> Unit,
+    /** Media so'rovlari uchun `Authorization` sarlavhasi — pleyerlar tokensiz `404` oladi. */
+    mediaHeaders: Map<String, String>,
     /** Hali tayyor bo'lmagan amal bosilganda ko'rsatiladigan bir martalik xabar. */
     onSoon: (String) -> Unit,
 ) {
-    var messageMenu by remember { mutableStateOf<ChatMessageUi?>(null) }
+    /**
+     * Belgilangan qatorlar (`ChatMessageUi.id` bo'yicha) — bo'sh bo'lmasa **tanlash rejimi**.
+     *
+     * Albom bitta qator: uning `id` si belgilanadi, o'chirishga esa [ChatMessageUi.messageIds]
+     * dagi hammasi ketadi — ekranda ular bitta to'r, ya'ni yarmini o'chirish g'alati bo'lardi.
+     */
+    var selectedIds by remember(conversation.id) { mutableStateOf(emptySet<String>()) }
     var reportMessageFor by remember { mutableStateOf<String?>(null) }
-    var deleteMessageFor by remember { mutableStateOf<ChatMessageUi?>(null) }
+    /** Bitta belgilangan xabar ustidagi qo'shimcha amallar (⋮). */
+    var singleMenu by remember { mutableStateOf<ChatMessageUi?>(null) }
+    /** Matnini belgilash uchun ochilgan xabar — bir gapni tanlab nusxa olish. */
+    var selectTextFor by remember { mutableStateOf<ChatMessageUi?>(null) }
+    var confirmDelete by remember { mutableStateOf(false) }
     var showMenu by remember { mutableStateOf(false) }
     var reportStudent by remember { mutableStateOf(false) }
     var confirmDisconnect by remember { mutableStateOf(false) }
@@ -408,7 +457,49 @@ private fun ChatThread(
     var stickersOpen by remember { mutableStateOf(false) }
     var profileOpen by remember { mutableStateOf(false) }
     // Ochilgan rasm: qaysi xabar va uning nechanchi rasmi.
-    var viewer by remember { mutableStateOf<Pair<List<ChatImageUi>, Int>?>(null) }
+    var viewer by remember { mutableStateOf<Pair<List<ChatMediaItem>, Int>?>(null) }
+
+    /**
+     * Eshitilayotgan ovozli xabar — bir vaqtda **faqat bittasi**.
+     *
+     * Holat ekran darajasida: ikkita pufak bir vaqtda o'ynasa foydalanuvchi hech qaysisini
+     * eshita olmasdi, va har pufak o'z pleyerini ushlab tursa mobil qurilmada audio kanal
+     * tugab qolardi.
+     */
+    var playingVoiceId by remember(conversation.id) { mutableStateOf<String?>(null) }
+    var voiceProgress by remember(conversation.id) { mutableStateOf(0f) }
+
+    /** To'liq ekranda ochilgan video. */
+    var videoViewer by remember { mutableStateOf<ChatAttachmentUi?>(null) }
+
+    /** Biriktirma menyusi — qog'oz qisqich bosilganda: Rasm / Video / Fayl. */
+    var attachMenu by remember { mutableStateOf(false) }
+
+    val filePicker = rememberFilePicker { picked ->
+        if (picked != null) onSendFile(picked.bytes, picked.fileName)
+    }
+    val videoPicker = rememberVideoPicker { picked ->
+        if (picked != null) onSendVideo(picked.bytes, picked.fileName)
+    }
+
+    var recording by remember { mutableStateOf(false) }
+    val recorder = rememberAudioRecorder { audio ->
+        recording = false
+        // `null` — bekor qilindi yoki mikrofonga ruxsat berilmadi. Ikkalasida ham
+        // foydalanuvchi nima bo'lganini biladi (tizim oynasi), qo'shimcha xabar ortiqcha.
+        if (audio != null) onSendVoice(audio.bytes, audio.fileName)
+    }
+
+    val audioPlayer = rememberAudioPlayer(
+        headers = mediaHeaders,
+        onProgress = { position, duration ->
+            voiceProgress = if (duration > 0) position.toFloat() / duration else 0f
+        },
+        onEnded = {
+            playingVoiceId = null
+            voiceProgress = 0f
+        },
+    )
 
     val picker = rememberMultiImagePicker { picked ->
         if (picked.isNotEmpty()) {
@@ -418,6 +509,98 @@ private fun ChatThread(
 
     val listState = rememberLazyListState()
     val messages = state.messages
+
+    // --- Belgilash rejimi ----------------------------------------------------------------
+
+    // Ro'yxatdagi HAQIQIY qatorlar bo'yicha: xabar keshdan yo'qolsa (o'zimizda o'chirdik)
+    // tanlov o'zi bo'shaydi va panel yopiladi — id'lar ro'yxatiga tayanish uni ekranda
+    // osilib qolgan holda qoldirardi.
+    val selectedRows = remember(messages, selectedIds) { messages.filter { it.id in selectedIds } }
+    val selectionMode = selectedRows.isNotEmpty()
+    // Albomdagi har bir rasm alohida xabar — foydalanuvchiga ham shu son ko'rsatiladi.
+    val selectedCount = selectedRows.sumOf { it.messageIds.size }
+    val clipboard = LocalClipboardManager.current
+    val haptics = LocalHapticFeedback.current
+
+    val toggleSelection: (ChatMessageUi) -> Unit = { m ->
+        selectedIds = if (m.id in selectedIds) selectedIds - m.id else selectedIds + m.id
+    }
+
+    /**
+     * Surib belgilash holati: qaysi qatordan boshlandi va boshlanishidagi tanlov.
+     *
+     * Baza saqlanadi, chunki surish avvalgi tanlovni **bekor qilmasligi** kerak: bosh
+     * barmoq bilan bir nechta xabar belgilab, keyin uzun bosib qolganini surib qo'shish —
+     * Telegram'dagi aynan shu xatti-harakat.
+     *
+     * Boshlangan joy **indeks emas, id** bilan saqlanadi: surish paytida tepaga yetib
+     * eski tarix yuklansa, hamma indekslar siljib, belgilash butunlay boshqa xabarlarga
+     * o'tib ketardi.
+     */
+    var dragAnchorId by remember { mutableStateOf<String?>(null) }
+    var dragBase by remember { mutableStateOf(emptySet<String>()) }
+
+    /** Barmoqning ro'yxat ichidagi balandligi; `null` — surish ketmayapti. */
+    var dragY by remember { mutableStateOf<Float?>(null) }
+
+    // Imo-ishora ro'yxatni **kalit sifatida olmaydi**: `messages` har bir yangi xabarda va
+    // hatto o'qildi belgichasi kelganda ham yangi obyekt bo'ladi, ya'ni `pointerInput` qayta
+    // ishga tushib, ketayotgan surishni yarmida uzib qo'yardi.
+    val currentMessages by rememberUpdatedState(messages)
+
+    /** Barmoq ostidagi qatorgacha bo'lgan oraliqni belgilaydi. */
+    val extendSelection: (Float) -> Unit = { y ->
+        val rows = currentMessages
+        val anchor = rows.indexOfFirst { it.id == dragAnchorId }
+        val target = listState.indexAt(y)
+        if (anchor >= 0 && target != null && target <= rows.lastIndex) {
+            val from = minOf(anchor, target)
+            val to = maxOf(anchor, target)
+            selectedIds = dragBase + rows.subList(from, to + 1).map { it.id }
+        }
+    }
+
+    // ⚠️ `LazyListItemInfo.offset` contentPadding'ni HISOBGA OLMAYDI (u faqat chizishda,
+    // `place()` da qo'shiladi), barmoqning koordinatasi esa oladi. Shuning uchun barmoqning
+    // `y` i qatorlar fazosiga o'tkaziladi — busiz belgilash bir qator chamasi pastga
+    // surilib ketardi. Shu fazoda ro'yxatning ko'rinadigan qismi aynan
+    // `viewportStartOffset..viewportEndOffset` oralig'i bo'ladi, ya'ni chetlarni aniqlash
+    // ham to'g'ri ishlaydi.
+    val listPadPx: Float
+    val edgePx: Float
+    with(LocalDensity.current) {
+        listPadPx = LIST_VERTICAL_PADDING.toPx()
+        edgePx = AUTO_SCROLL_EDGE.toPx()
+    }
+
+    // Barmoq ekranning tepa yoki past chetiga yetsa — ro'yxat o'zi suriladi va belgilash
+    // davom etadi (Telegram'dagidek). Surish tezligi chetga qanchalik chuqur kirganiga
+    // qarab o'sadi: chekkada sekin, eng chetida tez.
+    //
+    // ⚠️ Bu **avto-surish**, foydalanuvchining aylantirishi emas: imo-ishora hodisalarni
+    // o'zi yeb qo'yadi ([detectLongPressDragSelect]), ya'ni surish paytida ro'yxat faqat
+    // shu yerdan harakatlanadi. Har kadrda barmoq ostiga yangi qator kelgani uchun tanlov
+    // ham qayta hisoblanadi — barmoq qimirlamasa ham.
+    LaunchedEffect(dragY != null) {
+        while (dragY != null) {
+            val y = dragY ?: break
+            val info = listState.layoutInfo
+            val top = info.viewportStartOffset + edgePx
+            val bottom = info.viewportEndOffset - edgePx
+            val step = when {
+                y < top -> -AUTO_SCROLL_MAX_STEP * ((top - y) / edgePx).coerceIn(MIN_SCROLL_FRACTION, 1f)
+                y > bottom -> AUTO_SCROLL_MAX_STEP * ((y - bottom) / edgePx).coerceIn(MIN_SCROLL_FRACTION, 1f)
+                else -> 0f
+            }
+            if (step != 0f) {
+                listState.scrollBy(step)
+                extendSelection(y)
+            }
+            // Kadr boshiga bog'lanamiz: `delay` bilan surish qurilma tezligiga qarab
+            // turlicha silliq bo'lardi.
+            withFrameNanos { }
+        }
+    }
 
     // ⚠️ Klaviatura balandligi animatsiya davomida HAR KADRDA o'zgaradi. Uni to'g'ridan-
     // to'g'ri o'qish butun ekranni har kadrda qayta chizardi va `LaunchedEffect` ni qayta
@@ -468,14 +651,41 @@ private fun ChatThread(
     LaunchedEffect(atTop) { if (atTop) onLoadOlder() }
 
     Column(Modifier.fillMaxSize().background(Sc.ChatBg).imePadding()) {
-        ChatThreadHeader(
-            conversation = conversation,
-            typing = state.peerTyping,
-            realtime = state.realtime,
-            onBack = onBack,
-            onMenu = { showMenu = true },
-            onOpenProfile = { profileOpen = true },
-        )
+        // Tanlash rejimida sarlavha butunlay almashadi (Telegram'dagidek): ism va holat
+        // o'rniga tanlanganlar soni va amallar chiqadi.
+        if (selectionMode) {
+            SelectionHeader(
+                count = selectedCount,
+                onClose = { selectedIds = emptySet() },
+                onCopy = {
+                    val text = selectedRows.filter { !it.deleted }
+                        .map { it.text }
+                        .filter { it.isNotBlank() }
+                        .joinToString("\n")
+                    if (text.isBlank()) {
+                        onSoon("Bu xabarlarda nusxa olinadigan matn yo'q")
+                    } else {
+                        clipboard.setText(AnnotatedString(text))
+                        selectedIds = emptySet()
+                        onSoon("Nusxa olindi")
+                    }
+                },
+                onDelete = { confirmDelete = true },
+                // Qo'shimcha amallar bitta xabarga tegishli (shikoyat, qayta yuborish,
+                // matnni belgilash) — bir nechtasi tanlanganda ular ma'nosiz.
+                onMore = { selectedRows.singleOrNull()?.let { singleMenu = it } },
+                showMore = selectedRows.size == 1,
+            )
+        } else {
+            ChatThreadHeader(
+                conversation = conversation,
+                typing = state.peerTyping,
+                realtime = state.realtime,
+                onBack = onBack,
+                onMenu = { showMenu = true },
+                onOpenProfile = { profileOpen = true },
+            )
+        }
 
         Box(Modifier.fillMaxWidth().weight(1f)) {
             // Fon — brend rangining 6% shaffofligidagi nuqtali pattern (22dp qadam).
@@ -487,17 +697,98 @@ private fun ChatThread(
             }
             LazyColumn(
                 state = listState,
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 16.dp),
+                // Uzun bosib surib belgilash — imo-ishora ro'yxatning O'ZIDA: qatorga
+                // osilganda qator ekrandan chiqishi bilan (LazyColumn uni kompozitsiyadan
+                // olib tashlaydi) surish uzilardi va bir ekrandan uzunroq belgilab
+                // bo'lmasdi.
+                modifier = Modifier.fillMaxSize().pointerInput(Unit) {
+                    detectLongPressDragSelect(
+                        onStart = { offset ->
+                            val y = offset.y - listPadPx
+                            val row = listState.indexAt(y)?.let { currentMessages.getOrNull(it) }
+                            if (row != null) {
+                                // Telegram'dagidek: belgilash rejimi qisqa titrash bilan
+                                // ochiladi, aks holda uzun bosish "ishladimi?" degan savol
+                                // qolardi.
+                                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                dragAnchorId = row.id
+                                dragBase = selectedIds
+                                selectedIds = selectedIds + row.id
+                                dragY = y
+                            }
+                        },
+                        onDrag = { position ->
+                            val y = position.y - listPadPx
+                            dragY = y
+                            extendSelection(y)
+                        },
+                        onEnd = {
+                            dragAnchorId = null
+                            dragY = null
+                        },
+                    )
+                },
+                contentPadding = PaddingValues(horizontal = 14.dp, vertical = LIST_VERTICAL_PADDING),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 items(messages, key = { it.id }) { m ->
-                    if (m.dayLabel != null) DaySeparator(m.dayLabel)
-                    MessageBubble(
-                        message = m,
-                        onLongPress = { messageMenu = m },
-                        onOpenImage = { index -> viewer = m.images to index },
-                    )
+                    val selected = m.id in selectedIds
+                    Column(
+                        Modifier.fillMaxWidth()
+                            // Belgilangan qator butun kengligi bo'ylab yoritiladi — pufak
+                            // o'z rangini saqlaydi, ya'ni chiquvchi/kiruvchi farqi yo'qolmaydi.
+                            .background(if (selected) Sc.Brand.copy(alpha = 0.12f) else Color.Transparent),
+                    ) {
+                        if (m.dayLabel != null) DaySeparator(m.dayLabel)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            if (selectionMode) {
+                                SelectionCheck(selected)
+                                Spacer(Modifier.width(8.dp))
+                            }
+                            Box(Modifier.weight(1f)) {
+                                MessageBubble(
+                                    message = m,
+                                    // Tanlash rejimida har qanday bosish — belgilash;
+                                    // aks holda pufakning bo'sh joyi hech nima qilmaydi.
+                                    onTap = { if (selectionMode) toggleSelection(m) },
+                                    onOpenImage = { imageIndex ->
+                                        if (selectionMode) toggleSelection(m) else viewer = m.images to imageIndex
+                                    },
+                                    onOpenAttachment = { message ->
+                                        val media = message.attachment
+                                        when {
+                                            selectionMode -> toggleSelection(message)
+                                            media == null -> Unit
+                                            // Transkodlanmagan videoning fayli hali yo'q —
+                                            // pleyer uni ocholmaydi.
+                                            media.processing -> onSoon("Video hali tayyorlanmoqda")
+                                            message.type == MessageType.VIDEO -> videoViewer = media
+                                            // Faylni ilova ichida ochadigan komponent yo'q — uni tizim
+                                            // brauzeriga uzatib bo'lmaydi ham (havola token talab qiladi).
+                                            else -> onSoon("Faylni yuklab olish tez orada")
+                                        }
+                                    },
+                                    onToggleVoice = { message ->
+                                        // Boshqa xabar bosilsa avvalgisi to'xtaydi — pozitsiya ham nolga.
+                                        when {
+                                            selectionMode -> toggleSelection(message)
+                                            playingVoiceId == message.id -> {
+                                                playingVoiceId = null
+                                                audioPlayer.stop()
+                                            }
+                                            else -> {
+                                                playingVoiceId = message.id
+                                                voiceProgress = 0f
+                                                message.attachment?.url?.let { audioPlayer.play(it) }
+                                            }
+                                        }
+                                    },
+                                    playingVoiceId = playingVoiceId,
+                                    voiceProgress = voiceProgress,
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -508,15 +799,56 @@ private fun ChatThread(
             onSend = onSend,
             onPickImages = {
                 stickersOpen = false
-                picker.pick()
+                attachMenu = true
+            },
+            recording = recording,
+            onToggleRecording = {
+                if (recording) {
+                    recorder.stop()
+                } else {
+                    stickersOpen = false
+                    recording = true
+                    recorder.start()
+                }
             },
             stickersOpen = stickersOpen,
             onToggleStickers = { stickersOpen = !stickersOpen },
             onPickSticker = onSendSticker,
             // Panel tanlangandan keyin yopiladi: GIF/stiker yuborilgach ro'yxat pastga
             // suriladi va ochiq panel yangi xabarni to'sib qo'yardi.
+            onPickStickerRef = { stickersOpen = false; onSendStickerRef(it) },
             onPickGif = { stickersOpen = false; onSendGif(it) },
         )
+    }
+
+    if (attachMenu) {
+        AttachMenu(
+            onDismiss = { attachMenu = false },
+            onPickImages = { attachMenu = false; picker.pick() },
+            onPickVideo = { attachMenu = false; videoPicker.pick() },
+            onPickFile = { attachMenu = false; filePicker.pick() },
+        )
+    }
+
+    videoViewer?.let { video ->
+        Dialog(
+            onDismissRequest = { videoViewer = null },
+            properties = DialogProperties(usePlatformDefaultWidth = false),
+        ) {
+            Box(Modifier.fillMaxSize().background(Color.Black)) {
+                ScVideoPlayer(
+                    url = video.url,
+                    headers = mediaHeaders,
+                    modifier = Modifier.fillMaxSize(),
+                )
+                Box(
+                    Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(14.dp)
+                        .clickable { videoViewer = null },
+                ) {
+                    Icon(ScIcons.Close, "Yopish", tint = Color.White, modifier = Modifier.size(22.dp))
+                }
+            }
+        }
     }
 
     if (profileOpen) {
@@ -526,6 +858,8 @@ private fun ChatThread(
             realtime = state.realtime,
             photos = state.photos,
             links = state.links,
+            files = state.files,
+            onOpenFile = { profileOpen = false; onSoon("Faylni yuklab olish tez orada") },
             universityName = state.peerUniversity,
             onClose = { profileOpen = false },
             onDisconnect = {
@@ -549,46 +883,83 @@ private fun ChatThread(
         ImageViewerDialog(
             images = openViewer.first,
             startIndex = openViewer.second,
+            // Videoning havolasi himoyalangan (`/v1/media/{id}/raw`) — pleyerga sarlavha
+            // berilmasa `404` olardi va ekran qop-qora bo'lib qolardi.
+            mediaHeaders = mediaHeaders,
             onDismiss = { viewer = null },
         )
     }
 
     // --- Dialoglar ---------------------------------------------------------------------
 
-    val menuMessage = messageMenu
+    val menuMessage = singleMenu
     if (menuMessage != null) {
         AlertDialog(
-            onDismissRequest = { messageMenu = null },
+            onDismissRequest = { singleMenu = null },
             title = { Text("Xabar", style = scStyle(17f, FontWeight.ExtraBold)) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     if (menuMessage.status == MessageStatus.FAILED) {
                         ActionRow(ScIcons.Return, "Qayta yuborish") {
                             onRetry(menuMessage.messageIds)
-                            messageMenu = null
+                            singleMenu = null
+                            selectedIds = emptySet()
                         }
                     }
-                    // `DELETE /v1/messages/{id}` — faqat O'Z xabaring. Tahrirlash hali yo'q.
-                    if (menuMessage.canDelete) {
-                        ActionRow(ScIcons.Close, "O'chirish", danger = true) {
-                            deleteMessageFor = menuMessage
-                            messageMenu = null
+                    // Gapni belgilab nusxa olish — pufakning o'zida matn tanlab bo'lmaydi:
+                    // u yerda uzun bosish belgilash rejimini ochadi.
+                    if (!menuMessage.deleted && menuMessage.text.isNotBlank()) {
+                        ActionRow(ScIcons.FileText, "Matnni belgilash") {
+                            selectTextFor = menuMessage
+                            singleMenu = null
                         }
                     }
                     if (!menuMessage.outgoing && !menuMessage.deleted) {
                         ActionRow(ScIcons.Bell, "Shikoyat qilish", danger = true) {
                             reportMessageFor = menuMessage.id
-                            messageMenu = null
+                            singleMenu = null
+                            selectedIds = emptySet()
                         }
                     }
                 }
             },
             confirmButton = {},
             dismissButton = {
-                TextButton(onClick = { messageMenu = null }) {
+                TextButton(onClick = { singleMenu = null }) {
                     Text("Yopish", style = scStyle(14f, FontWeight.Bold, Sc.InkSoft))
                 }
             },
+        )
+    }
+
+    if (confirmDelete) {
+        DeleteMessagesDialog(
+            count = selectedCount,
+            peerName = conversation.other.displayName,
+            // Suhbatdoshning (yoki allaqachon o'chirilgan) xabarini serverdan o'chirib
+            // bo'lmaydi — o'shanda katak umuman ko'rsatilmaydi (`DELETE /v1/messages/{id}`
+            // faqat o'z xabaringga ruxsat beradi).
+            canDeleteForPeer = selectedRows.isNotEmpty() && selectedRows.all { it.canDelete },
+            onConfirm = { forEveryone ->
+                onDeleteMessages(selectedRows.flatMap { it.messageIds }, forEveryone)
+                confirmDelete = false
+                selectedIds = emptySet()
+            },
+            onDismiss = { confirmDelete = false },
+        )
+    }
+
+    val textMessage = selectTextFor
+    if (textMessage != null) {
+        SelectTextDialog(
+            text = textMessage.text,
+            onCopyAll = {
+                clipboard.setText(AnnotatedString(textMessage.text))
+                selectTextFor = null
+                selectedIds = emptySet()
+                onSoon("Nusxa olindi")
+            },
+            onDismiss = { selectTextFor = null },
         )
     }
 
@@ -651,19 +1022,6 @@ private fun ChatThread(
                 reportStudent = false
             },
             onDismiss = { reportStudent = false },
-        )
-    }
-
-    val deleteTarget = deleteMessageFor
-    if (deleteTarget != null) {
-        ConfirmDialog(
-            title = "Xabarni o'chirish",
-            // Xabar tarixdan yo'qolmaydi — o'rnida "o'chirilgan" izi qoladi, chunki `seq`
-            // butun tarix va o'qildi kursorlarining o'qi (`handoff/api-changes.md` §4b).
-            message = "Xabar ikkalangizda ham o'chadi. Uning o'rnida «Xabar o'chirildi» qoladi.",
-            confirmLabel = "O'chirish",
-            onConfirm = { onDeleteMessages(deleteTarget.messageIds); deleteMessageFor = null },
-            onDismiss = { deleteMessageFor = null },
         )
     }
 
@@ -751,6 +1109,248 @@ private fun ChatThreadHeader(
     }
 }
 
+/**
+ * Belgilash rejimidagi sarlavha — Telegram'dagidek suhbat sarlavhasining **o'rniga** chiqadi.
+ *
+ * Chapda yopish, o'rtada tanlanganlar soni, o'ngda amallar. «Yo'naltirish» bu yerda yo'q:
+ * backendda forward endpointi yo'q va ishlamaydigan tugma qo'yishdan ko'ra qo'ymagan yaxshi
+ * (`CHAT_SELECTION_AND_HISTORY_BACKEND.md` §0).
+ */
+@Composable
+private fun SelectionHeader(
+    count: Int,
+    onClose: () -> Unit,
+    onCopy: () -> Unit,
+    onDelete: () -> Unit,
+    onMore: () -> Unit,
+    /** Qo'shimcha amallar faqat BITTA xabar tanlanganda ma'noli. */
+    showMore: Boolean,
+) {
+    StatusBarAppearance(darkIcons = false)
+    Row(
+        Modifier.fillMaxWidth()
+            .background(Sc.headerBrush)
+            .statusBarsPadding()
+            .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        HeaderGlassButton(ScIcons.Close, "Belgilashni bekor qilish", onClose)
+        ScText(
+            "$count ta tanlandi", 17f, FontWeight.ExtraBold, Color.White,
+            letterSpacing = -0.2f, maxLines = 1, modifier = Modifier.weight(1f),
+        )
+        HeaderGlassButton(ScIcons.Copy, "Nusxa olish", onCopy)
+        if (showMore) HeaderGlassButton(ScIcons.DotsVertical, "Yana", onMore)
+        HeaderGlassButton(ScIcons.Trash, "O'chirish", onDelete)
+    }
+}
+
+/** Qator boshidagi belgilash katagi — tanlanganida brend rangi bilan to'ladi. */
+@Composable
+private fun SelectionCheck(selected: Boolean) {
+    Box(
+        Modifier.size(23.dp)
+            .clip(RoundedCornerShape(percent = 50))
+            .background(if (selected) Sc.Brand else Color.White.copy(alpha = 0.7f))
+            .border(1.5.dp, if (selected) Sc.Brand else Sc.Border, RoundedCornerShape(percent = 50)),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (selected) {
+            Icon(AppIcons.Check, null, tint = Color.White, modifier = Modifier.size(13.dp))
+        }
+    }
+}
+
+/**
+ * Ro'yxatning ichidagi [y] balandligida turgan qator indeksi.
+ *
+ * Qidiruv "aynan qator ichida" emas, "boshi barmoqdan yuqorida turgan **eng pastki** qator":
+ * xabarlar orasida 10dp bo'shliq bor va aniq tegishlilik bilan qidirilganda barmoq shu
+ * bo'shliqqa tushishi bilan mos qator topilmay, belgilash sakrab ketardi. Bu usul chetlarni
+ * ham o'zi hal qiladi — barmoq ro'yxatdan tashqariga chiqsa eng yaqin ko'rinadigan qator.
+ */
+private fun LazyListState.indexAt(y: Float): Int? {
+    val visible = layoutInfo.visibleItemsInfo
+    if (visible.isEmpty()) return null
+    return (visible.lastOrNull { y >= it.offset } ?: visible.first()).index
+}
+
+/**
+ * Uzun bosib **surib belgilash** — Telegram'dagi imo-ishora.
+ *
+ * Nega tayyor [detectDragGesturesAfterLongPress] emas, balki qo'lda:
+ *
+ * 1. **Hodisa `Initial` bosqichida olinadi.** Ro'yxat aylantirgichi shu modifikatorning
+ *    ICHIDA turadi va `Main` bosqichida hodisani BIRINCHI bo'lib ko'radi — o'shanda uzun
+ *    bosishdan keyingi surish belgilash o'rniga oddiy aylantirishga aylanib ketardi.
+ *    `Initial` esa ota'dan bolaga boradi: biz olib qo'ysak, aylantirgichga hech nima
+ *    yetmaydi va ro'yxat faqat avto-surish orqali harakatlanadi.
+ * 2. Shu sababli imo-ishora **ro'yxat darajasida** yashaydi. Qatorga osilganida qator
+ *    ekrandan chiqishi bilan kompozitsiyadan olib tashlanib, surish uzilardi.
+ *
+ * Uzun bosishning o'zi `Main` bosqichida kutiladi ([awaitLongPressOrCancellation]): shu
+ * yarim soniya ichida barmoq qimirlasa aylantirgich hodisani yeydi va kutish bekor bo'ladi,
+ * ya'ni **oddiy aylantirish avvalgidek** ishlaydi.
+ */
+private suspend fun PointerInputScope.detectLongPressDragSelect(
+    onStart: (Offset) -> Unit,
+    onDrag: (Offset) -> Unit,
+    onEnd: () -> Unit,
+) = awaitEachGesture {
+    val down = awaitFirstDown(requireUnconsumed = false)
+    val longPress = awaitLongPressOrCancellation(down.id) ?: return@awaitEachGesture
+    onStart(longPress.position)
+    try {
+        while (true) {
+            val event = awaitPointerEvent(PointerEventPass.Initial)
+            val change = event.changes.firstOrNull { it.id == down.id } ?: break
+            // Barmoq ko'tarildi — imo-ishora tugadi.
+            if (!change.pressed) break
+            change.consume()
+            onDrag(change.position)
+        }
+    } finally {
+        // Bekor qilinganda ham (ekran yopildi, boshqa imo-ishora g'olib chiqdi) holat
+        // tozalanadi — aks holda avto-surish sikli abadiy aylanib qolardi.
+        onEnd()
+    }
+}
+
+/**
+ * Xabarlar ro'yxatining tepa/past ichki chekkasi.
+ *
+ * Alohida doimiy: barmoq koordinatasini qatorlar fazosiga o'tkazishda aynan shu qiymat
+ * ayriladi ([LazyListState.indexAt] izohiga qarang). Ikkisi ajralib qolsa belgilash
+ * jimgina qo'shni qatorga siljib ketardi.
+ */
+private val LIST_VERTICAL_PADDING = 16.dp
+
+/** Avto-surish boshlanadigan chekka — barmoq shu masofaga kirsa ro'yxat sura boshlaydi. */
+private val AUTO_SCROLL_EDGE = 84.dp
+
+/** Bir kadrdagi eng katta surish (px) — ~60 kadrda sekundiga 1500px, qo'l bilan bir xilda. */
+private const val AUTO_SCROLL_MAX_STEP = 25f
+
+/** Chekkaga endigina kirganda ham sezilarli surish bo'lsin. */
+private const val MIN_SCROLL_FRACTION = 0.2f
+
+/**
+ * O'chirishni tasdiqlash — Telegram'dagi aynan shu oyna.
+ *
+ * Sukut bo'yicha xabar **faqat o'zingizda** o'chadi; katak belgilansa suhbatdoshda ham.
+ * Katak faqat hammasi o'zingniki bo'lganda ko'rinadi: `DELETE /v1/messages/{id}` o'zganikini
+ * o'chirmaydi va belgilangan katak yolg'on va'da bo'lardi.
+ */
+@Composable
+private fun DeleteMessagesDialog(
+    count: Int,
+    peerName: String,
+    canDeleteForPeer: Boolean,
+    onConfirm: (forEveryone: Boolean) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var forEveryone by remember { mutableStateOf(false) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("$count ta xabarni o'chirish", style = scStyle(17f, FontWeight.ExtraBold)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                Text(
+                    "Haqiqatan ham bu xabarlarni o'chirmoqchimisiz?",
+                    style = scStyle(14f, FontWeight.Medium, Sc.InkSoft, lineHeight = 20f),
+                )
+                if (canDeleteForPeer) {
+                    Row(
+                        Modifier.fillMaxWidth()
+                            .clip(RoundedCornerShape(10.dp))
+                            .clickable { forEveryone = !forEveryone }
+                            .padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        Box(
+                            Modifier.size(21.dp)
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(if (forEveryone) Sc.Brand else Color.Transparent)
+                                .border(
+                                    1.5.dp,
+                                    if (forEveryone) Sc.Brand else Sc.Border,
+                                    RoundedCornerShape(6.dp),
+                                ),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            if (forEveryone) {
+                                Icon(AppIcons.Check, null, tint = Color.White, modifier = Modifier.size(13.dp))
+                            }
+                        }
+                        ScText("$peerName uchun ham o'chirilsin", 14f, FontWeight.SemiBold, Sc.Ink)
+                    }
+                } else {
+                    // Sabab aytilmasa foydalanuvchi katakni "yo'qolib qolgan" deb o'ylardi.
+                    Text(
+                        "Suhbatdoshning xabarlarini faqat o'zingizda o'chira olasiz.",
+                        style = scStyle(12.5f, FontWeight.Medium, Sc.Muted, lineHeight = 18f),
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(forEveryone) }) {
+                Text("O'chirish", style = scStyle(14f, FontWeight.ExtraBold, Sc.Danger))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Bekor qilish", style = scStyle(14f, FontWeight.Bold, Sc.InkSoft))
+            }
+        },
+    )
+}
+
+/**
+ * Gapni belgilash oynasi — xabar matni **tanlanadigan** holda ko'rsatiladi.
+ *
+ * Nega alohida oyna: pufakning o'zida uzun bosish belgilash rejimini ochadi, ya'ni u yerda
+ * matn tanlash imo-ishorasiga joy yo'q. Bu yerda esa odatdagi tizim tanlagichi ishlaydi —
+ * kerakli gapni belgilab, tizimning «Copy» tugmasini bosish mumkin.
+ */
+@Composable
+private fun SelectTextDialog(text: String, onCopyAll: () -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Matnni belgilash", style = scStyle(17f, FontWeight.ExtraBold)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    "Kerakli gapni bosib turib belgilang, so'ng chiqqan «Copy» tugmasini bosing.",
+                    style = scStyle(12.5f, FontWeight.Medium, Sc.Muted, lineHeight = 18f),
+                )
+                Box(
+                    Modifier.fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Sc.FieldBg)
+                        .padding(horizontal = 12.dp, vertical = 11.dp),
+                ) {
+                    SelectionContainer {
+                        Text(text, style = scStyle(15f, FontWeight.Medium, Sc.Ink, lineHeight = 21f))
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onCopyAll) {
+                Text("Hammasini nusxalash", style = scStyle(14f, FontWeight.ExtraBold, Sc.Brand))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Yopish", style = scStyle(14f, FontWeight.Bold, Sc.InkSoft))
+            }
+        },
+    )
+}
+
 /** Gradient ustidagi shaffof-oq aylana tugma (40dp). */
 @Composable
 private fun HeaderGlassButton(
@@ -814,21 +1414,50 @@ private fun DaySeparator(label: String) {
 @Composable
 private fun MessageBubble(
     message: ChatMessageUi,
-    onLongPress: () -> Unit,
+    /**
+     * Pufakning bo'sh joyi bosildi. Uzun bosish bu yerda **yo'q**: u qatorning o'zida,
+     * surib belgilash bilan bitta imo-ishora bo'lishi uchun.
+     */
+    onTap: () -> Unit,
     onOpenImage: (Int) -> Unit,
+    /** Fayl yoki video bosildi — chaqiruvchi uni ochadi (yuklab olish / pleyer). */
+    onOpenAttachment: (ChatMessageUi) -> Unit,
+    onToggleVoice: (ChatMessageUi) -> Unit,
+    /** Hozir eshitilayotgan ovozli xabar id'si — bir vaqtda faqat bittasi ijro etiladi. */
+    playingVoiceId: String?,
+    /** Eshitilayotganining pozitsiyasi, `0f..1f`. */
+    voiceProgress: Float,
 ) {
     when {
         // O'chirilgan xabar — turi qanday bo'lishidan qat'i nazar oddiy tombstone pufagi.
-        message.deleted -> TextBubble(message, onLongPress = onLongPress)
-        message.type == MessageType.IMAGE -> ImageAlbumBubble(message, onOpen = onOpenImage, onLongPress = onLongPress)
-        message.sticker != null -> StickerBubble(message, onLongPress = onLongPress)
-        else -> TextBubble(message, onLongPress = onLongPress)
+        message.deleted -> TextBubble(message, onTap = onTap)
+        // Rasm, GIF **va video** — hammasi bitta mozaikada chiziladi ([ChatMediaItem]),
+        // shuning uchun shoxobcha turga emas, to'rda element borligiga qarab tanlanadi.
+        // Aralash albom (rasm + video) ham shu yerdan o'tadi.
+        message.images.isNotEmpty() ->
+            ImageAlbumBubble(message, onOpen = onOpenImage, onTap = onTap)
+        // Fayl hali ketmoqda — biriktirma serverning javobi bilan keladi, ya'ni quyidagi
+        // shoxobchalarning hech biri hozircha ishlamaydi.
+        message.upload != null -> UploadingAttachmentBubble(message, onTap = onTap)
+        message.type == MessageType.FILE && message.attachment != null ->
+            FileBubble(message, onOpen = { onOpenAttachment(message) })
+        message.type == MessageType.VOICE && message.attachment != null ->
+            VoiceBubble(
+                message = message,
+                playing = playingVoiceId == message.id,
+                progress = if (playingVoiceId == message.id) voiceProgress else 0f,
+                onTogglePlay = { onToggleVoice(message) },
+                onTap = onTap,
+            )
+        message.type == MessageType.VIDEO && message.attachment != null ->
+            VideoBubble(message, onOpen = { onOpenAttachment(message) })
+        message.sticker != null -> StickerBubble(message, onTap = onTap)
+        else -> TextBubble(message, onTap = onTap)
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun TextBubble(message: ChatMessageUi, onLongPress: () -> Unit) {
+private fun TextBubble(message: ChatMessageUi, onTap: () -> Unit) {
     val align = if (message.outgoing) Alignment.CenterEnd else Alignment.CenterStart
     Box(Modifier.fillMaxWidth(), contentAlignment = align) {
         // Dumcha o'z tomonida: chiquvchi 20/20/6/20, kiruvchi 20/20/20/6.
@@ -844,7 +1473,7 @@ private fun TextBubble(message: ChatMessageUi, onLongPress: () -> Unit) {
                     if (message.outgoing) Modifier.background(Sc.bubbleBrush)
                     else Modifier.background(Sc.Card),
                 )
-                .combinedClickable(onClick = {}, onLongClick = onLongPress)
+                .clickable(onClick = onTap)
                 .padding(start = 13.dp, end = 13.dp, top = 10.dp, bottom = 7.dp),
         ) {
             // Tombstone xira va kursiv emas, shunchaki so'nikroq — u xabar emas, iz.
@@ -865,9 +1494,9 @@ private fun TextBubble(message: ChatMessageUi, onLongPress: () -> Unit) {
  * Pastdagi kiritish paneli — biriktirish + pill maydon + gradient tugma, tagida ochiladigan
  * stiker paneli.
  *
- * Qog'oz qisqich galereyani ochadi (bir martada 10 tagacha rasm), tabassum stikerlarni.
- * Ovoz yozish hali yo'q — mikrofon ikonasi bo'sh maydonda ko'rinadi, lekin bosilganda
- * hech narsa qilmaydi (backendda ovoz yuklash endpointi yo'q).
+ * Qog'oz qisqich biriktirma menyusini ochadi (Rasm / Video / Fayl), tabassum stikerlarni.
+ * Matn maydoni bo'sh bo'lsa o'ng tugma **ovoz yozadi**: bosilganda yozish boshlanadi,
+ * qayta bosilganda to'xtaydi va xabar ketadi.
  */
 @Composable
 private fun Composer(
@@ -875,9 +1504,13 @@ private fun Composer(
     onDraft: (String) -> Unit,
     onSend: () -> Unit,
     onPickImages: () -> Unit,
+    /** Ovoz yozilyaptimi — mikrofon tugmasi holatini shu belgilaydi. */
+    recording: Boolean,
+    onToggleRecording: () -> Unit,
     stickersOpen: Boolean,
     onToggleStickers: () -> Unit,
     onPickSticker: (Sticker) -> Unit,
+    onPickStickerRef: (StickerSearchItem) -> Unit,
     onPickGif: (GifItem) -> Unit,
 ) {
     Column(Modifier.fillMaxWidth().background(Color.White).navigationBarsPadding()) {
@@ -925,18 +1558,57 @@ private fun Composer(
                     .clip(RoundedCornerShape(percent = 50))
                     .background(Sc.tileBrush)
                     // Bo'sh maydonda yuborish ma'nosiz — ovoz yozish esa hali yo'q.
-                    .clickable(enabled = draft.isNotBlank(), onClick = onSend),
+                    // Matn bo'lsa — yuborish, bo'lmasa — ovoz yozishni boshlash/to'xtatish.
+                    .clickable { if (draft.isNotBlank()) onSend() else onToggleRecording() },
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
-                    if (draft.isBlank()) ScIcons.Mic else ScIcons.Return,
-                    "Yuborish", tint = Color.White, modifier = Modifier.size(22.dp),
+                    when {
+                        draft.isNotBlank() -> ScIcons.Return
+                        // Yozib turganda — to'xtatish belgisi (alohida "stop" ikonkasi yo'q).
+                        recording -> ScIcons.Close
+                        else -> ScIcons.Mic
+                    },
+                    if (draft.isNotBlank()) "Yuborish" else if (recording) "To'xtatish" else "Ovoz yozish",
+                    tint = Color.White,
+                    modifier = Modifier.size(22.dp),
                 )
             }
         }
         // Stikerlar va GIF bitta panelda, yorliqlar bilan: kompozitorda ikkinchi ikonaga
         // joy yo'q va foydalanuvchi ikkalasini ham bir xil maqsadda ochadi.
-        if (stickersOpen) ChatMediaPanel(onPickSticker = onPickSticker, onPickGif = onPickGif)
+        if (stickersOpen) {
+            ChatMediaPanel(
+                onPickSticker = onPickSticker,
+                onPickStickerRef = onPickStickerRef,
+                onPickGif = onPickGif,
+            )
+        }
+    }
+}
+
+/**
+ * Biriktirma menyusi — qog'oz qisqich bosilganda.
+ *
+ * Uchta yo'l uch xil `kind` bilan yuklanadi (rasm 12 MB, video 64 MB · ≤3 daq, fayl 48 MB),
+ * shuning uchun ular bitta tanlagichga birlashtirilmagan: tizim tanlagichlari ham har xil
+ * (galereya va hujjatlar provayderi).
+ */
+@Composable
+private fun AttachMenu(
+    onDismiss: () -> Unit,
+    onPickImages: () -> Unit,
+    onPickVideo: () -> Unit,
+    onPickFile: () -> Unit,
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Column(
+            Modifier.clip(RoundedCornerShape(20.dp)).background(Sc.Card).padding(vertical = 8.dp),
+        ) {
+            ActionRow(ScIcons.Search, "Rasm", onClick = onPickImages)
+            ActionRow(AppIcons.Camera, "Video", onClick = onPickVideo)
+            ActionRow(ScIcons.Paperclip, "Fayl", onClick = onPickFile)
+        }
     }
 }
 

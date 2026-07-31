@@ -54,7 +54,7 @@ data class SocketIoEvent(val name: String, val data: JsonElement?)
  * **Minimal Socket.IO klienti** (Engine.IO v4 + Socket.IO v5) — Ktor WebSocket transporti ustida.
  *
  * Nega qo'lda yozilgan: Socket.IO'ning rasmiy Kotlin/Multiplatform klienti yo'q (JVM kutubxonasi
- * iOS'da ishlamaydi), backend gateway'i esa aynan Socket.IO (`chat.md` §7–§9). Protokolning
+ * iOS'da ishlamaydi), backend gateway'i esa aynan Socket.IO (`03-WEBSOCKET.md` §7–§9). Protokolning
  * bizga kerakli qismi kichik, shuning uchun shu yerda to'liq amalga oshirilgan:
  *
  * ```
@@ -67,7 +67,7 @@ data class SocketIoEvent(val name: String, val data: JsonElement?)
  * **Namespace** — `/chat` (URL yo'li emas!): handshake doim `{HOST}/socket.io/` ga boradi,
  * namespace esa CONNECT paketida yuboriladi. Token ikki joyda beriladi — handshake
  * so'rovining `Authorization` sarlavhasida **va** CONNECT paketining `auth` obyektida
- * (`chat.md` ikkalasini ham qo'llab-quvvatlaydi; qaysi biri o'qilishiga bog'liq bo'lmaslik uchun).
+ * (`03-WEBSOCKET.md` ikkalasini ham qo'llab-quvvatlaydi; qaysi biri o'qilishiga bog'liq bo'lmaslik uchun).
  *
  * Ulanish uzilsa [start] ichidagi sikl **avtomatik qayta ulanadi** (eksponensial kechikish).
  * Sessiya darhol uzilgan bo'lsa (token yaroqsiz — server sababni aytmaydi, faqat `disconnect`)
@@ -188,7 +188,7 @@ class SocketIoClient(
             val ok = runSession(refreshToken)
             val lasted = Clock.System.now().toEpochMilliseconds() - startedAt
 
-            // Sessiya deyarli darhol tugadi → ehtimol token yaroqsiz. `chat.md`: server sabab
+            // Sessiya deyarli darhol tugadi → ehtimol token yaroqsiz. `03-WEBSOCKET.md`: server sabab
             // bildirmaydi, faqat `disconnect`. Shuning uchun keyingi urinishdan oldin yangilaymiz.
             refreshToken = !ok || lasted < SHORT_SESSION_MS
             attempt = if (lasted > STABLE_SESSION_MS) 0 else attempt + 1

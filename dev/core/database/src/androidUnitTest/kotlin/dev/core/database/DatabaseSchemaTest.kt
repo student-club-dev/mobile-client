@@ -172,8 +172,11 @@ class DatabaseSchemaTest {
         // (`deletedAt`), to'liq biriktirma metama'lumoti (`attachmentId`/`kind`/`status`/
         // `waveform`…), stiker ustunlari va suhbat qatoridagi `lastMessageType`,
         // 23.sqm — bosh ekran bo'limlari katalog guruhiga bog'landi: `DiscountGroupEntity`
-        // jadvali + `DiscountCategoryEntity.groupKey` va `DiscountOfferEntity.groupKey`.
-        assertEquals(24L, StudentClubDatabase.Schema.version)
+        // jadvali + `DiscountCategoryEntity.groupKey` va `DiscountOfferEntity.groupKey`,
+        // 24.sqm — boyitilgan profil: `ProfileEntity.bio` va `ProfileEntity.phoneVisibility`
+        // (`handoff/08-PROFILE.md` §4–§5), 25.sqm — «faqat menda o'chirish»:
+        // `MessageEntity.hiddenAt` (`CHAT_SELECTION_AND_HISTORY_BACKEND.md` §A1).
+        assertEquals(26L, StudentClubDatabase.Schema.version)
     }
 
     @Test
@@ -216,6 +219,9 @@ class DatabaseSchemaTest {
             businessName = null,
             businessType = null,
             email = null,
+            bio = "5/5 · Dasturiy injiniring",
+            // Sukut `NOBODY` — raqam ko'pchilikda yopiq (`handoff/08-PROFILE.md` §4).
+            phoneVisibility = "NOBODY",
         )
         val profile = db.profileQueries.selectCurrent().executeAsOne()
         assertEquals("Quvonchbek", profile.firstName)
@@ -224,6 +230,8 @@ class DatabaseSchemaTest {
         assertEquals("MALE", profile.gender)
         assertEquals("NOBODY", profile.lastSeenVisibility)
         assertEquals("https://cdn.studentclub.uz/avatars/uid-1.jpg", profile.avatarUrl)
+        assertEquals("5/5 · Dasturiy injiniring", profile.bio)
+        assertEquals("NOBODY", profile.phoneVisibility)
 
         db.profileQueries.clear()
         assertNull(db.profileQueries.selectCurrent().executeAsOneOrNull())
@@ -325,7 +333,7 @@ class DatabaseSchemaTest {
      *
      * Avval moslik tana bo'yicha edi (`deleteSendingByBody`) va bu yerda ikkala qator ham
      * o'chib ketardi — foydalanuvchi aynan shu xatoni xabar qilgan. `clientMsgId` bo'yicha
-     * moslik faqat serverdan qaytgan bittasini oladi (`handoff/chat.md`).
+     * moslik faqat serverdan qaytgan bittasini oladi (`handoff/03-WEBSOCKET.md`).
      */
     @Test
     fun deleteSendingByClientMsgIdRemovesOnlyTheAcknowledgedRow() {
@@ -424,7 +432,7 @@ class DatabaseSchemaTest {
 
     /**
      * Soft delete (22.sqm): qator **o'chirilmaydi**, `seq` joyida qoladi va u
-     * o'qilmaganlar sanog'idan chiqadi (`handoff/api-changes.md` §4b).
+     * o'qilmaganlar sanog'idan chiqadi (`handoff/02-API-CHANGES.md` §4b).
      *
      * Qator yo'q qilinsa `seq` da teshik qolardi va `?before=`/`?after=` sahifalash hamda
      * o'qildi arifmetikasi buzilardi — shuning uchun faqat tanasi bo'shatiladi.
@@ -469,6 +477,45 @@ class DatabaseSchemaTest {
         q.setMessageDeleted(9_100L, "m41")
         q.decrementUnreadForDeleted("cnv_1", 41L)
         assertEquals(1L, q.selectConversation("cnv_1").executeAsOne().unreadCount)
+
+        driver.close()
+    }
+
+    /**
+     * «Faqat menda o'chirish» (25.sqm): xabar ro'yxatdan chiqadi, lekin qator, tana va
+     * `seq` joyida qoladi — u serverda hamon bor.
+     *
+     * Eng muhimi oxirgi tekshiruv: tarix serverdan qayta yuklanganda (`upsertMessage`)
+     * yashirish **saqlanadi**. `INSERT OR REPLACE` qatorni o'chirib qayta yozadi, ya'ni
+     * ustun so'rovda ataylab qayta o'qilmasa har `loadLatest` da xabarlar qaytib chiqardi.
+     */
+    @Test
+    fun hiddenMessagesLeaveHistoryIntact() {
+        val driver = freshDriver()
+        val db = StudentClubDatabase(driver).also { StudentClubDatabase.Schema.create(driver) }
+        val q = db.chatQueries
+
+        q.message("m1", seq = 1L, sender = "std_ali", body = "Salom!", createdAt = 1_000L)
+        q.message("m2", seq = 2L, sender = "me", body = "Qalaysan?", createdAt = 2_000L)
+        q.message("m3", seq = 3L, sender = "std_ali", body = "Yaxshi", createdAt = 3_000L)
+
+        q.hideMessages(9_000L, listOf("m2", "m3"))
+
+        assertEquals(listOf("m1"), q.selectMessages("cnv_1").executeAsList().map { it.id })
+        // Sinxronizatsiya kursori yashirilganlarni HISOBGA OLADI — aks holda `?after=`
+        // ularni qayta tortib, tarixda dublikat paydo bo'lardi.
+        assertEquals(3L, q.maxSeq("cnv_1").executeAsOne())
+        // Qator butun: tana ham, `seq` ham joyida (bu — o'chirish emas, yashirish).
+        val hidden = q.selectMessageById("m3").executeAsOne()
+        assertEquals("Yaxshi", hidden.body)
+        assertNull(hidden.deletedAt)
+        // Ro'yxatdagi ko'rinish uchun: ko'rinadigan eng oxirgi xabar.
+        assertEquals("m1", q.selectLastVisibleMessage("cnv_1").executeAsOne().id)
+
+        // Server tarixni qayta yubordi — yashirilgani yashiriligicha qolsin.
+        q.message("m3", seq = 3L, sender = "std_ali", body = "Yaxshi", createdAt = 3_000L)
+        assertEquals(9_000L, q.selectMessageById("m3").executeAsOne().hiddenAt)
+        assertEquals(listOf("m1"), q.selectMessages("cnv_1").executeAsList().map { it.id })
 
         driver.close()
     }

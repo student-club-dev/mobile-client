@@ -1,4 +1,4 @@
--- v22 -> v23 — chat media yangi backend kontraktiga ko'chdi (`handoff/chat.md`, `api-changes.md` §4c).
+-- v22 -> v23 — chat media yangi backend kontraktiga ko'chdi (`handoff/03-WEBSOCKET.md`, `02-API-CHANGES.md` §4c).
 --
 -- Ilgari rasm `POST /v1/media/upload` ga yuklanib, **havolasi xabar tanasi** sifatida
 -- yuborilardi va turi tanadan taxmin qilinardi (`MediaContent` evristikasi). Endi server

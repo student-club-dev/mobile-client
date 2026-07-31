@@ -8,7 +8,7 @@ import dev.feature.chat.domain.model.MessageType
  *
  * 2026-07-29 gacha backend tipli xabarni bilmasdi va media shunday uzatilardi:
  * rasm — tanasi `POST /v1/media/upload` qaytargan **havola**, stiker — tanasi **yakka
- * emoji**. Endi server `type` va `attachment` ni o'zi qaytaradi (`handoff/chat.md`), ya'ni
+ * emoji**. Endi server `type` va `attachment` ni o'zi qaytaradi (`handoff/03-WEBSOCKET.md`), ya'ni
  * yangi xabarlar hech qachon bu yerdan o'tmaydi.
  *
  * Nima uchun fayl saqlab qolindi: qurilmadagi **eski kesh qatorlari** hali ham o'sha eski
