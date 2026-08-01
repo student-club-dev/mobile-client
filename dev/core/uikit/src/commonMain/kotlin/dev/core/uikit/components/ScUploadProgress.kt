@@ -9,11 +9,13 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -86,14 +88,33 @@ fun ScUploadOverlay(
     modifier: Modifier = Modifier,
     shape: Shape = RoundedCornerShape(0.dp),
     ringSize: Dp = 46.dp,
+    /**
+     * Berilsa — halqaning **ichida** bekor qilish belgisi chiziladi va foiz o'rniga o'sha
+     * ko'rinadi (Telegramdagi kabi).
+     *
+     * Faqat uzoq ketadigan yuklashlar uchun: bir soniyada tugaydigan rasmga bosib ulgurib
+     * bo'lmaydi, ya'ni belgi faqat xalaqit berardi.
+     */
+    onCancel: (() -> Unit)? = null,
 ) {
     Box(
         modifier.fillMaxSize().clip(shape).background(Color.Black.copy(alpha = 0.28f)),
         contentAlignment = Alignment.Center,
     ) {
-        ScUploadRing(progress = progress, size = ringSize)
+        ScUploadRing(progress = progress, size = ringSize, showPercent = onCancel == null)
+        if (onCancel != null) {
+            Icon(
+                ScIcons.Close,
+                "Yuborishni bekor qilish",
+                tint = Color.White,
+                modifier = Modifier.size(ringSize * CANCEL_ICON_RATIO).clickable(onClick = onCancel),
+            )
+        }
     }
 }
+
+/** Bekor qilish belgisi halqaning ichiga sig'sin — yoyga tegib ketmasin. */
+private const val CANCEL_ICON_RATIO = 0.42f
 
 /** `0.42f` → `"42%"`. Chegaradan chiqqan qiymat qisiladi — chaqiruvchi tekshirmasin. */
 fun scUploadPercent(progress: Float): String =

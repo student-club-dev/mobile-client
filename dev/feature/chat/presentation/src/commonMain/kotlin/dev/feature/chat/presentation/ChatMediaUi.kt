@@ -40,6 +40,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -127,6 +128,8 @@ internal fun MessageMeta(message: ChatMessageUi, modifier: Modifier = Modifier, 
 internal fun ImageAlbumBubble(
     message: ChatMessageUi,
     onOpen: (Int) -> Unit,
+    /** Ketayotgan videoni to'xtatish — halqa ichidagi `×`. Berilmasa belgi chizilmaydi. */
+    onCancelUpload: ((String) -> Unit)? = null,
     /**
      * Pufakning **bo'sh joyi** bosildi (kataklar orasi, meta qatori).
      *
@@ -141,21 +144,27 @@ internal fun ImageAlbumBubble(
 
     val align = if (message.outgoing) Alignment.CenterEnd else Alignment.CenterStart
     Box(Modifier.fillMaxWidth(), contentAlignment = align) {
+        // ⚠️ Media pufagida **fon ham, ichki chekinish ham yo'q**: Telegramdagi kabi rasmning
+        // o'zi pufak bo'ladi. Ilgari atrofida rangli ramka bor edi va shu sabab rasm ham,
+        // video ham maketdan kichikroq ko'rinardi.
         Column(
             Modifier.width(BUBBLE_MAX_WIDTH)
-                .clip(RoundedCornerShape(18.dp))
-                .background(if (message.outgoing) Sc.Brand.copy(alpha = 0.12f) else Sc.Card)
-                .clickable(onClick = onTap)
-                .padding(3.dp),
+                .clip(RoundedCornerShape(BUBBLE_RADIUS))
+                .clickable(onClick = onTap),
             verticalArrangement = Arrangement.spacedBy(GRID_GAP),
         ) {
             if (images.size == 1) {
                 ImageCell(
                     image = images[0],
                     onClick = { onOpen(0) },
-                    modifier = Modifier.fillMaxWidth()
-                        // Nisbat noma'lum bo'lsa (server o'lcham qaytarmaydi) — 4:3.
-                        .aspectRatio(images[0].aspectRatio ?: DEFAULT_ASPECT),
+                    onCancelUpload = onCancelUpload,
+                    // Yakka media — o'z nisbatida, lekin CHEKLANGAN oraliqda: juda uzun
+                    // (9:16) video ekranni to'ldirib yuborardi, juda keng esa yupqa
+                    // chiziqqa aylanardi. Rasm va video bir xil qoidaga bo'ysunadi —
+                    // shuning uchun ular yonma-yon bir xil o'lchamda ko'rinadi.
+                    modifier = Modifier.fillMaxWidth().aspectRatio(clampAspect(images[0].aspectRatio)),
+                    // Yakka mediada burchaklar pufakning o'zi bilan bir xil.
+                    shape = RoundedCornerShape(BUBBLE_RADIUS),
                 )
             } else {
                 // Ikkitadan qator. Indeks QO'LDA hisoblanadi: `indexOf` ishlatib bo'lmaydi,
@@ -169,11 +178,13 @@ internal fun ImageAlbumBubble(
                             ImageCell(
                                 image = images[first],
                                 onClick = { onOpen(first) },
+                                onCancelUpload = onCancelUpload,
                                 modifier = Modifier.weight(1f).aspectRatio(1f),
                             )
                             ImageCell(
                                 image = images[second],
                                 onClick = { onOpen(second) },
+                                onCancelUpload = onCancelUpload,
                                 modifier = Modifier.weight(1f).aspectRatio(1f),
                             )
                         }
@@ -183,30 +194,73 @@ internal fun ImageAlbumBubble(
                         ImageCell(
                             image = images[first],
                             onClick = { onOpen(first) },
+                            onCancelUpload = onCancelUpload,
                             modifier = Modifier.fillMaxWidth().aspectRatio(2f),
                         )
                         index += 1
                     }
                 }
             }
-
-            MessageMeta(
-                message = message,
-                modifier = Modifier.align(Alignment.End).padding(horizontal = 6.dp, vertical = 2.dp),
-                onDark = false,
-            )
         }
+
+        // Vaqt — **medianing ustida**, o'ng pastki burchakda qora yorliqchada (Telegramdagi
+        // kabi). Ilgari u to'r ostidagi alohida qatorda turardi va pufak media balandligidan
+        // ortiqcha joy egallardi.
+        MetaChip(
+            message = message,
+            modifier = Modifier.align(if (message.outgoing) Alignment.BottomEnd else Alignment.BottomStart)
+                .padding(8.dp),
+        )
     }
 }
+
+/**
+ * Media ustidagi vaqt yorlig'i — yarim shaffof qora fon, oq matn.
+ *
+ * Fon **shart**: rasm och bo'lsa oq matn ko'rinmay qolardi, qora bo'lsa esa xira matn
+ * yo'qolardi. Telegram ham aynan shu sababdan yorliqcha chizadi.
+ */
+@Composable
+private fun MetaChip(message: ChatMessageUi, modifier: Modifier = Modifier) {
+    Box(
+        modifier.clip(RoundedCornerShape(percent = 50))
+            .background(Color.Black.copy(alpha = 0.45f))
+            .padding(horizontal = 8.dp, vertical = 3.dp),
+    ) {
+        MessageMeta(message, onDark = true)
+    }
+}
+
+/**
+ * Yakka medianing nisbati — **cheklangan** oraliqda.
+ *
+ * Server o'lcham bermasa (video metama'lumoti ba'zan kelmaydi) 4:3 olinadi. Cheklov esa
+ * rasm bilan videoni bir xil qoidaga bo'ysundiradi: 9:16 lik video ekranni to'ldirib
+ * yubormaydi, panorama rasm esa yupqa chiziqqa aylanmaydi.
+ */
+private fun clampAspect(ratio: Float?): Float =
+    (ratio ?: DEFAULT_ASPECT).coerceIn(MIN_ASPECT, MAX_ASPECT)
+
+/** Pufak burchaklari va nisbat chegaralari. */
+private val BUBBLE_RADIUS = 16.dp
+private const val MIN_ASPECT = 0.62f
+private const val MAX_ASPECT = 1.9f
 
 /**
  * Bitta katak. Yuklanayotgan rasmda serverda havola yo'q — tanlangan faylning **local
  * nusxasi** ko'rsatiladi va ustidan shimmer to'lqini yuradi.
  */
 @Composable
-private fun ImageCell(image: ChatMediaItem, onClick: () -> Unit, modifier: Modifier = Modifier) {
+private fun ImageCell(
+    image: ChatMediaItem,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    onCancelUpload: ((String) -> Unit)? = null,
+    /** To'rdagi katakda kichik radius, yakka mediada — pufakning o'zi bilan bir xil. */
+    shape: Shape = RoundedCornerShape(CELL_RADIUS),
+) {
     Box(
-        modifier.clip(RoundedCornerShape(14.dp))
+        modifier.clip(shape)
             .background(Sc.Chip)
             .clickable(enabled = !image.loading, onClick = onClick),
         contentAlignment = Alignment.Center,
@@ -241,13 +295,21 @@ private fun ImageCell(image: ChatMediaItem, onClick: () -> Unit, modifier: Modif
         when {
             image.uploading -> ScUploadOverlay(
                 progress = image.uploadProgress,
-                shape = RoundedCornerShape(14.dp),
+                shape = shape,
                 ringSize = UPLOAD_RING,
+                // Bekor qilish faqat videoda: u siqish bilan birga bir necha daqiqa
+                // ketishi mumkin, rasm esa sekundlarda tugaydi va belgiga bosib ulgurib
+                // bo'lmaydi.
+                onCancel = if (image.video && onCancelUpload != null) {
+                    { onCancelUpload(image.messageId) }
+                } else {
+                    null
+                },
             )
             image.loading -> Box(
                 Modifier.fillMaxSize()
                     .background(Color.Black.copy(alpha = 0.22f))
-                    .scShimmerSweep(RoundedCornerShape(14.dp)),
+                    .scShimmerSweep(shape),
             )
             // Video katagi — poster ustida o'ynatish belgisi va davomiyligi (Telegramdagidek).
             // Katak rasmnikidan farq qilmaydi: albom aralash bo'lganda to'r yaxlit ko'rinsin.
@@ -263,7 +325,10 @@ private fun BoxScope.VideoCellOverlay(item: ChatMediaItem) {
         Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.14f)),
         contentAlignment = Alignment.Center,
     ) {
-        if (item.processing) {
+        // Yuborilmagan xabarda «Tayyorlanmoqda…» ko'rsatilmaydi: pufakning o'zida
+        // allaqachon «yuborilmadi · qayta urinish» turadi va ikkalasi birga qarama-qarshi
+        // o'qilardi. Serverdagi transkod holati bu yerda ahamiyatsiz — xabar baribir ketmagan.
+        if (item.processing && !item.failed) {
             // Server videoni hali transkod qilmoqda — poster bor, o'zi hali yo'q.
             Box(
                 Modifier.clip(RoundedCornerShape(20.dp))
@@ -286,7 +351,7 @@ private fun BoxScope.VideoCellOverlay(item: ChatMediaItem) {
             }
         }
     }
-    if (item.durationMs > 0 && !item.processing) {
+    if (item.durationMs > 0 && !(item.processing && !item.failed)) {
         Box(
             Modifier.align(Alignment.TopStart)
                 .padding(6.dp)
@@ -304,6 +369,9 @@ private val PLAY_ICON = 20.dp
 
 /** Albom katagidagi halqa — kichik kataklarga ham sig'sin. */
 private val UPLOAD_RING = 44.dp
+
+/** To'rdagi katakning burchagi (yakka media pufak radiusini oladi). */
+private val CELL_RADIUS = 12.dp
 
 // ---------------------------------------------------------------------------
 // Stiker

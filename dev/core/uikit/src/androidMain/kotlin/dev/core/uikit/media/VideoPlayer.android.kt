@@ -1,5 +1,6 @@
 package dev.core.uikit.media
 
+import android.content.Context
 import android.graphics.Color
 import androidx.annotation.OptIn
 import androidx.compose.runtime.Composable
@@ -17,16 +18,92 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.database.StandaloneDatabaseProvider
+import androidx.media3.datasource.DataSource
+import androidx.media3.datasource.DataSpec
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.datasource.cache.CacheDataSource
+import androidx.media3.datasource.cache.LeastRecentlyUsedCacheEvictor
+import androidx.media3.datasource.cache.SimpleCache
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import kotlinx.coroutines.delay
+import java.io.File
 
 /** Pozitsiya so'rash oralig'i — 10 marta/sek: chiziq silliq to'ladi, batareya sezmaydi. */
 private const val PROGRESS_TICK_MS = 100L
+
+/**
+ * Ko'rilgan videolar telefonda saqlanadigan kesh — **`StudentClub/video`**.
+ *
+ * Busiz ExoPlayer har ochilishda faylni **boshidan yuklab olardi**: story ikkinchi marta
+ * ko'rilganda ham, chatdagi video qayta bosilganda ham. Telegram aynan shu sababdan o'z
+ * keshini yuritadi.
+ *
+ * ⚠️ [SimpleCache] bitta papka uchun **yagona** bo'lishi shart — ikkita nusxa yaratilsa
+ * `IllegalStateException` bilan yiqiladi. Shuning uchun u shu obyektda, ilova jarayoni
+ * davomida bir marta ochiladi.
+ *
+ * Papka `filesDir` da: `cacheDir` ni Android xotira tugaganda ogohlantirmasdan tozalaydi
+ * va "bir marta yuklab olingan" va'dasi buzilardi. O'sish esa LRU bilan cheklangan.
+ */
+@OptIn(UnstableApi::class)
+private object VideoCache {
+
+    private const val MAX_BYTES = 512L * 1024 * 1024
+
+    private var cache: SimpleCache? = null
+
+    private fun cache(context: Context): SimpleCache = synchronized(this) {
+        cache ?: SimpleCache(
+            File(context.filesDir, "StudentClub/video"),
+            LeastRecentlyUsedCacheEvictor(MAX_BYTES),
+            // Kesh indeksining o'zi baza: qaysi bo'lak yuklab olingani shu yerda turadi.
+            StandaloneDatabaseProvider(context),
+        ).also { cache = it }
+    }
+
+    /**
+     * Keshdan o'qiydigan, bo'lmaganini tarmoqdan olib **yozib qo'yadigan** manba.
+     *
+     * `FLAG_IGNORE_CACHE_ON_ERROR` — kesh buzilgan bo'lsa (disk to'lgan, fayl o'chirilgan)
+     * video baribir tarmoqdan o'ynaydi: kesh qulaylik, ijroning sharti emas.
+     */
+    fun dataSourceFactory(context: Context, upstream: DataSource.Factory): DataSource.Factory {
+        val cached = CacheDataSource.Factory()
+            .setCache(cache(context))
+            .setUpstreamDataSourceFactory(upstream)
+            .setFlags(CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR)
+        return DataSource.Factory { AlwaysCacheDataSource(cached.createDataSource()) }
+    }
+}
+
+/**
+ * Kesh **hajm noma'lum bo'lganda ham** yozilsin.
+ *
+ * ⚠️ Bu yerda nozik joy bor: `ProgressiveMediaSource` har so'rovga
+ * [DataSpec.FLAG_DONT_CACHE_IF_LENGTH_UNKNOWN] bayrog'ini qo'yadi va serverimiz
+ * `/v1/media/{id}/raw` uchun `Content-Length` bermaganda `CacheDataSink` **hech nima
+ * yozmaydi**. Tashqaridan bu "kesh ishlamayapti" bo'lib ko'rinadi: papka yaratiladi, ichi
+ * esa bo'sh qoladi va video har ochilganda qaytadan yuklanadi.
+ *
+ * Bayroqni olib tashlaymiz: media fayli **o'zgarmas** (`{id}` bo'yicha bir martalik
+ * havola), ya'ni uzunligini bilmasak ham keshlash xavfsiz — eskirgan nusxa degan tushuncha
+ * bu yerda yo'q.
+ */
+@OptIn(UnstableApi::class)
+private class AlwaysCacheDataSource(private val delegate: DataSource) : DataSource by delegate {
+
+    override fun open(dataSpec: DataSpec): Long =
+        delegate.open(
+            dataSpec.buildUpon()
+                .setFlags(dataSpec.flags and DataSpec.FLAG_DONT_CACHE_IF_LENGTH_UNKNOWN.inv())
+                .build(),
+        )
+}
 
 // `PlayerView`, `DefaultHttpDataSource` va boshqalar Media3'da hali "unstable" deb
 // belgilangan — bu Java'cha `@RequiresOptIn`, shuning uchun Kotlin'niki emas,
@@ -67,7 +144,12 @@ actual fun ScVideoPlayer(
 
         ExoPlayer.Builder(context)
             .setMediaSourceFactory(
-                DefaultMediaSourceFactory(DefaultDataSource.Factory(context, httpFactory)),
+                DefaultMediaSourceFactory(
+                    VideoCache.dataSourceFactory(
+                        context,
+                        DefaultDataSource.Factory(context, httpFactory),
+                    ),
+                ),
             )
             .build()
             .apply {

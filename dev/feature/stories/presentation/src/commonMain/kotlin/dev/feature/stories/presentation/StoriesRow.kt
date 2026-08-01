@@ -40,6 +40,7 @@ import dev.core.uikit.components.ScUploadRing
 import dev.core.uikit.components.scUploadPercent
 import dev.core.uikit.media.rememberImagePicker
 import dev.core.uikit.media.rememberVideoPicker
+import dev.core.uikit.media.rememberVideoPreparer
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.window.Dialog
 import androidx.compose.runtime.setValue
@@ -89,9 +90,12 @@ fun StoriesRow(
     }
     // Video ham qo'llab-quvvatlanadi (`kind = STORY_VIDEO`, 48 MB · ≤30 s) — tanlagich
     // chegaradan oshganini o'zi to'sadi va `null` qaytaradi.
+    // Siqish nashrdan KEYIN, katakchadagi halqa ichida ketadi — tanlagandan keyin
+    // foydalanuvchi hech narsa kutmaydi.
+    val videoPreparer = rememberVideoPreparer()
     val videoPicker = rememberVideoPicker { picked ->
         if (picked == null) return@rememberVideoPicker
-        vm.publish(picked.bytes, picked.fileName, caption = null)
+        vm.publishVideo(picked, videoPreparer, caption = null)
     }
 
     LazyRow(

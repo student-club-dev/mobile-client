@@ -46,6 +46,20 @@ interface StoryRepository {
     ): Resource<Story>
 
     /**
+     * O'sha lavha yaratish, lekin media **diskdagi fayldan** yuklanadi.
+     *
+     * Video uchun: story videosi 48 MB gacha bo'lishi mumkin va uni `ByteArray` ga o'qish
+     * (ustiga multipart nusxasi) arzon telefonni xotiradan qoqib tashlardi.
+     */
+    suspend fun createFromFile(
+        path: String,
+        sizeBytes: Long,
+        fileName: String,
+        caption: String?,
+        onProgress: ((Float) -> Unit)? = null,
+    ): Resource<Story>
+
+    /**
      * `POST /v1/stories/{id}/view` — har lavha ochilganda. **Idempotent**, o'z story'ingiz
      * hisoblanmaydi.
      *

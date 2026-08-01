@@ -48,7 +48,21 @@ CREATE TABLE ConversationEntity (
     -- Suhbatdoshning qurilmasi qabul qilgan eng yuqori seq (WS `message:delivered` va
     -- `peerDeliveredSeq`) — bitta belgicha ikkitaga aynan shunda aylanadi.
     otherDeliveredSeq INTEGER NOT NULL DEFAULT 0,
-    archived INTEGER NOT NULL DEFAULT 0
+    archived INTEGER NOT NULL DEFAULT 0,
+
+    -- «Tarixni tozalash» suv belgisi (`DELETE /v1/conversations/{id}/history`). Server
+    -- shundan past `seq` li xabarlarni BOSHQA QAYTARMAYDI (`before`/`after`/`around` —
+    -- hammasiga taalluqli), shuning uchun keshda ham ular saqlanmaydi. `seq` qayta
+    -- sanalmaydi: tozalashdan keyingi xabarlar o'sishda davom etadi.
+    clearedBeforeSeq INTEGER NOT NULL DEFAULT 0,
+
+    -- Suhbat ro'yxatdan olib tashlangan (`DELETE /v1/conversations/{id}`).
+    --
+    -- ⚠️ Qator O'CHIRILMAYDI: yangi xabar kelsa suhbat AYNAN o'sha `conversationId` bilan
+    -- qaytadi (server yangisini yaratmaydi), ya'ni o'chirsak tarix ikkiga bo'linardi.
+    -- Shuning uchun bu — ro'yxatdan yashirish bayrog'i va u `message:new` kelganda o'zi
+    -- nolga tushadi.
+    hidden INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE MessageEntity (
@@ -117,7 +131,26 @@ CREATE TABLE MessageEntity (
     -- (`CHAT_SELECTION_AND_HISTORY_BACKEND.md` §A1). Shu sabab yashirish qurilmaga bog'liq —
     -- ilova qayta o'rnatilsa xabarlar qaytadi. Server tayyor bo'lgach bu ustun uning
     -- ko'zgusiga aylanadi.
-    hiddenAt INTEGER
+    hiddenAt INTEGER,
+
+    -- --- Sitata bilan javob (`MessageDto.replyTo`) ---------------------------------------
+    --
+    -- Bu **surat**: nishon xabar keyin o'chirilsa ham matni shu yerda qoladi (server ham
+    -- shunday saqlaydi). Shuning uchun nishonni id bo'yicha qidirib chizmaymiz — qidirsak,
+    -- tarixi yuklanmagan yoki tozalangan xabarda sitata bo'sh bo'lib qolardi.
+    replyToId TEXT,
+    replyToSeq INTEGER,
+    replyToSenderId TEXT,
+    -- Server tayyor holda beradi — id bo'yicha ism qidirish shart emas.
+    replyToSenderName TEXT,
+    replyToType TEXT,
+    -- ≤120 belgi. Media xabarda NULL — o'shanda tur bo'yicha «📷 Rasm» chiziladi.
+    replyToPreview TEXT,
+    -- Belgilangan bo'lak: matn va uning nishon tanasidagi o'rni (UTF-16 kod birligida).
+    replyToQuoteText TEXT,
+    replyToQuoteOffset INTEGER,
+    -- Nishon o'chirilgan — sitata ko'rinaveradi, lekin unga SAKRAB bo'lmaydi.
+    replyToOriginalDeleted INTEGER
 );
 
 CREATE INDEX message_conversation_idx ON MessageEntity(conversationId, seq);
@@ -126,14 +159,16 @@ CREATE INDEX message_conversation_idx ON MessageEntity(conversationId, seq);
 
 -- Tartib: yangi faol suhbat tepada. NULL (hali xabar yozilmagan) ENG PASTDA — backend
 -- ularni tepaga chiqaradi (PostgreSQL `DESC` da NULL birinchi), bu yerda tuzatiladi.
+-- `hidden = 0` — «o'chirilgan» suhbat ro'yxatda ko'rinmaydi, lekin qatori keshda qoladi
+-- (yangi xabar kelsa u AYNAN o'sha id bilan qaytadi).
 selectConversations:
 SELECT * FROM ConversationEntity
-WHERE archived = 0
+WHERE archived = 0 AND hidden = 0
 ORDER BY lastMessageAt IS NULL, lastMessageAt DESC;
 
 selectArchivedConversations:
 SELECT * FROM ConversationEntity
-WHERE archived = 1
+WHERE archived = 1 AND hidden = 0
 ORDER BY lastMessageAt IS NULL, lastMessageAt DESC;
 
 selectConversation:
@@ -182,11 +217,47 @@ WHERE id = :id;
 
 -- WS `message:new` — ro'yxatdagi qatorni yangilaydi (suhbat allaqachon keshda bo'lsa).
 -- Yangi xabar kelgani uchun `lastMessageDeleted` doim nolga qaytadi.
+-- `hidden = 0` — suhbat o'chirilgan bo'lsa ham yangi xabar uni QAYTARADI (server o'sha
+-- `conversationId` bilan yuboradi). Busiz xabar keladi-yu, suhbat ro'yxatda ko'rinmasdi.
 touchConversation:
 UPDATE ConversationEntity
 SET lastMessageBody = ?, lastMessageSenderId = ?, lastMessageType = ?, lastMessageDeleted = 0,
-    lastMessageAt = ?, unreadCount = unreadCount + ?
+    lastMessageAt = ?, unreadCount = unreadCount + ?, hidden = 0
 WHERE id = ?;
+
+-- --- Tarixni tozalash / suhbatni o'chirish (`§B`) ----------------------------------------
+
+-- Server `seq <= clearedBeforeSeq` bo'lgan xabarlarni boshqa qaytarmaydi — keshda ham
+-- ularni saqlashning ma'nosi yo'q.
+--
+-- ⚠️ `seq > 0` sharti: hali yuborilmagan (optimistik) qatorlarda `seq = 0` va ular
+-- tozalashga aloqasiz — busiz foydalanuvchining ketayotgan xabari yo'q bo'lib qolardi.
+deleteMessagesUpToSeq:
+DELETE FROM MessageEntity WHERE conversationId = ? AND seq > 0 AND seq <= ?;
+
+setClearedBeforeSeq:
+UPDATE ConversationEntity
+SET clearedBeforeSeq = max(clearedBeforeSeq, ?)
+WHERE id = ?;
+
+-- Ro'yxatdagi ko'rinishni bo'shatadi: tozalashdan keyin `lastMessage` yo'q.
+clearLastMessage:
+UPDATE ConversationEntity
+SET lastMessageBody = NULL, lastMessageSenderId = NULL, lastMessageType = NULL,
+    lastMessageDeleted = 0, unreadCount = 0
+WHERE id = ?;
+
+setConversationHidden:
+UPDATE ConversationEntity SET hidden = ? WHERE id = ?;
+
+-- O'qilmaganlar sanog'ini SERVER bergan qiymatga tenglaydi (`POST /v1/messages/delete`
+-- javobida u qayta hisoblangan holda keladi).
+--
+-- Nega klientda qayta sanamaymiz: bir xil natijani ikki joyda hisoblash — ular bir kun
+-- albatta ajralib ketishi demakdir. Server esa yashiringan, o'chirilgan va tozalangan
+-- qatorlarni birga hisobga oladi.
+setUnreadCount:
+UPDATE ConversationEntity SET unreadCount = ? WHERE id = ?;
 
 -- Oxirgi xabar o'chirilganda (`message:deleted` yoki o'zimiz o'chirganda): ro'yxatdagi
 -- ko'rinish tombstone'ga aylanadi. Vaqt va jo'natuvchi joyida qoladi — xabar tarixdan
@@ -267,9 +338,13 @@ INSERT OR REPLACE INTO MessageEntity(
     attachmentId, attachmentUrl, attachmentThumbUrl, attachmentWidth, attachmentHeight,
     attachmentKind, attachmentStatus, attachmentMime, attachmentSizeBytes, attachmentDurationMs,
     attachmentWaveform, attachmentFileName, attachmentBlurHash, attachmentIsAnimated,
-    stickerId, stickerEmoji, stickerUrl, albumId, hiddenAt
+    stickerId, stickerEmoji, stickerUrl, albumId,
+    replyToId, replyToSeq, replyToSenderId, replyToSenderName, replyToType, replyToPreview,
+    replyToQuoteText, replyToQuoteOffset, replyToOriginalDeleted,
+    hiddenAt
 ) VALUES (
     :id, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+    ?, ?, ?, ?, ?, ?, ?, ?, ?,
     (SELECT hiddenAt FROM MessageEntity WHERE id = :id)
 );
 

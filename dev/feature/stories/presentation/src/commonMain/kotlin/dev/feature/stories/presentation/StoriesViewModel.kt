@@ -5,6 +5,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.core.common.Resource
 import dev.core.common.auth.TokenStore
+import dev.core.uikit.media.PickedVideo
+import dev.core.uikit.media.VideoPreparer
+import dev.core.uikit.media.deleteMediaFile
+import dev.core.uikit.media.videoNeedsPreparing
 import dev.feature.connections.domain.model.StudentSummary
 import dev.feature.stories.domain.model.Story
 import dev.feature.stories.domain.model.StoryGroup
@@ -168,11 +172,41 @@ class StoriesViewModel(
      * Lavha yaratadi. Fayl turi nomidan aniqlanadi; rasm uchun 12 MB, video uchun 48 MB
      * chegara serverda ham bor (§1).
      */
-    fun publish(bytes: ByteArray, fileName: String, caption: String?) {
+    fun publish(bytes: ByteArray, fileName: String, caption: String?) =
+        publish { onProgress -> repository.create(bytes, fileName, caption, onProgress) }
+
+    /**
+     * Video lavha — media **diskdagi fayldan** yuklanadi.
+     *
+     * Rasmdan farqli o'laroq baytlar xotiraga o'qilmaydi: 48 MB lik `ByteArray` va uning
+     * multipart nusxasi birga arzon telefonni xotiradan qoqib tashlardi.
+     *
+     * ⚠️ Fayl yuborilgandan keyin **o'chiriladi** — u ilova keshida turadi va uni boshqa
+     * hech kim tozalamaydi.
+     */
+    fun publishVideo(video: PickedVideo, preparer: VideoPreparer, caption: String?) =
+        publish { onProgress ->
+            // Siqishga ajratilgan ulush: siqilmaydigan videoda `0f`, ya'ni halqa darrov
+            // yuklashdan boshlanadi va yarmidan sakrab ketmaydi.
+            val prepareShare = if (videoNeedsPreparing(video.sizeBytes)) PREPARE_SHARE else 0f
+            val ready = preparer.prepare(video) { fraction -> onProgress(fraction * prepareShare) }
+                ?: return@publish Resource.Error("Videoni yuborib bo'lmadi — u juda katta.")
+
+            repository.createFromFile(
+                path = ready.path,
+                sizeBytes = ready.sizeBytes,
+                fileName = ready.fileName,
+                caption = caption,
+                onProgress = { fraction -> onProgress(prepareShare + fraction * (1f - prepareShare)) },
+            ).also { deleteMediaFile(ready.path) }
+        }
+
+    /** Ikkala yo'lning umumiy qismi — holat, foiz va yakuniy xabar. */
+    private fun publish(create: suspend ((Float) -> Unit) -> Resource<Story>) {
         if (_state.value.publishing) return
         _state.update { it.copy(publishing = true, publishProgress = 0f, message = null) }
         viewModelScope.launch {
-            val result = repository.create(bytes, fileName, caption) { fraction ->
+            val result = create { fraction ->
                 _state.update { current ->
                     when {
                         // Fayl to'liq ketdi. Endi server lavhani yaratmoqda (video bo'lsa —
@@ -213,6 +247,12 @@ class StoriesViewModel(
         }
     }
 
+    /**
+     * Video **siqilmoqda** — yuklash boshlanishidan oldingi bosqich.
+     *
+     * Katakcha shu vaqt ichida ham band ko'rinadi: 4K lavha bir necha o'n soniya siqiladi
+     * va busiz foydalanuvchi "bosdim, hech nima bo'lmadi" deb ikkinchi marta tanlardi.
+     */
     fun messageShown() = _state.update { it.copy(message = null) }
 
     /**
@@ -230,5 +270,13 @@ class StoriesViewModel(
 
         /** `MediaUploader` fayl to'liq ketganda aynan shu qiymatni beradi. */
         const val UPLOAD_DONE = 0.99f
+
+        /**
+         * Halqaning siqishga ajratilgan qismi — chatdagi bilan bir xil.
+         *
+         * Yarmi ataylab: mobil qurilmada siqish odatda yuklashdan tez emas, ya'ni
+         * ikkalasiga teng ulush berish halqani eng silliq to'ldiradi.
+         */
+        const val PREPARE_SHARE = 0.5f
     }
 }

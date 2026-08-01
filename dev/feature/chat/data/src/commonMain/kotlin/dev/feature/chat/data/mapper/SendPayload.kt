@@ -1,6 +1,7 @@
 package dev.feature.chat.data.mapper
 
 import dev.feature.chat.domain.model.MessageType
+import dev.feature.chat.domain.model.Quote
 import kotlinx.serialization.json.JsonObject
 
 /**
@@ -48,6 +49,18 @@ internal data class SendPayload(
     val previewThumbUrl: String? = null,
     val previewWidth: Long = 0,
     val previewHeight: Long = 0,
+    /**
+     * Javob berilayotgan xabar (`§C1`) — REST va WS'da bir xil maydon.
+     *
+     * Nishon **o'sha suhbatdan** va o'chirilmagan bo'lishi shart; aks holda server
+     * `422 REPLY_TARGET_NOT_FOUND` / `REPLY_TARGET_DELETED` qaytaradi.
+     */
+    val replyToMessageId: String? = null,
+    /**
+     * Nishon tanasining belgilangan bo'lagi. Server `body.slice(offset, offset + text.length)`
+     * ni nishonning **haqiqiy** tanasi bilan solishtiradi (`422 QUOTE_NOT_FOUND`).
+     */
+    val quote: Quote? = null,
 ) {
 
     /**
@@ -60,6 +73,8 @@ internal data class SendPayload(
      */
     fun validate(): String? {
         val text = body?.trim().orEmpty()
+        // Sitata qoidalari turdan mustaqil — shuning uchun turlar jadvalidan OLDIN.
+        quoteError()?.let { return it }
         return when (type) {
             MessageType.TEXT -> when {
                 text.isEmpty() -> "Xabar bo'sh."
@@ -101,6 +116,24 @@ internal data class SendPayload(
 
             // `SYSTEM` ni faqat server yozadi, `CALL` esa hali yo'q — klient yuborsa 422.
             MessageType.SYSTEM, MessageType.CALL -> "Bu turdagi xabarni yuborib bo'lmaydi."
+        }
+    }
+
+    /**
+     * Sitata qoidalari (`§C1`) — serverdagi `QUOTE_*` kodlarining klientdagi ko'zgusi.
+     *
+     * Nega oldindan: sitata bilan yuborilgan xabar `422` olsa, u ekranda `FAILED` bo'lib
+     * qolardi va foydalanuvchi sababini bilmasdi.
+     */
+    private fun quoteError(): String? {
+        val fragment = quote ?: return null
+        return when {
+            replyToMessageId == null -> "Sitata javob xabarisiz yuborilmaydi."
+            fragment.text.isBlank() -> "Sitata bo'sh."
+            fragment.text.length > Quote.MAX_LENGTH ->
+                "Sitata ${Quote.MAX_LENGTH} belgidan uzun bo'lmasin."
+            fragment.offset < 0 -> "Sitataning o'rni noto'g'ri."
+            else -> null
         }
     }
 

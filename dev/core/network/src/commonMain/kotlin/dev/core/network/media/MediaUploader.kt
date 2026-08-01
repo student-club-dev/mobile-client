@@ -5,15 +5,21 @@ import dev.core.network.generated.model.AttachmentDto
 import dev.core.network.generated.model.MediaUploadResponseDto
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
+import io.ktor.client.plugins.HttpTimeoutConfig
 import io.ktor.client.plugins.onUpload
+import io.ktor.client.plugins.timeout
 import io.ktor.client.request.HttpRequestBuilder
 import io.ktor.client.request.forms.FormBuilder
+import io.ktor.client.request.forms.InputProvider
 import io.ktor.client.request.forms.MultiPartFormDataContent
 import io.ktor.client.request.forms.formData
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.http.Headers
 import io.ktor.http.HttpHeaders
+import kotlinx.io.buffered
+import kotlinx.io.files.Path
+import kotlinx.io.files.SystemFileSystem
 
 /**
  * Rasm nima uchun yuklanayotgani — backend `POST /v1/media/upload` faqat shu uchtasini qabul qiladi.
@@ -82,6 +88,7 @@ class MediaUploader(
         purpose: MediaPurpose,
         onProgress: UploadProgress? = null,
     ): MediaUploadResponseDto = client.post(config.baseUrl + PATH) {
+        uploadTimeouts()
         trackUpload(onProgress)
         setBody(
             MultiPartFormDataContent(
@@ -117,6 +124,7 @@ class MediaUploader(
         conversationId: String? = null,
         onProgress: UploadProgress? = null,
     ): AttachmentDto = client.post(config.baseUrl + CHAT_PATH) {
+        uploadTimeouts()
         trackUpload(onProgress)
         setBody(
             MultiPartFormDataContent(
@@ -125,6 +133,41 @@ class MediaUploader(
                     append("kind", kind.name)
                     // Story va profil rasmida suhbat yo'q — maydon yuborilsa ham server uni
                     // e'tiborsiz qoldiradi, lekin yubormaslik niyatni aniqroq bildiradi.
+                    if (kind.needsConversation && conversationId != null) {
+                        append("conversationId", conversationId)
+                    }
+                },
+            ),
+        )
+    }.body()
+
+    /**
+     * [chatUpload] ning **fayl** varianti — baytlar xotiraga o'qilmaydi.
+     *
+     * Nega alohida: video 64 MB gacha bo'lishi mumkin va uni `ByteArray` ga o'qish shuncha
+     * xotirani band qiladi. Ustiga multipart uni ikkinchi marta nusxalaydi, ya'ni eng yomon
+     * holatda 128 MB — arzon telefonda bu `OutOfMemoryError`. Bu yerda fayl **oqim bilan**
+     * o'qiladi: xotirada faqat bufer qoladi.
+     *
+     * ⚠️ [path] so'rov **tugagunicha** turishi shart — Ktor qayta urinishda oqimni boshidan
+     * so'raydi ([InputProvider] bloki har safar yangi manba beradi), ya'ni faylni oldindan
+     * o'chirib bo'lmaydi.
+     */
+    suspend fun chatUploadFile(
+        path: String,
+        sizeBytes: Long,
+        fileName: String,
+        kind: ChatMediaKind,
+        conversationId: String? = null,
+        onProgress: UploadProgress? = null,
+    ): AttachmentDto = client.post(config.baseUrl + CHAT_PATH) {
+        uploadTimeouts()
+        trackUpload(onProgress)
+        setBody(
+            MultiPartFormDataContent(
+                formData {
+                    filePart(path, sizeBytes, fileName)
+                    append("kind", kind.name)
                     if (kind.needsConversation && conversationId != null) {
                         append("conversationId", conversationId)
                     }
@@ -150,6 +193,23 @@ class MediaUploader(
         )
 
     /**
+     * O'sha qism, lekin diskdagi fayldan.
+     *
+     * Hajm **oldindan** beriladi: usiz `Content-Length` noma'lum bo'lib qoladi va so'rov
+     * `chunked` ketadi — o'shanda [trackUpload] foizni hisoblay olmaydi (UI aniqlanmagan
+     * halqaga tushadi), ba'zi proksilar esa `chunked` multipart'ni umuman qabul qilmaydi.
+     */
+    private fun FormBuilder.filePart(path: String, sizeBytes: Long, fileName: String) =
+        append(
+            key = "file",
+            value = InputProvider(sizeBytes) { SystemFileSystem.source(Path(path)).buffered() },
+            headers = Headers.build {
+                append(HttpHeaders.ContentType, mimeTypeOf(fileName))
+                append(HttpHeaders.ContentDisposition, "filename=\"$fileName\"")
+            },
+        )
+
+    /**
      * Yuborilgan baytlarni `0f..1f` ga o'giradi va [onProgress] ga uzatadi.
      *
      * ⚠️ **Hech qachon `1f` bermaydi** ([MAX_REPORTED]): oxirgi bayt soketga yozilgani —
@@ -161,6 +221,26 @@ class MediaUploader(
      * Hajm noma'lum bo'lsa (`contentLength == null`) hodisa **tashlab yuboriladi**: bunda
      * foizni hisoblab bo'lmaydi va UI aniqlanmagan (aylanma) halqaga tushadi.
      */
+    /**
+     * Yuklash uchun **alohida** vaqt chegaralari.
+     *
+     * Umumiy klientda `requestTimeoutMillis = 15 s` — u oddiy JSON so'rovlariga mo'ljallangan
+     * va butun so'rovga (jumladan tananing oxirgi baytigacha) tegishli. 50 MB video mobil
+     * internetda 15 soniyada hech qachon ketmaydi, ya'ni yuklash **doim** «so'rov vaqti
+     * tugadi» bilan uzilardi.
+     *
+     * Shuning uchun bu yerda so'rov chegarasi **olib tashlanadi** — Telegram ham yuklashni
+     * vaqt bo'yicha to'xtatmaydi. O'rniga [UPLOAD_SOCKET_TIMEOUT_MS] qoladi: u "hech narsa
+     * uzatilmayapti" holatini ushlaydi, ya'ni tarmoq uzilsa yuklash osilib qolmaydi, lekin
+     * sekin internetda ishlab turgan yuklash uzilmaydi.
+     */
+    private fun HttpRequestBuilder.uploadTimeouts() {
+        timeout {
+            requestTimeoutMillis = HttpTimeoutConfig.INFINITE_TIMEOUT_MS
+            socketTimeoutMillis = UPLOAD_SOCKET_TIMEOUT_MS
+        }
+    }
+
     private fun HttpRequestBuilder.trackUpload(onProgress: UploadProgress?) {
         if (onProgress == null) return
         onUpload { sent, total ->
@@ -175,6 +255,15 @@ class MediaUploader(
         const val CHAT_PATH = "media/chat-upload"
 
         const val MAX_REPORTED = 0.99f
+
+        /**
+         * Soket jimligining chegarasi — 60 s.
+         *
+         * Bu "umuman uzatilmayapti" degani (tarmoq yo'qoldi, server javob bermay qoldi).
+         * Sekin, lekin ishlab turgan yuklashga ta'sir qilmaydi: har bo'lak yuborilganda
+         * hisob noldan boshlanadi.
+         */
+        const val UPLOAD_SOCKET_TIMEOUT_MS = 60_000L
     }
 }
 

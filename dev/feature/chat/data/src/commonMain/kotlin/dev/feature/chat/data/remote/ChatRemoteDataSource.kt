@@ -6,6 +6,11 @@ import dev.core.common.map
 import dev.core.common.network.NetworkConnectivity
 import dev.core.network.generated.api.ChatApi
 import dev.core.network.generated.model.AttachmentDto
+import dev.core.network.generated.model.BulkDeleteResultDto
+import dev.core.network.generated.model.ClearHistoryResultDto
+import dev.core.network.generated.model.DeleteMessagesDto
+import dev.core.network.generated.model.DeleteScopeDto
+import dev.core.network.generated.model.QuoteInputDto
 import dev.core.network.generated.model.ConversationListItemDto
 import dev.core.network.generated.model.ConversationPageDto
 import dev.core.network.generated.model.GifRefDto
@@ -24,6 +29,7 @@ import dev.core.network.media.UploadProgress
 import dev.core.network.response.safeCall
 import dev.feature.chat.data.mapper.SendPayload
 import dev.feature.chat.data.mapper.parseEnum
+import dev.feature.chat.domain.model.DeleteScope
 import dev.feature.chat.domain.model.MessageType
 import kotlinx.serialization.json.Json
 
@@ -69,9 +75,14 @@ class ChatRemoteDataSource(
         conversationId: String,
         before: Int? = null,
         after: Int? = null,
+        /**
+         * Sitataga sakrash — oyna shu `seq` ning ikkala tomonidan olinadi. `before`/`after`
+         * bilan **birga yuborilmaydi** (`422`), shuning uchun chaqiruvchi bittasini tanlaydi.
+         */
+        around: Int? = null,
         size: Int = MESSAGES_PAGE_SIZE,
     ): Resource<MessageListDto> = safeCall(connectivity) {
-        api.history(id = conversationId, before = before, after = after, size = size).body()
+        api.history(id = conversationId, before = before, after = after, around = around, size = size).body()
     }
 
     /**
@@ -90,6 +101,30 @@ class ChatRemoteDataSource(
     ): Resource<AttachmentDto> = safeCall(connectivity) {
         media.chatUpload(
             bytes = bytes,
+            fileName = fileName,
+            kind = kind,
+            conversationId = conversationId,
+            onProgress = onProgress,
+        )
+    }.withMediaServerMessage()
+
+    /**
+     * O'sha yuklash, lekin **diskdagi fayldan** — baytlar xotiraga o'qilmaydi.
+     *
+     * Video uchun: 64 MB lik `ByteArray` va uning multipart nusxasi birga arzon telefonni
+     * xotiradan qoqib tashlardi.
+     */
+    suspend fun uploadAttachmentFile(
+        conversationId: String,
+        path: String,
+        sizeBytes: Long,
+        fileName: String,
+        kind: ChatMediaKind,
+        onProgress: UploadProgress? = null,
+    ): Resource<AttachmentDto> = safeCall(connectivity) {
+        media.chatUploadFile(
+            path = path,
+            sizeBytes = sizeBytes,
             fileName = fileName,
             kind = kind,
             conversationId = conversationId,
@@ -119,6 +154,8 @@ class ChatRemoteDataSource(
                 sticker = payload.sticker?.let { json.decodeFromJsonElement(stickerSerializer, it) },
                 albumId = payload.albumId,
                 clientMsgId = clientMsgId,
+                replyToMessageId = payload.replyToMessageId,
+                quote = payload.quote?.let { QuoteInputDto(text = it.text, offset = it.offset) },
             ),
         ).body()
         // Media xabar (stiker/GIF/biriktirma) yuklashsiz ham shu yerdan ketadi — server
@@ -128,9 +165,38 @@ class ChatRemoteDataSource(
     /**
      * `DELETE /v1/messages/{id}` — soft delete, **idempotent**. Javob — o'chirilgan
      * xabarning o'zi (`deletedAt` to'ldirilgan, `body` bo'sh).
+     *
+     * `scope` **ochiq yuboriladi**: tushirilsa server uni `EVERYONE` deb oladi va bu
+     * chaqiruvchining niyatiga bog'liq bo'lib qolardi.
      */
-    suspend fun deleteMessage(messageId: String): Resource<MessageDto> =
-        safeCall(connectivity) { api.messagesRemove(messageId).body() }
+    suspend fun deleteMessage(
+        messageId: String,
+        scope: DeleteScope = DeleteScope.EVERYONE,
+    ): Resource<MessageDto> =
+        safeCall(connectivity) { api.messagesRemove(messageId, scope.dto()).body() }
+
+    /**
+     * `POST /v1/messages/delete` — **bitta so'rovda** 1–100 ta xabar (hammasi bitta
+     * suhbatdan). Ilgari har biri uchun alohida `DELETE` ketardi.
+     *
+     * Javobda `deleted` / `skipped` dan tashqari **qayta hisoblangan** `unreadCount` va
+     * `lastMessage` ham keladi — ro'yxatni qayta so'ramaymiz.
+     */
+    suspend fun deleteMessages(ids: List<String>, scope: DeleteScope): Resource<BulkDeleteResultDto> =
+        safeCall(connectivity) {
+            api.removeMany(DeleteMessagesDto(ids = ids, scope = scope.dto())).body()
+        }
+
+    /**
+     * `DELETE /v1/conversations/{id}/history` — suhbat ro'yxatda qoladi, tarixi ketadi.
+     * Javobdagi `clearedBeforeSeq` — keshdan qayergacha o'chirish kerakligi.
+     */
+    suspend fun clearHistory(conversationId: String, scope: DeleteScope): Resource<ClearHistoryResultDto> =
+        safeCall(connectivity) { api.clearHistory(conversationId, scope.dto()).body() }
+
+    /** `DELETE /v1/conversations/{id}` — javob shakli [clearHistory] bilan bir xil. */
+    suspend fun deleteConversation(conversationId: String, scope: DeleteScope): Resource<ClearHistoryResultDto> =
+        safeCall(connectivity) { api.deleteConversation(conversationId, scope.dto()).body() }
 
     /** O'qildi kursori — WS ack kelmaganda shu ishlatiladi. */
     suspend fun markRead(conversationId: String, seq: Int): Resource<Unit> =
@@ -172,6 +238,12 @@ internal fun <T> Resource<T>.withMediaServerMessage(): Resource<T> =
     } else {
         this
     }
+
+/** Domen qamrovi → generatsiya qilingan enum. Ikkisi bir xil, lekin bog'lanish bitta joyda. */
+private fun DeleteScope.dto(): DeleteScopeDto = when (this) {
+    DeleteScope.ME -> DeleteScopeDto.ME
+    DeleteScope.EVERYONE -> DeleteScopeDto.EVERYONE
+}
 
 internal const val MEDIA_SERVER_MESSAGE =
     "Biriktirmani yuborib bo'lmadi — serverdagi media xizmati javob bermayapti. Birozdan so'ng qayta urining."

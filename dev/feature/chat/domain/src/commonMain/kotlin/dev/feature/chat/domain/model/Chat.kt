@@ -130,6 +130,10 @@ data class Message(
      * qaytaradi** (`MessageDto.albumId`), ya'ni qabul qiluvchi tomonda ham to'g'ri ishlaydi.
      */
     val albumId: String? = null,
+    /**
+     * Javob berilgan xabarning surati — pufak ustidagi sitata bloki. Oddiy xabarda `null`.
+     */
+    val replyTo: ReplyTo? = null,
 ) {
     /** O'chirilgan xabar — ekranda "Xabar o'chirildi" tombstone'i chiziladi. */
     val deleted: Boolean get() = deletedAt != null
@@ -185,6 +189,59 @@ data class MessageSticker(
 )
 
 /**
+ * Xabar tanasining **belgilangan bo'lagi** — javob berishda sitata qilingan matn.
+ *
+ * [offset] — **UTF-16 kod birligida**: Kotlin `String` ham aynan shunday sanaydi, ya'ni
+ * `body.substring(offset, offset + text.length)` to'g'ridan-to'g'ri ishlaydi va server
+ * ham shu tekshiruvni bajaradi (mos kelmasa `422 QUOTE_NOT_FOUND`).
+ */
+data class Quote(
+    val text: String,
+    val offset: Int,
+) {
+    companion object {
+        /** Server chegarasi (`422 QUOTE_TOO_LONG`). */
+        const val MAX_LENGTH = 300
+    }
+}
+
+/**
+ * Javob berilgan xabarning **surati** (`MessageDto.replyTo`).
+ *
+ * ⚠️ Bu nishonning nusxasi, havolasi emas: nishon keyin o'chirilsa ham [preview] va
+ * [quote] o'z joyida qoladi. Shuning uchun pufakdagi sitata keshdan qidirilmaydi —
+ * qidirsak, tarixi yuklanmagan yoki tozalangan xabarda u bo'sh bo'lib qolardi.
+ */
+data class ReplyTo(
+    /**
+     * Nishonning id'si — **sakrash** uchun (`?around=`). `null` bo'lsa xabar bazadan
+     * butunlay tozalangan va sakrab bo'lmaydi.
+     */
+    val id: String? = null,
+    val seq: Int = 0,
+    val senderId: String = "",
+    /** Server tayyor holda beradi — id bo'yicha ism qidirish shart emas. */
+    val senderName: String = "",
+    val type: MessageType = MessageType.TEXT,
+    /** ≤120 belgi. Media xabarda `null` — o'shanda [type] bo'yicha «📷 Rasm» chiziladi. */
+    val preview: String? = null,
+    val quote: Quote? = null,
+    /** Nishon o'chirilgan — sitata ko'rinadi, lekin sakrash tugmasi bo'lmaydi. */
+    val originalDeleted: Boolean = false,
+) {
+    /** Sitataga bosilganda tarixning o'sha joyiga sakrash mumkinmi. */
+    val canJump: Boolean get() = id != null && !originalDeleted && seq > 0
+}
+
+/**
+ * O'chirish qamrovi (`scope`) — `handoff` §A1.
+ *
+ * ⚠️ Sukut qiymati endpointga qarab **boshqacha** bo'lgani uchun klient uni doim ochiq
+ * yuboradi: xabar o'chirishda server sukut bo'yicha [EVERYONE], tarix/suhbatda esa [ME].
+ */
+enum class DeleteScope { ME, EVERYONE }
+
+/**
  * Ketayotgan biriktirmaning holati — xabar ekranda ko'rinib turibdi, fayl esa hali yo'lda.
  *
  * Serverda bunday tushuncha yo'q va keshga ham yozilmaydi: yuklash bir necha soniya davom
@@ -230,3 +287,49 @@ class OutgoingImage(
     val messageType: MessageType
         get() = if (isGif) MessageType.GIF else MessageType.IMAGE
 }
+
+/**
+ * Yuborish uchun tayyorlangan video.
+ *
+ * Rasmdan ([OutgoingImage]) farqli o'laroq baytlar emas, **fayl yo'li** saqlanadi: video
+ * 64 MB gacha bo'lishi mumkin va uni xotiraga o'qish arzon telefonda ilovani quladi.
+ * Fayl ilova keshida turadi va yuborish tugagach o'chiriladi.
+ */
+class OutgoingVideo(
+    /** Keshdagi fayl yo'li — tanlangan (yoki siqilgan) videoning nusxasi. */
+    val path: String,
+    val fileName: String,
+    val sizeBytes: Long,
+    /** Aniqlab bo'lmasa `null` — o'shanda chegarani server tekshiradi. */
+    val durationMs: Int?,
+    /**
+     * Birinchi kadr. Yuklash tugagunicha serverda hech narsa yo'q, ya'ni pufakda
+     * ko'rsatadigan yagona tasvir shu — usiz ekranda bo'sh to'rtburchak turardi.
+     */
+    val posterBytes: ByteArray?,
+    /** Foydalanuvchi yozgan izoh (`≤ 1024` belgi); bo'sh bo'lsa `null`. */
+    val caption: String?,
+    /**
+     * Siqish kerakmi — halqaning qancha qismi shunga ajratilishini hal qiladi.
+     *
+     * Siqilmaydigan videoda halqa darrov yuklashdan boshlanadi; usiz u yarmigacha
+     * sakrab, keyin yuklashni boshlagandek ko'rinardi.
+     */
+    val needsPreparing: Boolean,
+    /**
+     * Yuborishdan oldingi **siqish** — Telegramdagi kabi, tanlash paytida emas,
+     * yuborilgandan keyin.
+     *
+     * Nega lambda: siqish platformaga xos (`media3-transformer` / `AVAssetExportSession`)
+     * va domen qatlami uni bilmaydi. Ayni paytda uni **repozitoriy** boshqarishi kerak:
+     * faqat o'sha yerda siqish bilan yuklash bitta jarayon bo'lib, bitta halqada
+     * ko'rsatilishi mumkin.
+     *
+     * Qaytadi: yuboriladigan video (siqilgani); `null` — siqib ham chegaraga sig'madi.
+     *
+     * ⚠️ Maydonning o'zi `null` bo'lsa video **allaqachon tayyor** va qayta siqilmaydi.
+     * Bu yuklash yiqilgandan keyingi qayta urinish uchun muhim: siqilgan faylni yana bir
+     * marta siqish yana o'nlab soniya va batareya degani.
+     */
+    val prepare: (suspend (onProgress: (Float) -> Unit) -> OutgoingVideo?)? = null,
+)

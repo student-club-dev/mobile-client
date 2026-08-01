@@ -16,6 +16,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import coil3.ImageLoader
 import coil3.compose.setSingletonImageLoaderFactory
+import coil3.disk.DiskCache
 import coil3.map.Mapper
 import io.github.aakira.napier.Napier
 import coil3.network.ktor3.KtorNetworkFetcherFactory
@@ -54,6 +55,16 @@ private fun AppScaffold(content: @Composable () -> Unit) {
     val apiOrigin = koinInject<NetworkConfig>().apiOrigin
     setSingletonImageLoaderFactory { context ->
         ImageLoader.Builder(context)
+            // Diskdagi kesh — **o'zimizning** papkada (`StudentClub/images`) va chegara
+            // bilan. Coil'ning sukutdagi joyi tizimning vaqtinchalik papkasi: OS uni
+            // xotira tugaganda tozalaydi va bir marta ko'rilgan rasm (ayniqsa story)
+            // qaytadan yuklanardi.
+            .diskCache {
+                DiskCache.Builder()
+                    .directory(imageCacheDirectory(context))
+                    .maxSizeBytes(IMAGE_CACHE_MAX_BYTES)
+                    .build()
+            }
             .components {
                 // ⚠️ Mapper fetcher'DAN OLDIN: backend rasm havolasini o'z ichki manzili
                 // bilan qaytarishi mumkin (`http://localhost:3000/uploads/…`) yoki nisbiy

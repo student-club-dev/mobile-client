@@ -175,8 +175,11 @@ class DatabaseSchemaTest {
         // jadvali + `DiscountCategoryEntity.groupKey` va `DiscountOfferEntity.groupKey`,
         // 24.sqm — boyitilgan profil: `ProfileEntity.bio` va `ProfileEntity.phoneVisibility`
         // (`handoff/08-PROFILE.md` §4–§5), 25.sqm — «faqat menda o'chirish»:
-        // `MessageEntity.hiddenAt` (`CHAT_SELECTION_AND_HISTORY_BACKEND.md` §A1).
-        assertEquals(26L, StudentClubDatabase.Schema.version)
+        // `MessageEntity.hiddenAt` (`CHAT_SELECTION_AND_HISTORY_BACKEND.md` §A1),
+        // 26.sqm — sitata bilan javob (`MessageEntity.replyTo*`), tarix suv belgisi
+        // (`ConversationEntity.clearedBeforeSeq`) va suhbatni ro'yxatdan yashirish
+        // (`ConversationEntity.hidden`) — `CHAT_SELECTION_AND_HISTORY_RESPONSE.md` §B, §C.
+        assertEquals(27L, StudentClubDatabase.Schema.version)
     }
 
     @Test
@@ -561,6 +564,16 @@ class DatabaseSchemaTest {
         stickerEmoji = null,
         stickerUrl = null,
         albumId = albumId,
+        // Sitata — bu yordamchi oddiy xabar yozadi; javob xabari alohida sinaladi.
+        replyToId = null,
+        replyToSeq = null,
+        replyToSenderId = null,
+        replyToSenderName = null,
+        replyToType = null,
+        replyToPreview = null,
+        replyToQuoteText = null,
+        replyToQuoteOffset = null,
+        replyToOriginalDeleted = null,
     )
 
     @Test

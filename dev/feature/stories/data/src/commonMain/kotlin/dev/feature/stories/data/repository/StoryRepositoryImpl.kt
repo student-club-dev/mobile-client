@@ -4,6 +4,7 @@ import dev.core.common.Resource
 import dev.core.common.map
 import dev.core.common.network.NetworkConnectivity
 import dev.core.network.generated.api.StoriesApi
+import dev.core.network.generated.model.AttachmentDto
 import dev.core.network.generated.model.CreateStoryDto
 import dev.core.network.media.ChatMediaKind
 import dev.core.network.media.MediaUploader
@@ -58,14 +59,39 @@ class StoryRepositoryImpl(
         fileName: String,
         caption: String?,
         onProgress: ((Float) -> Unit)?,
-    ): Resource<Story> = safeCall(connectivity) {
-        val kind = if (isVideo(fileName)) ChatMediaKind.STORY_VIDEO else ChatMediaKind.STORY_IMAGE
-        val uploaded = media.chatUpload(
-            bytes = bytes,
+    ): Resource<Story> = create(fileName, caption) { kind ->
+        media.chatUpload(bytes = bytes, fileName = fileName, kind = kind, onProgress = onProgress)
+    }
+
+    override suspend fun createFromFile(
+        path: String,
+        sizeBytes: Long,
+        fileName: String,
+        caption: String?,
+        onProgress: ((Float) -> Unit)?,
+    ): Resource<Story> = create(fileName, caption) { kind ->
+        media.chatUploadFile(
+            path = path,
+            sizeBytes = sizeBytes,
             fileName = fileName,
             kind = kind,
             onProgress = onProgress,
         )
+    }
+
+    /**
+     * Ikkala yo'lning umumiy qismi — yuklashdan **keyingi** hammasi.
+     *
+     * Faqat yuklash bosqichi farq qiladi (baytlardan yoki fayldan), qayta urinish mantiqi esa
+     * bir xil; ikki joyda takrorlansa ular albatta bir-biridan ajralib ketardi.
+     */
+    private suspend fun create(
+        fileName: String,
+        caption: String?,
+        upload: suspend (ChatMediaKind) -> AttachmentDto,
+    ): Resource<Story> = safeCall(connectivity) {
+        val kind = if (isVideo(fileName)) ChatMediaKind.STORY_VIDEO else ChatMediaKind.STORY_IMAGE
+        val uploaded = upload(kind)
         val body = CreateStoryDto(
             mediaId = uploaded.id,
             caption = caption?.trim()?.takeIf { it.isNotEmpty() },

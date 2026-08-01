@@ -5,6 +5,8 @@ import dev.feature.chat.domain.model.ConversationItem
 import dev.feature.chat.domain.model.GifRef
 import dev.feature.chat.domain.model.Message
 import dev.feature.chat.domain.model.OutgoingImage
+import dev.feature.chat.domain.model.OutgoingVideo
+import dev.feature.chat.domain.model.Quote
 import dev.feature.chat.domain.model.Sticker
 import dev.feature.chat.domain.model.StickerRef
 import dev.feature.chat.domain.model.UnreadCount
@@ -88,7 +90,22 @@ interface ChatRepository {
      * ketadi. Ikki yo'l ham bir xil `clientMsgId` ni ishlatadi — server takror xabar
      * yaratmaydi (C6).
      */
-    suspend fun send(conversationId: String, body: String): Resource<Unit>
+    /**
+     * [replyToMessageId] — javob berilayotgan xabar (**o'sha suhbatdan** va o'chirilmagan
+     * bo'lishi shart, aks holda `422 REPLY_TARGET_NOT_FOUND` / `REPLY_TARGET_DELETED`).
+     *
+     * [quote] — nishon tanasining belgilangan bo'lagi. Server `body.slice(offset, offset +
+     * text.length) == text` ni tekshiradi (`422 QUOTE_NOT_FOUND`), shuning uchun matn ham,
+     * o'rni ham nishonning **o'zidan** olinishi kerak. Sitata [replyToMessageId] siz
+     * yuborilmaydi (`422 QUOTE_WITHOUT_REPLY`); media xabarda esa sitata umuman bo'lmaydi —
+     * kesib olinadigan matn yo'q.
+     */
+    suspend fun send(
+        conversationId: String,
+        body: String,
+        replyToMessageId: String? = null,
+        quote: Quote? = null,
+    ): Resource<Unit>
 
     /**
      * Rasm(lar) yuborish — **bir martada bir nechta**.
@@ -118,8 +135,19 @@ interface ChatRepository {
      * ⚠️ Server H.264/AAC bo'lmagan videoni **transkod qiladi**: o'shanda biriktirma
      * `PROCESSING` holatida keladi (poster bor, o'zi yo'q) va tayyor bo'lgach `media:ready`
      * WS hodisasi uni almashtiradi. Klient hech narsa kutmaydi.
+     *
+     * Fayl keshdan **oqim bilan** yuklanadi va yuborish tugagach (yiqilsa ham) o'chiriladi —
+     * qarang [OutgoingVideo].
      */
-    suspend fun sendVideo(conversationId: String, bytes: ByteArray, fileName: String): Resource<Unit>
+    suspend fun sendVideo(conversationId: String, video: OutgoingVideo): Resource<Unit>
+
+    /**
+     * Ketayotgan yuborishni to'xtatadi — siqish ham, yuklash ham uziladi.
+     *
+     * Optimistik qator va keshdagi fayl o'chadi. Serverga yetib ulgurgan xabarni bu
+     * qaytarib ololmaydi (buning uchun `deleteMessage` bor).
+     */
+    suspend fun cancelSend(messageId: String)
 
     /**
      * Ovozli xabar yuboradi — `kind = VOICE` (16 MB, ≤ 5 daqiqa).
@@ -186,23 +214,53 @@ interface ChatRepository {
     suspend fun deleteMessage(messageId: String): Resource<Unit>
 
     /**
-     * Belgilangan xabarlarni o'chiradi — Telegram'dagi ikki qamrov bilan.
+     * Belgilangan xabarlarni o'chiradi — **bitta so'rov** bilan
+     * (`POST /v1/messages/delete`, 1–100 ta id, hammasi bitta suhbatdan).
      *
-     * - [forEveryone] = `true` — **ikkalangizda ham**: har biri uchun [deleteMessage]
-     *   (soft delete, tarixda tombstone qoladi). Faqat **o'z** xabaringga qo'llanadi,
-     *   suhbatdoshnikilari jimgina o'tkazib yuboriladi.
-     * - [forEveryone] = `false` — **faqat menda**: xabar local keshda yashiriladi
-     *   (`hiddenAt`), serverda va suhbatdoshda o'zgarishsiz qoladi. Istalgan xabarga —
-     *   o'zingnikiga ham, suhbatdoshnikiga ham — qo'llanadi.
+     * - [forEveryone] = `true` (`scope = EVERYONE`) — ikkala a'zoda ham: tana bo'shatiladi,
+     *   `deletedAt` qo'yiladi, tarixda tombstone qoladi. Faqat **o'z** xabaringga
+     *   qo'llanadi; suhbatdoshnikilari `skipped(NOT_OWN)` bo'lib qaytadi.
+     * - [forEveryone] = `false` (`scope = ME`) — faqat sizga, lekin **barcha
+     *   qurilmalaringizda**: server yashirishni o'zi saqlaydi va o'sha xabarlarni boshqa
+     *   qaytarmaydi. Istalgan xabarga — suhbatdoshnikiga ham — qo'llanadi.
      *
-     * ⚠️ «Faqat menda» hozircha **qurilmaga bog'liq**: backendda `scope = ME` yo'q
-     * (`CHAT_SELECTION_AND_HISTORY_BACKEND.md` §A1), ya'ni ilova qayta o'rnatilsa
-     * yashirilganlar qaytadi. Kontrakt tayyor bo'lgach shu usulning ichi o'zgaradi, imzosi
-     * emas.
+     * Butun paket **bitta tranzaksiyada** va **idempotent**: takror chaqirilsa yana `200`,
+     * raqamlar o'zgarmaydi. Bitta ham o'chmasa ham bu xato emas — natija.
      *
-     * Bir nechtasi yiqilsa ham qolganlari o'chiriladi; qaytadigan xato — **birinchisiniki**.
+     * ⚠️ Hali serverga yetib bormagan (optimistik) qatorlar so'rovga **kirmaydi**: ularning
+     * server id'si yo'q. Ular keshdan to'g'ridan-to'g'ri o'chiriladi.
      */
     suspend fun deleteMessages(messageIds: List<String>, forEveryone: Boolean): Resource<Unit>
+
+    /**
+     * `DELETE /v1/conversations/{id}/history` — suhbat **ro'yxatda qoladi**, tarixi ketadi.
+     *
+     * Server `clearedBeforeSeq` qaytaradi va shundan past `seq` li xabarlarni boshqa
+     * qaytarmaydi (`before`/`after`/`around` — hammasiga), shuning uchun kesh ham shu
+     * chegaragacha tozalanadi. `seq` qayta sanalmaydi: keyingi xabarlar o'sishda davom
+     * etadi.
+     *
+     * [forEveryone] = `false` (sukut) — faqat menda; `true` — ikkalamizda ham.
+     */
+    suspend fun clearHistory(conversationId: String, forEveryone: Boolean = false): Resource<Unit>
+
+    /**
+     * `DELETE /v1/conversations/{id}` — suhbat ro'yxatdan yo'qoladi.
+     *
+     * ⚠️ Local qator **o'chirilmaydi**, faqat yashiriladi: yangi xabar kelsa suhbat aynan
+     * o'sha `conversationId` bilan qaytadi (server yangisini yaratmaydi) — o'chirsak tarix
+     * ikkiga bo'linardi.
+     */
+    suspend fun deleteConversation(conversationId: String, forEveryone: Boolean = false): Resource<Unit>
+
+    /**
+     * `GET …/messages?around=` — sitataga bosilganda tarixning **o'rtasiga sakrash**.
+     *
+     * Oyna [seq] ning ikkala tomonidan olinadi; yashirilgan va tozalangan qatorlar oynaning
+     * joyini egallamaydi. Qaytadi: xabar keshga tushdimi (topilmasa `false` — sakrash
+     * tugmasini ko'rsatmang).
+     */
+    suspend fun loadAround(conversationId: String, seq: Int): Resource<Boolean>
 
     /** O'qildi kursorini suradi (eng yuqori ko'rilgan `seq`). */
     suspend fun markRead(conversationId: String)

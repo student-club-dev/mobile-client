@@ -13,6 +13,7 @@ import dev.feature.chat.domain.model.Message
 import dev.feature.chat.domain.model.MessageStatus
 import dev.feature.chat.domain.model.MessageType
 import dev.feature.chat.domain.model.OutgoingImage
+import dev.feature.chat.domain.model.OutgoingVideo
 import dev.feature.chat.domain.model.Sticker
 import dev.feature.chat.domain.model.StickerSearchItem
 import dev.feature.chat.domain.model.UploadState
@@ -79,6 +80,14 @@ data class ChatMediaItem(
     val durationMs: Int = 0,
     /** Server videoni hali transkod qilmoqda — poster bor, o'zi hali yo'q. */
     val processing: Boolean = false,
+    /**
+     * Xabar yuborilmadi.
+     *
+     * Kerak, chunki fayl **yuklanib bo'lgan**, lekin `message:send` yiqilgan bo'lishi mumkin:
+     * o'shanda biriktirma `PROCESSING` holatida qoladi va katak bir vaqtda ham
+     * «Tayyorlanmoqda…», ham «yuborilmadi» deb turardi — ikkita qarama-qarshi yorliq.
+     */
+    val failed: Boolean = false,
 ) {
     val loading: Boolean get() = url == null
 }
@@ -451,6 +460,7 @@ class ChatViewModel(
                                 0
                             },
                             processing = m.attachment?.processing == true,
+                            failed = m.status == MessageStatus.FAILED,
                         )
                     }
                 } else {
@@ -698,16 +708,31 @@ class ChatViewModel(
         }
     }
 
-    /** Video yuborish (`kind = VIDEO`). Server kerak bo'lsa transkod qiladi. */
-    fun sendVideo(bytes: ByteArray, fileName: String) {
+    /**
+     * Video yuborish (`kind = VIDEO`). Server kerak bo'lsa transkod qiladi.
+     *
+     * Fayl keshdan oqim bilan yuklanadi va yuborilgach o'chiriladi — qarang [OutgoingVideo].
+     */
+    fun sendVideo(video: OutgoingVideo) {
         val id = selectedId.value ?: return
         stopTyping()
         viewModelScope.launch {
-            when (val res = chatRepository.sendVideo(id, bytes, fileName)) {
+            when (val res = chatRepository.sendVideo(id, video)) {
                 is Resource.Error -> extra.update { it.copy(message = res.message) }
                 else -> Unit
             }
         }
+    }
+
+    /**
+     * Ketayotgan yuborishni to'xtatadi — pufakdagi `×`.
+     *
+     * Videoda siqish ham, yuklash ham uziladi va optimistik qator yo'qoladi. Xato
+     * ko'rsatilmaydi: bekor qilish foydalanuvchining o'z qarori, unga "bekor qilindi"
+     * deb aytish ortiqcha shovqin bo'lardi.
+     */
+    fun cancelUpload(messageId: String) {
+        viewModelScope.launch { chatRepository.cancelSend(messageId) }
     }
 
     /** Ovozli xabar (`kind = VOICE`). To'lqin va davomiylikni server hisoblaydi. */

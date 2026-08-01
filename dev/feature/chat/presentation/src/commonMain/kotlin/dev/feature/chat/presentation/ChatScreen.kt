@@ -80,13 +80,21 @@ import dev.core.uikit.components.ScHeaderTitle
 import dev.core.uikit.components.ScIconTile
 import dev.core.uikit.components.ScIcons
 import dev.core.uikit.components.ScText
+import dev.core.uikit.components.ScUploadRing
 import dev.core.uikit.components.StatusBarAppearance
 import dev.core.uikit.components.scCard
 import dev.core.uikit.components.scStyle
+import dev.core.uikit.media.PickedVideo
+import dev.core.uikit.media.deleteMediaFile
+import dev.core.uikit.media.ownsFile
 import dev.core.uikit.media.rememberMultiImagePicker
 import dev.core.uikit.media.ScVideoPlayer
 import dev.core.uikit.media.rememberAudioPlayer
 import dev.core.uikit.media.rememberAudioRecorder
+import dev.core.uikit.media.VideoPreparer
+import dev.core.uikit.media.rememberVideoCapture
+import dev.core.uikit.media.rememberVideoPreparer
+import dev.core.uikit.media.videoNeedsPreparing
 import dev.core.uikit.media.rememberVideoPicker
 import dev.core.uikit.media.rememberFilePicker
 import dev.core.uikit.theme.Sc
@@ -96,6 +104,7 @@ import dev.feature.chat.domain.model.Message
 import dev.feature.chat.domain.model.MessageStatus
 import dev.feature.chat.domain.model.MessageType
 import dev.feature.chat.domain.model.OutgoingImage
+import dev.feature.chat.domain.model.OutgoingVideo
 import dev.feature.chat.domain.model.Sticker
 import dev.feature.chat.domain.model.StickerSearchItem
 import dev.feature.chat.presentation.gif.ChatMediaPanel
@@ -173,6 +182,7 @@ fun ChatScreen(
                 // tayyor bo'lgach) — hozircha foydalanuvchi bo'sh bosishdan xabardor bo'lsin.
                 onSendFile = vm::sendFile,
                 onSendVideo = vm::sendVideo,
+                onCancelUpload = vm::cancelUpload,
                 onSendVoice = vm::sendVoice,
                 // Sarlavha har kompozitsiyada qayta o'qiladi — token yangilangach ham to'g'ri.
                 mediaHeaders = vm.mediaHeaders(),
@@ -430,7 +440,9 @@ private fun ChatThread(
     onReportStudent: (String, ReportReason, String?) -> Unit,
     onReportMessage: (String, ReportReason, String?) -> Unit,
     onSendFile: (ByteArray, String) -> Unit,
-    onSendVideo: (ByteArray, String) -> Unit,
+    onSendVideo: (OutgoingVideo) -> Unit,
+    /** Ketayotgan videoni to'xtatish — siqish ham, yuklash ham uziladi. */
+    onCancelUpload: (String) -> Unit,
     onSendVoice: (ByteArray, String) -> Unit,
     /** Media so'rovlari uchun `Authorization` sarlavhasi — pleyerlar tokensiz `404` oladi. */
     mediaHeaders: Map<String, String>,
@@ -478,8 +490,33 @@ private fun ChatThread(
     val filePicker = rememberFilePicker { picked ->
         if (picked != null) onSendFile(picked.bytes, picked.fileName)
     }
+    /**
+     * Tanlangan, lekin hali **yuborilmagan** video — ko'rish va izoh ekranida turadi.
+     *
+     * Darrov yuborilmaydi: noto'g'ri faylni tanlash yoki izohni unutish tuzatib bo'lmaydigan
+     * xato edi, xabarni faqat o'chirish qolardi.
+     */
+    var previewVideo by remember { mutableStateOf<PickedVideo?>(null) }
+
+    // Kamera galereya bilan bir xil natijani beradi ([PickedVideo]) va o'sha ko'rish
+    // ekranidan o'tadi — foydalanuvchi uchun ikkisi orasida farq yo'q.
+    val videoCapture = rememberVideoCapture { picked ->
+        if (picked != null) previewVideo = picked
+    }
+
+    // Siqish yuborilgandan KEYIN ishlaydi — Telegramdagi kabi. Shuning uchun u tanlagichda
+    // emas, yuboriladigan videoga biriktiriladi va repozitoriy uni halqa ichida chaqiradi.
+    val videoPreparer = rememberVideoPreparer()
+
     val videoPicker = rememberVideoPicker { picked ->
-        if (picked != null) onSendVideo(picked.bytes, picked.fileName)
+        if (picked != null) {
+            previewVideo = picked
+        } else {
+            // Sabab deyarli doim bitta: server chegarasi — 3 daqiqa. Undan uzunini siqib
+            // ham sig'dirib bo'lmaydi, shuning uchun buni ochiq aytamiz (ilgari tanlov
+            // jimgina yo'qolardi va "bosdim, hech nima bo'lmadi" bo'lib qolardi).
+            onSoon("Videoni yuborib bo'lmadi — u 3 daqiqadan uzun yoki formati qo'llab-quvvatlanmaydi.")
+        }
     }
 
     var recording by remember { mutableStateOf(false) }
@@ -754,6 +791,7 @@ private fun ChatThread(
                                     onOpenImage = { imageIndex ->
                                         if (selectionMode) toggleSelection(m) else viewer = m.images to imageIndex
                                     },
+                                    onCancelUpload = onCancelUpload,
                                     onOpenAttachment = { message ->
                                         val media = message.attachment
                                         when {
@@ -791,6 +829,7 @@ private fun ChatThread(
                     }
                 }
             }
+
         }
 
         Composer(
@@ -826,7 +865,25 @@ private fun ChatThread(
             onDismiss = { attachMenu = false },
             onPickImages = { attachMenu = false; picker.pick() },
             onPickVideo = { attachMenu = false; videoPicker.pick() },
+            onCaptureVideo = { attachMenu = false; videoCapture.pick() },
             onPickFile = { attachMenu = false; filePicker.pick() },
+        )
+    }
+
+    previewVideo?.let { picked ->
+        VideoPreviewSheet(
+            video = picked,
+            // Bekor qilinsa keshdagi fayl DARROV o'chadi — u o'nlab MB va uni boshqa hech
+            // kim tozalamaydi. ⚠️ Faqat **bizniki** bo'lsa: galereyadan tanlangan video
+            // ko'chirilmagan bo'lishi mumkin va u yerdagi yo'l foydalanuvchining o'z fayli.
+            onCancel = {
+                if (picked.ownsFile) deleteMediaFile(picked.path)
+                previewVideo = null
+            },
+            onSend = { caption ->
+                previewVideo = null
+                onSendVideo(picked.toOutgoing(caption, videoPreparer))
+            },
         )
     }
 
@@ -1420,6 +1477,8 @@ private fun MessageBubble(
      */
     onTap: () -> Unit,
     onOpenImage: (Int) -> Unit,
+    /** Ketayotgan videoni to'xtatish — halqa ichidagi `×`. */
+    onCancelUpload: (String) -> Unit,
     /** Fayl yoki video bosildi — chaqiruvchi uni ochadi (yuklab olish / pleyer). */
     onOpenAttachment: (ChatMessageUi) -> Unit,
     onToggleVoice: (ChatMessageUi) -> Unit,
@@ -1435,7 +1494,12 @@ private fun MessageBubble(
         // shuning uchun shoxobcha turga emas, to'rda element borligiga qarab tanlanadi.
         // Aralash albom (rasm + video) ham shu yerdan o'tadi.
         message.images.isNotEmpty() ->
-            ImageAlbumBubble(message, onOpen = onOpenImage, onTap = onTap)
+            ImageAlbumBubble(
+                message,
+                onOpen = onOpenImage,
+                onCancelUpload = onCancelUpload,
+                onTap = onTap,
+            )
         // Fayl hali ketmoqda — biriktirma serverning javobi bilan keladi, ya'ni quyidagi
         // shoxobchalarning hech biri hozircha ishlamaydi.
         message.upload != null -> UploadingAttachmentBubble(message, onTap = onTap)
@@ -1599,14 +1663,22 @@ private fun AttachMenu(
     onDismiss: () -> Unit,
     onPickImages: () -> Unit,
     onPickVideo: () -> Unit,
+    onCaptureVideo: () -> Unit,
     onPickFile: () -> Unit,
 ) {
     Dialog(onDismissRequest = onDismiss) {
         Column(
             Modifier.clip(RoundedCornerShape(20.dp)).background(Sc.Card).padding(vertical = 8.dp),
         ) {
-            ActionRow(ScIcons.Search, "Rasm", onClick = onPickImages)
-            ActionRow(AppIcons.Camera, "Video", onClick = onPickVideo)
+            // Har band o'z ikonkasi bilan: ilgari «Rasm» qidiruv lupasini, «Video» bilan
+            // «Kamera» esa bitta kamera ikonkasini ulashardi va menyuni faqat matndan
+            // o'qib tushunish mumkin edi.
+            ActionRow(AppIcons.ImageIcon, "Rasm", onClick = onPickImages)
+            ActionRow(AppIcons.Video, "Video", onClick = onPickVideo)
+            // Kamera galereyadan ALOHIDA band: "Video" galereyani ochadi va u yerdan
+            // kamerani topib bo'lmaydi — hozir suratga olishni xohlagan foydalanuvchi
+            // ilovadan chiqib, kamerani ochib, qaytib kelishi kerak bo'lardi.
+            ActionRow(AppIcons.Camera, "Kamera", onClick = onCaptureVideo)
             ActionRow(ScIcons.Paperclip, "Fayl", onClick = onPickFile)
         }
     }

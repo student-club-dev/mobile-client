@@ -25,11 +25,14 @@ import dev.feature.chat.data.mapper.toRow
 import dev.feature.chat.data.realtime.ChatSocket
 import dev.feature.chat.data.remote.ChatRemoteDataSource
 import dev.feature.chat.domain.model.ConversationItem
+import dev.feature.chat.domain.model.DeleteScope
 import dev.feature.chat.domain.model.GifRef
 import dev.feature.chat.domain.model.Message
 import dev.feature.chat.domain.model.MessageStatus
 import dev.feature.chat.domain.model.MessageType
 import dev.feature.chat.domain.model.OutgoingImage
+import dev.feature.chat.domain.model.OutgoingVideo
+import dev.feature.chat.domain.model.Quote
 import dev.feature.chat.domain.model.Sticker
 import dev.feature.chat.domain.model.StickerRef
 import dev.feature.chat.domain.model.UnreadCount
@@ -44,8 +47,11 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.withContext
 import kotlinx.datetime.Clock
+import kotlinx.io.files.Path
+import kotlinx.io.files.SystemFileSystem
 import kotlin.random.Random
 
 /**
@@ -82,6 +88,23 @@ class ChatRepositoryImpl(
      * o'zi ko'rinadi, keyin serverdagi havolaga almashadi.
      */
     private val localImages = MutableStateFlow<Map<String, ByteArray>>(emptyMap())
+
+    /**
+     * Yuklanmay qolgan videolar (xabar id → keshdagi fayl).
+     *
+     * Rasmdan farqli o'laroq baytlar emas, **fayl** saqlanadi ([OutgoingVideo]) — 64 MB ni
+     * xotirada ushlab turish mumkin emas. Yozuv yuklash muvaffaqiyatli tugaganda o'chadi;
+     * qolgani — qayta urinish uchun kutayotgan fayl.
+     */
+    private val localVideos = MutableStateFlow<Map<String, OutgoingVideo>>(emptyMap())
+
+    /**
+     * Ketayotgan yuborishlar (xabar id → korutin) — bekor qilish uchun ([cancelSend]).
+     *
+     * Faqat video: rasm va fayl sekundlarda ketadi, video esa siqish bilan birga bir necha
+     * daqiqa davom etishi mumkin va foydalanuvchi fikridan qaytishi tabiiy.
+     */
+    private val sendJobs = MutableStateFlow<Map<String, Job>>(emptyMap())
 
     /**
      * Hozir ketayotgan biriktirmalar (xabar id → foiz). Faqat xotirada: yarim ketgan
@@ -165,10 +188,39 @@ class ChatRepositoryImpl(
             }
         }
         launch {
-            // `message:deleted` IKKALA a'zoga keladi — o'zimiz o'chirgan bo'lsak ham,
-            // suhbatdosh o'chirgan bo'lsa ham bir xil yo'ldan yuriladi.
+            // `message:deleted` — belgilab o'chirilgan butun paket uchun **bitta** hodisa.
+            //
+            // Auditoriya qoidasi (§4.4): `EVERYONE` ikkala a'zoga, `ME` esa faqat MENING
+            // qurilmalarimga keladi — ya'ni `ME` kelgan bo'lsa, bu boshqa telefonimda
+            // yashirgan xabarlarim va ular bu yerda ham yashirilishi kerak.
             socket.deletedMessages.collect { event ->
-                applyDeleted(event.conversationId, event.messageId, event.seq)
+                val ids = event.allIds
+                if (ids.isEmpty()) return@collect
+                if (event.onlyForMe) {
+                    hideLocally(event.conversationId, ids)
+                } else {
+                    ids.zip(event.allSeqs.ifEmpty { List(ids.size) { 0 } })
+                        .forEach { (id, seq) -> applyDeleted(event.conversationId, id, seq) }
+                }
+            }
+        }
+        launch {
+            // `history:cleared` — tarix tozalandi (o'zim boshqa qurilmada yoki suhbatdosh
+            // `EVERYONE` bilan). Kesh serverning suv belgisiga tenglashadi.
+            socket.historyCleared.collect { event ->
+                applyHistoryCleared(event.conversationId, event.clearedBeforeSeq)
+            }
+        }
+        launch {
+            // `conversation:deleted` — suhbat ro'yxatdan olib tashlandi. Qator O'CHIRILMAYDI:
+            // yangi xabar kelsa u aynan o'sha id bilan qaytadi.
+            socket.conversationsDeleted.collect { event ->
+                withContext(dispatchers.io) {
+                    q.transaction {
+                        q.clearLastMessage(event.conversationId)
+                        q.setConversationHidden(1L, event.conversationId)
+                    }
+                }
             }
         }
         launch {
@@ -377,8 +429,20 @@ class ChatRepositoryImpl(
 
     // --- Yuborish ------------------------------------------------------------------------
 
-    override suspend fun send(conversationId: String, body: String): Resource<Unit> =
-        sendPayload(conversationId, SendPayload(type = MessageType.TEXT, body = body))
+    override suspend fun send(
+        conversationId: String,
+        body: String,
+        replyToMessageId: String?,
+        quote: Quote?,
+    ): Resource<Unit> = sendPayload(
+        conversationId,
+        SendPayload(
+            type = MessageType.TEXT,
+            body = body,
+            replyToMessageId = replyToMessageId,
+            quote = quote,
+        ),
+    )
 
     override suspend fun sendSticker(conversationId: String, sticker: Sticker): Resource<Unit> =
         // Serverdagi stiker `stickerId` bilan ketadi (tana TAQIQLANGAN). Ilovaga kiritilgan
@@ -448,6 +512,13 @@ class ChatRepositoryImpl(
         val localId = LOCAL_ID_PREFIX + clientMsgId
         val text = payload.wireBody.orEmpty()
 
+        // Sitata surati optimistik qatorga ham yoziladi: serverning javobi kelguncha bir
+        // necha soniya o'tadi va usiz javob xabari o'sha vaqt ichida sitatasiz ko'rinardi.
+        // Nishonni keshdan olamiz — u ekranda turgani uchun albatta bor.
+        val replySnapshot = payload.replyToMessageId?.let { targetId ->
+            withContext(dispatchers.io) { q.selectMessageById(targetId).executeAsOneOrNull() }
+        }
+
         // Optimistik ko'rinish — foydalanuvchi xabarni darhol ko'radi.
         withContext(dispatchers.io) {
             q.transaction {
@@ -475,6 +546,17 @@ class ChatRepositoryImpl(
                         attachmentHeight = payload.previewHeight,
                         attachmentKind = payload.previewUrl?.let { payload.type.name },
                         attachmentIsAnimated = if (payload.type == MessageType.GIF) 1L else null,
+                        // ⚠️ `senderName` bo'sh qoladi — keshda ismlar yo'q (faqat id).
+                        // Server javobida u to'ladi va qator o'sha bilan almashadi; shu
+                        // qisqa oynada pufakda faqat matn ko'rinadi.
+                        replyToId = payload.replyToMessageId,
+                        replyToSeq = replySnapshot?.seq,
+                        replyToSenderId = replySnapshot?.senderId,
+                        replyToType = replySnapshot?.type,
+                        replyToPreview = replySnapshot?.body?.take(REPLY_PREVIEW_LENGTH),
+                        replyToQuoteText = payload.quote?.text,
+                        replyToQuoteOffset = payload.quote?.offset?.toLong(),
+                        replyToOriginalDeleted = 0L,
                     ),
                 )
                 q.touchConversation(text, me, payload.type.name, now, 0L, conversationId)
@@ -594,8 +676,166 @@ class ChatRepositoryImpl(
     override suspend fun sendFile(conversationId: String, bytes: ByteArray, fileName: String) =
         sendSingleAttachment(conversationId, bytes, fileName, ChatMediaKind.FILE, MessageType.FILE)
 
-    override suspend fun sendVideo(conversationId: String, bytes: ByteArray, fileName: String) =
-        sendSingleAttachment(conversationId, bytes, fileName, ChatMediaKind.VIDEO, MessageType.VIDEO)
+    /**
+     * Video — yakka biriktirmalarning ([sendSingleAttachment]) ichida **eng og'iri**, shuning
+     * uchun alohida yo'l:
+     *
+     * - fayl xotiraga o'qilmaydi, oqim bilan yuklanadi (`uploadAttachmentFile`);
+     * - poster kadr darhol ekranga chiqadi, ya'ni yuklanayotgan video bo'sh to'rtburchak
+     *   emas — Telegramdagidek o'z kadri bilan turadi;
+     * - izoh (caption) qo'llab-quvvatlanadi.
+     */
+    override suspend fun sendVideo(conversationId: String, video: OutgoingVideo): Resource<Unit> {
+        val caption = video.caption?.trim()?.takeIf { it.isNotEmpty() }
+        // Chegara klientda tekshiriladi: `422` ni kutsak xabar ekranda "yuborilmadi" bo'lib
+        // qolardi va foydalanuvchi sababini bilmasdi.
+        if (caption != null && caption.length > SendPayload.MAX_CAPTION) {
+            deleteLocalFile(video.path)
+            return errorOf(AppException.Validation("Izoh ${SendPayload.MAX_CAPTION} belgidan uzun bo'lmasin."))
+        }
+
+        val me = currentUserId ?: return errorOf(AppException.Unauthorized())
+        val clientMsgId = randomClientMsgId()
+        val localId = LOCAL_ID_PREFIX + clientMsgId
+        val now = Clock.System.now().toEpochMilliseconds()
+
+        // Poster DARHOL ko'rinsin — yuklash o'nlab soniya davom etadi va usiz o'sha vaqt
+        // ichida ekranda bo'sh pufak turardi.
+        video.posterBytes?.let { poster -> localImages.update { it + (localId to poster) } }
+        // Yiqilsa qayta urinish uchun fayl yo'li kerak — baytlar saqlanmaydi.
+        localVideos.update { it + (localId to video) }
+
+        withContext(dispatchers.io) {
+            q.transaction {
+                q.insert(
+                    MessageRow(
+                        id = localId,
+                        conversationId = conversationId,
+                        senderId = me,
+                        seq = 0L,
+                        type = MessageType.VIDEO.name,
+                        body = caption.orEmpty(),
+                        createdAt = now,
+                        clientMsgId = clientMsgId,
+                        status = MessageStatus.SENDING.name,
+                        attachmentFileName = video.fileName,
+                        attachmentSizeBytes = video.sizeBytes,
+                    ),
+                )
+                q.touchConversation(caption.orEmpty(), me, MessageType.VIDEO.name, now, 0L, conversationId)
+            }
+        }
+
+        // Bekor qilish uchun shu yuborishning korutini eslab qolinadi ([cancelSend]).
+        // ⚠️ Aynan chaqiruvchining `Job` i — uni bekor qilish faqat shu videoni to'xtatadi,
+        // ViewModel'ning qolgan ishlariga tegmaydi.
+        return withSendJob(localId) {
+            uploadAndDeliverVideo(conversationId, video, caption, clientMsgId, localId)
+        }
+    }
+
+    /**
+     * Ketayotgan yuborishni to'xtatadi: siqish ham, yuklash ham uziladi, optimistik qator
+     * va keshdagi fayl o'chadi.
+     *
+     * Telegramdagi kabi bekor qilish **pufakning o'zida** — yuklash halqasi ichidagi `×`.
+     * Jarayon allaqachon tugagan bo'lsa hech narsa qilinmaydi.
+     */
+    override suspend fun cancelSend(messageId: String) {
+        sendJobs.value[messageId]?.cancel()
+        sendJobs.update { it - messageId }
+        // Qator faqat hali yuborilmagan bo'lsa o'chiriladi: bekor qilish serverga yetib
+        // ulgurgan xabarni qaytarib ololmaydi.
+        if (messageId.startsWith(LOCAL_ID_PREFIX)) {
+            withContext(dispatchers.io) { q.deleteMessage(messageId) }
+        }
+        forgetLocalMedia(setOf(messageId))
+        uploads.update { it - messageId }
+    }
+
+    /** Blokni [sendJobs] da ro'yxatga olib bajaradi — tugagach yozuv o'chadi. */
+    private suspend fun <T> withSendJob(localId: String, block: suspend () -> T): T {
+        currentCoroutineContext()[Job]?.let { job -> sendJobs.update { it + (localId to job) } }
+        return try {
+            block()
+        } finally {
+            sendJobs.update { it - localId }
+        }
+    }
+
+    /**
+     * Videoni **siqadi**, yuklaydi va xabar sifatida yuboradi — [sendVideo] va [retry] uchun
+     * umumiy.
+     *
+     * Siqish shu yerda, yuklashning oldida: foydalanuvchi uchun bu bitta jarayon va u bitta
+     * halqada ko'rinadi. Telegram ham shunday — tanlangandan keyin hech narsa kutilmaydi,
+     * xabar darrov ro'yxatga tushadi va halqa siqish bilan yuklashni birga hisoblaydi.
+     */
+    private suspend fun uploadAndDeliverVideo(
+        conversationId: String,
+        video: OutgoingVideo,
+        caption: String?,
+        clientMsgId: String,
+        localId: String,
+    ): Resource<Unit> {
+        // Siqishga ajratilgan ulush: siqilmaydigan videoda `0f`, ya'ni halqa darrov
+        // yuklashdan boshlanadi va yarmidan sakrab ketmaydi.
+        val prepareShare = if (video.needsPreparing && video.prepare != null) PREPARE_SHARE else 0f
+        var ready: OutgoingVideo? = null
+
+        val upload = tracked(localId, video.fileName, video.sizeBytes) { onProgress ->
+            val prepare = video.prepare
+            val prepared = if (prepare == null) {
+                // Video allaqachon siqilgan (qayta urinish) — uni yana siqish shunchaki
+                // yana o'nlab soniya va batareya degani.
+                video
+            } else {
+                prepare { fraction -> onProgress(fraction * prepareShare) } ?: return@tracked null
+            }
+            ready = prepared
+            // Siqilgani saqlanadi: yuklash yiqilsa qayta urinish uni QAYTA SIQMASLIGI kerak —
+            // bu yana o'nlab soniya va batareya degani.
+            localVideos.update { it + (localId to prepared) }
+
+            remote.uploadAttachmentFile(
+                conversationId = conversationId,
+                path = prepared.path,
+                sizeBytes = prepared.sizeBytes,
+                fileName = prepared.fileName,
+                kind = ChatMediaKind.VIDEO,
+                onProgress = { fraction -> onProgress(prepareShare + fraction * (1f - prepareShare)) },
+            )
+        } ?: return fail(
+            localId,
+            "Videoni yuborib bo'lmadi — u juda katta yoki formati qo'llab-quvvatlanmaydi.",
+        )
+
+        val attachment = when (upload) {
+            is Resource.Success -> upload.data.toColumns()
+            // Fayl **saqlanadi** — qayta urinishda u qaytadan yuklanishi kerak.
+            is Resource.Error -> return fail(localId, upload.message, upload.error)
+            Resource.Loading -> return Resource.Success(Unit)
+        }
+
+        // Serverda baytlar bor — keshdagi nusxa endi keraksiz. `mediaId` bir martalik, ya'ni
+        // qayta urinish ham faylni qaytadan yuklamaydi.
+        deleteLocalFile((ready ?: video).path)
+        localVideos.update { it - localId }
+
+        // Biriktirma DARHOL keshga yoziladi: yuborish yiqilsa ham qayta urinishda fayl
+        // qaytadan yuklanmasligi kerak (`422 MEDIA_ALREADY_USED`).
+        withContext(dispatchers.io) { q.setAttachment(attachment, localId) }
+
+        val result = deliver(
+            conversationId = conversationId,
+            payload = SendPayload(type = MessageType.VIDEO, body = caption, mediaId = attachment.id),
+            clientMsgId = clientMsgId,
+            localId = localId,
+        )
+        // Server posteri keldi — local nusxa endi kerak emas.
+        localImages.update { it - localId }
+        return result
+    }
 
     override suspend fun sendVoice(conversationId: String, bytes: ByteArray, fileName: String) =
         sendSingleAttachment(conversationId, bytes, fileName, ChatMediaKind.VOICE, MessageType.VOICE)
@@ -696,6 +936,20 @@ class ChatRepositoryImpl(
                 albumId = message.albumId,
             )
         }
+        // Video ham xuddi shunday: fayl hali yuklanmagan bo'lsa avval uni yuklaymiz. Fayl
+        // keshdan topilmasa (ilova qayta ishga tushgan, tizim keshni tozalagan) qayta
+        // urinishning ma'nosi yo'q — foydalanuvchi videoni qaytadan tanlashi kerak.
+        if (type == MessageType.VIDEO && message.attachmentId == null) {
+            val video = localVideos.value[message.id]
+                ?: return fail(message.id, "Video topilmadi — uni qaytadan tanlang")
+            return uploadAndDeliverVideo(
+                conversationId = message.conversationId,
+                video = video,
+                caption = message.body.takeIf { it.isNotEmpty() },
+                clientMsgId = clientMsgId,
+                localId = message.id,
+            )
+        }
         return deliver(
             conversationId = message.conversationId,
             payload = SendPayload(
@@ -733,6 +987,8 @@ class ChatRepositoryImpl(
             albumId = payload.albumId,
             gif = payload.gif,
             sticker = payload.sticker,
+            replyToMessageId = payload.replyToMessageId,
+            quote = payload.quote,
         )
         if (ack != null) {
             if (ack.isSent) {
@@ -808,7 +1064,7 @@ class ChatRepositoryImpl(
         // Hali yuborilmagan (optimistik) xabar serverda yo'q — uni oddiy o'chirsa bo'ladi.
         if (messageId.startsWith(LOCAL_ID_PREFIX)) {
             withContext(dispatchers.io) { q.deleteMessage(messageId) }
-            localImages.update { it - messageId }
+            forgetLocalMedia(setOf(messageId))
             return Resource.Success(Unit)
         }
         return when (val res = remote.deleteMessage(messageId)) {
@@ -823,51 +1079,171 @@ class ChatRepositoryImpl(
         }
     }
 
+    /**
+     * `POST /v1/messages/delete` — **bitta so'rov**, 1–100 ta id.
+     *
+     * Ilgari har bir xabar uchun alohida `DELETE` ketardi (50 ta belgilansa 50 ta so'rov);
+     * backend endi paketni bitta tranzaksiyada bajaradi va qayta hisoblangan `unreadCount`
+     * bilan `lastMessage` ni ham qaytaradi.
+     *
+     * Optimistik qatorlar so'rovga **kirmaydi**: ularning server id'si yo'q, ya'ni ular
+     * uchun `skipped(NOT_FOUND)` kelardi. Ular keshdan to'g'ridan-to'g'ri o'chiriladi
+     * (yashirilsa, `FAILED` holatida keshda abadiy qolib ketardi).
+     */
     override suspend fun deleteMessages(messageIds: List<String>, forEveryone: Boolean): Resource<Unit> {
         if (messageIds.isEmpty()) return Resource.Success(Unit)
-        return if (forEveryone) deleteForEveryone(messageIds) else hideForMe(messageIds)
-    }
+        val (local, remoteIds) = messageIds.partition { it.startsWith(LOCAL_ID_PREFIX) }
 
-    /**
-     * Har bir xabar uchun alohida so'rov — backendda ko'p o'chirish endpointi yo'q
-     * (`CHAT_SELECTION_AND_HISTORY_BACKEND.md` §A2). Ketma-ket ketadi: parallel yuborilsa
-     * 50 ta tanlangan xabar serverga bir vaqtda 50 ta so'rov bo'lib urilardi.
-     *
-     * Yiqilgani boshqalarni to'xtatmaydi — foydalanuvchi o'chirilganini ko'radi va
-     * qolganini qayta urinishi mumkin.
-     */
-    private suspend fun deleteForEveryone(messageIds: List<String>): Resource<Unit> {
-        var firstError: Resource.Error? = null
-        messageIds.forEach { id ->
-            val res = deleteMessage(id)
-            if (res is Resource.Error && firstError == null) firstError = res
+        if (local.isNotEmpty()) {
+            withContext(dispatchers.io) { q.transaction { q.deleteMessages(local) } }
+            forgetLocalMedia(local.toSet())
         }
-        return firstError ?: Resource.Success(Unit)
+        if (remoteIds.isEmpty()) return Resource.Success(Unit)
+
+        val scope = if (forEveryone) DeleteScope.EVERYONE else DeleteScope.ME
+        return when (val res = remote.deleteMessages(remoteIds.take(MAX_DELETE_IDS), scope)) {
+            is Resource.Success -> {
+                applyBulkDelete(res.data.conversationId, res.data.deleted, forEveryone, res.data.unreadCount)
+                Resource.Success(Unit)
+            }
+            is Resource.Error -> res
+            Resource.Loading -> Resource.Success(Unit)
+        }
     }
 
     /**
-     * «Faqat menda o'chirish» — serverga bormaydi.
+     * Server tasdiqlagan o'chirishni keshga qo'llaydi.
      *
-     * Yuborilmagan (optimistik) qatorlar **haqiqatan** o'chiriladi: ular serverda yo'q va
-     * yashirilgani ekranda ko'rinmay, `FAILED` bo'lib keshda abadiy qolib ketardi.
+     * `EVERYONE` — tana bo'shatiladi va tarixda tombstone qoladi; `ME` — qator o'z holicha
+     * qoladi, faqat **yashiriladi** (server ham xuddi shunday saqlaydi va o'sha xabarlarni
+     * boshqa qaytarmaydi, ya'ni qurilma almashsa ham yashiringan qoladi).
+     *
+     * `unreadCount` **serverdan** olinadi: uni klientda qayta sanash ikki manbadan bir xil
+     * natija kutish demakdir va ular albatta bir kun ajralib ketardi.
      */
-    private suspend fun hideForMe(messageIds: List<String>): Resource<Unit> {
+    private suspend fun applyBulkDelete(
+        conversationId: String,
+        ids: List<String>,
+        forEveryone: Boolean,
+        unreadCount: Int,
+    ) {
+        if (ids.isEmpty()) return
         val now = Clock.System.now().toEpochMilliseconds()
         withContext(dispatchers.io) {
             q.transaction {
-                val rows = messageIds.mapNotNull { q.selectMessageById(it).executeAsOneOrNull() }
-                val (local, remoteRows) = rows.partition { it.id.startsWith(LOCAL_ID_PREFIX) }
-                if (local.isNotEmpty()) q.deleteMessages(local.map { it.id })
-                if (remoteRows.isNotEmpty()) q.hideMessages(now, remoteRows.map { it.id })
-                // Ko'rinmaydigan xabarni o'qib bo'lmaydi — busiz badge abadiy yonib turardi.
-                remoteRows.filter { it.senderId != currentUserId && it.deletedAt == null }
-                    .forEach { q.decrementUnreadForDeleted(it.conversationId, it.seq) }
-                rows.map { it.conversationId }.distinct().forEach { refreshPreview(it) }
+                if (forEveryone) {
+                    ids.forEach { id ->
+                        val row = q.selectMessageById(id).executeAsOneOrNull() ?: return@forEach
+                        q.setMessageDeleted(now, row.id)
+                    }
+                } else {
+                    q.hideMessages(now, ids)
+                }
+                q.setUnreadCount(unreadCount.toLong(), conversationId)
+                refreshPreview(conversationId)
             }
         }
-        localImages.update { it - messageIds.toSet() }
-        return Resource.Success(Unit)
+        forgetLocalMedia(ids.toSet())
     }
+
+    override suspend fun clearHistory(conversationId: String, forEveryone: Boolean): Resource<Unit> {
+        val scope = if (forEveryone) DeleteScope.EVERYONE else DeleteScope.ME
+        return when (val res = remote.clearHistory(conversationId, scope)) {
+            is Resource.Success -> {
+                applyHistoryCleared(res.data.conversationId, res.data.clearedBeforeSeq)
+                Resource.Success(Unit)
+            }
+            is Resource.Error -> res
+            Resource.Loading -> Resource.Success(Unit)
+        }
+    }
+
+    override suspend fun deleteConversation(conversationId: String, forEveryone: Boolean): Resource<Unit> {
+        val scope = if (forEveryone) DeleteScope.EVERYONE else DeleteScope.ME
+        return when (val res = remote.deleteConversation(conversationId, scope)) {
+            is Resource.Success -> {
+                applyConversationDeleted(res.data.conversationId, res.data.clearedBeforeSeq)
+                Resource.Success(Unit)
+            }
+            is Resource.Error -> res
+            Resource.Loading -> Resource.Success(Unit)
+        }
+    }
+
+    /**
+     * Tarix tozalandi: `seq <= clearedBeforeSeq` bo'lgan qatorlar keshdan chiqadi.
+     *
+     * Ularni saqlashning ma'nosi yo'q — server ham boshqa qaytarmaydi (`before`, `after`,
+     * `around` — hammasiga taalluqli), ya'ni kesh bilan server abadiy ajralib qolardi.
+     */
+    private suspend fun applyHistoryCleared(conversationId: String, clearedBeforeSeq: Int) {
+        withContext(dispatchers.io) {
+            q.transaction {
+                q.deleteMessagesUpToSeq(conversationId, clearedBeforeSeq.toLong())
+                q.setClearedBeforeSeq(clearedBeforeSeq.toLong(), conversationId)
+                refreshPreview(conversationId)
+            }
+        }
+    }
+
+    /**
+     * Suhbat ro'yxatdan olib tashlandi.
+     *
+     * ⚠️ Qator **o'chirilmaydi**, yashiriladi: yangi xabar kelsa suhbat aynan o'sha
+     * `conversationId` bilan qaytadi va `touchConversation` bayroqni o'zi nolga tushiradi.
+     * O'chirsak, kelgan xabar egasiz qolib, ro'yxatda umuman ko'rinmasdi.
+     */
+    private suspend fun applyConversationDeleted(conversationId: String, clearedBeforeSeq: Int) {
+        withContext(dispatchers.io) {
+            q.transaction {
+                if (clearedBeforeSeq > 0) {
+                    q.deleteMessagesUpToSeq(conversationId, clearedBeforeSeq.toLong())
+                    q.setClearedBeforeSeq(clearedBeforeSeq.toLong(), conversationId)
+                }
+                q.clearLastMessage(conversationId)
+                q.setConversationHidden(1L, conversationId)
+            }
+        }
+    }
+
+    /**
+     * WS'dan kelgan «faqat menda o'chirildi» — boshqa qurilmamdagi amalning ko'zgusi.
+     *
+     * Serverga qayta so'rov yubormaymiz: hodisaning o'zi tasdiq va u idempotent. Sanoq
+     * ham shu yerda tuzatiladi — yashiringan xabarni o'qib bo'lmaydi, ya'ni usiz badge
+     * yonib qolardi.
+     */
+    private suspend fun hideLocally(conversationId: String, ids: List<String>) {
+        val now = Clock.System.now().toEpochMilliseconds()
+        withContext(dispatchers.io) {
+            q.transaction {
+                val rows = ids.mapNotNull { q.selectMessageById(it).executeAsOneOrNull() }
+                if (rows.isEmpty()) return@transaction
+                q.hideMessages(now, rows.map { it.id })
+                rows.filter { it.senderId != currentUserId && it.deletedAt == null }
+                    .forEach { q.decrementUnreadForDeleted(it.conversationId, it.seq) }
+                refreshPreview(conversationId)
+            }
+        }
+        forgetLocalMedia(ids.toSet())
+    }
+
+    /**
+     * `?around=` — sitataga sakrash uchun tarixning o'rtasidan oyna.
+     *
+     * Qaytadi: nishon keshga tushdimi. `false` bo'lsa (tozalangan yoki fizik o'chirilgan)
+     * chaqiruvchi sakramaydi — bo'sh ekranga olib borishdan ko'ra shunisi to'g'ri.
+     */
+    override suspend fun loadAround(conversationId: String, seq: Int): Resource<Boolean> =
+        when (val res = remote.messages(conversationId, around = seq)) {
+            is Resource.Success -> {
+                storeMessages(res.data.items.map { it.toRow() })
+                Resource.Success(res.data.items.any { it.seq == seq })
+            }
+            is Resource.Error -> res
+            Resource.Loading -> Resource.Success(false)
+        }
+
 
     /**
      * Suhbatlar ro'yxatidagi ko'rinishni keshdan qayta hisoblaydi.
@@ -914,7 +1290,7 @@ class ChatRepositoryImpl(
                 if (row == null || row.seq >= newest) q.setLastMessageDeleted(conversationId)
             }
         }
-        localImages.update { it - messageId }
+        forgetLocalMedia(setOf(messageId))
     }
 
     // --- Kursorlar -----------------------------------------------------------------------
@@ -1002,6 +1378,15 @@ class ChatRepositoryImpl(
         stickerEmoji = row.stickerEmoji,
         stickerUrl = row.stickerUrl,
         albumId = row.albumId,
+        replyToId = row.replyToId,
+        replyToSeq = row.replyToSeq,
+        replyToSenderId = row.replyToSenderId,
+        replyToSenderName = row.replyToSenderName,
+        replyToType = row.replyToType,
+        replyToPreview = row.replyToPreview,
+        replyToQuoteText = row.replyToQuoteText,
+        replyToQuoteOffset = row.replyToQuoteOffset,
+        replyToOriginalDeleted = row.replyToOriginalDeleted,
     )
 
     private fun ChatQueries.setAttachment(columns: AttachmentColumns, messageId: String) = setMessageAttachment(
@@ -1021,6 +1406,27 @@ class ChatRepositoryImpl(
         attachmentIsAnimated = columns.isAnimated,
         id = messageId,
     )
+
+    /**
+     * Xabar(lar)ning local nusxalarini unutadi.
+     *
+     * Rasm baytlari xotiradan chiqadi, videoning keshdagi fayli esa **diskdan ham**
+     * o'chiriladi: aks holda o'chirilgan yoki yuborilmay qolgan har bir video keshda
+     * o'nlab MB bo'lib qolib ketardi va uni tozalaydigan hech kim yo'q edi.
+     */
+    private fun forgetLocalMedia(ids: Set<String>) {
+        localImages.update { it - ids }
+        // Fayllar `update` dan TASHQARIDA o'chiriladi: blok raqobat holatida bir necha marta
+        // qayta ishga tushishi mumkin va yon ta'sir shuncha marta takrorlanardi.
+        val dropped = localVideos.value.filterKeys { it in ids }.values
+        localVideos.update { it - ids }
+        dropped.forEach { deleteLocalFile(it.path) }
+    }
+
+    /** Keshdagi faylni o'chiradi; yo'q bo'lsa jim qaytadi. */
+    private fun deleteLocalFile(path: String) {
+        runCatching { SystemFileSystem.delete(Path(path), mustExist = false) }
+    }
 
     /**
      * Yuklashni [uploads] da ko'rsatib turadi: boshida `0%`, keyin foiz, oxirida — **har
@@ -1079,5 +1485,21 @@ class ChatRepositoryImpl(
 
         /** Foiz shundan kam o'zgargan bo'lsa qayta chizmaymiz — 1% yetarlicha silliq. */
         const val PROGRESS_STEP = 0.01f
+
+        /**
+         * Halqaning siqishga ajratilgan qismi.
+         *
+         * Yarmi ataylab: mobil qurilmada siqish odatda yuklashdan tez emas (4K lavhani
+         * qayta kodlash o'nlab soniya), ya'ni ikkalasiga teng ulush berish halqani eng
+         * silliq to'ldiradi. Aniq nisbatni oldindan bilib bo'lmaydi — u qurilmaning
+         * kodegiga ham, tarmoq tezligiga ham bog'liq.
+         */
+        const val PREPARE_SHARE = 0.5f
+
+        /** Server chegarasi: bitta so'rovda 100 tagacha id (`422 TOO_MANY_IDS`). */
+        const val MAX_DELETE_IDS = 100
+
+        /** Optimistik sitatadagi qisqartma — server ham ≤120 belgi beradi (§5.2). */
+        const val REPLY_PREVIEW_LENGTH = 120
     }
 }

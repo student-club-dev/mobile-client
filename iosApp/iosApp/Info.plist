@@ -39,6 +39,8 @@
 	     foydalanuvchi tilida va aniq sababni aytadi (App Store talabi). -->
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Suhbatda ovozli xabar yozib yuborish uchun mikrofonga ruxsat kerak.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Suhbatda video yozib yuborish uchun kameraga ruxsat kerak.</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UIApplicationSceneManifest</key>

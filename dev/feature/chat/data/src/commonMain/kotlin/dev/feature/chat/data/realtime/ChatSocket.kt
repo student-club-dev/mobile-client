@@ -1,6 +1,7 @@
 package dev.feature.chat.data.realtime
 
 import dev.core.network.ws.SocketIoClient
+import dev.feature.chat.domain.model.Quote
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.mapNotNull
@@ -46,7 +47,35 @@ data class WsMessage(
     val albumId: String? = null,
     val attachment: WsAttachment? = null,
     val sticker: WsSticker? = null,
+    /** Javob berilgan xabarning surati — REST'dagi `MessageDto.replyTo` bilan bir xil shakl. */
+    val replyTo: WsReplyTo? = null,
     val createdAt: String,
+)
+
+/**
+ * `MessageDto.replyTo` ning WS ko'rinishi.
+ *
+ * Barcha maydonlar ixtiyoriy: bitta yetishmagani butun xabarni pars qilinmaydigan qilib
+ * qo'ymasligi kerak — u holda suhbat ekranda yo'qolardi (`WsAttachment` dagi o'sha qoida).
+ */
+@Serializable
+data class WsReplyTo(
+    /** Tozalangan xabarda `null` — sitata ko'rinadi, lekin sakrab bo'lmaydi. */
+    val id: String? = null,
+    val seq: Int? = null,
+    val senderId: String? = null,
+    val senderName: String? = null,
+    val type: String? = null,
+    val preview: String? = null,
+    val quote: WsQuote? = null,
+    val originalDeleted: Boolean? = null,
+)
+
+/** Belgilangan bo'lak. `offset` — **UTF-16 kod birligida** (Kotlin ham shunday sanaydi). */
+@Serializable
+data class WsQuote(
+    val text: String,
+    val offset: Int = 0,
 )
 
 /**
@@ -86,17 +115,70 @@ data class WsSticker(
 )
 
 /**
- * `message:deleted` — **ikkala** a'zoga ketadi (`handoff/02-API-CHANGES.md` §4b).
+ * `message:deleted` — belgilab o'chirilgan **butun paket uchun bitta** hodisa
+ * (`CHAT_SELECTION_AND_HISTORY_RESPONSE.md` §4.1): 50 ta xabar o'chirilsa 50 ta emas,
+ * bitta hodisa keladi.
  *
- * Xabar tarixdan yo'qolmaydi: `seq` joyida qoladi, faqat tanasi bo'shatiladi va u
- * o'qilmaganlar sanog'idan chiqadi.
+ * ⚠️ [ids] va [seqs] — **parallel massivlar**, bir xil tartibda (`zip` to'g'ri juftlik
+ * beradi). [messageId] / [seq] esa eski, bitta xabarli shaklning qoldig'i: server orqaga
+ * moslik uchun ularni ham yuboradi (`ids[0]` / `seqs[0]`) va eski klientlar buzilmasin.
+ *
+ * [scope] auditoriyani belgilaydi: `EVERYONE` — ikkala a'zoga, `ME` — **faqat amalni
+ * bajargan odamning** qurilmalariga. Ya'ni `ME` kelgan bo'lsa, bu men boshqa qurilmamda
+ * yashirgan xabarlar; suhbatdoshga bu hodisa umuman bormaydi.
  */
 @Serializable
 data class WsMessageDeleted(
     val conversationId: String,
-    val messageId: String,
+    /** Eski shakl — `ids[0]`. Yangi kod [ids] ni o'qiydi. */
+    val messageId: String? = null,
     val seq: Int = 0,
+    val ids: List<String> = emptyList(),
+    val seqs: List<Int> = emptyList(),
+    val scope: String? = null,
+    val deletedBy: String? = null,
+) {
+    /** O'chirilgan barcha id'lar — eski va yangi shakl birlashtirilgan holda. */
+    val allIds: List<String> get() = ids.ifEmpty { listOfNotNull(messageId) }
+
+    /** `seq` lar id'lar bilan bir xil tartibda; eski shaklda bittasi. */
+    val allSeqs: List<Int> get() = seqs.ifEmpty { listOf(seq) }
+
+    /** `ME` — xabar faqat menda yashiriladi, tanasi va suhbatdosh tomoni tegilmaydi. */
+    val onlyForMe: Boolean get() = scope == SCOPE_ME
+}
+
+/**
+ * `history:cleared` — suhbat tarixi tozalandi.
+ *
+ * `seq <= clearedBeforeSeq` bo'lgan hamma narsa keshdan chiqadi; suhbatning o'zi ro'yxatda
+ * qoladi va keyingi xabarlar odatdagidek keladi.
+ */
+@Serializable
+data class WsHistoryCleared(
+    val conversationId: String,
+    val clearedBeforeSeq: Int = 0,
+    val scope: String? = null,
+    val by: String? = null,
+) {
+    val onlyForMe: Boolean get() = scope == SCOPE_ME
+}
+
+/**
+ * `conversation:deleted` — suhbat ro'yxatdan olib tashlandi.
+ *
+ * ⚠️ Local qatorni **o'chirmang**: keyinroq o'sha `conversationId` bilan `message:new`
+ * kelsa suhbat qaytadi (server yangisini yaratmaydi).
+ */
+@Serializable
+data class WsConversationDeleted(
+    val conversationId: String,
+    val scope: String? = null,
+    val by: String? = null,
 )
+
+/** `scope` maydonining «faqat menda» qiymati — uchala hodisada ham bir xil. */
+private const val SCOPE_ME = "ME"
 
 /**
  * `media:ready` — video transkodlash tugadi.
@@ -200,6 +282,8 @@ class ChatSocket(private val socket: SocketIoClient) {
 
     val newMessages: Flow<WsMessageNew> = socket.eventsOf(EVENT_MESSAGE_NEW)
     val deletedMessages: Flow<WsMessageDeleted> = socket.eventsOf(EVENT_MESSAGE_DELETED)
+    val historyCleared: Flow<WsHistoryCleared> = socket.eventsOf(EVENT_HISTORY_CLEARED)
+    val conversationsDeleted: Flow<WsConversationDeleted> = socket.eventsOf(EVENT_CONVERSATION_DELETED)
     val mediaReady: Flow<WsMediaReady> = socket.eventsOf(EVENT_MEDIA_READY)
     val readCursors: Flow<WsCursor> = socket.eventsOf(EVENT_MESSAGE_READ)
     val deliveredCursors: Flow<WsCursor> = socket.eventsOf(EVENT_MESSAGE_DELIVERED)
@@ -228,6 +312,8 @@ class ChatSocket(private val socket: SocketIoClient) {
         albumId: String? = null,
         gif: JsonObject? = null,
         sticker: JsonObject? = null,
+        replyToMessageId: String? = null,
+        quote: Quote? = null,
     ): WsSendAck? {
         val ack = socket.emitWithAck(
             EVENT_MESSAGE_SEND,
@@ -243,6 +329,18 @@ class ChatSocket(private val socket: SocketIoClient) {
                 // Qidiruvdan kelgan stiker — `stickerId` bilan BIRGA ketmaydi
                 // (`SendPayload.validate` buni oldindan to'sadi).
                 sticker?.let { put("sticker", it) }
+                // Sitata: validatsiya REST bilan AYNAN bir xil — WS orqali yuborish
+                // tekshiruvni chetlab o'tish yo'li emas (§4.5).
+                replyToMessageId?.let { put("replyToMessageId", JsonPrimitive(it)) }
+                quote?.let {
+                    put(
+                        "quote",
+                        buildJsonObject {
+                            put("text", JsonPrimitive(it.text))
+                            put("offset", JsonPrimitive(it.offset))
+                        },
+                    )
+                }
             },
         ) ?: return null
         return runCatching { json.decodeFromJsonElement(WsSendAck.serializer(), ack) }.getOrNull()
@@ -289,6 +387,8 @@ class ChatSocket(private val socket: SocketIoClient) {
         // Server → klient
         const val EVENT_MESSAGE_NEW = "message:new"
         const val EVENT_MESSAGE_DELETED = "message:deleted"
+        const val EVENT_HISTORY_CLEARED = "history:cleared"
+        const val EVENT_CONVERSATION_DELETED = "conversation:deleted"
         const val EVENT_MEDIA_READY = "media:ready"
         const val EVENT_PRESENCE = "presence:update"
         const val EVENT_TYPING = "typing"

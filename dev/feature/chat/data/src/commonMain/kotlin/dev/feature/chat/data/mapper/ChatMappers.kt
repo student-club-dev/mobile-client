@@ -5,9 +5,11 @@ import dev.core.database.sql.MessageEntity
 import dev.core.network.generated.model.AttachmentDto
 import dev.core.network.generated.model.MessageDto
 import dev.core.network.generated.model.MessageStickerDto
+import dev.core.network.generated.model.ReplyToDto
 import dev.core.network.media.MediaUrl
 import dev.feature.chat.data.realtime.WsAttachment
 import dev.feature.chat.data.realtime.WsMessage
+import dev.feature.chat.data.realtime.WsReplyTo
 import dev.feature.chat.data.realtime.WsSticker
 import dev.feature.chat.domain.model.Attachment
 import dev.feature.chat.domain.model.Conversation
@@ -19,6 +21,8 @@ import dev.feature.chat.domain.model.Message
 import dev.feature.chat.domain.model.MessageStatus
 import dev.feature.chat.domain.model.MessageSticker
 import dev.feature.chat.domain.model.MessageType
+import dev.feature.chat.domain.model.Quote
+import dev.feature.chat.domain.model.ReplyTo
 import dev.feature.connections.domain.model.Gender
 import dev.feature.connections.domain.model.StudentSummary
 import kotlinx.datetime.Instant
@@ -118,6 +122,24 @@ internal fun MessageEntity.toDomain(origin: String): Message = Message(
     // provayder stikerining optimistik qatorida `stickerId` YO'Q (u server katalogida yo'q,
     // `handoff/06-STICKER-SEARCH.md` §2), faqat havolasi bor — shartga uni ham qo'shmasak,
     // server javobi kelgunicha pufak bo'sh turardi.
+    // Sitata — keshdagi **surat**, nishonning joriy holati emas. `replyToId` bo'lmasa ham
+    // ko'rsatiladi: nishon tozalangan bo'lsa id yo'q, matn esa qoladi (§5.2).
+    replyTo = if (replyToSenderId == null && replyToPreview == null && replyToQuoteText == null) {
+        null
+    } else {
+        ReplyTo(
+            id = replyToId,
+            seq = replyToSeq?.toInt() ?: 0,
+            senderId = replyToSenderId.orEmpty(),
+            senderName = replyToSenderName.orEmpty(),
+            type = replyToType?.let { parseEnum(it, MessageType.TEXT) } ?: MessageType.TEXT,
+            preview = replyToPreview,
+            quote = replyToQuoteText?.let { text ->
+                Quote(text = text, offset = replyToQuoteOffset?.toInt() ?: 0)
+            },
+            originalDeleted = replyToOriginalDeleted == 1L,
+        )
+    },
     sticker = (stickerId ?: stickerUrl)?.let {
         MessageSticker(
             id = stickerId.orEmpty(),
@@ -168,6 +190,15 @@ internal data class MessageRow(
     val stickerEmoji: String? = null,
     val stickerUrl: String? = null,
     val albumId: String? = null,
+    val replyToId: String? = null,
+    val replyToSeq: Long? = null,
+    val replyToSenderId: String? = null,
+    val replyToSenderName: String? = null,
+    val replyToType: String? = null,
+    val replyToPreview: String? = null,
+    val replyToQuoteText: String? = null,
+    val replyToQuoteOffset: Long? = null,
+    val replyToOriginalDeleted: Long? = null,
 )
 
 /** Keshdagi qator → yozish uchun qator (ack kelganda `id`/`seq` almashtiriladi). */
@@ -200,6 +231,15 @@ internal fun MessageEntity.toRow(): MessageRow = MessageRow(
     stickerEmoji = stickerEmoji,
     stickerUrl = stickerUrl,
     albumId = albumId,
+    replyToId = replyToId,
+    replyToSeq = replyToSeq,
+    replyToSenderId = replyToSenderId,
+    replyToSenderName = replyToSenderName,
+    replyToType = replyToType,
+    replyToPreview = replyToPreview,
+    replyToQuoteText = replyToQuoteText,
+    replyToQuoteOffset = replyToQuoteOffset,
+    replyToOriginalDeleted = replyToOriginalDeleted,
 )
 
 /**
@@ -222,7 +262,7 @@ internal fun MessageDto.toRow(fallbackClientMsgId: String? = null): MessageRow =
     clientMsgId = clientMsgId ?: fallbackClientMsgId,
     deletedAt = deletedAt?.toEpochMilliseconds(),
     albumId = albumId,
-).withAttachment(attachment).withSticker(sticker)
+).withAttachment(attachment).withSticker(sticker).withReplyTo(replyTo)
 
 internal fun WsMessage.toRow(): MessageRow = MessageRow(
     id = id,
@@ -235,7 +275,47 @@ internal fun WsMessage.toRow(): MessageRow = MessageRow(
     clientMsgId = clientMsgId,
     deletedAt = parseInstant(deletedAt).takeIf { it > 0L },
     albumId = albumId,
-).withAttachment(attachment).withSticker(sticker)
+).withAttachment(attachment).withSticker(sticker).withReplyTo(replyTo)
+
+// --- Sitata (javob berilgan xabarning surati) --------------------------------------------
+
+/**
+ * `MessageDto.replyTo` → kesh ustunlari.
+ *
+ * ⚠️ Surat **o'zgarmas**: nishon keyin o'chirilsa ham matni shu qatorda qoladi. Shuning
+ * uchun bu yerda nishonni id bo'yicha izlab, uning joriy holatini olib qo'yish YO'Q —
+ * server bergan nusxa aynan shu holicha yoziladi.
+ */
+private fun MessageRow.withReplyTo(reply: ReplyToDto?): MessageRow {
+    if (reply == null) return this
+    return copy(
+        replyToId = reply.id,
+        replyToSeq = reply.seq.toLong(),
+        replyToSenderId = reply.senderId,
+        replyToSenderName = reply.senderName,
+        replyToType = reply.type.name,
+        replyToPreview = reply.preview,
+        replyToQuoteText = reply.quote?.text,
+        replyToQuoteOffset = reply.quote?.offset?.toLong(),
+        replyToOriginalDeleted = if (reply.originalDeleted) 1L else 0L,
+    )
+}
+
+/** WS `message:new` dagi o'sha surat — REST bilan bir xil shakl, faqat qo'lda yozilgan tip. */
+private fun MessageRow.withReplyTo(reply: WsReplyTo?): MessageRow {
+    if (reply == null) return this
+    return copy(
+        replyToId = reply.id,
+        replyToSeq = reply.seq?.toLong() ?: 0L,
+        replyToSenderId = reply.senderId,
+        replyToSenderName = reply.senderName,
+        replyToType = reply.type,
+        replyToPreview = reply.preview,
+        replyToQuoteText = reply.quote?.text,
+        replyToQuoteOffset = reply.quote?.offset?.toLong(),
+        replyToOriginalDeleted = if (reply.originalDeleted == true) 1L else 0L,
+    )
+}
 
 // --- Biriktirma --------------------------------------------------------------------------
 
