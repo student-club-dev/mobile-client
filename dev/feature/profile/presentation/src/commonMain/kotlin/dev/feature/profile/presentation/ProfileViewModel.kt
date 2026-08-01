@@ -3,13 +3,7 @@ package dev.feature.profile.presentation
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.core.common.Resource
-import dev.feature.ads.domain.model.Ad
-import dev.core.domain.model.DiscountOffer
-import dev.feature.jobs.domain.model.JobApplication
 import dev.feature.university.domain.model.University
-import dev.feature.ads.domain.repository.AdRepository
-import dev.core.domain.repository.DiscountRepository
-import dev.feature.jobs.domain.repository.JobRepository
 import dev.feature.university.domain.repository.UniversityRepository
 import dev.core.domain.usecase.LogoutUseCase
 import dev.core.domain.usecase.ObserveCurrentUserUseCase
@@ -39,9 +33,6 @@ data class ProfileUiState(
     val universityMonogram: String? = null,
     val courseLabel: String? = null,
     val contact: String = "",
-    val myAds: List<Ad> = emptyList(),
-    val savedDiscounts: List<DiscountOffer> = emptyList(),
-    val applications: List<JobApplication> = emptyList(),
     /** Tahrirlash ekrani uchun xom profil ma'lumoti (local keshdan). */
     val profile: UserProfile? = null,
     /** Universitet tanlash uchun ro'yxat. */
@@ -74,9 +65,6 @@ class ProfileViewModel(
     observeCurrentUserUseCase: ObserveCurrentUserUseCase,
     observeProfileUseCase: ObserveProfileUseCase,
     universityRepository: UniversityRepository,
-    private val adRepository: AdRepository,
-    discountRepository: DiscountRepository,
-    jobRepository: JobRepository,
     private val logoutUseCase: LogoutUseCase,
     private val saveProfileUseCase: SaveProfileUseCase,
     private val refreshProfileUseCase: RefreshProfileUseCase,
@@ -96,55 +84,28 @@ class ProfileViewModel(
         // Offline-first: ekran ochilishi bilan fon rejimida masofaviy manbadan
         // yangilaymiz. Xato bo'lsa keshdagi ma'lumot ko'rinaveradi.
         viewModelScope.launch { refreshProfileUseCase() }
-        viewModelScope.launch { adRepository.refresh() }
     }
 
-    private val header = combine(
+    val state: StateFlow<ProfileUiState> = combine(
         observeCurrentUserUseCase(),
         observeProfileUseCase(),
         universityRepository.observeUniversities(),
     ) { user, profile, universities ->
         val uni = universities.firstOrNull { it.id == profile?.universityId }
-        Header(
+        ProfileUiState(
             // Ism profildan olinadi; profil hali to'ldirilmagan bo'lsa — sessiya nomidan.
             name = profile?.displayName
                 ?: user?.fullName?.takeIf { it.isNotBlank() }
                 ?: "Talaba",
-            monogram = uni?.monogram,
-            course = profile?.courseYear?.let(::courseLabel),
+            universityMonogram = uni?.monogram,
+            courseLabel = profile?.courseYear?.let(::courseLabel),
             contact = user?.phoneNumber ?: user?.email.orEmpty(),
-            ownerId = (user?.id ?: 0L).toString(),
             profile = profile,
             universities = universities,
         )
     }
-
-    private val lists = combine(
-        adRepository.observeAds(),
-        discountRepository.observeSaved(),
-        jobRepository.observeApplications(),
-    ) { ads, saved, applications -> Lists(ads, saved, applications) }
-
-    val state: StateFlow<ProfileUiState> = combine(header, lists) { h, l ->
-        ProfileUiState(
-            name = h.name,
-            universityMonogram = h.monogram,
-            courseLabel = h.course,
-            contact = h.contact,
-            myAds = l.ads.filter { it.ownerId == h.ownerId },
-            savedDiscounts = l.saved,
-            applications = l.applications,
-            profile = h.profile,
-            universities = h.universities,
-        )
-    }
         .catch { emit(ProfileUiState()) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), ProfileUiState())
-
-    /** E'lonni o'chirish ("Mening e'lonlarim"). */
-    fun deleteAd(adId: String) {
-        viewModelScope.launch { adRepository.delete(adId) }
-    }
 
     fun logout(onDone: () -> Unit) {
         viewModelScope.launch {
@@ -283,22 +244,6 @@ class ProfileViewModel(
         /** `MediaUploader` fayl to'liq ketganda aynan shu qiymatni beradi. */
         const val UPLOAD_DONE = 0.99f
     }
-
-    private data class Header(
-        val name: String,
-        val monogram: String?,
-        val course: String?,
-        val contact: String,
-        val ownerId: String,
-        val profile: UserProfile?,
-        val universities: List<University>,
-    )
-
-    private data class Lists(
-        val ads: List<Ad>,
-        val saved: List<DiscountOffer>,
-        val applications: List<JobApplication>,
-    )
 }
 
 private fun courseLabel(courseYear: String): String = when (courseYear) {

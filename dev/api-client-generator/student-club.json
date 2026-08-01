@@ -12508,6 +12508,164 @@
         ]
       }
     },
+    "/v1/stories/archive": {
+      "get": {
+        "operationId": "StoriesController_archive",
+        "summary": "Your archived (expired) stories",
+        "description": "Stories whose 24 hours are over. Visible **only to the author** — nobody else can read this list, and archived media is never returned by `/feed`, `/mine` or a direct story fetch. Newest first.",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "format": "int32",
+              "default": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "name": "size",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "format": "int32",
+              "default": 30,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/BaseResponseDto"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "result": {
+                          "$ref": "#/components/schemas/StoryArchivePageDto"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid access token (`UNAUTHORIZED`), or expired (`TOKEN_EXPIRED`) — refresh and retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/BaseResponseDto"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "success": {
+                          "type": "boolean",
+                          "example": false
+                        },
+                        "status": {
+                          "type": "integer",
+                          "example": 401
+                        },
+                        "message": {
+                          "type": "string",
+                          "example": "Avtorizatsiyadan o‘tilmagan"
+                        },
+                        "result": {
+                          "nullable": true,
+                          "example": null
+                        },
+                        "error": {
+                          "allOf": [
+                            {
+                              "$ref": "#/components/schemas/ApiErrorDto"
+                            }
+                          ],
+                          "example": {
+                            "code": "UNAUTHORIZED",
+                            "message": "Avtorizatsiyadan o‘tilmagan",
+                            "fields": {}
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller is not a STUDENT account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/BaseResponseDto"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "success": {
+                          "type": "boolean",
+                          "example": false
+                        },
+                        "status": {
+                          "type": "integer",
+                          "example": 403
+                        },
+                        "message": {
+                          "type": "string",
+                          "example": "Ruxsat yo‘q"
+                        },
+                        "result": {
+                          "nullable": true,
+                          "example": null
+                        },
+                        "error": {
+                          "allOf": [
+                            {
+                              "$ref": "#/components/schemas/ApiErrorDto"
+                            }
+                          ],
+                          "example": {
+                            "code": "FORBIDDEN",
+                            "message": "Ruxsat yo‘q",
+                            "fields": {}
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Stories"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
     "/v1/stories/{id}/view": {
       "post": {
         "operationId": "StoriesController_view",
@@ -21985,6 +22143,40 @@
         },
         "required": [
           "items"
+        ]
+      },
+      "StoryArchivePageDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "description": "Newest first.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StoryDto"
+            }
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "size": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "hasNext": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "items",
+          "page",
+          "size",
+          "total",
+          "hasNext"
         ]
       },
       "StoryViewerPageDto": {

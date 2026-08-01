@@ -2,6 +2,7 @@ package dev.feature.stories.domain.repository
 
 import dev.core.common.Resource
 import dev.feature.stories.domain.model.Story
+import dev.feature.stories.domain.model.StoryArchivePage
 import dev.feature.stories.domain.model.StoryGroup
 import dev.feature.stories.domain.model.StoryViewerPage
 
@@ -12,8 +13,9 @@ import dev.feature.stories.domain.model.StoryViewerPage
  * hech qachon ko'rmaydi. Bog'lanish uzilsa lavha lentadan **darhol** yo'qoladi.
  *
  * Kesh yo'q — ma'lumot tez eskiradi (har lavha 24 soat yashaydi va istalgan payt muddati
- * o'tishi mumkin). Muddati o'tgan story serverdan **hech qachon** qaytmaydi, ya'ni
- * `expiresAt` ni klientda tekshirish shart emas.
+ * o'tishi mumkin). Muddati o'tgan story [feed] va [mine] dan **hech qachon** qaytmaydi,
+ * ya'ni `expiresAt` ni klientda tekshirish shart emas. Yagona istisno — [archive]: u
+ * ataylab **faqat** muddati o'tganlarini beradi va uni faqat muallif ko'radi.
  */
 interface StoryRepository {
 
@@ -25,6 +27,16 @@ interface StoryRepository {
 
     /** `GET /v1/stories/mine` — faol lavhalarim + **haqiqiy** `viewsCount`. */
     suspend fun mine(): Resource<List<Story>>
+
+    /**
+     * `GET /v1/stories/archive` — **muddati o'tgan** lavhalarim (profildagi «Arxivlangan
+     * postlar»).
+     *
+     * ⚠️ Faqat muallifga: arxiv lentaga ham, `mine` ga ham hech qachon tushmaydi va uni
+     * boshqa hech kim o'qiy olmaydi. Ya'ni 24 soat tugagach lavha **yo'qolmaydi**, egasi
+     * uchun shu ro'yxatga o'tadi (`STORY_ARCHIVE_BACKEND.md`).
+     */
+    suspend fun archive(page: Int = 1, size: Int = DEFAULT_ARCHIVE_PAGE): Resource<StoryArchivePage>
 
     /**
      * Rasm/video yuklab, lavha yaratadi: `POST /v1/media/chat-upload` → `POST /v1/stories`.
@@ -75,5 +87,8 @@ interface StoryRepository {
 
     companion object {
         const val DEFAULT_VIEWERS_PAGE = 30
+
+        /** Arxiv bir sahifada — to'rda 3 ustun, ya'ni 10 qator. */
+        const val DEFAULT_ARCHIVE_PAGE = 30
     }
 }

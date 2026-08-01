@@ -32,9 +32,24 @@ data class Story(
     /** **Siz** ko'rganmisiz. O'z story'ingizda doim `true`. */
     val seen: Boolean = false,
     val viewsCount: Int? = null,
+    /**
+     * Telefondagi **`StudentClub`** papkasidagi nusxa (`dev.core.uikit.media`).
+     *
+     * O'z lavhangiz yuborilgandan keyin ham telefonda qoladi, ya'ni uni ko'rish uchun
+     * serverdan qayta yuklab olish shart emas. Boshqa odamning lavhasida doim `null`.
+     */
+    val localUri: String? = null,
 ) {
     /** Ekranda necha millisekund turishi. */
     val displayMs: Int get() = durationMs?.takeIf { it > 0 } ?: DEFAULT_IMAGE_MS
+
+    /**
+     * Ko'rsatiladigan media — **avval telefondagi nusxa**, bo'lmasa serverdagi havola.
+     *
+     * Local fayl tarmoqni ham, kutishni ham butunlay chetlab o'tadi va u aynan yuborilgan
+     * fayl (server siqishidan oldingi sifat).
+     */
+    val displayUrl: String get() = localUri ?: url
 
     companion object {
         /** Rasm uchun standart davomiylik — hujjat aynan shuni tavsiya qiladi (§3). */
@@ -63,6 +78,21 @@ data class StoryGroup(
     val startIndex: Int get() = stories.indexOfFirst { !it.seen }.takeIf { it >= 0 } ?: 0
 }
 
+/**
+ * Arxiv sahifasi (`GET /v1/stories/archive`) — muddati o'tgan **o'z** lavhalarim.
+ *
+ * Lenta va `mine` dan farqli o'laroq bu ro'yxat uzoq bo'lishi mumkin (har kuni 20 tagacha
+ * lavha), shuning uchun u sahifalanadi.
+ */
+data class StoryArchivePage(
+    /** Yangidan eskiga. */
+    val items: List<Story>,
+    val page: Int,
+    val size: Int,
+    val total: Int,
+    val hasNext: Boolean,
+)
+
 /** `GET /v1/stories/{id}/views` sahifasi — faqat muallifga. */
 data class StoryViewerPage(
     val items: List<StudentSummary>,
@@ -88,6 +118,15 @@ object StoryLimits {
     /** Rasm hajmi — `kind=STORY_IMAGE`. */
     const val MAX_IMAGE_BYTES = 12 * 1024 * 1024
 
-    /** Video hajmi — `kind=STORY_VIDEO`, ustiga **≤ 30 s**. */
+    /** Video hajmi — `kind=STORY_VIDEO`. */
     const val MAX_VIDEO_BYTES = 48 * 1024 * 1024
+
+    /**
+     * Lavha videosining eng uzun davomiyligi — **1 daqiqa**.
+     *
+     * Klientda ham tekshiriladi: uzun videoni yuklab bo'lgach `422` bilan rad etilishi
+     * foydalanuvchi uchun eng yomon variant — u trafikni ham, vaqtni ham sarflab
+     * bo'lgan bo'ladi (`CHAT_MEDIA_PARITY_BACKEND.md` §2).
+     */
+    const val MAX_VIDEO_MS = 60 * 1000
 }

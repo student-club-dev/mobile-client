@@ -18,6 +18,7 @@ import dev.feature.chat.domain.repository.ChatRepository
 import dev.feature.chat.domain.repository.GifRepository
 import dev.feature.chat.domain.repository.StickerRepository
 import dev.feature.chat.presentation.ChatViewModel
+import dev.feature.chat.presentation.PeerMediaViewModel
 import dev.feature.chat.presentation.gif.GifPanelViewModel
 import dev.feature.chat.presentation.gif.StickerPanelViewModel
 import io.ktor.client.HttpClient
@@ -91,6 +92,9 @@ fun chatModule() = module {
     single<StickerRepository> { StickerRepositoryImpl(remote = get(), search = get()) }
 
     viewModelOf(::ChatViewModel)
+    // Talaba profilidagi «Media / Fayllar / Havolalar» bo'limlari (chatdan ham, story
+    // lentasidan ham bir xil ochiladi).
+    viewModelOf(::PeerMediaViewModel)
     viewModelOf(::GifPanelViewModel)
     viewModelOf(::StickerPanelViewModel)
 }

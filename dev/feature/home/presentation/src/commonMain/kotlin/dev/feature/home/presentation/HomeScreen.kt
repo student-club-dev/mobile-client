@@ -27,6 +27,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -65,6 +68,9 @@ import dev.core.uikit.components.ScShimmerLine
 import dev.core.uikit.components.ScShimmerCard
 import dev.core.uikit.theme.Sc
 import dev.feature.stories.presentation.StoriesCollapsed
+import dev.feature.chat.presentation.rememberPeerProfileSections
+import dev.feature.connections.domain.model.StudentSummary
+import dev.feature.connections.presentation.StudentProfileSheet
 import dev.feature.stories.presentation.StoriesRow
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
@@ -124,6 +130,15 @@ fun HomeScreen(
 
     val scope = rememberCoroutineScope()
 
+    /**
+     * Ochilgan talaba profili — story lentasidagi muallif ustiga bosilganda.
+     *
+     * Varaq shu yerda chiziladi, story modulida emas: undagi «Media / Fayllar /
+     * Havolalar» bo'limlari chat modulida yashaydi va story chatga bog'lanolmaydi
+     * (chat allaqachon story'ga bog'langan — «Postlar» bo'limi uchun).
+     */
+    var profileStudent by remember { mutableStateOf<StudentSummary?>(null) }
+
     Column(Modifier.fillMaxSize().background(Sc.Bg)) {
         HomeHeader(
             state = state,
@@ -141,7 +156,14 @@ fun HomeScreen(
             // Story lentasi — eng tepada, bo'limlardan oldin (`handoff/07-STORIES.md` §2).
             // O'z holatini o'zi boshqaradi: lenta bo'sh bo'lsa ham «Lavham» katakchasi
             // qoladi, ya'ni bu yerda shart tekshirilmaydi.
-            StoriesRow(myName = state.userName, myAvatarUrl = state.avatarUrl)
+            StoriesRow(
+                myName = state.userName,
+                myAvatarUrl = state.avatarUrl,
+                // Lavha muallifi ustiga bosilganda uning profili — CHATDAGI bilan bir xil
+                // varaq va bir xil bo'limlar (`rememberPeerProfileSections`). Varaqni shu
+                // yerda chizamiz: story moduli chat moduliga bog'lanolmaydi.
+                onOpenProfile = { author -> profileStudent = author },
+            )
 
             // Birinchi yuklanish, keshda hech narsa yo'q — bo'limlar o'rniga skelet.
             if (state.loading) {
@@ -176,6 +198,20 @@ fun HomeScreen(
             // Pastki navigatsiya + FAB uchun joy.
             Spacer(Modifier.height(96.dp))
         }
+    }
+
+    profileStudent?.let { author ->
+        StudentProfileSheet(
+            studentId = author.id,
+            known = author,
+            onClose = { profileStudent = null },
+            // Chatdagi profil bilan AYNAN bir xil bo'limlar.
+            sections = rememberPeerProfileSections(author.id),
+            onOpenChat = { id ->
+                profileStudent = null
+                onOpenChatWith(id)
+            },
+        )
     }
 }
 

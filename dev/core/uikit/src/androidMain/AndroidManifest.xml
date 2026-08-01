@@ -21,5 +21,16 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/sc_media_paths" />
         </provider>
+
+        <!--
+            Ilova kontekstini erta ushlab qolish uchun (qarang `ScMediaContextProvider`) —
+            «StudentClub» papkasiga saqlash ViewModel'dan, ya'ni Compose'dan tashqarida
+            chaqiriladi. `initOrder` yuqori: u boshqa provider'lardan oldin ishga tushsin.
+        -->
+        <provider
+            android:name="dev.core.uikit.media.ScMediaContextProvider"
+            android:authorities="${applicationId}.scmediacontext"
+            android:exported="false"
+            android:initOrder="1000" />
     </application>
 </manifest>

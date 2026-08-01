@@ -71,6 +71,12 @@ internal fun StoryViewerDialog(
     onPrevious: () -> Unit,
     onClose: () -> Unit,
     onDelete: (String) -> Unit,
+    /**
+     * Muallif ustiga bosildi — uning profili ochiladi (Telegram/Instagramdagidek).
+     *
+     * `null` — bosish o'chirilgan: o'z lavhangizda ochadigan profil yo'q.
+     */
+    onOpenAuthor: ((String) -> Unit)? = null,
 ) {
     val group = state.group ?: return
     val story = state.story ?: return
@@ -116,7 +122,8 @@ internal fun StoryViewerDialog(
         Box(Modifier.fillMaxSize().background(Color.Black)) {
             if (isVideo) {
                 ScVideoPlayer(
-                    url = story.url,
+                    // Telefondagi nusxa bo'lsa — o'sha: tarmoq ham, kutish ham yo'q.
+                    url = story.displayUrl,
                     // ⚠️ Story medialari **token bilan** so'raladi (§11.2) — faqat muallif va
                     // unga bog'langan odam o'qiy oladi, ya'ni tokensiz pleyer `404` olardi.
                     headers = mediaHeaders,
@@ -138,7 +145,7 @@ internal fun StoryViewerDialog(
                 )
             } else {
                 ScNetworkImage(
-                    url = story.url,
+                    url = story.displayUrl,
                     contentDescription = story.caption,
                     contentScale = ContentScale.Fit,
                     modifier = Modifier.fillMaxSize(),
@@ -177,17 +184,39 @@ internal fun StoryViewerDialog(
                 )
                 Spacer(Modifier.height(10.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    ScAvatar(
-                        name = group.author.displayName,
-                        size = 32.dp,
-                        avatarUrl = group.author.avatarUrl,
-                    )
-                    Spacer(Modifier.width(9.dp))
-                    Column(Modifier.weight(1f)) {
-                        ScText(group.author.displayName, 13.5f, FontWeight.Bold, Color.White, maxLines = 1)
-                        // O'z lavhamda ko'rishlar soni bor; boshqalarnikida u ATAYLAB `null`.
-                        story.viewsCount?.let {
-                            ScText("$it marta ko'rilgan", 11f, FontWeight.Medium, Color.White.copy(alpha = 0.75f))
+                    // Avatar va ism — bitta bosiladigan bo'lak: muallifning profili
+                    // ochiladi. Ular tepadagi qatorda, ya'ni lavhani surish zonalaridan
+                    // ([StoryTapZone]) tashqarida — bosish keyingi lavhaga o'tkazmaydi.
+                    Row(
+                        Modifier.weight(1f)
+                            .clip(RoundedCornerShape(percent = 50))
+                            .then(
+                                if (onOpenAuthor == null) {
+                                    Modifier
+                                } else {
+                                    Modifier.clickable { onOpenAuthor(group.author.id) }
+                                },
+                            )
+                            .padding(end = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        ScAvatar(
+                            name = group.author.displayName,
+                            size = 32.dp,
+                            avatarUrl = group.author.avatarUrl,
+                        )
+                        Spacer(Modifier.width(9.dp))
+                        Column(Modifier.weight(1f)) {
+                            ScText(group.author.displayName, 13.5f, FontWeight.Bold, Color.White, maxLines = 1)
+                            // O'z lavhamda ko'rishlar soni bor; boshqalarnikida u ATAYLAB `null`.
+                            story.viewsCount?.let {
+                                ScText(
+                                    "$it marta ko'rilgan",
+                                    11f,
+                                    FontWeight.Medium,
+                                    Color.White.copy(alpha = 0.75f),
+                                )
+                            }
                         }
                     }
                     story.viewsCount?.let {

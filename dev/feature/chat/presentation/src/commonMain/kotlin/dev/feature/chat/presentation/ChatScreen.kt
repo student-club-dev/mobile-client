@@ -92,6 +92,7 @@ import dev.core.uikit.media.ScVideoPlayer
 import dev.core.uikit.media.rememberAudioPlayer
 import dev.core.uikit.media.rememberAudioRecorder
 import dev.core.uikit.media.VideoPreparer
+import dev.feature.connections.presentation.StudentProfileSheet
 import dev.core.uikit.media.rememberVideoCapture
 import dev.core.uikit.media.rememberVideoPreparer
 import dev.core.uikit.media.videoNeedsPreparing
@@ -909,16 +910,32 @@ private fun ChatThread(
     }
 
     if (profileOpen) {
-        PeerProfileSheet(
-            conversation = conversation,
-            typing = state.peerTyping,
-            realtime = state.realtime,
-            photos = state.photos,
-            links = state.links,
-            files = state.files,
-            onOpenFile = { profileOpen = false; onSoon("Faylni yuklab olish tez orada") },
-            universityName = state.peerUniversity,
+        // Profil varag'i **umumiy** (`connections:presentation`): story lentasidan ham
+        // shu ochiladi. Chatga xos qismi faqat bo'limlarning mazmuni — u shu modulda
+        // qoladi (`ChatProfileSections`).
+        val peer = conversation.other
+        StudentProfileSheet(
+            studentId = peer.id,
             onClose = { profileOpen = false },
+            // Bo'limlar story lentasidan ochilgani bilan **bitta manba**dan
+            // (`rememberPeerProfileSections`) quriladi — ikki joyda ikki xil profil
+            // bo'lib qolmasin.
+            sections = rememberPeerProfileSections(
+                studentId = peer.id,
+                onOpenFile = {
+                    profileOpen = false
+                    onSoon("Faylni yuklab olish tez orada")
+                },
+            ),
+            // Suhbat konteksti — profilning o'zi «yozmoqda…» ni bilmaydi.
+            statusOverride = when {
+                state.peerTyping -> "yozmoqda…"
+                peer.online -> "onlayn"
+                !state.realtime -> "ulanmoqda…"
+                else -> ChatFormat.lastSeen(peer.lastSeenAt)
+            },
+            onSoon = onSoon,
+            // Tasdiqlash oynalari chatda — ular bloklashdan keyin suhbatni ham yopadi.
             onDisconnect = {
                 profileOpen = false
                 confirmDisconnect = true
@@ -931,7 +948,15 @@ private fun ChatThread(
                 profileOpen = false
                 reportStudent = true
             },
-            onSoon = onSoon,
+            // Suhbat ro'yxati bu odamni allaqachon biladi — varaq to'liq holda ochiladi.
+            known = peer,
+            // Yoyilgan avatarga bosilganda — chatdagi to'liq ekranli ko'rgich.
+            onOpenPhoto = { index ->
+                val photos = peer.photos.mapIndexed { i, photo ->
+                    ChatMediaItem("profile-$i", photo.url, null, null)
+                }
+                if (photos.isNotEmpty()) viewer = photos to index.coerceIn(0, photos.lastIndex)
+            },
         )
     }
 

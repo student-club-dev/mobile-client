@@ -14,6 +14,10 @@ kotlin { sourceSets { commonMain.dependencies {
     implementation(projects.dev.feature.profile.domain)
     // Story lentasi (bosh ekranning eng tepasidagi qator).
     implementation(projects.dev.feature.stories.presentation)
+    // Lavha muallifining profili — umumiy varaq (connections) + uning chatdan keladigan
+    // bo'limlari (media/fayl/havola). Bosh ekran ikkalasini birlashtiradigan yagona joy.
+    implementation(projects.dev.feature.connections.presentation)
+    implementation(projects.dev.feature.chat.presentation)
     // DiscountRepository/DiscountCategory/DiscountOffer + ObserveCurrentUserUseCase.
     implementation(projects.dev.core.domain)
     // Yordam e'lonlari kartochkasidagi muddat yorlig'i ("Ertaga 12:00").

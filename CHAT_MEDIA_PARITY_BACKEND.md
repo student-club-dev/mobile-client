@@ -140,19 +140,77 @@ cheklovi emas.
 
 ---
 
-## 2. Chegaralar
+## 2. Chegaralar — **olib tashlanadi**
 
-| `kind` | Hozir | Bo'lsin | Izoh |
-|---|---|---|---|
-| `FILE` | 48 MB | **2 GB** | Telegramda 2 GB (Premium'da 4). §7 dagi bo'lakli yuklashsiz bunga chiqib bo'lmaydi |
-| `VIDEO` | 64 MB · 3 daq | **2 GB · 60 daq** | |
-| `IMAGE` | 12 MB | **50 MB** | Asl sifat uchun (§3) |
-| `VOICE` | 16 MB · 5 daq | **2 soat** | Telegramda amalda cheksiz |
-| `GIF` | 20 MB · 30 s | o'zgarishsiz | Yetarli |
+**Talab:** `POST /v1/media/chat-upload` da hajm (MB) va davomiylik (daqiqa) chegarasi
+**bo'lmasin** — hech bir `kind` uchun. Bu **story yuklashga ham** tegishli
+(`STORY_IMAGE`, `STORY_VIDEO`): bugun ular 12 MB / 48 MB · 30 s bilan cheklangan,
+bundan keyin hajm bo'yicha cheklanmasin.
 
-Kvota ham ko'tariladi: **daqiqasiga 60 yuklash, kuniga 10 GB**. Kvotani butunlay olib
-tashlash tavsiya etilmaydi — u xatolik yoki suiiste'mol paytida serverni ushlab turadigan
-yagona narsa, va oddiy foydalanuvchi unga hech qachon urilmaydi.
+**Yagona istisno — story davomiyligi: `30 s` → `60 s` ga OSHIRILADI.**
+
+Ya'ni `STORY_VIDEO` uchun davomiylik chegarasi butunlay olib tashlanmaydi, balki
+**ikki barobar ko'tariladi**: bugungi 30 soniya → **1 daqiqa**. Bu texnik emas, **mahsulot**
+qarori: lavha qisqa formatda qoladi (Telegramda ham, Instagram'da ham 60 s). Hajmi esa
+cheklanmaydi — 1 daqiqalik 4K video ham qabul qilinsin.
+
+Qabul mezoni: **45 soniyalik** lavha yuklansa `200` bilan qabul qilinadi (bugun `422` bilan
+rad etiladi), **90 soniyalik** lavha esa `422 STORY_VIDEO_TOO_LONG` oladi.
+
+| `kind` | Hozir | Bo'lsin |
+|---|---|---|
+| `FILE` | 48 MB | **chegara yo'q** |
+| `VIDEO` | 64 MB · 3 daq | **chegara yo'q** |
+| `IMAGE` | 12 MB | **chegara yo'q** |
+| `VOICE` | 16 MB · 5 daq | **chegara yo'q** |
+| `GIF` | 20 MB · 30 s | **chegara yo'q** |
+| `STORY_IMAGE` | 12 MB | **chegara yo'q** |
+| `STORY_VIDEO` | 48 MB · 30 s | **hajm: chegara yo'q · davomiylik: ≤ 60 s** |
+
+Ya'ni `413 PAYLOAD_TOO_LARGE`, `MEDIA_TOO_LARGE`, `VIDEO_TOO_LONG`, `VOICE_TOO_LONG` va
+shu turdagi javoblar **umuman qaytmaydi** — bitta holatdan tashqari: `STORY_VIDEO`
+60 soniyadan uzun bo'lsa `422 STORY_VIDEO_TOO_LONG` (xabarda ruxsat etilgan davomiylik
+ko'rsatilsin, klient uni foydalanuvchiga aynan shunday chiqaradi).
+
+### 2.1 Buni ishlaydigan qilish uchun nima kerak
+
+Chegarani sonini o'zgartirish bilan emas, **oqim bilan** olib tashlanadi — aks holda
+birinchi 1 GB lik fayl serverni yiqitadi:
+
+1. **nginx** — `client_max_body_size 0;` (`/v1/media/chat-upload` uchun) va
+   `proxy_request_buffering off;`. Hozirgi `client_max_body_size 64m` fayl NestJS'ga
+   yetib bormasdan `413` beradi, ya'ni kodda nima yozilganining farqi yo'q.
+2. **NestJS** — fayl **xotiraga o'qilmasin**: multipart oqimi to'g'ridan-to'g'ri
+   bucket'ga (`S3 multipart upload` / diskka stream). `memoryStorage` bilan 1 GB lik
+   fayl 1 GB RAM degani.
+3. **Transkod navbati** — uzun video sinxron ishlanmasin: yuklash `PROCESSING` qaytarsin,
+   `media:ready` WS hodisasi tayyor bo'lganda kelsin (bu mexanizm allaqachon bor).
+4. **§7 dagi bo'lakli yuklash** — cheklov olib tashlangach u **majburiy** bo'ladi: bir
+   martalik so'rov bilan yuborilgan 2 GB lik fayl uzilsa noldan boshlanadi va mobil
+   internetda hech qachon yetib bormaydi.
+
+⚠️ **Halol ogohlantirish:** "chegara yo'q" degani texnik jihatdan ham cheksiz degani emas —
+bucket hajmi, disk va tarmoq baribir chegara. Shuning uchun mahsulot darajasidagi chegara
+olib tashlansin, lekin infratuzilma darajasida **himoya qolsin**:
+
+- kvota: **daqiqasiga 60 yuklash, kuniga 20 GB** (bitta hisob uchun) — bu oddiy
+  foydalanuvchiga hech qachon tegmaydi, lekin skript bilan bucket to'ldirishni to'xtatadi;
+- bitta ochiq yuklash sessiyasi **24 soat** yashasin, tugallanmagani tozalansin;
+- disk 85% ga to'lganda `503` bilan rad etilsin (jimgina yiqilgandan ko'ra tushunarli).
+
+Bu himoyalar foydalanuvchiga **chegara bo'lib ko'rinmaydi**: ular hajmga emas, tezlikka va
+serverning holatiga qarab ishlaydi.
+
+### 2.2 Klient tomoni
+
+Klientdagi tekshiruvlar (`StoryLimits`, video tanlagichdagi 64 MB / 30 s to'siqlari)
+backend chegarani olib tashlaganidan **keyin** yechiladi — hozir yechilsa ilova serverdan
+`413` oladi va foydalanuvchi sababini bilmaydi. Ya'ni bu bandning klient qismi shu
+endpoint yangilanishiga bog'liq.
+
+Story davomiyligi esa **klientda ham qoladi**: 60 soniyadan uzun video tanlansa u
+yuklashdan oldin rad etilsin (yoki kesish taklif qilinsin) — bir daqiqalik chegarani
+foydalanuvchi yuklash tugagach emas, tanlagan zahoti bilishi kerak.
 
 ---
 

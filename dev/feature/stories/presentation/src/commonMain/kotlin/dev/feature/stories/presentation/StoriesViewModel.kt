@@ -8,6 +8,9 @@ import dev.core.common.auth.TokenStore
 import dev.core.uikit.media.PickedVideo
 import dev.core.uikit.media.VideoPreparer
 import dev.core.uikit.media.deleteMediaFile
+import dev.core.uikit.media.saveBytesToStudentClubFolder
+import dev.core.uikit.media.saveToStudentClubFolder
+import dev.core.uikit.media.storyMediaFileName
 import dev.core.uikit.media.videoNeedsPreparing
 import dev.feature.connections.domain.model.StudentSummary
 import dev.feature.stories.domain.model.Story
@@ -87,10 +90,14 @@ class StoriesViewModel(
         viewModelScope.launch {
             val feed = repository.feed()
             val mine = repository.mine()
+            // Faqat O'ZIMNIKIGA local nusxa qidiriladi — boshqa odamning lavhasi telefonda
+            // yo'q.
+            val local = localMediaUrls()
             _state.update { current ->
                 current.copy(
                     groups = (feed as? Resource.Success)?.data ?: current.groups,
-                    mine = (mine as? Resource.Success)?.data ?: current.mine,
+                    mine = (mine as? Resource.Success)?.data?.map { it.withLocalMedia(local) }
+                        ?: current.mine,
                     loading = false,
                     // Lenta yuklanmasa ham ekran ishlayveradi — story qo'shimcha qatlam,
                     // shuning uchun xato faqat foydalanuvchi o'zi amal qilganda ko'rsatiladi.
@@ -173,7 +180,15 @@ class StoriesViewModel(
      * chegara serverda ham bor (§1).
      */
     fun publish(bytes: ByteArray, fileName: String, caption: String?) =
-        publish { onProgress -> repository.create(bytes, fileName, caption, onProgress) }
+        publish { onProgress ->
+            repository.create(bytes, fileName, caption, onProgress).alsoKeepOnDevice { story ->
+                saveBytesToStudentClubFolder(
+                    bytes = bytes,
+                    fileName = storyMediaFileName(story.id, isVideo = false),
+                    isVideo = false,
+                )
+            }
+        }
 
     /**
      * Video lavha — media **diskdagi fayldan** yuklanadi.
@@ -198,8 +213,34 @@ class StoriesViewModel(
                 fileName = ready.fileName,
                 caption = caption,
                 onProgress = { fraction -> onProgress(prepareShare + fraction * (1f - prepareShare)) },
-            ).also { deleteMediaFile(ready.path) }
+            )
+                // ⚠️ Nusxa keshdagi fayl O'CHIRILISHIDAN oldin olinadi.
+                .alsoKeepOnDevice { story ->
+                    saveToStudentClubFolder(
+                        sourcePath = ready.path,
+                        fileName = storyMediaFileName(story.id, isVideo = true),
+                        isVideo = true,
+                    )
+                }
+                .also { deleteMediaFile(ready.path) }
         }
+
+    /**
+     * Yuborilgan media telefonda **qoladi** — «StudentClub» papkasida.
+     *
+     * Nega: o'z lavhangizni ko'rish uchun uni serverdan qayta yuklab olish bekorga
+     * sarflangan trafik. Saqlash yiqilsa hech narsa bo'lmaydi — o'shanda media eskicha,
+     * tarmoqdan o'qiladi.
+     */
+    private suspend fun Resource<Story>.alsoKeepOnDevice(
+        save: suspend (Story) -> String?,
+    ): Resource<Story> {
+        if (this is Resource.Success) {
+            val savedUri = runCatching { save(data) }.getOrNull()
+            if (savedUri != null) return Resource.Success(data.copy(localUri = savedUri))
+        }
+        return this
+    }
 
     /** Ikkala yo'lning umumiy qismi — holat, foiz va yakuniy xabar. */
     private fun publish(create: suspend ((Float) -> Unit) -> Resource<Story>) {
@@ -254,6 +295,22 @@ class StoriesViewModel(
      * va busiz foydalanuvchi "bosdim, hech nima bo'lmadi" deb ikkinchi marta tanlardi.
      */
     fun messageShown() = _state.update { it.copy(message = null) }
+
+    /**
+     * Ekranga xabar chiqaradi — masalan tanlangan video chegaradan uzun bo'lsa.
+     *
+     * Yuklash **boshlanmaydi**: sabab foydalanuvchiga tanlagan zahoti aytiladi, serverdan
+     * xato kutib emas.
+     */
+    /**
+     * Lavha muallifi **men**mi.
+     *
+     * Profilni ochishdan oldin tekshiriladi: o'z lavhangda muallif ustiga bosish
+     * «bog'lanish» tugmalari bilan o'z profilingizni ochardi.
+     */
+    fun isMine(authorId: String): Boolean = _state.value.mine.any { it.authorId == authorId }
+
+    fun showMessage(text: String) = _state.update { it.copy(message = text) }
 
     /**
      * `POST /v1/stories/{id}/view` — **idempotent** va fon amali: javobi kutilmaydi, xatosi

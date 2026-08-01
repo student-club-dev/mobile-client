@@ -6,6 +6,7 @@ import dev.feature.connections.data.repository.ConnectionsRepositoryImpl
 import dev.feature.connections.domain.repository.ConnectionsRepository
 import dev.feature.connections.presentation.BlockedStudentsViewModel
 import dev.feature.connections.presentation.ConnectionsViewModel
+import dev.feature.connections.presentation.StudentProfileViewModel
 import io.ktor.client.HttpClient
 import org.koin.core.module.dsl.viewModelOf
 import org.koin.dsl.module
@@ -26,4 +27,6 @@ fun connectionsModule() = module {
     viewModelOf(::ConnectionsViewModel)
     // "Bloklanganlar" ro'yxati — Sozlamalar → Maxfiylik'dan ochiladigan alohida ekran.
     viewModelOf(::BlockedStudentsViewModel)
+    // Boshqa talabaning profili — story ko'ruvchisidan muallif ustiga bosilganda ochiladi.
+    viewModelOf(::StudentProfileViewModel)
 }

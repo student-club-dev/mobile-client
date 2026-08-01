@@ -4,4 +4,6 @@ kotlin { sourceSets { commonMain.dependencies {
     implementation(projects.dev.feature.stories.data)
     // Koin moduli `StoriesApi` ni quradi.
     implementation(projects.dev.core.network)
+    // Arxivdagi postning sanasi ("12 iyul") — `Instant` → local sana.
+    implementation(libs.kotlinx.datetime)
 } } }

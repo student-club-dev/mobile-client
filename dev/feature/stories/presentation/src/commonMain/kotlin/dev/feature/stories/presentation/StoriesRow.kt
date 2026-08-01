@@ -47,7 +47,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
 import dev.core.uikit.theme.Sc
+import dev.feature.connections.domain.model.StudentSummary
 import dev.feature.stories.domain.model.StoryGroup
+import dev.feature.stories.domain.model.StoryLimits
 import org.koin.compose.viewmodel.koinViewModel
 
 /**
@@ -77,6 +79,14 @@ fun StoriesRow(
     myName: String,
     myAvatarUrl: String?,
     modifier: Modifier = Modifier,
+    /**
+     * Lavha muallifi ustiga bosildi — uning profili ochilsin.
+     *
+     * Profil varag'ini **chaqiruvchi** chizadi: undagi «Media / Fayllar / Havolalar»
+     * bo'limlari chat modulida yashaydi va story moduli chatga bog'lanolmaydi (chat
+     * allaqachon story'ga bog'langan — «Postlar» bo'limi uchun).
+     */
+    onOpenProfile: ((StudentSummary) -> Unit)? = null,
     vm: StoriesViewModel = koinViewModel(),
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
@@ -88,14 +98,19 @@ fun StoriesRow(
         if (picked == null) return@rememberImagePicker
         vm.publish(picked.bytes, picked.fileName, caption = null)
     }
-    // Video ham qo'llab-quvvatlanadi (`kind = STORY_VIDEO`, 48 MB · ≤30 s) — tanlagich
-    // chegaradan oshganini o'zi to'sadi va `null` qaytaradi.
     // Siqish nashrdan KEYIN, katakchadagi halqa ichida ketadi — tanlagandan keyin
     // foydalanuvchi hech narsa kutmaydi.
     val videoPreparer = rememberVideoPreparer()
     val videoPicker = rememberVideoPicker { picked ->
-        if (picked == null) return@rememberVideoPicker
-        vm.publishVideo(picked, videoPreparer, caption = null)
+        when {
+            // `null` — foydalanuvchi bekor qildi (yoki fayl o'qilmadi). Xabar
+            // ko'rsatilmaydi: bekor qilishga javoban chiqadigan oyna bezovta qilardi.
+            picked == null -> Unit
+            // ⚠️ Chegara YUKLASHDAN OLDIN tekshiriladi: 1 daqiqadan uzun videoni siqib,
+            // yuklab bo'lgach serverdan `422` olish — trafik ham, vaqt ham behuda.
+            tooLongForStory(picked.durationMs) -> vm.showMessage(STORY_TOO_LONG_MESSAGE)
+            else -> vm.publishVideo(picked, videoPreparer, caption = null)
+        }
     }
 
     LazyRow(
@@ -123,6 +138,12 @@ fun StoriesRow(
         }
     }
 
+    // Yuborish natijasi va chegara xabarlari — ilgari ular holatda turardi-yu, ekranda
+    // hech qayerda ko'rinmasdi.
+    state.message?.let { text ->
+        StoryMessageDialog(text = text, onDismiss = vm::messageShown)
+    }
+
     if (pickerChoice) {
         StoryPickerChoice(
             onDismiss = { pickerChoice = false },
@@ -139,8 +160,17 @@ fun StoriesRow(
             onPrevious = vm::previous,
             onClose = vm::close,
             onDelete = vm::delete,
+            // O'z lavhamda profil ochilmaydi — u yerda ochadigan «boshqa odam» yo'q.
+            onOpenAuthor = { authorId ->
+                val author = viewer.group?.author
+                if (author != null && !vm.isMine(authorId)) {
+                    vm.close()
+                    onOpenProfile?.invoke(author)
+                }
+            },
         )
     }
+
 }
 
 /**
@@ -396,3 +426,40 @@ private val COLLAPSED_AVATAR = 26.dp
 private val COLLAPSED_RING = 1.5.dp
 private val COLLAPSED_OVERLAP = 10.dp
 private const val COLLAPSED_MAX = 3
+
+/**
+ * Tanlangan video lavha uchun juda uzunmi.
+ *
+ * Davomiylik aniqlanmagan bo'lsa (`null`) to'silmaydi: bu ba'zi kodeklarda bo'ladi va
+ * o'shanda chegarani server tekshiradi — foydalanuvchini taxmin bilan to'xtatmaymiz.
+ */
+private fun tooLongForStory(durationMs: Int?): Boolean =
+    durationMs != null && durationMs > StoryLimits.MAX_VIDEO_MS
+
+/** Xabar oynasi — bitta tugmali, chunki bu yerda tanlov yo'q. */
+@Composable
+private fun StoryMessageDialog(text: String, onDismiss: () -> Unit) {
+    Dialog(onDismissRequest = onDismiss) {
+        Column(
+            Modifier.clip(RoundedCornerShape(22.dp))
+                .background(Sc.Card)
+                .padding(horizontal = 20.dp, vertical = 18.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            ScText(text, 14.5f, FontWeight.SemiBold, Sc.Ink, maxLines = 4)
+            Spacer(Modifier.height(14.dp))
+            Box(
+                Modifier.clip(RoundedCornerShape(14.dp))
+                    .background(Sc.Brand.copy(alpha = 0.12f))
+                    .clickable(onClick = onDismiss)
+                    .padding(horizontal = 26.dp, vertical = 9.dp),
+            ) {
+                ScText("Tushunarli", 13.5f, FontWeight.ExtraBold, Sc.Brand, maxLines = 1)
+            }
+        }
+    }
+}
+
+/** Chegara **mahsulot** qarori — `CHAT_MEDIA_PARITY_BACKEND.md` §2. */
+private const val STORY_TOO_LONG_MESSAGE =
+    "Lavha 1 daqiqadan uzun bo'lmasin. Videoni qisqartirib qayta tanlang."

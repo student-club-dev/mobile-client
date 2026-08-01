@@ -11,6 +11,7 @@ import dev.core.network.media.MediaUploader
 import dev.core.network.response.safeCall
 import dev.feature.stories.data.mapper.toDomain
 import dev.feature.stories.domain.model.Story
+import dev.feature.stories.domain.model.StoryArchivePage
 import dev.feature.stories.domain.model.StoryGroup
 import dev.feature.stories.domain.model.StoryViewerPage
 import dev.feature.stories.domain.repository.StoryRepository
@@ -42,6 +43,14 @@ class StoryRepositoryImpl(
 
     override suspend fun mine(): Resource<List<Story>> =
         safeCall(connectivity) { api.mine().body() }.map { dto -> dto.items.map { it.toDomain(apiOrigin) } }
+
+    /**
+     * Arxiv — muddati o'tgan lavhalarim. Bu yerda ham kesh yo'q: ro'yxat faqat profilning
+     * bitta bo'limida ko'rinadi va o'sha yerda bir marta o'qiladi.
+     */
+    override suspend fun archive(page: Int, size: Int): Resource<StoryArchivePage> =
+        safeCall(connectivity) { api.archive(page = page, size = size).body() }
+            .map { it.toDomain(apiOrigin) }
 
     /**
      * Ikki qadam: media yuklash → `POST /v1/stories`.

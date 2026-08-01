@@ -77,7 +77,6 @@ import dev.feature.notifications.presentation.NotificationsScreen
 import dev.feature.clubs.presentation.ClubsScreen
 import dev.feature.settings.presentation.SettingsScreen
 import dev.feature.university.presentation.MyUniversityScreen
-import dev.feature.ads.presentation.PostAdScreen
 import dev.feature.chat.presentation.ChatScreen
 import dev.feature.home.presentation.HomeScreen
 import dev.feature.profile.presentation.EditProfileScreen
@@ -124,7 +123,6 @@ private val studentListingKinds = listOf(
     ListingKind.SERVICE,
     ListingKind.JOB,
 )
-private const val POST_AD = "post_ad"
 private const val PROFILE = "profile"
 /**
  * "Do'stlar" — `Connections` bo'limi (qidiruv / so'rovlar / bog'langanlar).
@@ -331,14 +329,6 @@ fun StudentShell(onLoggedOut: () -> Unit) {
                 )
             }
             composable(
-                route = "$POST_AD?adId={adId}",
-                arguments = listOf(navArgument("adId") { type = NavType.StringType; nullable = true; defaultValue = null }),
-            ) { entry ->
-                // Eski (feature:ads) e'lonlarini TAHRIRLASH uchun qoldirilgan — yangi e'lon
-                // bu yerdan qo'yilmaydi, "Elon" tugmasi POST_LISTING ga boradi.
-                PostAdScreen(onClose = { nav.popSafe() }, editAdId = entry.arguments?.getString("adId"))
-            }
-            composable(
                 route = "$POST_LISTING?listingId={listingId}",
                 arguments = listOf(
                     navArgument("listingId") { type = NavType.StringType; nullable = true; defaultValue = null },
@@ -358,7 +348,6 @@ fun StudentShell(onLoggedOut: () -> Unit) {
                     onLoggedOut = onLoggedOut,
                     onEditProfile = { nav.navigateSafe(EDIT_PROFILE) },
                     onOpenSettings = { nav.navigateSafe(SETTINGS) },
-                    onEditAd = { adId -> nav.navigateSafe("$POST_AD?adId=${encodeArg(adId)}") },
                     // Talabada biznes bo'limi ko'rinmaydi.
                     showMyBusiness = false,
                 )

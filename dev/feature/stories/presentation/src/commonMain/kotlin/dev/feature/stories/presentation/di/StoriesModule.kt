@@ -5,7 +5,9 @@ import dev.core.network.generated.api.StoriesApi
 import dev.core.network.media.apiOrigin
 import dev.feature.stories.data.repository.StoryRepositoryImpl
 import dev.feature.stories.domain.repository.StoryRepository
+import dev.feature.stories.presentation.MyPostsViewModel
 import dev.feature.stories.presentation.StoriesViewModel
+import dev.feature.stories.presentation.StudentPostsViewModel
 import io.ktor.client.HttpClient
 import org.koin.core.module.dsl.viewModelOf
 import org.koin.dsl.module
@@ -32,4 +34,8 @@ fun storiesModule() = module {
     }
 
     viewModelOf(::StoriesViewModel)
+    // Profildagi «Postlar» / «Arxivlangan postlar» bo'limi — lentadan alohida holat.
+    viewModelOf(::MyPostsViewModel)
+    // Boshqa talaba profilidagi «Postlar» bo'limi.
+    viewModelOf(::StudentPostsViewModel)
 }

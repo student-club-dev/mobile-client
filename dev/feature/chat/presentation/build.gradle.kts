@@ -5,6 +5,10 @@ kotlin { sourceSets { commonMain.dependencies {
     implementation(projects.dev.feature.chat.data)
     // Bloklash / shikoyat / bog'lanishni uzish — chat ichidan chaqiriladi.
     implementation(projects.dev.feature.connections.data)
+    // Suhbatdosh profili — UMUMIY varaq (story lentasidan ham shu ochiladi).
+    implementation(projects.dev.feature.connections.presentation)
+    // O'sha profildagi «Postlar» bo'limi — suhbatdoshning faol lavhalari.
+    implementation(projects.dev.feature.stories.presentation)
     // Suhbatdosh profilidagi universitet nomi: backend faqat `universityId` beradi
     // (katalogi yo'q), nomni local katalogdan topamiz.
     implementation(projects.dev.feature.university.domain)

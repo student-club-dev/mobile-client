@@ -268,13 +268,13 @@ private val ALBUM_LIKE = setOf(MessageType.IMAGE, MessageType.VIDEO)
 private val ATTACHMENT_LIKE = setOf(MessageType.FILE, MessageType.VOICE)
 
 /** Matndagi `http(s)://…` bo'laklari. Tinish belgilari havolaga yopishib qolmasin. */
-private fun String.extractLinks(): List<String> = split(' ', '\n', '\t')
+internal fun String.extractLinks(): List<String> = split(' ', '\n', '\t')
     .map { it.trim().trimEnd('.', ',', ')', ']', '!', '?', ';', ':') }
     .filter { it.startsWith("https://") || it.startsWith("http://") }
     .filter { it.length > MIN_LINK_LENGTH }
 
 /** `https://studentclub.uz/a/b?x=1` → `studentclub.uz`. */
-private fun String.hostOf(): String = substringAfter("://")
+internal fun String.hostOf(): String = substringAfter("://")
     .substringBefore('/')
     .substringBefore('?')
     .removePrefix("www.")

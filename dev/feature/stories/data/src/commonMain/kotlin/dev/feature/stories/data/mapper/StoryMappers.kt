@@ -1,5 +1,6 @@
 package dev.feature.stories.data.mapper
 
+import dev.core.network.generated.model.StoryArchivePageDto
 import dev.core.network.generated.model.StoryDto
 import dev.core.network.generated.model.StoryGroupDto
 import dev.core.network.generated.model.StoryKindDto
@@ -7,6 +8,7 @@ import dev.core.network.generated.model.StoryViewerPageDto
 import dev.core.network.media.MediaUrl
 import dev.feature.connections.data.mapper.toDomain as summaryToDomain
 import dev.feature.stories.domain.model.Story
+import dev.feature.stories.domain.model.StoryArchivePage
 import dev.feature.stories.domain.model.StoryGroup
 import dev.feature.stories.domain.model.StoryKind
 import dev.feature.stories.domain.model.StoryViewerPage
@@ -54,6 +56,15 @@ fun StoryGroupDto.toDomain(origin: String): StoryGroup = StoryGroup(
     stories = stories.map { it.toDomain(origin) },
     hasUnseen = hasUnseen,
     lastCreatedAt = lastCreatedAt,
+)
+
+/** Arxiv sahifasi — muddati o'tgan lavhalarim (`STORY_ARCHIVE_BACKEND.md`). */
+fun StoryArchivePageDto.toDomain(origin: String): StoryArchivePage = StoryArchivePage(
+    items = items.map { it.toDomain(origin) },
+    page = page,
+    size = propertySize,
+    total = total,
+    hasNext = hasNext,
 )
 
 fun StoryViewerPageDto.toDomain(): StoryViewerPage = StoryViewerPage(
