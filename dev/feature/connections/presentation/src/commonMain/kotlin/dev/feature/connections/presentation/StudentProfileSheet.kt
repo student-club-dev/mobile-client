@@ -36,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.core.common.format.formatUzPhoneFull
 import dev.core.uikit.components.AppIcons
 import dev.core.uikit.components.ScGlassButton
 import dev.core.uikit.components.ScIcons
@@ -199,7 +200,7 @@ fun StudentProfileSheet(
                                 InfoLine("@$it", "Foydalanuvchi nomi")
                             }
                             // ⚠️ Telefon ko'pincha `null`: sukut sozlama — `NOBODY`.
-                            student.phoneNumber?.let { InfoLine(it, "Mobil raqam") }
+                            student.phoneNumber?.let { InfoLine(formatUzPhoneFull(it), "Mobil raqam") }
                             student.bio?.takeIf { it.isNotBlank() }?.let { InfoLine(it, "Tarjimayi hol") }
                             state.universityName?.let { InfoLine(it, "Universitet") }
                             student.courseYear?.let { InfoLine(courseLabel(it), "Kurs") }

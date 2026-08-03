@@ -1,10 +1,14 @@
 package dev.feature.listings.domain.usecase
 
 import dev.core.common.Resource
+import dev.core.common.error.AppException
 import dev.feature.listings.domain.model.Listing
 import dev.feature.listings.domain.model.ListingBranch
 import dev.feature.listings.domain.model.ListingError
+import dev.feature.listings.domain.model.ListingField
 import dev.feature.listings.domain.model.ListingKind
+import dev.feature.listings.domain.model.ListingPage
+import dev.feature.listings.domain.model.ListingQuery
 import dev.feature.listings.domain.model.ListingStatus
 import dev.feature.listings.domain.model.ListingValidator
 import dev.feature.listings.domain.repository.GeoRepository
@@ -32,6 +36,48 @@ class ObserveListingsByKindUseCase(private val repository: ListingRepository) {
     operator fun invoke(kind: ListingKind): Flow<List<Listing>> = repository.observeActiveByKind(kind)
 }
 
+/**
+ * Serverdagi qidiruv — ro'yxat ekranining asosiy manbasi.
+ *
+ * Filtrlash va saralash klientda emas, chunki telefonda e'lonlarning faqat bir qismi bor:
+ * local filtr "topilmadi" deganda ham serverda o'nlab mos e'lon turgan bo'lishi mumkin.
+ */
+class SearchListingsUseCase(private val repository: ListingRepository) {
+    suspend operator fun invoke(query: ListingQuery): Resource<ListingPage> = repository.search(query)
+}
+
+/**
+ * Bo'limning birinchi sahifasini serverdan **keshga** tortadi.
+ *
+ * Home va "Universitetim" ekranlari e'lonlarni [ObserveListingsByKindUseCase] bilan
+ * keshdan kuzatadi: ular uchun e'lon — ekranning bir bo'lagi, alohida ro'yxat emas, ya'ni
+ * sahifalash ham, filtr ham kerak emas. Lekin kesh o'zi to'lmaydi — uni kimdir to'ldirishi
+ * kerak, aks holda bu bo'limlar faqat foydalanuvchi "E'lonlar" ekranini ochgandan keyin
+ * jonlanardi.
+ */
+class RefreshListingsUseCase(private val repository: ListingRepository) {
+    suspend operator fun invoke(kind: ListingKind): Resource<Unit> =
+        when (val res = repository.search(ListingQuery(kind = kind, size = ListingQuery.MAX_PAGE_SIZE))) {
+            is Resource.Success -> Resource.Success(Unit)
+            is Resource.Error -> res
+            Resource.Loading -> Resource.Loading
+        }
+}
+
+/** "Mening e'lonlarim" ni server bilan sinxronlaydi (barcha status va turlar). */
+class RefreshMyListingsUseCase(private val repository: ListingRepository) {
+    suspend operator fun invoke(ownerId: String): Resource<List<Listing>> =
+        repository.refreshMine(ownerId)
+}
+
+/**
+ * E'lonni to'liq ko'rish uchun yuklaydi. Keshdagi nusxadan farqi: `viewsCount` shu
+ * so'rovda oshadi va `contactPhone` **faqat shu javobda** keladi — ro'yxatda u yo'q.
+ */
+class FetchListingUseCase(private val repository: ListingRepository) {
+    suspend operator fun invoke(id: String): Resource<Listing> = repository.fetchById(id)
+}
+
 /** Qoralama sifatida saqlaydi — validatsiyasiz (yarim to'ldirilgan forma ham saqlanadi). */
 class SaveDraftUseCase(private val repository: ListingRepository) {
     suspend operator fun invoke(listing: Listing): Resource<Listing> =
@@ -39,14 +85,24 @@ class SaveDraftUseCase(private val repository: ListingRepository) {
 }
 
 /**
- * E'lonni publish qiladi. **Avval validatsiya** — xato bo'lsa masofaviy manbaga bormaydi.
- * Xatolar maydonlarga bog'langan holda qaytadi ([ListingError]), UI ularni forma ostida ko'rsatadi.
+ * E'lonni publish qiladi. **Avval klient validatsiyasi** — xato bo'lsa serverga bormaydi.
+ *
+ * Server baribir o'zi tekshiradi (§5) va uning xatolari ham aynan shu shaklda qaytadi:
+ * `error.fields` kalitlari [ListingField] nomlari bilan bir xil, matnlari esa klientdagi
+ * matnlar bilan **so'zma-so'z** mos. Shu sabab UI uchun ikkalasi farq qilmaydi — xato
+ * qayerdan kelganidan qat'i nazar, o'sha maydon ostida chiqadi.
  */
 class PublishListingUseCase(private val repository: ListingRepository) {
 
     sealed interface Result {
         data class Success(val listing: Listing) : Result
-        data class Invalid(val errors: List<ListingError>) : Result
+
+        /**
+         * [message] — serverning umumiy xabari. U faqat **birorta ham** maydon xatosi
+         * tanib olinmaganda to'ldiriladi (masalan spec kengayib, yangi kalit qo'shilgan):
+         * shunda foydalanuvchi hech bo'lmasa nima bo'lganini ko'radi.
+         */
+        data class Invalid(val errors: List<ListingError>, val message: String? = null) : Result
         data class Failed(val message: String) : Result
     }
 
@@ -56,8 +112,20 @@ class PublishListingUseCase(private val repository: ListingRepository) {
 
         return when (val res = repository.submit(listing)) {
             is Resource.Success -> Result.Success(res.data)
-            is Resource.Error -> Result.Failed(res.message)
+            is Resource.Error -> res.toResult()
             Resource.Loading -> Result.Failed("E'lonni yuborib bo'lmadi")
+        }
+    }
+
+    private fun Resource.Error.toResult(): Result {
+        val validation = error as? AppException.Validation ?: return Result.Failed(message)
+        val fields = validation.fields.mapNotNull { (key, text) ->
+            ListingField.entries.firstOrNull { it.name == key }?.let { ListingError(it, text) }
+        }
+        return if (fields.isEmpty()) {
+            Result.Failed(message)
+        } else {
+            Result.Invalid(fields)
         }
     }
 }

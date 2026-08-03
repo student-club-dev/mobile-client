@@ -33,6 +33,7 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import dev.core.common.format.toUzPhoneDigits
 
 /** UI navigatsiyasini boshqaradigan bir martalik hodisalar. */
 sealed interface AuthEvent {
@@ -121,7 +122,7 @@ class AuthFlowViewModel(
     // ------------------------------------------------------------------
 
     fun onPhoneChange(v: String) = _state.update {
-        it.copy(phone = v.filter { c -> c.isDigit() }.take(9), error = null)
+        it.copy(phone = v.toUzPhoneDigits(), error = null)
     }
 
     fun onPasswordChange(v: String) = _state.update { it.copy(password = v, error = null) }

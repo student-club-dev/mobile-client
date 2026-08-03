@@ -3,6 +3,9 @@ package dev.feature.listings.presentation
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.core.common.Resource
+import dev.core.common.format.UZ_PHONE_CODE
+import dev.core.common.format.toAmountDigits
+import dev.core.common.format.toUzPhoneDigits
 import dev.core.domain.usecase.ObserveCurrentUserUseCase
 import dev.feature.profile.domain.usecase.ObserveProfileUseCase
 import dev.feature.listings.domain.model.BusinessType
@@ -10,6 +13,7 @@ import dev.feature.listings.domain.model.EmploymentType
 import dev.feature.listings.domain.model.JobCatalog
 import dev.feature.listings.domain.model.Listing
 import dev.feature.listings.domain.model.ListingDetails
+import dev.feature.listings.domain.model.ListingIds
 import dev.feature.listings.domain.model.ListingKind
 import dev.feature.listings.domain.model.ListingRedemption
 import dev.feature.listings.domain.model.ListingStatus
@@ -139,10 +143,12 @@ class PostListingViewModel(
     fun onTitle(v: String) = _state.update { it.copy(title = v) }
     fun onDescription(v: String) = _state.update { it.copy(description = v) }
     fun onPriceUnit(v: PriceUnit) = _state.update { it.copy(priceUnit = v) }
-    fun onPrice(v: String) = _state.update { it.copy(price = v.digits()) }
-    fun onPriceMax(v: String) = _state.update { it.copy(priceMax = v.digits()) }
+    fun onPrice(v: String) = _state.update { it.copy(price = v.toAmountDigits()) }
+    fun onPriceMax(v: String) = _state.update { it.copy(priceMax = v.toAmountDigits()) }
     fun onNegotiable(v: Boolean) = _state.update { it.copy(isNegotiable = v) }
-    fun onContactPhone(v: String) = _state.update { it.copy(contactPhone = v) }
+
+    /** Holatda faqat 9 xonali milliy raqam turadi — "+998" va probellar saqlanmaydi. */
+    fun onContactPhone(v: String) = _state.update { it.copy(contactPhone = v.toUzPhoneDigits()) }
     fun onDuration(days: Int) = _state.update { it.copy(durationDays = days) }
     fun consumeMessage() = _state.update { it.copy(message = null) }
 
@@ -400,9 +406,13 @@ class PostListingViewModel(
                 is PublishListingUseCase.Result.Success ->
                     _state.update { it.copy(submitting = false, published = true) }
 
-                // Validatsiya xatolari maydonlarga bog'lanadi — forma ularni joyida ko'rsatadi.
+                // Validatsiya xatolari maydonlarga bog'lanadi — forma ularni joyida
+                // ko'rsatadi. Server xatolari ham shu yo'ldan keladi: uning `error.fields`
+                // kalitlari `ListingField` nomlari bilan bir xil.
                 is PublishListingUseCase.Result.Invalid ->
-                    _state.update { it.copy(submitting = false, errors = res.errors) }
+                    _state.update {
+                        it.copy(submitting = false, errors = res.errors, message = res.message)
+                    }
 
                 is PublishListingUseCase.Result.Failed ->
                     _state.update { it.copy(submitting = false, message = res.message) }
@@ -424,7 +434,10 @@ class PostListingViewModel(
         val now = Clock.System.now().toEpochMilliseconds()
 
         return Listing(
-            id = editingId ?: "lst-$ownerId-$now",
+            // Yangi e'lonning id'si vaqtinchalik: haqiqiysini server beradi va repository
+            // javob kelgach almashtiradi. Prefiks aynan shuning uchun —
+            // `POST` va `PATCH` ni ajratadigan yagona belgi (qarang [ListingIds]).
+            id = editingId ?: ListingIds.newLocalId(ownerId, now),
             ownerId = ownerId,
             businessId = editingBusinessId,
             details = details,
@@ -435,18 +448,34 @@ class PostListingViewModel(
             price = s.price.toLongOrNull() ?: 0,
             priceMax = s.priceMax.toLongOrNull(),
             isNegotiable = s.isNegotiable,
-            contactPhone = s.contactPhone.trim().ifBlank { null },
+            // Holatda 9 xonali raqam turadi — modelga doim "+998..." ko'rinishida ketadi.
+            // Chala raqam ham shu ko'rinishda ketadi: uni [ListingValidator] ushlaydi.
+            contactPhone = s.contactPhone.toUzPhoneDigits().ifBlank { null }?.let { UZ_PHONE_CODE + it },
             // Tahrirlashda e'lon o'z universitetida qoladi; yangi e'lon egasinikiga bog'lanadi.
             universityId = editingUniversityId ?: universityId.value,
             // Chegirmada kategoriyaga xos maydonlar shu yerda saqlanadi.
             attributes = s.discount.attributeValues.takeIf { kind == ListingKind.DISCOUNT }.orEmpty(),
             branches = s.branches,
             validFrom = now,
-            validTo = now + s.durationDays.toLong() * MILLIS_PER_DAY,
+            validTo = validTo(now, s.durationDays, details),
             status = ListingStatus.DRAFT,
             createdAt = editingCreatedAt ?: now,
             updatedAt = now,
         )
+    }
+
+    /**
+     * E'lon qachongacha ro'yxatda turadi.
+     *
+     * Topshiriqda muddat **topshirish muddatidan oshmaydi**: server buni talab qiladi
+     * (`422 VALIDITY` — `STUDENT_LISTINGS_BACKEND.md` §6) va mantiqan ham to'g'ri —
+     * muddati o'tgan topshiriqni ko'rsatib turishning ma'nosi yo'q. Formada "30 kun"
+     * tanlab, muddatni "ertaga" qo'yish juda oson, shuning uchun tanlov emas, hisob.
+     */
+    private fun validTo(now: Long, durationDays: Int, details: ListingDetails): Long {
+        val requested = now + durationDays.toLong() * MILLIS_PER_DAY
+        val deadline = (details as? ListingDetails.Task)?.deadline ?: return requested
+        return minOf(requested, deadline)
     }
 
     /** Turga xos holatdan [ListingDetails] quradi. Chegirmada biznes turi tanlanmagan — `null`. */
@@ -542,10 +571,10 @@ class PostListingViewModel(
             description = description.orEmpty(),
             images = images,
             priceUnit = priceUnit,
-            price = price.toString(),
-            priceMax = priceMax?.toString().orEmpty(),
+            price = price.takeIf { it > 0 }?.toString().orEmpty(),
+            priceMax = priceMax?.takeIf { it > 0 }?.toString().orEmpty(),
             isNegotiable = isNegotiable,
-            contactPhone = contactPhone.orEmpty(),
+            contactPhone = contactPhone.orEmpty().toUzPhoneDigits(),
             branches = branches,
             durationDays = ((validTo - validFrom) / MILLIS_PER_DAY).toInt().coerceAtLeast(1),
             editing = true,
@@ -573,7 +602,7 @@ class PostListingViewModel(
                     isDiscounted = d.isDiscounted,
                     modeLocked = true,
                     discountType = d.discountType,
-                    discountValue = d.discountValue.toString(),
+                    discountValue = d.discountValue.takeIf { it > 0 }?.toString().orEmpty(),
                     conditions = d.conditions.orEmpty(),
                     redemptionMethod = d.redemption.method,
                     promoCode = d.redemption.promoCode.orEmpty(),
@@ -641,9 +670,6 @@ class PostListingViewModel(
         const val SEARCH_DEBOUNCE_MS = 400L
     }
 }
-
-/** Raqamli maydonlarga faqat raqam kiritiladi (klaviatura turi kafolat bermaydi). */
-private fun String.digits(): String = filter { it.isDigit() }
 
 /** Ish e'lonida to'lov davri o'zgarganda narx birligi ham mos bo'lishi uchun. */
 internal fun PayPeriod.toPriceUnit(): PriceUnit = JobCatalog.priceUnit(this)

@@ -65,6 +65,7 @@ import dev.core.navigation.navigateSafe
 import dev.core.navigation.popSafe
 import dev.feature.listings.domain.model.ListingKind
 import dev.feature.listings.presentation.browse.ListingsBrowseScreen
+import dev.feature.listings.presentation.MyListingsScreen
 import dev.feature.listings.presentation.PostListingScreen
 import dev.feature.listings.presentation.detail.ListingDetailScreen
 import dev.feature.listings.presentation.platform.rememberPhoneCaller
@@ -117,6 +118,12 @@ private val StudentTab.icon: ImageVector
 private const val CHAT = "chat"
 private const val LISTING_DETAIL = "listing_detail"
 private const val POST_LISTING = "post_listing"
+
+/**
+ * "Mening e'lonlarim" — foydalanuvchining O'Z e'lonlari, barcha statuslar bilan.
+ * Yon paneldan ochiladi; tab emas, orqaga tugmasi bilan chiziladi.
+ */
+private const val MY_LISTINGS = "my_listings"
 
 /**
  * Talaba qo'ya oladigan e'lon turlari. [ListingKind.DISCOUNT] yo'q — u biznes turini
@@ -274,6 +281,7 @@ fun StudentShell(onLoggedOut: () -> Unit) {
                     // TABLAR, shuning uchun oddiy tab almashish (holat saqlanadi).
                     onOpenUniversity = { selectTab(StudentTab.UNIVERSITY.route) },
                     onOpenListings = { selectTab(StudentTab.LISTINGS.route) },
+                    onOpenMyListings = { nav.navigateSafe(MY_LISTINGS) },
                     // Sozlamalar — tafsilot ekrani, stack'ga qo'yiladi (orqaga → Home).
                     onOpenSettings = { nav.navigateSafe(SETTINGS) },
                 )
@@ -382,6 +390,16 @@ fun StudentShell(onLoggedOut: () -> Unit) {
                     // kelsa — sukut bo'yicha "Do'stlar" (ekranning o'z boshlang'ich holati).
                     initialTab = entry.arguments?.getString("tab")
                         ?.let { name -> ConnectionsTab.entries.firstOrNull { it.name == name } },
+                )
+            }
+            composable(MY_LISTINGS) {
+                MyListingsScreen(
+                    onCreate = { nav.navigateSafe(POST_LISTING) },
+                    // Tahrirlash — e'lon qo'yish oqimining o'zi, tayyor qiymatlar bilan.
+                    onEdit = { id -> nav.navigateSafe("$POST_LISTING?listingId=${encodeArg(id)}") },
+                    onBack = { nav.popSafe() },
+                    // Chegirmalar biznesniki — talabaning e'lonlari orasida ko'rinmaydi.
+                    filterDiscount = false,
                 )
             }
             composable(NOTIFICATIONS) { NotificationsScreen(onBack = { nav.popSafe() }) }

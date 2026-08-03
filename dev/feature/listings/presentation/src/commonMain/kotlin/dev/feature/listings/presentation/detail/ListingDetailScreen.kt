@@ -37,6 +37,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.core.common.format.formatUzPhoneFull
 import dev.core.uikit.components.ScCircleButton
 import dev.core.uikit.components.ScGradientButton
 import dev.core.uikit.components.ScIcons
@@ -82,8 +83,10 @@ fun ListingDetailScreen(
     val listing = state.listing
 
     when {
-        // E'lon kelguncha — sahifaning skeleti: rasm, sarlavha, narx, matn qatorlari.
-        state.loading -> Column(
+        // Skelet faqat KO'RSATADIGAN HECH NARSA bo'lmaganda. Keshdagi nusxa bo'lsa u
+        // darrov chiziladi va serverdan to'liq varianti (telefon raqami, ko'rishlar soni)
+        // ustiga tushadi — tayyor sahifani skeletga qaytarish orqaga qadam bo'lardi.
+        state.loading && listing == null -> Column(
             Modifier.fillMaxSize().background(Sc.Bg),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
@@ -100,22 +103,35 @@ fun ListingDetailScreen(
             }
         }
 
-        state.notFound || listing == null -> Column(
-            Modifier.fillMaxSize().background(Sc.Bg).padding(horizontal = 32.dp),
-            verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Text("🔍", style = TextStyle(fontSize = 40.sp))
-            Spacer(Modifier.height(12.dp))
-            ScText("E'lon topilmadi", 19f, FontWeight.ExtraBold, Sc.Ink)
-            Spacer(Modifier.height(6.dp))
-            Text(
-                "E'lon o'chirilgan yoki havola eskirgan bo'lishi mumkin.",
-                style = scStyle(13.5f, FontWeight.Medium, Sc.Muted, lineHeight = 20f)
-                    .copy(textAlign = TextAlign.Center),
-            )
-            Spacer(Modifier.height(20.dp))
-            ScSoftButton("Orqaga", onBack, Modifier.width(180.dp))
+        state.notFound || listing == null -> {
+            // Ikki sabab, ikki javob: e'lon YO'Q (o'chirilgan, muddati o'tgan yoki sizga
+            // ko'rinmaydi — server ataylab `404` beradi) yoki shunchaki YETIB BORMADI.
+            // Birinchisida qayta urinish ma'nosiz, ikkinchisida — yagona to'g'ri harakat.
+            val networkError = state.error
+            Column(
+                Modifier.fillMaxSize().background(Sc.Bg).padding(horizontal = 32.dp),
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text(if (networkError != null) "📡" else "🔍", style = TextStyle(fontSize = 40.sp))
+                Spacer(Modifier.height(12.dp))
+                ScText(
+                    if (networkError != null) "Yuklab bo'lmadi" else "E'lon topilmadi",
+                    19f, FontWeight.ExtraBold, Sc.Ink,
+                )
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    networkError ?: "E'lon o'chirilgan yoki havola eskirgan bo'lishi mumkin.",
+                    style = scStyle(13.5f, FontWeight.Medium, Sc.Muted, lineHeight = 20f)
+                        .copy(textAlign = TextAlign.Center),
+                )
+                Spacer(Modifier.height(20.dp))
+                if (networkError != null) {
+                    ScSoftButton("Qayta urinish", vm::retry, Modifier.width(180.dp))
+                    Spacer(Modifier.height(10.dp))
+                }
+                ScSoftButton("Orqaga", onBack, Modifier.width(180.dp))
+            }
         }
 
         else -> Column(Modifier.fillMaxSize().background(Sc.Bg)) {
@@ -407,7 +423,8 @@ private fun CallBar(listing: Listing, onCall: (String) -> Unit) {
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         if (!phone.isNullOrBlank()) {
-            ScText(phone, 12.5f, FontWeight.Bold, Sc.Muted, maxLines = 1)
+            // Ko'rsatishda qolip, qo'ng'iroqqa esa xom raqam ketadi (`tel:` sxemasi).
+            ScText(formatUzPhoneFull(phone), 12.5f, FontWeight.Bold, Sc.Muted, maxLines = 1)
         }
         if (phone.isNullOrBlank()) {
             ScSoftButton("Telefon ko'rsatilmagan", onClick = {})

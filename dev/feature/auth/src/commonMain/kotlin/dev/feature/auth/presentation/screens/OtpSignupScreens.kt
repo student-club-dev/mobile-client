@@ -41,6 +41,8 @@ import dev.core.uikit.components.ErrorText
 import dev.core.uikit.components.FieldLabel
 import dev.core.uikit.components.GlassTextField
 import dev.core.uikit.components.HintText
+import dev.core.common.format.formatUzPhoneFull
+import dev.core.uikit.components.PhonePrefix
 import dev.core.uikit.components.PhoneVisualTransformation
 import dev.core.uikit.components.PrimaryButton
 import dev.core.uikit.components.ScreenSubtitle
@@ -87,7 +89,7 @@ fun OtpScreen(
         Text(
             buildAnnotatedString {
                 withStyle(androidx.compose.ui.text.SpanStyle(color = palette.ink, fontWeight = FontWeight.Bold)) {
-                    append("+998 ${dev.core.uikit.components.formatUzPhone(state.phone.ifEmpty { "901234567" })} ")
+                    append("${formatUzPhoneFull(state.phone.ifEmpty { "901234567" })} ")
                 }
                 withStyle(androidx.compose.ui.text.SpanStyle(color = palette.inkMuted)) {
                     append("raqamiga yuborilgan 6 xonali kodni kiriting.")

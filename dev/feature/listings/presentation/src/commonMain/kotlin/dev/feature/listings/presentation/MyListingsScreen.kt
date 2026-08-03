@@ -87,7 +87,12 @@ fun MyListingsScreen(
                     )
                 }
                 Column(Modifier.weight(1f)) {
-                    ScText("Mening chegirmalarim", 19f, FontWeight.ExtraBold, Sc.Ink, letterSpacing = -0.3f, maxLines = 1)
+                    // Sarlavha filtrga qarab — talaba shell'ida ("Mening e'lonlarim") chegirma
+                    // yo'q, biznesda esa aksincha. [EmptyState] ham AYNAN shu shart bilan.
+                    ScText(
+                        if (filterDiscount == false) "Mening e'lonlarim" else "Mening chegirmalarim",
+                        19f, FontWeight.ExtraBold, Sc.Ink, letterSpacing = -0.3f, maxLines = 1,
+                    )
                     ScText("${listings.size} ta e'lon", 12.5f, FontWeight.Medium, Sc.Muted, maxLines = 1)
                 }
                 if (showHeaderCreate) {
@@ -100,7 +105,23 @@ fun MyListingsScreen(
             Spacer(Modifier.height(16.dp))
         }
 
-        if (listings.isEmpty() && state.loading) {
+        // Tarmoq xatosi keshni almashtirmaydi — ro'yxat joyida qoladi va xabar shu yerda
+        // chiqadi. Bo'sh ro'yxatda esa "e'lon yo'q" deb ko'rsatish yolg'on bo'lardi.
+        state.message?.let { message ->
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = Sc.ScreenPadding, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                ScText(message, 12.5f, FontWeight.Medium, Sc.Muted, Modifier.weight(1f))
+                ScText(
+                    "Qayta urinish", 12.5f, FontWeight.Bold, Sc.Brand,
+                    Modifier.clickable { vm.consumeMessage(); vm.refresh() },
+                )
+            }
+        }
+
+        if (listings.isEmpty() && (state.loading || state.refreshing)) {
             // Ro'yxat kelguncha — kartalarning skeleti.
             ScShimmerList(
                 rows = 4,

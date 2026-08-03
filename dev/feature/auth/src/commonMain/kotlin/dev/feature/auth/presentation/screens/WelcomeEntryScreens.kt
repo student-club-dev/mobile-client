@@ -37,6 +37,7 @@ import dev.core.uikit.components.FooterLink
 import dev.core.uikit.components.GlassTextField
 import dev.core.uikit.components.LogoTile
 import dev.core.uikit.components.OrDivider
+import dev.core.uikit.components.PhonePrefix
 import dev.core.uikit.components.PhoneVisualTransformation
 import dev.core.uikit.components.PrimaryButton
 import dev.core.uikit.components.ScreenSubtitle
@@ -46,24 +47,6 @@ import dev.feature.auth.presentation.flow.AuthFlowState
 import dev.feature.auth.presentation.flow.AuthFlowViewModel
 import dev.core.uikit.theme.AppPalette
 import dev.core.uikit.theme.appPalette
-
-/** Telefon maydonining "🇺🇿 +998 |" prefiksi. */
-@Composable
-fun PhonePrefix(palette: AppPalette) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Text(
-            "🇺🇿 +998",
-            style = TextStyle(
-                fontFamily = AppFontFamily,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold,
-                color = palette.ink
-            ),
-        )
-        Spacer(Modifier.width(9.dp))
-        Box(Modifier.width(1.dp).height(22.dp).background(palette.border))
-    }
-}
 
 // ===========================================================================
 // 1d — ONBOARDING

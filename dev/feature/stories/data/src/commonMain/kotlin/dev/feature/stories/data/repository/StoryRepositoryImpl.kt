@@ -42,7 +42,7 @@ class StoryRepositoryImpl(
         safeCall(connectivity) { api.feed().body() }.map { dto -> dto.items.map { it.toDomain(apiOrigin) } }
 
     override suspend fun mine(): Resource<List<Story>> =
-        safeCall(connectivity) { api.mine().body() }.map { dto -> dto.items.map { it.toDomain(apiOrigin) } }
+        safeCall(connectivity) { api.storiesMine().body() }.map { dto -> dto.items.map { it.toDomain(apiOrigin) } }
 
     /**
      * Arxiv — muddati o'tgan lavhalarim. Bu yerda ham kesh yo'q: ro'yxat faqat profilning
@@ -109,7 +109,7 @@ class StoryRepositoryImpl(
         var lastError: Throwable? = null
         repeat(CREATE_ATTEMPTS) { attempt ->
             try {
-                return@safeCall api.create(body).body()
+                return@safeCall api.storiesCreate(body).body()
             } catch (e: CancellationException) {
                 throw e
             } catch (e: ResponseException) {

@@ -298,6 +298,7 @@ internal fun HomeSideNav(
     onOpenStudents: () -> Unit,
     onOpenStudentSearch: () -> Unit,
     onOpenStudentRequests: () -> Unit,
+    onOpenMyListings: () -> Unit,
     onOpenSettings: () -> Unit,
 ) {
     if (!nav.visible) return
@@ -354,6 +355,10 @@ internal fun HomeSideNav(
 
                 // "Profilim" qatori YO'Q — panel sarlavhasining o'zi profilga olib boradi.
                 SideNavLabel("Hisob")
+                // "E'lonlar" bo'limidan farqi: u YERDA hammaning e'lonlari, bu yerda faqat
+                // O'ZINIKI — tahrirlash, to'xtatish va o'chirish bilan. Shu sababli ikonasi
+                // ham boshqacha, aks holda panelda bir xil belgili ikki qator turardi.
+                SideNavItem("Mening e'lonlarim", ScIcons.Archive, Sc.TintBlue, Sc.Brand, go(onOpenMyListings))
                 // Ikona profildagi "Sozlamalar" bilan AYNAN bir xil (`AppIcons.Settings`):
                 // bir bo'lim ikki joyda ikki xil belgi bilan turmasin.
                 SideNavItem("Sozlamalar", AppIcons.Settings, Sc.Chip, Sc.ChipInk, go(onOpenSettings))

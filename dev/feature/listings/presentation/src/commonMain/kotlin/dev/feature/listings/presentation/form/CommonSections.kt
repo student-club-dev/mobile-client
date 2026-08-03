@@ -21,8 +21,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import dev.core.uikit.components.AmountVisualTransformation
 import dev.core.uikit.components.AppFontFamily
 import dev.core.uikit.components.GlassTextField
+import dev.core.uikit.components.PhonePrefix
+import dev.core.uikit.components.PhoneVisualTransformation
 import dev.core.uikit.theme.AppPalette
 import dev.core.uikit.theme.appPalette
 import dev.feature.listings.domain.model.ListingField
@@ -137,6 +140,7 @@ fun PriceSection(
                 state.price, vm::onPrice, hint,
                 height = 48,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                visualTransformation = AmountVisualTransformation(),
                 trailing = { Suffix("so'm", palette) },
             )
 
@@ -146,6 +150,7 @@ fun PriceSection(
                     state.priceMax, vm::onPriceMax, "Yuqori chegara",
                     height = 48,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    visualTransformation = AmountVisualTransformation(),
                     trailing = { Suffix("so'm", palette) },
                 )
             }
@@ -189,16 +194,24 @@ private fun PriceEcho(state: PostListingUiState, palette: AppPalette) {
 
 /** Aloqa — telefon raqami. Hamma turda majburiy. */
 @Composable
-fun ContactSection(state: PostListingUiState, vm: PostListingViewModel, subtitle: String) {
+fun ContactSection(
+    state: PostListingUiState,
+    vm: PostListingViewModel,
+    subtitle: String,
+    palette: AppPalette = appPalette,
+) {
     FormSection(
         title = "Telefon raqami",
         subtitle = subtitle,
         error = state.errorFor(ListingField.CONTACT),
     ) {
+        // Prefiks maydondan tashqarida — foydalanuvchi faqat 9 xonali raqamni yozadi.
         GlassTextField(
-            state.contactPhone, vm::onContactPhone, "+998 90 123 45 67",
+            state.contactPhone, vm::onContactPhone, "90 123 45 67",
             height = 48,
+            leadingContent = { PhonePrefix(palette) },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+            visualTransformation = PhoneVisualTransformation(),
         )
     }
 }

@@ -47,6 +47,7 @@ import dev.core.uikit.components.ScShimmerBox
 import dev.core.uikit.components.ScShimmerLine
 import dev.core.uikit.theme.AppPalette
 import kotlinx.coroutines.delay
+import dev.core.common.format.formatAmount
 
 /**
  * E'lon tafsiloti — `POST /v1/discounts/detail` javobi. Feed kartasi ko'rsatolmaydigan hamma
@@ -160,12 +161,12 @@ private fun DetailBody(d: OfferDetail, palette: AppPalette) {
         // Narx
         Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(
-                "${(if (d.isDiscount) d.finalPrice else d.originalPrice).spaced()} so'm",
+                "${(if (d.isDiscount) d.finalPrice else d.originalPrice).formatAmount()} so'm",
                 style = TextStyle(fontFamily = AppFontFamily, fontSize = 22.sp, fontWeight = FontWeight.Black, color = if (d.isDiscount) accent else palette.ink),
             )
             if (d.isDiscount && d.originalPrice > d.finalPrice) {
                 Text(
-                    d.originalPrice.spaced(),
+                    d.originalPrice.formatAmount(),
                     style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.sp, color = palette.inkFaint, textDecoration = TextDecoration.LineThrough),
                 )
                 Box(Modifier.clip(RoundedCornerShape(9.dp)).background(accent).padding(horizontal = 9.dp, vertical = 4.dp)) {
@@ -179,7 +180,7 @@ private fun DetailBody(d: OfferDetail, palette: AppPalette) {
         }
         if (d.isDiscount && d.savedAmount > 0) {
             Text(
-                "${d.savedAmount.spaced()} so'm tejaysiz",
+                "${d.savedAmount.formatAmount()} so'm tejaysiz",
                 style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = palette.primary),
             )
         }
@@ -306,4 +307,3 @@ private fun InfoBanner(text: String, palette: AppPalette) {
 }
 
 // "55000" → "55 000"
-private fun Long.spaced(): String = toString().reversed().chunked(3).joinToString(" ").reversed()

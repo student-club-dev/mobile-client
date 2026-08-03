@@ -34,6 +34,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.core.common.format.formatUzPhoneFull
 import dev.core.uikit.components.AppIcons
 import dev.core.uikit.components.ScGlassButton
 import dev.core.uikit.components.ScIconTile
@@ -181,7 +182,7 @@ fun ProfileScreen(
                     .firstOrNull { it.id == state.profile?.universityId }?.name
                 val phone = state.profile?.phoneNumber ?: state.contact.takeIf { it.isNotBlank() }
                 InfoCard {
-                    phone?.let { InfoRow(it, "Mobil raqam") }
+                    phone?.let { InfoRow(formatUzPhoneFull(it), "Mobil raqam") }
                     state.profile?.bio?.takeIf { it.isNotBlank() }?.let { InfoRow(it, "Tarjimayi hol") }
                     state.profile?.email?.takeIf { it.isNotBlank() }?.let { InfoRow(it, "Pochta") }
                     university?.let { InfoRow(it, "Universitet") }

@@ -1,5 +1,7 @@
 package dev.feature.listings.domain.model
 
+import dev.core.common.format.isUzPhoneComplete
+
 /**
  * E'lonni publish qilish shartlari — `DISCOUNTS_BUSINESS_API.md` §6.1 ning klient tomoni.
  *
@@ -116,8 +118,12 @@ object ListingValidator {
             add(ListingError(ListingField.PRICE, "Yuqori chegara quyi chegaradan katta bo'lsin"))
         }
 
+        // Raqam qolipi butun ilovada bitta: "+998" + 9 xona. Chala raqam serverga ketmasligi
+        // kerak — aks holda e'londagi yagona aloqa kanali ishlamaydi.
         if (listing.contactPhone.isNullOrBlank()) {
             add(ListingError(ListingField.CONTACT, "Telefon raqamini kiriting"))
+        } else if (!listing.contactPhone.isUzPhoneComplete()) {
+            add(ListingError(ListingField.CONTACT, "Raqamni to'liq kiriting: +998 90 123 45 67"))
         }
 
         addAll(validateBranches(listing))

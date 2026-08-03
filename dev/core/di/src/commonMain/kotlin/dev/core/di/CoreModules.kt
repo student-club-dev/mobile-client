@@ -81,6 +81,19 @@ const val REMOTE_SYNC_ENABLED = false
  */
 const val DISCOUNTS_REMOTE_ENABLED = true
 
+/**
+ * Talaba e'lonlari backenddan keladimi — `/v1/student-listings*` (9 endpoint).
+ *
+ * `STUDENT_LISTINGS_RESPONSE.md` bo'yicha modul tayyor: yaratish, e'lon qilish, qidiruv,
+ * xarita va muddati o'tishi. Shu sabab u umumiy [REMOTE_SYNC_ENABLED] bayrog'iga bog'liq
+ * emas — o'sha bayroq hali endpoint'i yo'q bo'limlar (ishlar, klublar, universitetlar)
+ * uchun `false` bo'lib turibdi.
+ *
+ * `false` qilinsa ilova butunlay local bazada ishlaydi (backendsiz rejim): e'lon darrov
+ * faol bo'ladi, rasm `data:` URI sifatida saqlanadi.
+ */
+const val STUDENT_LISTINGS_REMOTE_ENABLED = true
+
 /** Coil ishlatadigan rasm klientining Koin nomi. */
 const val IMAGE_CLIENT = "imageHttpClient"
 

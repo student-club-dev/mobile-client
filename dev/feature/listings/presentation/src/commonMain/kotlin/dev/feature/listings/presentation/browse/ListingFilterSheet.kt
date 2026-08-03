@@ -102,6 +102,7 @@ fun ListingFilterSheet(
                 }
 
                 PriceFilter(state.kind, state.draft, palette, vm)
+                SortFilter(state, palette, vm)
                 Spacer(Modifier.height(2.dp))
             }
 
@@ -311,6 +312,26 @@ private fun PriceFilter(
                 SelectChip("${limit.formatSum()} gacha", draft.maxPrice == limit, onClick = {
                     vm.updateDraft { it.copy(maxPrice = it.maxPrice.toggle(limit)) }
                 })
+            }
+        }
+    }
+}
+
+/**
+ * Saralash — serverning `sort` parametri (`STUDENT_LISTINGS_BACKEND.md` §7.2.2).
+ *
+ * Filtr bilan bitta varaqda, chunki ikkalasi ham bitta so'rovga aylanadi va foydalanuvchi
+ * uchun ham bir xil savolning davomi: "qanaqasi kerak" va "qaysi biri birinchi".
+ * "Eng yaqin" faqat joylashuv ma'lum bo'lganda ro'yxatda bo'ladi — usiz server uni
+ * jimgina "yangi e'lonlar" ga aylantiradi.
+ */
+@Composable
+private fun SortFilter(state: ListingFilterUiState, palette: AppPalette, vm: ListingsBrowseViewModel) {
+    if (state.sortOptions.size < 2) return
+    FilterSection("Saralash", palette) {
+        ChipFlow {
+            state.sortOptions.forEach { sort ->
+                SelectChip(sort.label, state.sort == sort, onClick = { vm.updateSort(sort) })
             }
         }
     }

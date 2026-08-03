@@ -7,6 +7,7 @@ import dev.core.domain.model.DiscountOffer
 import dev.feature.listings.domain.model.Listing
 import dev.feature.listings.domain.model.ListingKind
 import dev.feature.listings.domain.usecase.ObserveListingsByKindUseCase
+import dev.feature.listings.domain.usecase.RefreshListingsUseCase
 import dev.feature.students.domain.model.FriendStatus
 import dev.feature.students.domain.model.Student
 import dev.feature.university.domain.model.University
@@ -55,11 +56,15 @@ class MyUniversityViewModel(
     private val studentRepository: StudentRepository,
     discountRepository: DiscountRepository,
     observeListingsByKind: ObserveListingsByKindUseCase,
+    private val refreshListings: RefreshListingsUseCase,
 ) : ViewModel() {
 
     init {
         viewModelScope.launch { universityRepository.refresh() }
         viewModelScope.launch { studentRepository.refresh() }
+        // "Fanlardan yordam" bo'limi keshdan o'qiladi — uni serverdagi e'lonlar bilan
+        // to'ldiramiz, aks holda ro'yxat faqat local seed'ni ko'rsatib turardi.
+        viewModelScope.launch { refreshListings(ListingKind.TASK) }
     }
 
     val state: StateFlow<MyUniversityUiState> = combine(
