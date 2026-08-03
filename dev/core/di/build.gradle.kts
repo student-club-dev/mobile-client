@@ -31,6 +31,8 @@ kotlin {
             // connectionsModule() — "Do'stlar" (Connections). chatModule() undan foydalanadi.
             api(projects.dev.feature.connections.presentation)
             api(projects.dev.feature.chat.presentation)
+            // callsModule() — 1:1 audio/video qo'ng'iroq (`/calls` + WebRTC).
+            api(projects.dev.feature.calls.presentation)
             // storiesModule() — 24 soatlik lavhalar (bosh ekrandagi lenta + viewer).
             api(projects.dev.feature.stories.presentation)
             api(projects.dev.feature.home.presentation)

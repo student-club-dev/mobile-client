@@ -19,11 +19,11 @@ import dev.core.network.generated.model.MarkDeliveredDto
 import dev.core.network.generated.model.MarkReadDto
 import dev.core.network.generated.model.MessageDto
 import dev.core.network.generated.model.MessageListDto
-import dev.core.network.generated.model.MessageTypeDto
 import dev.core.network.generated.model.OpenDirectDto
 import dev.core.network.generated.model.SendMessageDto
 import dev.core.network.generated.model.UnreadCountDto
 import dev.core.network.media.ChatMediaKind
+import dev.core.network.media.MediaQuality
 import dev.core.network.media.MediaUploader
 import dev.core.network.media.UploadProgress
 import dev.core.network.response.safeCall
@@ -96,6 +96,8 @@ class ChatRemoteDataSource(
         bytes: ByteArray,
         fileName: String,
         kind: ChatMediaKind,
+        /** Video sifati (`AUTO`/`HIGH`/`ORIGINAL`). Faqat videoga ta'sir qiladi. */
+        quality: MediaQuality? = null,
         /** Yuborilgan baytlar ulushi (`0f..1f`) — ekrandagi foiz halqasi uchun. */
         onProgress: UploadProgress? = null,
     ): Resource<AttachmentDto> = safeCall(connectivity) {
@@ -104,6 +106,7 @@ class ChatRemoteDataSource(
             fileName = fileName,
             kind = kind,
             conversationId = conversationId,
+            quality = quality,
             onProgress = onProgress,
         )
     }.withMediaServerMessage()
@@ -111,8 +114,13 @@ class ChatRemoteDataSource(
     /**
      * O'sha yuklash, lekin **diskdagi fayldan** — baytlar xotiraga o'qilmaydi.
      *
-     * Video uchun: 64 MB lik `ByteArray` va uning multipart nusxasi birga arzon telefonni
+     * Video uchun: gigabaytlik `ByteArray` va uning multipart nusxasi birga arzon telefonni
      * xotiradan qoqib tashlardi.
+     *
+     * ⚠️ ~10 MB dan kattasi **rezyumlanadigan** yo'ldan ketadi (`/v1/media/upload/init` →
+     * `part` → `complete`): bir martalik so'rov uzilganda noldan boshlanardi, endi esa
+     * server olgan bo'laklar joyida qoladi. Bu [MediaUploader] ichida hal qilinadi —
+     * chaqiruvchi uchun hech narsa o'zgarmaydi.
      */
     suspend fun uploadAttachmentFile(
         conversationId: String,
@@ -120,7 +128,10 @@ class ChatRemoteDataSource(
         sizeBytes: Long,
         fileName: String,
         kind: ChatMediaKind,
+        quality: MediaQuality? = null,
         onProgress: UploadProgress? = null,
+        /** Rezyumlanadigan sessiya ochilganda — bekor qilish uchun id. */
+        onSession: ((String) -> Unit)? = null,
     ): Resource<AttachmentDto> = safeCall(connectivity) {
         media.chatUploadFile(
             path = path,
@@ -128,7 +139,9 @@ class ChatRemoteDataSource(
             fileName = fileName,
             kind = kind,
             conversationId = conversationId,
+            quality = quality,
             onProgress = onProgress,
+            onSession = onSession,
         )
     }.withMediaServerMessage()
 
@@ -146,7 +159,9 @@ class ChatRemoteDataSource(
         api.conversationsSend(
             id = conversationId,
             sendMessageDto = SendMessageDto(
-                type = parseEnum(payload.type.name, MessageTypeDto.TEXT),
+                // `SendMessageDto.type` — `String` (spec'ning `lenientEnums` ro'yxati).
+                // Domen enum'ining nomi bilan sim formati bir xil, ya'ni o'girish shart emas.
+                type = payload.type.name,
                 body = payload.wireBody,
                 mediaId = payload.mediaId,
                 gif = payload.gif?.let { json.decodeFromJsonElement(gifSerializer, it) },

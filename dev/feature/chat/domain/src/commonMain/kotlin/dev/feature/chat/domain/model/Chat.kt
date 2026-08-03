@@ -1,5 +1,8 @@
 package dev.feature.chat.domain.model
 
+import dev.feature.calls.domain.model.CallEndReason
+import dev.feature.calls.domain.model.CallMedia
+import dev.feature.calls.domain.model.CallStatus
 import dev.feature.connections.domain.model.StudentSummary
 import kotlinx.datetime.Instant
 
@@ -13,10 +16,15 @@ enum class ConversationType { DIRECT, GROUP }
  * taxmin qilinardi. Endi tipli xabar to'liq ishlaydi va evristika faqat **eski keshdagi**
  * qatorlar uchun zaxira bo'lib qoldi.
  *
- * `SYSTEM` ni faqat server yozadi — klient yuborsa `422`. `CALL` hali yo'q (qo'ng'iroq
- * bosqichida qo'shiladi), lekin enum'da turibdi: eski kesh qatorlari uni saqlashi mumkin.
+ * `SYSTEM` va `CALL` ni **faqat server yozadi** — klient yuborsa WS'da ham, REST'da ham
+ * `422 VALIDATION_ERROR` (`handoff/09-CALLS-REST.md` §4). `CALL` qatori qo'ng'iroq
+ * tugagach avtomatik paydo bo'ladi va tafsilotlari [Message.call] da keladi.
+ *
+ * ⚠️ Sim formatida bu **enum emas, `String`** (`lenientEnums`): server ro'yxatni
+ * kengaytirsa noma'lum qiymat butun javobni yiqitmasin. Bu yerga o'girish har doim
+ * `parseEnum(raw, TEXT)` orqali — noma'lum tur oddiy matn pufakchasi bo'lib qoladi.
  */
-enum class MessageType { TEXT, IMAGE, GIF, VIDEO, VOICE, FILE, STICKER, CALL, SYSTEM }
+enum class MessageType { TEXT, IMAGE, GIF, VIDEO, VIDEO_NOTE, VOICE, FILE, STICKER, CALL, SYSTEM }
 
 /**
  * Xabar bilan nima ketayotgani — `handoff/03-WEBSOCKET.md` dagi jadval.
@@ -27,14 +35,20 @@ enum class MessageType { TEXT, IMAGE, GIF, VIDEO, VOICE, FILE, STICKER, CALL, SY
  */
 val MessageType.requiresBody: Boolean get() = this == MessageType.TEXT
 
-/** `GIF`/`VOICE`/`STICKER` da izoh ataylab rad etiladi — uni chizadigan joy yo'q. */
+/**
+ * `GIF`/`VOICE`/`STICKER`/`VIDEO_NOTE` da izoh ataylab rad etiladi — uni chizadigan joy yo'q.
+ *
+ * `VIDEO_NOTE` (dumaloq video xabar) shu ro'yxatda: pufakcha aylana shaklida chiziladi va
+ * matn qo'yiladigan maydon umuman yo'q (server ham izohni qabul qilmaydi).
+ */
 val MessageType.forbidsBody: Boolean
-    get() = this == MessageType.GIF || this == MessageType.VOICE || this == MessageType.STICKER
+    get() = this == MessageType.GIF || this == MessageType.VOICE ||
+        this == MessageType.STICKER || this == MessageType.VIDEO_NOTE
 
 /** `mediaId` majburiy bo'lgan turlar (`GIF` — yuklangani; qidiruvdan olingani `gif` bilan ketadi). */
 val MessageType.requiresMedia: Boolean
     get() = this == MessageType.IMAGE || this == MessageType.VIDEO ||
-        this == MessageType.FILE || this == MessageType.VOICE
+        this == MessageType.VIDEO_NOTE || this == MessageType.FILE || this == MessageType.VOICE
 
 /** Xabarning **local** yuborilish holati (serverda bunday maydon yo'q). */
 enum class MessageStatus {
@@ -48,8 +62,17 @@ enum class MessageStatus {
     FAILED,
 }
 
-/** Biriktirmaning turi — `POST /v1/media/chat-upload` dagi `kind`. */
-enum class MediaKind { IMAGE, GIF, VIDEO, VOICE, FILE }
+/**
+ * Biriktirmaning turi — `POST /v1/media/chat-upload` dagi `kind`.
+ *
+ * [VIDEO_NOTE] — dumaloq video xabar: **kvadrat** bo'lishi shart (aks holda
+ * `422 MEDIA_NOT_SQUARE`), ≤ 60 s va ≤ 12 MB. Butun spec bo'yicha hajm chegarasi qolgan
+ * yagona tur shu (`handoff/09-CALLS-REST.md` emas — `chat-upload` tavsifida).
+ *
+ * `IMAGE_ORIGINAL` bu yerda **yo'q**: u yuklash rejimi, biriktirma turi emas — server
+ * baribir `kind: IMAGE` qaytaradi, farq faqat sifatda ([dev.core.network.media.ChatMediaKind]).
+ */
+enum class MediaKind { IMAGE, GIF, VIDEO, VIDEO_NOTE, VOICE, FILE }
 
 /**
  * Biriktirmaning holati.
@@ -134,9 +157,38 @@ data class Message(
      * Javob berilgan xabarning surati — pufak ustidagi sitata bloki. Oddiy xabarda `null`.
      */
     val replyTo: ReplyTo? = null,
+    /**
+     * [MessageType.CALL] xabarining tafsiloti (`MessageDto.call`), qolganlarida `null`.
+     *
+     * ⚠️ Bu **surat**, `Call` jadvaliga havola emas: qiymatlar xabar yozilgan paytda
+     * muzlatiladi va **hech qachon o'zgarmaydi** (`handoff/09-CALLS-DEVIATIONS.md` §14),
+     * ya'ni pufakchani yangilash uchun hech narsa qayta so'ralmaydi.
+     */
+    val call: MessageCall? = null,
 ) {
     /** O'chirilgan xabar — ekranda "Xabar o'chirildi" tombstone'i chiziladi. */
     val deleted: Boolean get() = deletedAt != null
+}
+
+/**
+ * Chat lentasidagi qo'ng'iroq yozuvi (`MessageDto.call`).
+ *
+ * Xabarning `senderId` si **doimo chaquvchi** — javobsiz qo'ng'iroqda ham. Ya'ni pufakcha
+ * qaysi tomonda chizilishi «kim qo'ng'iroq qildi» degan savolga javob beradi, «kim bilan
+ * gaplashdi» ga emas.
+ */
+data class MessageCall(
+    /** **uuid v4** (36 belgi) — talaba id'laridan (cuid) farq qiladi. */
+    val callId: String,
+    val media: CallMedia = CallMedia.AUDIO,
+    /** Amalda faqat terminal qiymatlar: `ENDED` `MISSED` `DECLINED` `CANCELED` `FAILED`. */
+    val status: CallStatus = CallStatus.ENDED,
+    /** **Hech qachon `null` emas** — javob berilmagan qo'ng'iroqda `0`. */
+    val durationMs: Int = 0,
+    val endReason: CallEndReason? = null,
+) {
+    /** Faqat javobsiz qo'ng'iroq o'qilmagan hisoblanadi (`handoff/09-CALLS-REST.md` §4). */
+    val missed: Boolean get() = status == CallStatus.MISSED
 }
 
 /**
@@ -158,7 +210,14 @@ data class Attachment(
     val height: Int = 0,
     val sizeBytes: Long = 0,
     val durationMs: Int = 0,
-    /** Ovozli xabarning 48 nuqtali to'lqin shakli (`0..100`). Boshqa turlarda bo'sh. */
+    /**
+     * Ovozli xabarning to'lqin shakli (`0..100`) — serverda hisoblanadi.
+     *
+     * ⚠️ Nuqtalar soni **serverga bog'liq** va 2026-08-03 da 48 dan **100** ga oshdi.
+     * Shuning uchun uni hech qayerda qotirib qo'ymang: chizuvchi `size` ni ro'yxatning
+     * o'zidan oladi (`ChatMediaUi`), aks holda eski keshdagi 48 nuqtali qatorlar
+     * yangi kod bilan noto'g'ri chizilardi.
+     */
     val waveform: List<Int> = emptyList(),
     /** `FILE` uchun asl nom. */
     val fileName: String? = null,
@@ -166,6 +225,16 @@ data class Attachment(
     val blurHash: String? = null,
     /** `true` — ovozsiz va takrorlanuvchi qilib o'ynatiladi (GIF va GIF'dan o'girilgan MP4). */
     val isAnimated: Boolean = false,
+    /**
+     * Ovozli xabarning matnga o'girilgani. **Bugun doim `null`** — maydon spec'da
+     * transkripsiyani keyin yoqish klient o'zgarishisiz bo'lsin deb zaxiralangan.
+     */
+    val transcript: String? = null,
+    /**
+     * Videoning muqobil sifatlari (tarmoq kengligiga qarab tanlash uchun). **Bugun doim
+     * bo'sh** — to'lguncha [url] o'ynatiladi.
+     */
+    val variants: List<MediaVariant> = emptyList(),
 ) {
     /** Ko'rsatish uchun eng arzon havola — ro'yxatda kichigi, ochilganda to'lig'i. */
     val previewUrl: String get() = thumbUrl ?: url
@@ -175,7 +244,23 @@ data class Attachment(
 
     /** Video hali transkodlanmoqda — poster kadr bor, o'zi hali yo'q. */
     val processing: Boolean get() = status == MediaStatus.PROCESSING
+
+    /** Dumaloq chiziladigan video xabar — nisbat 1:1 va boshqaruv paneli yo'q. */
+    val isVideoNote: Boolean get() = kind == MediaKind.VIDEO_NOTE
 }
+
+/**
+ * Videoning bitta muqobil sifati (`AttachmentDto.variants` elementi).
+ *
+ * Server hozircha ularni to'ldirmaydi; ro'yxat bo'sh bo'lsa [Attachment.url] o'ynatiladi.
+ */
+data class MediaVariant(
+    val url: String,
+    /** Kadr balandligi (`720`, `1080`…). */
+    val height: Int = 0,
+    /** Bit tezligi (bit/sek). */
+    val bitrate: Int = 0,
+)
 
 /** Xabarga biriktirilgan stiker (`MessageDto.sticker`). */
 data class MessageSticker(
@@ -332,4 +417,14 @@ class OutgoingVideo(
      * marta siqish yana o'nlab soniya va batareya degani.
      */
     val prepare: (suspend (onProgress: (Float) -> Unit) -> OutgoingVideo?)? = null,
+    /**
+     * Bu **dumaloq video xabar** (`VIDEO_NOTE`) mi.
+     *
+     * Faqat bitta bayroq, chunki oqim bir xil: yozib olish → tayyorlash → yuklash →
+     * `message:send`. Farq qiladigan uchta narsa ham shu bayroqdan chiqadi:
+     * `kind = VIDEO_NOTE`, `type = VIDEO_NOTE` va **izoh yo'q** (server matnni qabul
+     * qilmaydi). Kvadratlik esa tayyorlashda ta'minlanadi — aks holda
+     * `422 MEDIA_NOT_SQUARE`.
+     */
+    val videoNote: Boolean = false,
 )

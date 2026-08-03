@@ -10,6 +10,7 @@ import dev.feature.chat.domain.model.EmojiText
 import dev.feature.chat.domain.model.FluentEmoji
 import dev.feature.chat.domain.model.GifItem
 import dev.feature.chat.domain.model.Message
+import dev.feature.chat.domain.model.MessageCall
 import dev.feature.chat.domain.model.MessageStatus
 import dev.feature.chat.domain.model.MessageType
 import dev.feature.chat.domain.model.OutgoingImage
@@ -190,6 +191,13 @@ data class ChatMessageUi(
      * ([ChatMediaItem.uploadProgress]).
      */
     val upload: ChatUploadUi? = null,
+    /**
+     * `CALL` xabarining tafsiloti — pufakcha o'rniga qo'ng'iroq qatori chiziladi.
+     *
+     * Qiymatlar **muzlatilgan** (server ularni xabar yozilgan paytda saqlab qo'yadi), ya'ni
+     * bu qatorni yangilash uchun hech narsa qayta so'ralmaydi.
+     */
+    val call: MessageCall? = null,
 )
 
 /**
@@ -281,8 +289,13 @@ private val MEDIA_GRID = setOf(MessageType.IMAGE, MessageType.GIF, MessageType.V
  */
 private val ALBUM_LIKE = setOf(MessageType.IMAGE, MessageType.VIDEO)
 
-/** O'z pufagida chiziladigan biriktirma turlari — mozaikaga yig'ilmaydi. */
-private val ATTACHMENT_LIKE = setOf(MessageType.FILE, MessageType.VOICE)
+/**
+ * O'z pufagida chiziladigan biriktirma turlari — mozaikaga yig'ilmaydi.
+ *
+ * `VIDEO_NOTE` shu yerda: dumaloq xabar hech qachon albomga qo'shilmaydi va uning
+ * biriktirmasi `ChatAttachmentUi` orqali keladi (`VideoNoteBubble` uni chizadi).
+ */
+private val ATTACHMENT_LIKE = setOf(MessageType.FILE, MessageType.VOICE, MessageType.VIDEO_NOTE)
 
 /** Matndagi `http(s)://…` bo'laklari. Tinish belgilari havolaga yopishib qolmasin. */
 internal fun String.extractLinks(): List<String> = split(' ', '\n', '\t')
@@ -561,6 +574,8 @@ class ChatViewModel(
                 upload = uploads[head.id]
                     ?.takeIf { head.type in ATTACHMENT_LIKE }
                     ?.let { ChatUploadUi(it.progress, it.fileName, it.sizeBytes) },
+                // O'chirilgan qo'ng'iroq qatori oddiy tombstone bo'lib qoladi.
+                call = head.call?.takeIf { !head.deleted },
             )
         }
     }

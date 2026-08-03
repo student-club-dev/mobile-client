@@ -51,6 +51,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
@@ -100,6 +101,7 @@ import dev.core.uikit.media.rememberAudioRecorder
 import dev.core.uikit.media.VideoPreparer
 import dev.feature.connections.presentation.StudentProfileSheet
 import dev.core.uikit.media.rememberVideoCapture
+import dev.core.uikit.media.rememberVideoNotePreparer
 import dev.core.uikit.media.rememberVideoPreparer
 import dev.core.uikit.media.videoNeedsPreparing
 import dev.core.uikit.media.rememberFilePicker
@@ -107,6 +109,7 @@ import dev.core.uikit.theme.Sc
 import dev.feature.chat.domain.model.ConversationItem
 import dev.feature.chat.domain.model.GifItem
 import dev.feature.chat.domain.model.Message
+import dev.feature.chat.domain.model.MessageCall
 import dev.feature.chat.domain.model.MessageStatus
 import dev.feature.chat.domain.model.MessageType
 import dev.feature.chat.domain.model.OutgoingImage
@@ -115,8 +118,16 @@ import dev.feature.chat.domain.model.Sticker
 import dev.feature.chat.domain.model.StickerSearchItem
 import dev.feature.chat.presentation.gif.ChatMediaPanel
 import dev.feature.clubs.domain.model.Club
+import dev.feature.calls.domain.model.CallMedia
+import dev.feature.calls.domain.model.CallStatus
+import dev.feature.calls.domain.repository.CallController
+import dev.feature.calls.presentation.formatDuration
+import dev.feature.calls.presentation.rememberCallPermissions
 import dev.feature.connections.domain.model.ReportReason
+import dev.feature.connections.domain.model.StudentSummary
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 
 /**
@@ -317,9 +328,14 @@ private fun Message?.preview(): String = when {
     type == MessageType.IMAGE -> "📷 Rasm"
     type == MessageType.GIF -> "GIF"
     type == MessageType.VIDEO -> "🎬 Video"
+    type == MessageType.VIDEO_NOTE -> "⭕️ Video xabar"
     type == MessageType.VOICE -> "🎤 Ovozli xabar"
     type == MessageType.FILE -> "📎 Fayl"
     type == MessageType.STICKER -> "${sticker?.emoji.orEmpty()} Stiker".trim()
+    // Qo'ng'iroq — push matni bilan **bir xil** shakl (`handoff/09-CALLS-REST.md` §4).
+    // `call` keshdan kelmasa (suhbatlar ro'yxatining qisqa qatorida u yo'q) turdan
+    // umumiy matn quriladi.
+    type == MessageType.CALL -> call?.let { "📞 ${callPreview(it)}" } ?: "📞 Qo'ng'iroq"
     body.isBlank() -> "Xabar yozing…"
     else -> body
 }
@@ -804,6 +820,21 @@ private fun ChatThread(
     // emas, yuboriladigan videoga biriktiriladi va repozitoriy uni halqa ichida chaqiradi.
     val videoPreparer = rememberVideoPreparer()
 
+    /**
+     * Yozib olingan, lekin hali yuborilmagan **dumaloq** video xabar.
+     *
+     * Oddiy videodan alohida holat: uning ko'rish ekrani boshqacha (aylana, izohsiz) va
+     * yuborilganda boshqa turdagi xabar bo'ladi.
+     */
+    var videoNotePreview by remember { mutableStateOf<PickedVideo?>(null) }
+
+    // Yozib olish tizim kamerasi bilan — o'sha `PickedVideo`. Kvadratga kesish va
+    // 60 soniyaga qirqish yuborilgandan keyin, yuklash halqasi ichida bo'ladi.
+    val videoNoteCapture = rememberVideoCapture { picked ->
+        if (picked != null) videoNotePreview = picked
+    }
+    val videoNotePreparer = rememberVideoNotePreparer()
+
     var recording by remember { mutableStateOf(false) }
     val recorder = rememberAudioRecorder { audio ->
         recording = false
@@ -1114,7 +1145,11 @@ private fun ChatThread(
                                             // Transkodlanmagan videoning fayli hali yo'q —
                                             // pleyer uni ocholmaydi.
                                             media.processing -> onSoon("Video hali tayyorlanmoqda")
-                                            message.type == MessageType.VIDEO -> videoViewer = media
+                                            // Dumaloq xabar ham to'liq ekranda ochiladi:
+                                            // 208 dp doirada ba'zan hech narsa ko'rinmaydi.
+                                            message.type == MessageType.VIDEO ||
+                                                message.type == MessageType.VIDEO_NOTE ->
+                                                videoViewer = media
                                             // Faylni ilova ichida ochadigan komponent yo'q — uni tizim
                                             // brauzeriga uzatib bo'lmaydi ham (havola token talab qiladi).
                                             else -> onSoon("Faylni yuklab olish tez orada")
@@ -1184,6 +1219,23 @@ private fun ChatThread(
             onOpenSystemPicker = { attachSheet = false; mediaPicker.pick() },
             onPickFile = { attachSheet = false; filePicker.pick() },
             onCaptureVideo = { attachSheet = false; videoCapture.pick() },
+            onRecordVideoNote = { attachSheet = false; videoNoteCapture.pick() },
+        )
+    }
+
+    videoNotePreview?.let { picked ->
+        VideoNotePreviewSheet(
+            video = picked,
+            // Bekor qilinsa keshdagi fayl DARROV o'chadi — u o'nlab MB va uni boshqa hech
+            // kim tozalamaydi (kameradan yozilgani doim bizniki).
+            onCancel = {
+                if (picked.ownsFile) deleteMediaFile(picked.path)
+                videoNotePreview = null
+            },
+            onSend = {
+                videoNotePreview = null
+                onSendVideo(picked.toOutgoingVideoNote(videoNotePreparer))
+            },
         )
     }
 
@@ -1504,9 +1556,44 @@ private fun ChatThreadHeader(
                 ScText(status, 13f, FontWeight.Medium, Color.White.copy(alpha = 0.9f), maxLines = 1)
             }
             }
+            ChatCallButtons(peer = conversation.other)
             HeaderGlassButton(ScIcons.DotsVertical, "Menyu", onMenu)
         }
     }
+}
+
+/**
+ * Suhbat sarlavhasidagi ovozli va video qo'ng'iroq tugmalari.
+ *
+ * Bosilganda ketma-ketlik: ruxsat → TURN hisobi → offer → `call:invite`. Ruxsat
+ * berilmasa yoki TURN olinmasa qo'ng'iroq **boshlanmaydi va server hech narsa bilmaydi**
+ * (chastota chegaralari sarflanmaydi). Qo'ng'iroq ekranining o'zi bu yerdan ochilmaydi —
+ * u ilova ildizidagi `CallHost` da, `CallController.session` paydo bo'lishi bilan.
+ *
+ * ⚠️ Tugmalar `CALLS_ENABLED=false` bo'lganda ham ko'rinadi: buni oldindan bilishning
+ * yagona yo'li — `GET /v1/calls/ice-servers` ni har suhbat ochilganda so'rash, u esa
+ * daqiqasiga 10 ta chegarali. Shuning uchun holat bosilgandan keyin aniqlanadi va
+ * foydalanuvchi «Qo'ng'iroq hozircha mavjud emas» matnini ko'radi.
+ */
+@Composable
+private fun ChatCallButtons(peer: StudentSummary) {
+    val controller = koinInject<CallController>()
+    val scope = rememberCoroutineScope()
+    var pendingMedia by remember { mutableStateOf<CallMedia?>(null) }
+
+    val permissions = rememberCallPermissions { granted ->
+        val media = pendingMedia ?: return@rememberCallPermissions
+        pendingMedia = null
+        if (granted) scope.launch { controller.call(peer, media) }
+    }
+
+    val start: (CallMedia) -> Unit = { media ->
+        pendingMedia = media
+        permissions.request(video = media == CallMedia.VIDEO)
+    }
+
+    HeaderGlassButton(ScIcons.PhoneCall, "Ovozli qo'ng'iroq") { start(CallMedia.AUDIO) }
+    HeaderGlassButton(ScIcons.Video, "Video qo'ng'iroq") { start(CallMedia.VIDEO) }
 }
 
 /**
@@ -1833,6 +1920,8 @@ private fun MessageBubble(
     when {
         // O'chirilgan xabar — turi qanday bo'lishidan qat'i nazar oddiy tombstone pufagi.
         message.deleted -> TextBubble(message, onTap = onTap)
+        // Qo'ng'iroq yozuvi — server yozgan qator (klient bunday xabar yubora olmaydi).
+        message.call != null -> CallBubble(message, message.call, onTap = onTap)
         // Rasm, GIF **va video** — hammasi bitta mozaikada chiziladi ([ChatMediaItem]),
         // shuning uchun shoxobcha turga emas, to'rda element borligiga qarab tanlanadi.
         // Aralash albom (rasm + video) ham shu yerdan o'tadi.
@@ -1856,12 +1945,84 @@ private fun MessageBubble(
                 onTogglePlay = { onToggleVoice(message) },
                 onTap = onTap,
             )
+        // Dumaloq video xabar — o'z pufagi yo'q, aylana bo'lib chiziladi.
+        message.type == MessageType.VIDEO_NOTE && message.attachment != null ->
+            VideoNoteBubble(message, onOpen = { onOpenAttachment(message) })
         message.type == MessageType.VIDEO && message.attachment != null ->
             VideoBubble(message, onOpen = { onOpenAttachment(message) })
         message.sticker != null -> StickerBubble(message, onTap = onTap)
         else -> TextBubble(message, onTap = onTap)
     }
 }
+
+/**
+ * Qo'ng'iroq qatori — chatdagi «📞 Javobsiz qo'ng'iroq · 3:04».
+ *
+ * ⚠️ Pufakcha **chaquvchining tomonida** chiziladi: `senderId` doimo chaquvchi, javobsiz
+ * qo'ng'iroqda ham (`handoff/09-CALLS-REST.md` §4). Ya'ni «menga qo'ng'iroq qilingan»
+ * yozuvi chap tomonda turadi va bu to'g'ri — u kim boshlaganini ko'rsatadi.
+ *
+ * Javobsiz qo'ng'iroq qizil ikona bilan ajratiladi: chat lentasida u ko'zga tashlanishi
+ * kerak, chunki **faqat u** o'qilmagan hisoblanadi.
+ */
+@Composable
+private fun CallBubble(message: ChatMessageUi, call: MessageCall, onTap: () -> Unit) {
+    val align = if (message.outgoing) Alignment.CenterEnd else Alignment.CenterStart
+    val missed = call.missed
+    Box(Modifier.fillMaxWidth(), contentAlignment = align) {
+        val shape = if (message.outgoing) {
+            RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp, bottomEnd = 6.dp, bottomStart = 20.dp)
+        } else {
+            RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp, bottomEnd = 20.dp, bottomStart = 6.dp)
+        }
+        Row(
+            Modifier.widthIn(max = 280.dp)
+                .clip(shape)
+                .then(
+                    if (message.outgoing) Modifier.background(Sc.bubbleBrush)
+                    else Modifier.background(Sc.Card),
+                )
+                .clickable(onClick = onTap)
+                .padding(start = 12.dp, end = 14.dp, top = 10.dp, bottom = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            val tint = when {
+                missed -> Sc.Danger
+                message.outgoing -> Color.White
+                else -> Sc.Brand
+            }
+            Icon(
+                imageVector = if (call.media == CallMedia.VIDEO) ScIcons.Video else ScIcons.PhoneCall,
+                contentDescription = null,
+                tint = tint,
+                modifier = Modifier.size(20.dp),
+            )
+            Column {
+                val textColor = if (message.outgoing) Color.White else Sc.Ink
+                ScText(callTitle(call), 15f, FontWeight.SemiBold, textColor, maxLines = 1)
+                Spacer(Modifier.height(2.dp))
+                MessageMeta(message, onDark = message.outgoing)
+            }
+        }
+    }
+}
+
+/**
+ * Qator matni — push bildirishnomasidagi bilan **bir xil qoida**
+ * (`handoff/09-CALLS-REST.md` §4): javobsiz alohida, javob berilmagan qolganlari
+ * davomiyliksiz, qolgani davomiyligi bilan.
+ */
+private fun callTitle(call: MessageCall): String = when {
+    call.missed -> "Javobsiz qo'ng'iroq"
+    call.status == CallStatus.DECLINED -> "Rad etilgan qo'ng'iroq"
+    call.status == CallStatus.CANCELED -> "Bekor qilingan qo'ng'iroq"
+    call.durationMs == 0 -> "Qo'ng'iroq"
+    else -> "Qo'ng'iroq · ${formatDuration(call.durationMs.toLong())}"
+}
+
+/** Suhbatlar ro'yxatidagi qisqa ko'rinish — [callTitle] bilan bir xil qoida. */
+private fun callPreview(call: MessageCall): String = callTitle(call)
 
 @Composable
 private fun TextBubble(message: ChatMessageUi, onTap: () -> Unit) {

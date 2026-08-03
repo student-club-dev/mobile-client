@@ -23,6 +23,31 @@ val specFile = layout.projectDirectory.file("student-club.json")
 // Tayyorlangan spec build papkasiga tushadi (iym'dagi `v2-processed.json` ekvivalenti).
 val processedSpec = layout.buildDirectory.file("student-club-processed.json")
 
+/**
+ * Enum'lar ro'yxati — **server tomonda kengayishi kutilayotgan** va javobning issiq yo'lida
+ * turganlari. Ular Kotlin enum'i EMAS, oddiy `String` bo'lib generatsiya qilinadi (qadam 11).
+ *
+ * Sabab tarixiy va aniq: `MessageType` ga `CALL` qiymati qo'shilganda kotlinx.serialization
+ * eski klientlarda `SerializationException` tashladi va bu bitta pufakchani emas — suhbat
+ * tarixini, suhbatlar ro'yxatini va `message:new` handler'ini birdaniga yiqitdi.
+ *
+ * Bu yerga faqat **javobda** keladigan va kodda enum sifatida ishlatilmaydigan turlar
+ * kiritiladi (qiymat domenda `parseEnum` bilan o'qiladi). So'rov parametri sifatida
+ * ishlatiladigan enum'lar (`DeleteScopeDto`, `StudentSortDto`, …) tegilmaydi: ularni biz
+ * yozamiz, server emas, ya'ni noma'lum qiymat kelib qolishi mumkin emas.
+ */
+val lenientEnums = setOf(
+    "MessageTypeDto",
+    "MediaKindDto",
+    "MediaStatusDto",
+    "ConversationTypeDto",
+    "CallStatusDto",
+    "CallEndReasonDto",
+    "CallMediaDto",
+    "CallDirectionDto",
+    "CallPartyDto",
+)
+
 // Generatsiya qilingan kod SHU modulning `build/` papkasiga chiqadi, `:dev:api-client` esa uni
 // srcDir sifatida ulaydi (`builtBy` orqali).
 //
@@ -74,6 +99,12 @@ val apiServerUrl = "https://api.studentclub.uz/v1"
  * 10. **`nullable` maydonlar `required` dan chiqariladi** — aks holda generator ularga
  *    `@Required` qo'yadi va backend bitta kalitni tushirib qoldirsa butun javob pars
  *    bo'lmaydi (masalan `MessageDto.deletedAt` yo'q bo'lsa — butun suhbat tarixi).
+ * 11. **Kengayadigan enum'lar oddiy `string` ga o'giriladi** ([lenientEnums]) — kotlinx
+ *    noma'lum enum qiymatida `SerializationException` tashlaydi va u BITTA maydonni emas,
+ *    **butun javobni** yiqitadi. `MessageType` ga `CALL` qo'shilishi aynan shu tarzda
+ *    tarqatilgan klientlarning chat ekranini o'ldirdi (`handoff/09-CALLS-PREREQUISITES.md` §1).
+ *    Domen tomonda qiymat baribir `parseEnum(raw, default)` bilan o'qiladi, ya'ni noma'lum
+ *    qiymat faqat o'sha bitta xabarni "noma'lum tur" qiladi.
  */
 val cleanSwagger = tasks.register("cleanSwagger") {
     group = "openapi"
@@ -82,7 +113,9 @@ val cleanSwagger = tasks.register("cleanSwagger") {
     val input = specFile.asFile
     val output = processedSpec.get().asFile
     val serverUrl = apiServerUrl
+    val lenient = lenientEnums
     inputs.file(input)
+    inputs.property("lenientEnums", lenient.sorted().joinToString(","))
     outputs.file(output)
 
     doLast {
@@ -373,6 +406,26 @@ val cleanSwagger = tasks.register("cleanSwagger") {
         }
         relaxRequired(root["components"])
         relaxRequired(root["paths"])
+
+        // (11) Kengayadigan enum'lar → oddiy `string`.
+        //
+        // Sxemaning O'ZI o'zgartiriladi, unga `$ref` qilgan maydonlar emas: shunda barcha
+        // ishlatilish joyi (javob, kesh, `replyTo.type`) bir vaqtda bardoshli bo'ladi.
+        // Qiymatlar ro'yxati `description` ga ko'chiriladi — spec hujjat sifatida o'qiladi.
+        @Suppress("UNCHECKED_CAST")
+        val schemas = (root["components"] as? MutableMap<String, Any?>)
+            ?.get("schemas") as? MutableMap<String, Any?>
+        lenient.forEach { name ->
+            @Suppress("UNCHECKED_CAST")
+            val schema = schemas?.get(name) as? MutableMap<String, Any?> ?: return@forEach
+            val values = (schema.remove("enum") as? List<*>)?.joinToString(" · ") ?: return@forEach
+            schema["type"] = "string"
+            val doc = (schema["description"] as? String)?.plus("\n\n") ?: ""
+            schema["description"] = doc +
+                "Qiymatlar: $values. Ataylab `enum` EMAS — server ro'yxatni kengaytirsa " +
+                "noma'lum qiymat butun javobni pars qilinmaydigan qilib qo'ymasligi kerak."
+            logger.lifecycle("cleanSwagger: $name → string (kengayadigan enum)")
+        }
 
         // Xom spec'da `servers` bo'sh — generator BASE_URL konstantasi uchun manzil kutadi.
         root["servers"] = listOf(mapOf("url" to serverUrl, "description" to "Dev"))

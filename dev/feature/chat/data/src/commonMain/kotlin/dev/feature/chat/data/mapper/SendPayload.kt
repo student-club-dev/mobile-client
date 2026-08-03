@@ -114,7 +114,18 @@ internal data class SendPayload(
                 else -> null
             }
 
-            // `SYSTEM` ni faqat server yozadi, `CALL` esa hali yo'q — klient yuborsa 422.
+            // Dumaloq video xabar: izoh **umuman yo'q** (uni chizadigan joy ham yo'q) va
+            // fayl kvadrat bo'lishi shart — kvadratlikni yuklashdan oldin kesuvchi
+            // ta'minlaydi, aks holda server `422 MEDIA_NOT_SQUARE` beradi.
+            MessageType.VIDEO_NOTE -> when {
+                mediaId.isNullOrBlank() -> "Video xabar yuklanmadi."
+                text.isNotEmpty() -> CAPTION_FORBIDDEN
+                else -> null
+            }
+
+            // `SYSTEM` va `CALL` qatorini FAQAT server yozadi — klient yuborsa WS'da ham,
+            // REST'da ham `422 VALIDATION_ERROR` (`handoff/09-CALLS-REST.md` §4). Aks holda
+            // har kim soxta "javobsiz qo'ng'iroq" push'i yuborardi.
             MessageType.SYSTEM, MessageType.CALL -> "Bu turdagi xabarni yuborib bo'lmaydi."
         }
     }

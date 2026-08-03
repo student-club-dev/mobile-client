@@ -228,6 +228,43 @@ internal fun PickedVideo.toOutgoing(caption: String, preparer: VideoPreparer): O
         prepare = { onProgress -> preparer.prepare(this, onProgress)?.toPrepared(caption) },
     )
 
+/**
+ * Dumaloq video xabar — `VIDEO_NOTE`.
+ *
+ * Oddiy videodan uch farqi va uchalasi ham serverning talabi:
+ * izoh **yo'q**, tayyorlovchi **kvadratga kesadi** ([rememberVideoNotePreparer]) va
+ * `videoNote = true` tufayli xabar `type: VIDEO_NOTE` bo'lib ketadi.
+ *
+ * [OutgoingVideo.needsPreparing] doim `true`: kesish har doim kerak, hatto fayl kichik
+ * bo'lsa ham — aks holda kvadrat bo'lmagan video serverga ketib `422 MEDIA_NOT_SQUARE`
+ * bilan qaytardi.
+ */
+internal fun PickedVideo.toOutgoingVideoNote(preparer: VideoPreparer): OutgoingVideo =
+    OutgoingVideo(
+        path = path,
+        fileName = fileName,
+        sizeBytes = sizeBytes,
+        durationMs = durationMs,
+        posterBytes = posterBytes,
+        caption = null,
+        needsPreparing = true,
+        videoNote = true,
+        prepare = { onProgress -> preparer.prepare(this, onProgress)?.toPreparedVideoNote() },
+    )
+
+/** Kesib bo'lingan dumaloq xabar — qayta tayyorlanmaydi. */
+private fun PickedVideo.toPreparedVideoNote(): OutgoingVideo =
+    OutgoingVideo(
+        path = path,
+        fileName = fileName,
+        sizeBytes = sizeBytes,
+        durationMs = durationMs,
+        posterBytes = posterBytes,
+        caption = null,
+        needsPreparing = false,
+        videoNote = true,
+    )
+
 /** Siqib bo'lingan video — qayta siqilmaydi. */
 private fun PickedVideo.toPrepared(caption: String): OutgoingVideo =
     OutgoingVideo(

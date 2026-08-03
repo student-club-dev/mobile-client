@@ -49,7 +49,29 @@ data class WsMessage(
     val sticker: WsSticker? = null,
     /** Javob berilgan xabarning surati — REST'dagi `MessageDto.replyTo` bilan bir xil shakl. */
     val replyTo: WsReplyTo? = null,
+    /** `type = "CALL"` xabarining tafsiloti; qolganlarida `null`. */
+    val call: WsCall? = null,
     val createdAt: String,
+)
+
+/**
+ * `MessageDto.call` ning WS ko'rinishi (`handoff/09-CALLS-REST.md` §4).
+ *
+ * Maydonlar **String** sifatida o'qiladi (enum emas): server ro'yxatni kengaytirsa noma'lum
+ * qiymat butun `message:new` handler'ini yiqitmasin. Domenga o'girish `parseEnum` da.
+ *
+ * ⚠️ Tartib: bu qator `call:ended` hodisasidan **oldin** keladi — chat pufakchasini
+ * qo'ng'iroq ekrani yopilishidan avval ko'rish normal holat.
+ */
+@Serializable
+data class WsCall(
+    /** uuid v4, 36 belgi. */
+    val callId: String,
+    val media: String = "AUDIO",
+    val status: String = "ENDED",
+    /** Javob berilmaganda `0` — hech qachon `null` emas. */
+    val durationMs: Int = 0,
+    val endReason: String? = null,
 )
 
 /**
@@ -101,6 +123,8 @@ data class WsAttachment(
     val isAnimated: Boolean = false,
     val provider: String? = null,
     val externalId: String? = null,
+    /** Ovozli xabarning matni — server zaxiralagan, bugun doim `null`. */
+    val transcript: String? = null,
 )
 
 /** `MessageDto.sticker`. */

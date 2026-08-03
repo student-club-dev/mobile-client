@@ -13,6 +13,24 @@ sealed class AppException(
     cause: Throwable? = null,
 ) : Exception(userMessage, cause) {
 
+    /**
+     * Backend konvertidagi **mashina o'qiydigan** kod (`error.code`): `NOT_CONNECTED`,
+     * `USER_BLOCKED`, `CALL_BUSY`, `NOT_IMPLEMENTED`, `RATE_LIMITED`…
+     *
+     * HTTP statusi bir xil bo'lgan holatlarni ajratish uchun kerak va **matnga qarab
+     * tekshirishning o'rnini bosadi**: `403` ning o'zi «bog'lanmagansiz» mi yoki
+     * «bloklangansiz» mi ekanini aytmaydi, `503` esa «server yiqildi» mi yoki
+     * «qo'ng'iroq xususiyati o'chirilgan» mi ekanini (`handoff/09-CALLS-REST.md` §1).
+     *
+     * `null` — kod kelmadi (tarmoq xatosi, konvertsiz javob). Kod bo'yicha shoxlanganda
+     * doim zaxira yo'l qoldiring: u kelmasligi normal holat.
+     */
+    var errorCode: String? = null
+        private set
+
+    /** Konvertdan o'qilgan kodni biriktiradi (`toAppException` ichida chaqiriladi). */
+    fun withCode(value: String?): AppException = apply { if (value != null) errorCode = value }
+
     /** Internet yo'q — retry mazmunli. */
     class NoInternet(cause: Throwable? = null) :
         AppException("Internet aloqasi yo'q. Ulanishni tekshirib, qayta urining.", cause)

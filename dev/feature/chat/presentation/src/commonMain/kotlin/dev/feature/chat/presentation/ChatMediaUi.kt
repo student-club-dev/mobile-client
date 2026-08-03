@@ -27,6 +27,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
@@ -863,6 +864,79 @@ internal fun VideoBubble(message: ChatMessageUi, onOpen: () -> Unit) {
 }
 
 /**
+ * Dumaloq video xabar (`VIDEO_NOTE`) — Telegram'dagi «kruglyashka».
+ *
+ * Oddiy videodan uch narsa bilan farq qiladi va uchalasi ham **formatning ta'rifi**:
+ *
+ * 1. **Doira** — server faylning kvadratligini talab qiladi (`422 MEDIA_NOT_SQUARE`),
+ *    ya'ni nisbat doim 1:1 va uni `aspectRatio` dan olish shart emas.
+ * 2. **Pufak yo'q** — video to'g'ridan-to'g'ri fonda turadi, chetlari yumaloq emas, aylana.
+ * 3. **Izoh yo'q** — server matnni qabul qilmaydi, shuning uchun matn maydoni ham yo'q.
+ *
+ * Davomiylik yozuvi doiraning **ostida** emas, ichida pastda: doiradan tashqarida u
+ * osilib qolgandek ko'rinardi.
+ */
+@Composable
+internal fun VideoNoteBubble(message: ChatMessageUi, onOpen: () -> Unit) {
+    val video = message.attachment ?: return
+    val align = if (message.outgoing) Alignment.CenterEnd else Alignment.CenterStart
+    Box(Modifier.fillMaxWidth(), contentAlignment = align) {
+        Box(
+            Modifier.size(VIDEO_NOTE_SIZE)
+                .clip(CircleShape)
+                .background(Sc.Chip)
+                .clickable(onClick = onOpen),
+        ) {
+            AsyncImage(
+                model = video.thumbUrl ?: video.url,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+            Box(
+                Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.14f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (video.processing) {
+                    ScText("Tayyorlanmoqda…", 12.5f, FontWeight.Bold, Color.White)
+                } else {
+                    Box(
+                        Modifier.size(44.dp)
+                            .clip(CircleShape)
+                            .background(Color.Black.copy(alpha = 0.42f)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            ScIcons.ChevronRight,
+                            "O'ynatish",
+                            tint = Color.White,
+                            modifier = Modifier.size(21.dp),
+                        )
+                    }
+                }
+            }
+            Column(
+                Modifier.align(Alignment.BottomCenter).padding(bottom = 14.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                if (video.durationMs > 0) {
+                    ScText(
+                        ChatFormat.duration(video.durationMs),
+                        11f,
+                        FontWeight.Bold,
+                        Color.White,
+                    )
+                }
+                MessageMeta(message, onDark = true)
+            }
+        }
+    }
+}
+
+/** Dumaloq video xabarning diametri — Telegram'dagi bilan bir xil his beradi. */
+private val VIDEO_NOTE_SIZE = 208.dp
+
+/**
  * **Ketayotgan** biriktirma — fayl, video yoki ovoz hali yuklanmoqda.
  *
  * Nega alohida pufak: biriktirma serverning javobi bilan keladi, ya'ni yuklash davomida
@@ -881,6 +955,26 @@ internal fun UploadingAttachmentBubble(message: ChatMessageUi, onTap: () -> Unit
     val background = if (message.outgoing) Sc.Brand.copy(alpha = 0.12f) else Sc.Card
 
     Box(Modifier.fillMaxWidth(), contentAlignment = align) {
+        // Dumaloq xabar yuklanayotganda ham **doira** bo'lib turadi: shakl yuklash tugagach
+        // o'zgarmasligi kerak, aks holda pufakcha to'rtburchakdan aylanaga sakrardi.
+        if (message.type == MessageType.VIDEO_NOTE) {
+            Box(
+                Modifier.size(VIDEO_NOTE_SIZE)
+                    .clip(CircleShape)
+                    .background(Sc.Chip)
+                    .clickable(onClick = onTap),
+                contentAlignment = Alignment.Center,
+            ) {
+                ScUploadRing(upload.progress)
+                MessageMeta(
+                    message,
+                    Modifier.align(Alignment.BottomCenter).padding(bottom = 14.dp),
+                    onDark = true,
+                )
+            }
+            return@Box
+        }
+
         if (message.type == MessageType.VIDEO) {
             Box(
                 Modifier.width(BUBBLE_MAX_WIDTH)

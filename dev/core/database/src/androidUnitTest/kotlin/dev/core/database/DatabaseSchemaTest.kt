@@ -180,8 +180,10 @@ class DatabaseSchemaTest {
         // (`ConversationEntity.clearedBeforeSeq`) va suhbatni ro'yxatdan yashirish
         // (`ConversationEntity.hidden`) — `CHAT_SELECTION_AND_HISTORY_RESPONSE.md` §B, §C,
         // 27.sqm — e'lon universitetga bog'landi (`ListingEntity.universityId`,
-        // `STUDENT_LISTINGS_BACKEND.md` §7.2.4): "Universitetimda" bo'limi shu ustundan.
-        assertEquals(28L, StudentClubDatabase.Schema.version)
+        // `STUDENT_LISTINGS_BACKEND.md` §7.2.4): "Universitetimda" bo'limi shu ustundan,
+        // 28.sqm — chat lentasidagi qo'ng'iroq yozuvi (`MessageEntity.call*`) va ovozli
+        // xabar matni (`attachmentTranscript`) — `handoff/09-CALLS-REST.md` §4.
+        assertEquals(29L, StudentClubDatabase.Schema.version)
     }
 
     @Test
@@ -415,6 +417,8 @@ class DatabaseSchemaTest {
             attachmentFileName = null,
             attachmentBlurHash = "LKO2?U%2Tw=w",
             attachmentIsAnimated = 0L,
+            // Server maydonni zaxiralagan, lekin bugun doim `null` yuboradi.
+            attachmentTranscript = null,
             id = "local:img",
         )
 
@@ -576,6 +580,13 @@ class DatabaseSchemaTest {
         replyToQuoteText = null,
         replyToQuoteOffset = null,
         replyToOriginalDeleted = null,
+        attachmentTranscript = null,
+        // Qo'ng'iroq qatori — bu yordamchi oddiy xabar yozadi; `CALL` alohida sinaladi.
+        callId = null,
+        callMedia = null,
+        callStatus = null,
+        callDurationMs = null,
+        callEndReason = null,
     )
 
     @Test

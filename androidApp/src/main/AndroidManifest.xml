@@ -32,6 +32,24 @@
         android:maxSdkVersion="32" />
     <uses-feature android:name="android.hardware.microphone" android:required="false" />
 
+    <!-- ===================== Qo'ng'iroq (1:1 audio/video) ===================== -->
+
+    <!-- Video qo'ng'iroqda kamera. Ruxsat ish vaqtida, qo'ng'iroq tugmasi bosilganda
+         so'raladi (`rememberCallPermissions`). ⚠️ Rad etilsa qo'ng'iroq TO'XTAMAYDI —
+         ovozli bo'lib davom etadi; majburiysi faqat mikrofon. -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+
+    <!-- Qo'ng'iroq davomida ilova fonga o'tsa ham mikrofon/kamera ishlashda davom etsin.
+         ⚠️ Android 14+ da bularsiz tizim fonda mikrofonni JIMGINA o'chirib qo'yadi:
+         suhbatdosh sizni eshitmay qoladi va hech qanday xato ko'rinmaydi. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA" />
+
+    <!-- Kiruvchi qo'ng'iroq ekranini yoqilmagan telefonda ham ko'rsatish. -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
     <application
         android:name=".StudentClubApp"
         android:allowBackup="true"
@@ -55,6 +73,16 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Jonli qo'ng'iroq xizmati — ilova fonda bo'lganda mikrofon/kamerani tirik
+             ushlab turadi va bildirishnomada "Qo'ng'iroq davom etmoqda" ko'rsatadi.
+             `foregroundServiceType` da ikkalasi ham: ovozli qo'ng'iroqda kamera
+             ishlatilmaydi, lekin tur e'lon qilinmasa video qo'ng'iroqda kamera fonda
+             o'chib qolardi. -->
+        <service
+            android:name="dev.feature.calls.data.session.CallForegroundService"
+            android:exported="false"
+            android:foregroundServiceType="microphone|camera" />
 
         <!-- FCM: token yangilanishi va old plandagi xabarlar. -->
         <service

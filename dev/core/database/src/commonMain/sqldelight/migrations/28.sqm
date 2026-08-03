@@ -1,0 +1,27 @@
+-- v28 -> v29 — chat lentasidagi qo'ng'iroq yozuvi va ovozli xabar matni.
+--
+-- Qo'ng'iroq tugagach server suhbatga `type = 'CALL'` xabar yozadi (`handoff/09-CALLS-REST.md`
+-- §4). Uning tafsiloti `MessageDto.call` da keladi va **surat** bo'lib qoladi: qiymatlar
+-- xabar yozilgan paytda muzlatiladi, keyin hech qachon o'zgarmaydi. Shuning uchun ular
+-- alohida jadvalga emas, xabarning O'Z ustunlariga yoziladi (`replyTo` va `sticker` bilan
+-- aynan bir xil naqsh) — pufakchani chizish uchun hech qachon ikkinchi so'rov kerak emas.
+--
+-- `attachmentTranscript` — ovozli xabarning matni. Server maydonni zaxiralagan va bugun
+-- DOIM `null` yuboradi; ustun shu yerda transkripsiya yoqilgan kuni klientda migratsiya
+-- kerak bo'lmasin deb turibdi.
+--
+-- Migratsiya FAQAT QO'SHADI: hech narsa ko'chirilmaydi va o'chirilmaydi, eski qatorlarda
+-- yangi ustunlar NULL bo'lib qoladi (ular `CALL` xabar emas — pufakcha o'zgarmaydi).
+
+ALTER TABLE MessageEntity ADD COLUMN attachmentTranscript TEXT;
+
+-- uuid v4 (36 belgi) — talaba id'laridan (cuid) farq qiladi.
+ALTER TABLE MessageEntity ADD COLUMN callId TEXT;
+-- AUDIO | VIDEO
+ALTER TABLE MessageEntity ADD COLUMN callMedia TEXT;
+-- ENDED | MISSED | DECLINED | CANCELED | FAILED
+ALTER TABLE MessageEntity ADD COLUMN callStatus TEXT;
+-- Javob berilmagan qo'ng'iroqda 0, NULL emas.
+ALTER TABLE MessageEntity ADD COLUMN callDurationMs INTEGER;
+-- HANGUP | TIMEOUT | DECLINED | BUSY | FAILED | CANCELED | UNAUTHORIZED
+ALTER TABLE MessageEntity ADD COLUMN callEndReason TEXT;

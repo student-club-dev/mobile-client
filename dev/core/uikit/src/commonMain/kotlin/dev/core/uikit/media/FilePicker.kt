@@ -31,10 +31,17 @@ fun interface FilePicker {
 expect fun rememberFilePicker(onResult: (PickedFile?) -> Unit): FilePicker
 
 /**
- * Bitta faylning chegarasi — serverdagi yuklash chegarasi bilan bir xil, undan katta fayl
- * baribir rad etiladi.
+ * Bitta faylning chegarasi — **100 MB**.
  *
- * ⚠️ Tekshiruv **o'qishdan oldin** bajariladi: bunday hajmdagi faylni baytlarga aylantirish
- * telefon xotirasini bo'g'adi, ya'ni "yuklab bo'lmadi" xatosi emas, ilova qulashi bo'ladi.
+ * ⚠️ Bu **serverning chegarasi emas**: 2026-08-03 dan `FILE` turida hajm cheklovi yo'q
+ * (fayl bayt-baytga saqlanadi, uni faqat kunlik kvota va serverdagi bo'sh joy cheklaydi).
+ * Bu raqam — **qurilma tomonidagi** cheklov: tanlangan hujjat hozircha to'liq baytlar
+ * massiviga o'qiladi, ya'ni bundan kattasi "yuklab bo'lmadi" xatosi emas, ilova qulashi
+ * bo'lardi.
+ *
+ * Chegarani butunlay olib tashlash uchun hujjat tanlagichi ham video kabi **fayl yo'lini**
+ * qaytarishi kerak (o'shanda yuklash rezyumlanadigan oqim bilan ketadi) — bu alohida ish.
+ *
+ * ⚠️ Tekshiruv **o'qishdan oldin** bajariladi — aynan shu sababdan.
  */
-const val MAX_FILE_BYTES = 48 * 1024 * 1024
+const val MAX_FILE_BYTES = 100L * 1024 * 1024

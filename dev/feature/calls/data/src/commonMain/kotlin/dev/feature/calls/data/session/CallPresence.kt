@@ -1,0 +1,25 @@
+package dev.feature.calls.data.session
+
+/**
+ * Tizimga «hozir qo'ng'iroq ketyapti» deb bildiradigan platforma ilmog'i.
+ *
+ * Android'da bu old plan xizmati ([CallForegroundService]): usiz Android 14+ ilova fonga
+ * o'tganda mikrofonni jimgina o'chirib qo'yadi. iOS'da bu CallKit bo'ladi (2-bosqich).
+ *
+ * Interfeys `commonMain` da, chunki uni chaqiradigan joy — holat mashinasi, u esa ikkala
+ * platformada bir xil.
+ */
+interface CallPresence {
+
+    /** Jonli qo'ng'iroq boshlandi. [peerName] bildirishnomada ko'rinadi. */
+    fun onCallStarted(peerName: String)
+
+    /** Qo'ng'iroq tugadi — barcha ilmoqlar bo'shatiladi. */
+    fun onCallEnded()
+
+    /** Platforma ilmog'i kerak bo'lmagan joylar uchun (testlar, iOS 1-bosqichi). */
+    companion object Noop : CallPresence {
+        override fun onCallStarted(peerName: String) = Unit
+        override fun onCallEnded() = Unit
+    }
+}

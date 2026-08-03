@@ -33,7 +33,12 @@ fun <T> BaseResponse<T>.check(): T = ResponseChecker.check(this)
  *
  * [httpStatus] — konvertda `status` bo'lmaganda ishlatiladigan zaxira (HTTP javob kodi).
  */
-fun BaseResponse<*>.toAppException(httpStatus: Int? = null): AppException {
+fun BaseResponse<*>.toAppException(httpStatus: Int? = null): AppException =
+    // `error.code` — HTTP statusi ayta olmaydigan yagona narsa (403 «bog'lanmagan» mi yoki
+    // «bloklangan» mi, 503 «server yiqildi» mi yoki «xususiyat o'chirilgan» mi).
+    typedException(httpStatus).withCode(error?.code ?: code)
+
+private fun BaseResponse<*>.typedException(httpStatus: Int?): AppException {
     val text = error?.message ?: message
     val fields = error?.fields.orEmpty()
     // Maydon xatolari bor bo'lsa status qanday bo'lishidan qat'i nazar bu — validatsiya.

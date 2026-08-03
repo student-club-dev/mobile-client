@@ -326,7 +326,7 @@ class ChatRepositoryImpl(
         // tiklanadi.
         q.insertConversationIfNew(
             id = item.conversation.id,
-            type = item.conversation.type.name,
+            type = item.conversation.type,
             lastMessageAt = item.conversation.lastMessageAt?.toEpochMilliseconds(),
             otherId = item.other.id,
             otherUsername = item.other.username,
@@ -339,7 +339,7 @@ class ChatRepositoryImpl(
             otherCourseYear = item.other.courseYear?.value,
             lastMessageBody = last?.body,
             lastMessageSenderId = last?.senderId,
-            lastMessageType = last?.type?.name,
+            lastMessageType = last?.type,
             lastMessageDeleted = lastDeleted,
             unreadCount = item.unreadCount.toLong(),
             lastReadSeq = item.myReadSeq.toLong(),
@@ -347,7 +347,7 @@ class ChatRepositoryImpl(
             otherDeliveredSeq = item.peerDeliveredSeq.toLong(),
         )
         q.updateConversation(
-            type = item.conversation.type.name,
+            type = item.conversation.type,
             lastMessageAt = item.conversation.lastMessageAt?.toEpochMilliseconds(),
             otherId = item.other.id,
             otherUsername = item.other.username,
@@ -360,7 +360,7 @@ class ChatRepositoryImpl(
             otherCourseYear = item.other.courseYear?.value,
             lastMessageBody = last?.body,
             lastMessageSenderId = last?.senderId,
-            lastMessageType = last?.type?.name,
+            lastMessageType = last?.type,
             lastMessageDeleted = lastDeleted,
             unreadCount = item.unreadCount.toLong(),
             lastReadSeq = item.myReadSeq.toLong(),
@@ -701,13 +701,19 @@ class ChatRepositoryImpl(
      * - izoh (caption) qo'llab-quvvatlanadi.
      */
     override suspend fun sendVideo(conversationId: String, video: OutgoingVideo): Resource<Unit> {
-        val caption = video.caption?.trim()?.takeIf { it.isNotEmpty() }
+        // ⚠️ Dumaloq video xabarda izoh **umuman yo'q** — server matnni qabul qilmaydi
+        // (`handoff/09-CALLS-REST.md` emas, `chat-upload` tavsifi: «carries no caption»).
+        // Shuning uchun u bu yerda jimgina tashlanadi, xato sifatida emas: UI'da izoh
+        // maydoni ham chizilmaydi, ya'ni bu yerga faqat dasturiy xato bilan kelinadi.
+        val caption = video.caption?.trim()
+            ?.takeIf { it.isNotEmpty() && !video.videoNote }
         // Chegara klientda tekshiriladi: `422` ni kutsak xabar ekranda "yuborilmadi" bo'lib
         // qolardi va foydalanuvchi sababini bilmasdi.
         if (caption != null && caption.length > SendPayload.MAX_CAPTION) {
             deleteLocalFile(video.path)
             return errorOf(AppException.Validation("Izoh ${SendPayload.MAX_CAPTION} belgidan uzun bo'lmasin."))
         }
+        val messageType = if (video.videoNote) MessageType.VIDEO_NOTE else MessageType.VIDEO
 
         val me = currentUserId ?: return errorOf(AppException.Unauthorized())
         val clientMsgId = randomClientMsgId()
@@ -728,7 +734,7 @@ class ChatRepositoryImpl(
                         conversationId = conversationId,
                         senderId = me,
                         seq = 0L,
-                        type = MessageType.VIDEO.name,
+                        type = messageType.name,
                         body = caption.orEmpty(),
                         createdAt = now,
                         clientMsgId = clientMsgId,
@@ -737,7 +743,7 @@ class ChatRepositoryImpl(
                         attachmentSizeBytes = video.sizeBytes,
                     ),
                 )
-                q.touchConversation(caption.orEmpty(), me, MessageType.VIDEO.name, now, 0L, conversationId)
+                q.touchConversation(caption.orEmpty(), me, messageType.name, now, 0L, conversationId)
             }
         }
 
@@ -817,7 +823,7 @@ class ChatRepositoryImpl(
                 path = prepared.path,
                 sizeBytes = prepared.sizeBytes,
                 fileName = prepared.fileName,
-                kind = ChatMediaKind.VIDEO,
+                kind = if (video.videoNote) ChatMediaKind.VIDEO_NOTE else ChatMediaKind.VIDEO,
                 onProgress = { fraction -> onProgress(prepareShare + fraction * (1f - prepareShare)) },
             )
         } ?: return fail(
@@ -843,7 +849,11 @@ class ChatRepositoryImpl(
 
         val result = deliver(
             conversationId = conversationId,
-            payload = SendPayload(type = MessageType.VIDEO, body = caption, mediaId = attachment.id),
+            payload = SendPayload(
+                type = if (video.videoNote) MessageType.VIDEO_NOTE else MessageType.VIDEO,
+                body = caption,
+                mediaId = attachment.id,
+            ),
             clientMsgId = clientMsgId,
             localId = localId,
         )
@@ -1389,6 +1399,7 @@ class ChatRepositoryImpl(
         attachmentFileName = row.attachmentFileName,
         attachmentBlurHash = row.attachmentBlurHash,
         attachmentIsAnimated = row.attachmentIsAnimated,
+        attachmentTranscript = row.attachmentTranscript,
         stickerId = row.stickerId,
         stickerEmoji = row.stickerEmoji,
         stickerUrl = row.stickerUrl,
@@ -1402,6 +1413,11 @@ class ChatRepositoryImpl(
         replyToQuoteText = row.replyToQuoteText,
         replyToQuoteOffset = row.replyToQuoteOffset,
         replyToOriginalDeleted = row.replyToOriginalDeleted,
+        callId = row.callId,
+        callMedia = row.callMedia,
+        callStatus = row.callStatus,
+        callDurationMs = row.callDurationMs,
+        callEndReason = row.callEndReason,
     )
 
     private fun ChatQueries.setAttachment(columns: AttachmentColumns, messageId: String) = setMessageAttachment(
@@ -1419,6 +1435,7 @@ class ChatRepositoryImpl(
         attachmentFileName = columns.fileName,
         attachmentBlurHash = columns.blurHash,
         attachmentIsAnimated = columns.isAnimated,
+        attachmentTranscript = columns.transcript,
         id = messageId,
     )
 

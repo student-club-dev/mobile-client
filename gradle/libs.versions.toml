@@ -42,6 +42,16 @@ coil = "3.0.4"
 media3 = "1.5.1"
 # Chucker — Debug HTTP inspektori (bildirishnoma + alohida ekran)
 chucker = "4.0.0"
+# WebRTC (Android target) — 1:1 audio/video qo'ng'iroq media qatlami.
+#
+# Google'ning `org.webrtc:google-webrtc` nashri 2019 dan beri yangilanmagan va Maven'dan
+# olib tashlangan; `io.github.webrtc-sdk:android` — o'sha `org.webrtc` API'sining faol
+# saqlanadigan qurilmasi (LiveKit ham shuni ishlatadi). Paket nomi bir xil bo'lgani uchun
+# kod Google nashri bilan ham mos keladi.
+#
+# 125.x qatori ataylab: 137+ compileSdk 36 va yangi NDK talab qiladi, loyihada esa
+# compileSdk 35 / AGP 8.7 (media3 ham shu sababdan 1.5.x da qolgan).
+webrtc = "125.6422.07"
 
 # Firebase / Auth (Google + Phone)
 googleServices = "4.4.2"
@@ -148,6 +158,10 @@ androidx-media3-ui = { group = "androidx.media3", name = "media3-ui", version.re
 # ekranda ko'z ilg'amaydigan darajada. `media3-effect` — o'lchamni o'zgartirish (`Presentation`).
 androidx-media3-transformer = { group = "androidx.media3", name = "media3-transformer", version.ref = "media3" }
 androidx-media3-effect = { group = "androidx.media3", name = "media3-effect", version.ref = "media3" }
+
+# WebRTC (Android target) — `PeerConnectionFactory`, `PeerConnection`, kamera/mikrofon
+# manbalari va `SurfaceViewRenderer`. iOS tomonida `WebRTC.framework` kerak (2-bosqich).
+webrtc-android = { group = "io.github.webrtc-sdk", name = "android", version.ref = "webrtc" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

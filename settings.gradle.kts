@@ -95,6 +95,12 @@ include(":dev:feature:connections:presentation")
 include(":dev:feature:chat:domain")
 include(":dev:feature:chat:data")
 include(":dev:feature:chat:presentation")
+// Qo'ng'iroq — 1:1 audio/video, sof P2P WebRTC + TURN. Socket.IO namespace `/calls`
+// (chatdan ALOHIDA: SDP hech qachon chat kanaliga tushmaydi) + uchta REST endpoint.
+// Handoff: handoff/09-CALLS-*.md. `chat:domain` shu modulning enum'laridan foydalanadi.
+include(":dev:feature:calls:domain")
+include(":dev:feature:calls:data")
+include(":dev:feature:calls:presentation")
 // Story — 24 soatlik lavhalar. Eshik chat bilan bir xil: faqat bog'langanlar ko'radi.
 // Handoff: handoff/07-STORIES.md.
 include(":dev:feature:stories:domain")

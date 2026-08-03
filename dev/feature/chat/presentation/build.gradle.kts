@@ -5,6 +5,10 @@ kotlin { sourceSets { commonMain.dependencies {
     implementation(projects.dev.feature.chat.data)
     // Bloklash / shikoyat / bog'lanishni uzish — chat ichidan chaqiriladi.
     implementation(projects.dev.feature.connections.data)
+    // Suhbat sarlavhasidagi qo'ng'iroq tugmalari: `CallController` + mikrofon/kamera
+    // ruxsati (`rememberCallPermissions`). Qo'ng'iroq EKRANI bu yerdan chaqirilmaydi —
+    // u ilova ildizida (`CallHost`) turadi, ya'ni bog'liqlik faqat boshlash uchun.
+    implementation(projects.dev.feature.calls.presentation)
     // Suhbatdosh profili — UMUMIY varaq (story lentasidan ham shu ochiladi).
     implementation(projects.dev.feature.connections.presentation)
     // O'sha profildagi «Postlar» bo'limi — suhbatdoshning faol lavhalari.

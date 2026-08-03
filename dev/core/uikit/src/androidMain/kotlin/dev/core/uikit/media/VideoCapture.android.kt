@@ -1,6 +1,8 @@
 package dev.core.uikit.media
 
+import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -8,6 +10,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import java.io.File
 
@@ -45,28 +48,60 @@ actual fun rememberVideoCapture(onResult: (PickedVideo?) -> Unit): VideoPicker {
         }
     }
 
-    return remember(launcher, target) {
+    /**
+     * ⚠️ **Ruxsat kerak bo'lib qoldi.** `ActivityResultContracts.CaptureVideo` tizim
+     * kamerasini ochadi va odatda hech qanday ruxsat talab qilmaydi — **lekin faqat ilova
+     * `CAMERA` ruxsatini e'lon qilmagan bo'lsa**. Biz uni video qo'ng'iroq uchun e'lon
+     * qildik, ya'ni Android endi shu chaqiruvni ham himoyalangan deb hisoblaydi va ruxsat
+     * berilmagan bo'lsa `SecurityException` bilan yiqiladi.
+     *
+     * Shuning uchun ruxsat **tugma bosilganda** so'raladi; rad etilsa `null` qaytadi va
+     * chaqiruvchi uchun bu «bekor qilindi» bilan bir xil.
+     */
+    val permission = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        if (granted) target.pendingLaunch?.invoke() else onResult(null)
+        target.pendingLaunch = null
+    }
+
+    return remember(launcher, permission, target) {
         VideoPicker {
-            val file = context.newCaptureFile()
-            val uri = context.captureUriOrNull(file)
-            if (uri == null) {
-                // FileProvider sozlanmagan — kamerani ochishning ma'nosi yo'q, u baribir
-                // yozadigan joy topa olmasdi.
-                file.delete()
-                onResult(null)
-            } else {
+            val open = open@{
+                val file = context.newCaptureFile()
+                val uri = context.captureUriOrNull(file)
+                if (uri == null) {
+                    // FileProvider sozlanmagan — kamerani ochishning ma'nosi yo'q, u baribir
+                    // yozadigan joy topa olmasdi.
+                    file.delete()
+                    onResult(null)
+                    return@open
+                }
                 target.file = file
                 target.uri = uri
                 launcher.launch(uri)
+            }
+            if (context.hasCameraPermission()) {
+                open()
+            } else {
+                target.pendingLaunch = open
+                permission.launch(Manifest.permission.CAMERA)
             }
         }
     }
 }
 
+private fun Context.hasCameraPermission(): Boolean =
+    ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) ==
+        PackageManager.PERMISSION_GRANTED
+
 /** Kamera yozayotgan fayl va uning `content://` havolasi. */
 private class CaptureTarget {
     var file: File? = null
     var uri: Uri? = null
+
+    /** Ruxsat berilgach bajariladigan ish — foydalanuvchi tugmani ikki marta bosmasin. */
+    var pendingLaunch: (() -> Unit)? = null
 }
 
 /**

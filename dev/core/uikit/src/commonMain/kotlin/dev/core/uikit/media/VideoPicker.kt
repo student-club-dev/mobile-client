@@ -147,13 +147,31 @@ fun videoNeedsPreparing(sizeBytes: Long): Boolean = sizeBytes > COMPRESS_ABOVE_B
 private const val COMPRESS_ABOVE_BYTES = 12L * 1024 * 1024
 
 /**
- * Yuborilishi mumkin bo'lgan eng katta hajm (64 MB).
+ * Yuborilishi mumkin bo'lgan eng katta hajm.
  *
- * ⚠️ Serverda ham shu chegara bor, lekin bu yerda **oldin** to'sish kerak: bundan kattasini
- * yuborish uzoq ketadi va so'rov baribir `413` bilan qaytadi — ya'ni trafikni xato uchun
- * sarflagan bo'lamiz.
+ * ⚠️ **Serverda hajm chegarasi 2026-08-03 dan yo'q** (`chat-upload` tavsifi): yuklash
+ * rezyumlanadigan `/v1/media/upload/…` yo'lidan ketadi va uni faqat kunlik kvota hamda
+ * serverdagi bo'sh joy cheklaydi. Shu sabab bu yerdagi chegara ham serverning ko'zgusi
+ * emas — u **qurilma tomonidagi aql chegarasi**: 2 GB dan katta faylni telefonda siqish
+ * ham, yuborish ham amalda tugamaydi va foydalanuvchi buni kutib o'tirmasligi kerak.
  */
-const val MAX_VIDEO_BYTES: Long = 64L * 1024 * 1024
+const val MAX_VIDEO_BYTES: Long = 2L * 1024 * 1024 * 1024
 
-/** Yuborilishi mumkin bo'lgan eng uzun davomiylik (3 daqiqa) — server ham shuni tekshiradi. */
+/**
+ * Yuborilishi mumkin bo'lgan eng uzun davomiylik (3 daqiqa).
+ *
+ * ⚠️ Serverda chat videosining davomiyligi endi **cheklanmagan** — chegara faqat
+ * `STORY_VIDEO` va `VIDEO_NOTE` da (60 s). Bu yerdagi 3 daqiqa mahsulot qarori bo'lib
+ * qoladi: undan uzun videoni telefonda siqish bir necha daqiqa oladi va yuborish amalda
+ * tugamaydi.
+ */
 const val MAX_VIDEO_MS: Int = 3 * 60 * 1000
+
+/**
+ * Dumaloq video xabarning chegaralari — **serverniki** (`kind=VIDEO_NOTE`).
+ *
+ * Ikkalasi ham qat'iy: uzunroq yoki og'irroq fayl `422` bilan qaytadi, kvadrat bo'lmagani
+ * esa `422 MEDIA_NOT_SQUARE`.
+ */
+const val MAX_VIDEO_NOTE_MS: Int = 60 * 1000
+const val MAX_VIDEO_NOTE_BYTES: Long = 12L * 1024 * 1024

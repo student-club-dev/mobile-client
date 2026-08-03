@@ -57,7 +57,7 @@ private fun Context.readDocument(uri: Uri): PickedFile? {
     // yuklash ilovani o'ldiradi.
     if (meta.size != null && meta.size > MAX_FILE_BYTES) return null
 
-    val bytes = contentResolver.openInputStream(uri)?.use { it.readAtMost(MAX_FILE_BYTES) }
+    val bytes = contentResolver.openInputStream(uri)?.use { it.readAtMost(MAX_FILE_BYTES.toInt()) }
         ?: return null
     if (bytes.isEmpty()) return null
 

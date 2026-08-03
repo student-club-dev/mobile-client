@@ -14,6 +14,8 @@ import dev.core.uikit.generated.resources.ic_book
 import dev.core.uikit.generated.resources.ic_briefcase
 import dev.core.uikit.generated.resources.ic_cafe
 import dev.core.uikit.generated.resources.ic_call
+import dev.core.uikit.generated.resources.ic_call_end
+import dev.core.uikit.generated.resources.ic_camera_switch
 import dev.core.uikit.generated.resources.ic_cart
 import dev.core.uikit.generated.resources.ic_chat
 import dev.core.uikit.generated.resources.ic_check_double
@@ -32,17 +34,21 @@ import dev.core.uikit.generated.resources.ic_laptop
 import dev.core.uikit.generated.resources.ic_map
 import dev.core.uikit.generated.resources.ic_messages
 import dev.core.uikit.generated.resources.ic_mic
+import dev.core.uikit.generated.resources.ic_mic_off
 import dev.core.uikit.generated.resources.ic_more
 import dev.core.uikit.generated.resources.ic_pin
 import dev.core.uikit.generated.resources.ic_pizza
 import dev.core.uikit.generated.resources.ic_search
 import dev.core.uikit.generated.resources.ic_send_enter
+import dev.core.uikit.generated.resources.ic_speaker
 import dev.core.uikit.generated.resources.ic_tag
 import dev.core.uikit.generated.resources.ic_tools
 import dev.core.uikit.generated.resources.ic_trash
 import dev.core.uikit.generated.resources.ic_university
 import dev.core.uikit.generated.resources.ic_university_badge
 import dev.core.uikit.generated.resources.ic_users
+import dev.core.uikit.generated.resources.ic_video
+import dev.core.uikit.generated.resources.ic_video_off
 import org.jetbrains.compose.resources.vectorResource
 
 /**
@@ -112,6 +118,28 @@ object ScIcons {
     val Paperclip: ImageVector @Composable get() = vectorResource(Res.drawable.ic_attach)
     val Smile: ImageVector @Composable get() = vectorResource(Res.drawable.ic_emoji)
     val Mic: ImageVector @Composable get() = vectorResource(Res.drawable.ic_mic)
+
+    // --- Qo'ng'iroq ekrani -------------------------------------------------
+    // Bu beshtasi TO'Q fon uchun oq chiziqli: qo'ng'iroq ekrani doim to'q, ya'ni ular
+    // brend ko'kida chizilsa ko'rinmay qolardi.
+
+    /** Tugatish — qizil doira ichida. */
+    val CallEnd: ImageVector @Composable get() = vectorResource(Res.drawable.ic_call_end)
+
+    /** Mikrofon o'chirilgan. */
+    val MicOff: ImageVector @Composable get() = vectorResource(Res.drawable.ic_mic_off)
+
+    /** Kamera yoqilgan (video qo'ng'iroq). */
+    val Video: ImageVector @Composable get() = vectorResource(Res.drawable.ic_video)
+
+    /** Kamera o'chirilgan. */
+    val VideoOff: ImageVector @Composable get() = vectorResource(Res.drawable.ic_video_off)
+
+    /** Karnay. */
+    val Speaker: ImageVector @Composable get() = vectorResource(Res.drawable.ic_speaker)
+
+    /** Old/orqa kamerani almashtirish. */
+    val CameraSwitch: ImageVector @Composable get() = vectorResource(Res.drawable.ic_camera_switch)
 
     /** Chiquvchi xabar tasdig'i (✓✓). */
     val DoubleCheck: ImageVector @Composable get() = vectorResource(Res.drawable.ic_check_double)

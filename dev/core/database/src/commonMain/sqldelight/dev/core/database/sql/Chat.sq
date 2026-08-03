@@ -110,6 +110,9 @@ CREATE TABLE MessageEntity (
     attachmentBlurHash TEXT,
     -- 1 bo'lsa ovozsiz va takrorlanuvchi qilib o'ynatiladi (GIF va GIF'dan o'girilgan MP4).
     attachmentIsAnimated INTEGER,
+    -- Ovozli xabarning matni. Server maydonni zaxiralagan, lekin BUGUN DOIM NULL yuboradi —
+    -- ustun shu yerda transkripsiya yoqilganda klientda hech narsa o'zgarmasin deb turibdi.
+    attachmentTranscript TEXT,
 
     -- STICKER xabarida `body` TAQIQLANGAN, shuning uchun ko'rsatiladigan hamma narsa
     -- shu ustunlarda: emoji (rasm bo'lmasa) va serverdagi tasviri.
@@ -150,7 +153,25 @@ CREATE TABLE MessageEntity (
     replyToQuoteText TEXT,
     replyToQuoteOffset INTEGER,
     -- Nishon o'chirilgan — sitata ko'rinaveradi, lekin unga SAKRAB bo'lmaydi.
-    replyToOriginalDeleted INTEGER
+    replyToOriginalDeleted INTEGER,
+
+    -- --- Qo'ng'iroq yozuvi (`MessageDto.call`, type = 'CALL') -----------------------------
+    --
+    -- Qo'ng'iroq tugagach server suhbatga avtomatik qator yozadi. Bu **surat**: qiymatlar
+    -- xabar yozilgan paytda muzlatiladi va keyin hech qachon o'zgarmaydi
+    -- (`handoff/09-CALLS-DEVIATIONS.md` §14), ya'ni `Call` jadvaliga JOIN yo'q va
+    -- pufakchani yangilash uchun hech narsa qayta so'ralmaydi.
+    --
+    -- ⚠️ `callId` — **uuid v4** (36 belgi), boshqa id'lar (cuid) bilan bir xil emas.
+    callId TEXT,
+    -- AUDIO | VIDEO
+    callMedia TEXT,
+    -- ENDED | MISSED | DECLINED | CANCELED | FAILED (amalda faqat terminal qiymatlar).
+    callStatus TEXT,
+    -- Javob berilmagan qo'ng'iroqda 0 — NULL EMAS (server ham shunday yuboradi).
+    callDurationMs INTEGER,
+    -- HANGUP | TIMEOUT | DECLINED | BUSY | FAILED | CANCELED | UNAUTHORIZED
+    callEndReason TEXT
 );
 
 CREATE INDEX message_conversation_idx ON MessageEntity(conversationId, seq);
@@ -344,13 +365,17 @@ INSERT OR REPLACE INTO MessageEntity(
     attachmentId, attachmentUrl, attachmentThumbUrl, attachmentWidth, attachmentHeight,
     attachmentKind, attachmentStatus, attachmentMime, attachmentSizeBytes, attachmentDurationMs,
     attachmentWaveform, attachmentFileName, attachmentBlurHash, attachmentIsAnimated,
+    attachmentTranscript,
     stickerId, stickerEmoji, stickerUrl, albumId,
     replyToId, replyToSeq, replyToSenderId, replyToSenderName, replyToType, replyToPreview,
     replyToQuoteText, replyToQuoteOffset, replyToOriginalDeleted,
+    callId, callMedia, callStatus, callDurationMs, callEndReason,
     hiddenAt
 ) VALUES (
-    :id, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+    :id, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+    ?, ?, ?, ?,
     ?, ?, ?, ?, ?, ?, ?, ?, ?,
+    ?, ?, ?, ?, ?,
     (SELECT hiddenAt FROM MessageEntity WHERE id = :id)
 );
 
@@ -376,7 +401,8 @@ UPDATE MessageEntity SET
     attachmentWaveform = ?,
     attachmentFileName = ?,
     attachmentBlurHash = ?,
-    attachmentIsAnimated = ?
+    attachmentIsAnimated = ?,
+    attachmentTranscript = ?
 WHERE id = ?;
 
 -- Soft delete (`DELETE /v1/messages/{id}` va WS `message:deleted`). Tana **haqiqatan**

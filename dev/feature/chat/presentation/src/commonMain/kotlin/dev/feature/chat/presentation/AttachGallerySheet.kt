@@ -95,6 +95,8 @@ internal fun AttachGallerySheet(
     onOpenSystemPicker: () -> Unit,
     onPickFile: () -> Unit,
     onCaptureVideo: () -> Unit,
+    /** Dumaloq video xabar yozib olish (`VIDEO_NOTE`). */
+    onRecordVideoNote: () -> Unit,
 ) {
     val gallery = rememberDeviceGallery()
     val scope = rememberCoroutineScope()
@@ -209,6 +211,7 @@ internal fun AttachGallerySheet(
                 onOpenSystemPicker = onOpenSystemPicker,
                 onPickFile = onPickFile,
                 onCaptureVideo = onCaptureVideo,
+                onRecordVideoNote = onRecordVideoNote,
                 onSend = {
                     // Ikki marta bosilsa ikki marta yuborilardi — tugma o'chiriladi.
                     if (sending) return@AttachActions
@@ -412,6 +415,8 @@ private fun AttachActions(
     onOpenSystemPicker: () -> Unit,
     onPickFile: () -> Unit,
     onCaptureVideo: () -> Unit,
+    /** Dumaloq video xabar yozib olish (`VIDEO_NOTE`). */
+    onRecordVideoNote: () -> Unit,
     onSend: () -> Unit,
 ) {
     Row(
@@ -460,6 +465,10 @@ private fun AttachActions(
             )
             AttachAction(ScIcons.Paperclip, "Fayl", false, Modifier.weight(1f), onPickFile)
             AttachAction(AppIcons.Camera, "Kamera", false, Modifier.weight(1f), onCaptureVideo)
+            // Dumaloq video xabar — kamerada yozib olinadi, so'ng markazidan kvadrat
+            // kesilib yuboriladi. Kameradan alohida band: natija boshqa turdagi xabar
+            // (`VIDEO_NOTE`) va uni izoh bilan yuborib bo'lmaydi.
+            AttachAction(ScIcons.Video, "Video xabar", false, Modifier.weight(1f), onRecordVideoNote)
         }
     }
 }

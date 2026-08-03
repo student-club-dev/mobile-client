@@ -9,6 +9,8 @@ import dev.feature.clubs.data.di.clubsModule
 import dev.feature.settings.presentation.di.settingsModule
 import dev.feature.university.presentation.di.universityModule
 import dev.feature.ads.presentation.di.adsModule
+import dev.feature.calls.presentation.di.callsModule
+import dev.feature.calls.presentation.di.callsPlatformModule
 import dev.feature.chat.presentation.di.chatModule
 import dev.feature.connections.presentation.di.connectionsModule
 import dev.feature.home.presentation.di.homeModule
@@ -41,6 +43,10 @@ fun appModules() = coreModules() +
     // Bog'lanishlar va chat — to'liq backendda (bayroqsiz): `Connections` + `Chat` bo'limlari.
     connectionsModule() +
     chatModule() +
+    // Qo'ng'iroq — chatning ustida turadi (bog'lanmagan odamga qo'ng'iroq qilib bo'lmaydi).
+    // Media qatlami platformaga xos, shuning uchun ikkita modul.
+    callsModule() +
+    callsPlatformModule() +
     // Story — chat bilan bir xil eshik (faqat bog'langanlar ko'radi).
     storiesModule() +
     homeModule()

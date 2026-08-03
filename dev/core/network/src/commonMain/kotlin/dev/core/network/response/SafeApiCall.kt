@@ -78,7 +78,7 @@ suspend fun ResponseException.toAppExceptionWithFields(): AppException {
     val parsed = parseErrorEnvelope(body, status.value) ?: return status.toAppException(this)
     // Konvertda `cause` yo'q — asl istisnoni log/telemetriya uchun saqlab qo'yamiz.
     return if (parsed is AppException.Validation) {
-        AppException.Validation(parsed.reason, parsed.fields, this)
+        AppException.Validation(parsed.reason, parsed.fields, this).withCode(parsed.errorCode)
     } else {
         parsed
     }

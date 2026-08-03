@@ -3,21 +3,27 @@ package dev.feature.chat.data.mapper
 import dev.core.database.sql.ConversationEntity
 import dev.core.database.sql.MessageEntity
 import dev.core.network.generated.model.AttachmentDto
+import dev.core.network.generated.model.MessageCallDto
 import dev.core.network.generated.model.MessageDto
 import dev.core.network.generated.model.MessageStickerDto
 import dev.core.network.generated.model.ReplyToDto
 import dev.core.network.media.MediaUrl
 import dev.feature.chat.data.realtime.WsAttachment
+import dev.feature.chat.data.realtime.WsCall
 import dev.feature.chat.data.realtime.WsMessage
 import dev.feature.chat.data.realtime.WsReplyTo
 import dev.feature.chat.data.realtime.WsSticker
 import dev.feature.chat.domain.model.Attachment
+import dev.feature.calls.domain.model.CallEndReason
+import dev.feature.calls.domain.model.CallMedia
+import dev.feature.calls.domain.model.CallStatus
 import dev.feature.chat.domain.model.Conversation
 import dev.feature.chat.domain.model.ConversationItem
 import dev.feature.chat.domain.model.ConversationType
 import dev.feature.chat.domain.model.MediaKind
 import dev.feature.chat.domain.model.MediaStatus
 import dev.feature.chat.domain.model.Message
+import dev.feature.chat.domain.model.MessageCall
 import dev.feature.chat.domain.model.MessageStatus
 import dev.feature.chat.domain.model.MessageSticker
 import dev.feature.chat.domain.model.MessageType
@@ -116,6 +122,17 @@ internal fun MessageEntity.toDomain(origin: String): Message = Message(
             fileName = attachmentFileName,
             blurHash = attachmentBlurHash,
             isAnimated = attachmentIsAnimated == 1L,
+            transcript = attachmentTranscript,
+        )
+    },
+    // `CALL` xabarning tafsiloti — surat, ya'ni keshdagi ustunlar yagona manba.
+    call = callId?.let { id ->
+        MessageCall(
+            callId = id,
+            media = parseEnum(callMedia, CallMedia.AUDIO),
+            status = parseEnum(callStatus, CallStatus.ENDED),
+            durationMs = callDurationMs?.toInt() ?: 0,
+            endReason = callEndReason?.let { reason -> parseEnumOrNull<CallEndReason>(reason) },
         )
     },
     // `stickerId` YOKI `stickerUrl` — ikkalasidan biri yetadi. Qidiruvdan yuborilgan
@@ -186,6 +203,7 @@ internal data class MessageRow(
     val attachmentFileName: String? = null,
     val attachmentBlurHash: String? = null,
     val attachmentIsAnimated: Long? = null,
+    val attachmentTranscript: String? = null,
     val stickerId: String? = null,
     val stickerEmoji: String? = null,
     val stickerUrl: String? = null,
@@ -199,6 +217,11 @@ internal data class MessageRow(
     val replyToQuoteText: String? = null,
     val replyToQuoteOffset: Long? = null,
     val replyToOriginalDeleted: Long? = null,
+    val callId: String? = null,
+    val callMedia: String? = null,
+    val callStatus: String? = null,
+    val callDurationMs: Long? = null,
+    val callEndReason: String? = null,
 )
 
 /** Keshdagi qator → yozish uchun qator (ack kelganda `id`/`seq` almashtiriladi). */
@@ -227,6 +250,7 @@ internal fun MessageEntity.toRow(): MessageRow = MessageRow(
     attachmentFileName = attachmentFileName,
     attachmentBlurHash = attachmentBlurHash,
     attachmentIsAnimated = attachmentIsAnimated,
+    attachmentTranscript = attachmentTranscript,
     stickerId = stickerId,
     stickerEmoji = stickerEmoji,
     stickerUrl = stickerUrl,
@@ -240,6 +264,11 @@ internal fun MessageEntity.toRow(): MessageRow = MessageRow(
     replyToQuoteText = replyToQuoteText,
     replyToQuoteOffset = replyToQuoteOffset,
     replyToOriginalDeleted = replyToOriginalDeleted,
+    callId = callId,
+    callMedia = callMedia,
+    callStatus = callStatus,
+    callDurationMs = callDurationMs,
+    callEndReason = callEndReason,
 )
 
 /**
@@ -256,13 +285,15 @@ internal fun MessageDto.toRow(fallbackClientMsgId: String? = null): MessageRow =
     conversationId = conversationId,
     senderId = senderId,
     seq = seq.toLong(),
-    type = type.name,
+    // `type` — DTO'da ataylab `String` (spec'ning `lenientEnums` ro'yxati): server enum'ni
+    // kengaytirsa noma'lum qiymat butun javobni yiqitmasin. Domenga o'girish `parseEnum` da.
+    type = type,
     body = body.orEmpty(),
     createdAt = createdAt.toEpochMilliseconds(),
     clientMsgId = clientMsgId ?: fallbackClientMsgId,
     deletedAt = deletedAt?.toEpochMilliseconds(),
     albumId = albumId,
-).withAttachment(attachment).withSticker(sticker).withReplyTo(replyTo)
+).withAttachment(attachment).withSticker(sticker).withReplyTo(replyTo).withCall(call)
 
 internal fun WsMessage.toRow(): MessageRow = MessageRow(
     id = id,
@@ -275,7 +306,7 @@ internal fun WsMessage.toRow(): MessageRow = MessageRow(
     clientMsgId = clientMsgId,
     deletedAt = parseInstant(deletedAt).takeIf { it > 0L },
     albumId = albumId,
-).withAttachment(attachment).withSticker(sticker).withReplyTo(replyTo)
+).withAttachment(attachment).withSticker(sticker).withReplyTo(replyTo).withCall(call)
 
 // --- Sitata (javob berilgan xabarning surati) --------------------------------------------
 
@@ -293,7 +324,7 @@ private fun MessageRow.withReplyTo(reply: ReplyToDto?): MessageRow {
         replyToSeq = reply.seq.toLong(),
         replyToSenderId = reply.senderId,
         replyToSenderName = reply.senderName,
-        replyToType = reply.type.name,
+        replyToType = reply.type,
         replyToPreview = reply.preview,
         replyToQuoteText = reply.quote?.text,
         replyToQuoteOffset = reply.quote?.offset?.toLong(),
@@ -317,6 +348,35 @@ private fun MessageRow.withReplyTo(reply: WsReplyTo?): MessageRow {
     )
 }
 
+// --- Qo'ng'iroq yozuvi (`MessageDto.call`) -----------------------------------------------
+
+/**
+ * `type = CALL` xabarining ustunlari.
+ *
+ * ⚠️ `durationMs` **hech qachon `null` emas** — javob berilmagan qo'ng'iroqda `0`
+ * (`handoff/09-CALLS-DEVIATIONS.md` §10). Shuning uchun bu yerda `?: 0` yo'q: server
+ * qiymatni doim yuboradi va uni "noma'lum" ga aylantirish pufakchada `0:00` o'rniga
+ * bo'sh joy qoldirardi.
+ */
+private fun MessageRow.withCall(dto: MessageCallDto?): MessageRow =
+    if (dto == null) this else copy(
+        callId = dto.callId,
+        callMedia = dto.media,
+        callStatus = dto.status,
+        callDurationMs = dto.durationMs.toLong(),
+        callEndReason = dto.endReason,
+    )
+
+/** WS `message:new` dagi o'sha yozuv — bir xil shakl, qo'lda yozilgan tip. */
+private fun MessageRow.withCall(ws: WsCall?): MessageRow =
+    if (ws == null) this else copy(
+        callId = ws.callId,
+        callMedia = ws.media,
+        callStatus = ws.status,
+        callDurationMs = ws.durationMs.toLong(),
+        callEndReason = ws.endReason,
+    )
+
 // --- Biriktirma --------------------------------------------------------------------------
 
 /**
@@ -339,6 +399,8 @@ internal data class AttachmentColumns(
     val fileName: String?,
     val blurHash: String?,
     val isAnimated: Long,
+    /** Ovozli xabarning matni — server maydonni zaxiralagan, bugun doim `null`. */
+    val transcript: String? = null,
 )
 
 internal fun AttachmentDto.toColumns(): AttachmentColumns = AttachmentColumns(
@@ -347,8 +409,8 @@ internal fun AttachmentDto.toColumns(): AttachmentColumns = AttachmentColumns(
     thumbUrl = thumbUrl,
     width = width?.toLong() ?: 0L,
     height = height?.toLong() ?: 0L,
-    kind = kind.name,
-    status = status.name,
+    kind = kind,
+    status = status,
     mimeType = mimeType,
     sizeBytes = sizeBytes.toLong(),
     durationMs = durationMs?.toLong(),
@@ -356,6 +418,7 @@ internal fun AttachmentDto.toColumns(): AttachmentColumns = AttachmentColumns(
     fileName = fileName,
     blurHash = blurHash,
     isAnimated = if (isAnimated) 1L else 0L,
+    transcript = transcript,
 )
 
 internal fun WsAttachment.toColumns(): AttachmentColumns = AttachmentColumns(
@@ -373,6 +436,7 @@ internal fun WsAttachment.toColumns(): AttachmentColumns = AttachmentColumns(
     fileName = fileName,
     blurHash = blurHash,
     isAnimated = if (isAnimated) 1L else 0L,
+    transcript = transcript,
 )
 
 private fun MessageRow.withAttachment(columns: AttachmentColumns?): MessageRow =
@@ -391,6 +455,7 @@ private fun MessageRow.withAttachment(columns: AttachmentColumns?): MessageRow =
         attachmentFileName = columns.fileName,
         attachmentBlurHash = columns.blurHash,
         attachmentIsAnimated = columns.isAnimated,
+        attachmentTranscript = columns.transcript,
     )
 
 private fun MessageRow.withAttachment(dto: AttachmentDto?): MessageRow = withAttachment(dto?.toColumns())
@@ -420,5 +485,17 @@ internal fun decodeWaveform(raw: String?): List<Int> =
 internal fun parseInstant(value: String?): Long =
     value?.let { runCatching { Instant.parse(it).toEpochMilliseconds() }.getOrNull() } ?: 0L
 
-internal inline fun <reified T : Enum<T>> parseEnum(name: String, default: T): T =
+/**
+ * Sim/kesh qiymati → domen enum'i. Noma'lum qiymat [default] ga tushadi.
+ *
+ * Bu butun chat qatlamining enum eshigi: DTO'lar ataylab `String` bo'lib generatsiya
+ * qilinadi (`lenientEnums`, `dev/api-client-generator/build.gradle.kts` qadam 11), chunki
+ * kotlinx.serialization noma'lum enum qiymatida **butun javobni** yiqitadi — `MessageType`
+ * ga `CALL` qo'shilishi aynan shu tarzda eski klientlarda chat ekranini o'ldirdi.
+ */
+internal inline fun <reified T : Enum<T>> parseEnum(name: String?, default: T): T =
     enumValues<T>().firstOrNull { it.name == name } ?: default
+
+/** [parseEnum] ning nullable varianti — maydonning o'zi ixtiyoriy bo'lganda. */
+internal inline fun <reified T : Enum<T>> parseEnumOrNull(name: String?): T? =
+    enumValues<T>().firstOrNull { it.name == name }

@@ -32,6 +32,7 @@ import dev.feature.settings.domain.model.ThemeMode
 import dev.feature.settings.domain.repository.SettingsRepository
 import dev.feature.university.domain.repository.UniversityRepository
 import dev.feature.auth.presentation.flow.AuthNavHost
+import dev.feature.calls.presentation.CallHost
 import dev.core.uikit.theme.appPalette
 import io.ktor.client.HttpClient
 import org.koin.compose.koinInject
@@ -114,6 +115,11 @@ private fun AppScaffold(content: @Composable () -> Unit) {
             ) {
                 content()
             }
+            // Qo'ng'iroq ekrani BUTUN ilova ustida turadi va inset o'ramidan tashqarida:
+            // u to'liq ekranni egallaydi (video kadr status bar ostiga ham chiqadi) va
+            // o'z insetlarini o'zi qo'yadi. Kiruvchi qo'ng'iroq foydalanuvchi qaysi
+            // ekranda turganidan qat'i nazar ko'rinishi kerak.
+            CallHost()
         }
     }
 }
