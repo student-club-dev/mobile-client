@@ -6,6 +6,6 @@ package dev.feature.calls.data.session
  * ishlaydi, faqat tizim qo'ng'iroq ekrani ko'rinmaydi.
  */
 class IosCallPresence : CallPresence {
-    override fun onCallStarted(peerName: String) = Unit
+    override fun onCallStarted(peerName: String, video: Boolean) = Unit
     override fun onCallEnded() = Unit
 }

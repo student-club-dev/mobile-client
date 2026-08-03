@@ -11,15 +11,21 @@ package dev.feature.calls.data.session
  */
 interface CallPresence {
 
-    /** Jonli qo'ng'iroq boshlandi. [peerName] bildirishnomada ko'rinadi. */
-    fun onCallStarted(peerName: String)
+    /**
+     * Jonli qo'ng'iroq boshlandi. [peerName] bildirishnomada ko'rinadi.
+     *
+     * [video] — kamera ishlatiladimi. Android'da bu **muhim**: old plan xizmatining
+     * `camera` turi berilgan `CAMERA` ruxsatini talab qiladi va ovozli qo'ng'iroqda u
+     * yo'q — turni bekorga e'lon qilish `SecurityException` keltiradi.
+     */
+    fun onCallStarted(peerName: String, video: Boolean)
 
     /** Qo'ng'iroq tugadi — barcha ilmoqlar bo'shatiladi. */
     fun onCallEnded()
 
     /** Platforma ilmog'i kerak bo'lmagan joylar uchun (testlar, iOS 1-bosqichi). */
     companion object Noop : CallPresence {
-        override fun onCallStarted(peerName: String) = Unit
+        override fun onCallStarted(peerName: String, video: Boolean) = Unit
         override fun onCallEnded() = Unit
     }
 }

@@ -194,8 +194,11 @@ class CallSessionManager(
             newEngine.close()
             return "Mikrofonga ruxsat berilmagan yoki qurilma band."
         }
-        attach(newEngine)
 
+        // ⚠️ Sessiya `attach` dan OLDIN quriladi: `attach` tizim ilmog'ini chaqiradi
+        // (Android'da old plan xizmati) va u kimga qo'ng'iroq qilinayotganini hamda
+        // kamera yoqilganini sessiyadan o'qiydi. Teskari tartibda bildirishnoma nomsiz
+        // chiqar, video qo'ng'iroqda esa `camera` turi umuman e'lon qilinmasdi.
         _session.value = CallSession(
             callId = "",
             peer = peer,
@@ -206,6 +209,7 @@ class CallSessionManager(
             cameraEnabled = media == CallMedia.VIDEO,
             speakerOn = media == CallMedia.VIDEO,
         )
+        attach(newEngine)
 
         // 3. Taklif. Shu paytgacha server hech narsa bilmaydi — yuqoridagi bosqichlarning
         //    birortasi yiqilsa hech qanday chegara sarflanmaydi.
@@ -352,6 +356,10 @@ class CallSessionManager(
         val enabled = !current.cameraEnabled
         engine?.setCameraEnabled(enabled)
         _session.update { it.copy(cameraEnabled = enabled) }
+        // Tizim ilmog'i qayta e'lon qilinadi: Android 14+ da old plan xizmatining turlari
+        // ruxsatlarga bog'liq va kamera suhbat o'rtasida yoqilganda `camera` turi
+        // qo'shilishi kerak — aks holda ilova fonga o'tganda kamera o'chib qolardi.
+        presence.onCallStarted(current.peer.fullName.orEmpty(), video = enabled)
         publishMediaState()
     }
 
@@ -459,7 +467,14 @@ class CallSessionManager(
         // Media qatlami ko'tarildi — endi mikrofon ochiq va tizimga shu haqda aytish
         // kerak. Sessiya obyekti hali qurilmagan bo'lishi mumkin, shuning uchun ism
         // bo'lmasa bo'sh satr ketadi (bildirishnomada zaxira sarlavha ko'rinadi).
-        presence.onCallStarted(_session.value?.peer?.fullName.orEmpty())
+        val current = _session.value
+        presence.onCallStarted(
+            peerName = current?.peer?.fullName.orEmpty(),
+            // ⚠️ Kamera **haqiqatan yoqilganmi** — qo'ng'iroq turi emas. Video qo'ng'iroqda
+            // ham kameraga ruxsat berilmagan bo'lishi mumkin (u ixtiyoriy), va o'shanda
+            // old plan xizmatiga `camera` turini e'lon qilish `SecurityException` beradi.
+            video = current?.cameraEnabled == true,
+        )
         engineJob = scope.launch {
             newEngine.events.collect { event ->
                 when (event) {

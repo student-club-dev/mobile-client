@@ -10,7 +10,8 @@ import android.content.Context
  */
 class AndroidCallPresence(private val context: Context) : CallPresence {
 
-    override fun onCallStarted(peerName: String) = CallForegroundService.start(context, peerName)
+    override fun onCallStarted(peerName: String, video: Boolean) =
+        CallForegroundService.start(context, peerName, video)
 
     override fun onCallEnded() = CallForegroundService.stop(context)
 }
