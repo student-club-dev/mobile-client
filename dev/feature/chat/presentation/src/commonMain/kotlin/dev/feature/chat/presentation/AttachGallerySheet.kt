@@ -285,7 +285,7 @@ private fun GalleryGrid(
             // qidirishi shart emas.
             item(key = "camera") {
                 Box(
-                    Modifier.aspectRatio(1f).clip(CELL_SHAPE).background(Sc.Ink.copy(alpha = 0.85f))
+                    Modifier.aspectRatio(1f).clip(CELL_SHAPE).background(Sc.InkSurface.copy(alpha = 0.85f))
                         .clickable(onClick = onCamera),
                     contentAlignment = Alignment.Center,
                 ) {

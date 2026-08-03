@@ -60,6 +60,7 @@ import dev.core.uikit.components.ScAvatar
 import dev.core.uikit.components.ScSectionHeader
 import dev.core.uikit.components.ScText
 import dev.core.uikit.components.scCard
+import dev.core.uikit.components.scGlassButtonColors
 import dev.core.uikit.components.scSoftShadow
 import dev.core.uikit.components.scStyle
 import dev.core.uikit.components.ScNetworkImage
@@ -416,18 +417,24 @@ private fun HomeHeader(
     }
 }
 
-/** Gradient topbar ichidagi oq aylana tugma (soyasi topbar gradientida ko'rinmaydi). */
+/**
+ * Gradient topbar ichidagi aylana tugma (soyasi topbar gradientida ko'rinmaydi).
+ *
+ * Rangi ilovadagi boshqa topbar tugmalari bilan bir xil ([scGlassButtonColors]): yorug'da
+ * oq doira + ko'k belgi, to'q rejimda shaffof doira + oq belgi.
+ */
 @Composable
 private fun HeaderCircleButton(
     icon: ImageVector, label: String, onClick: () -> Unit, badge: Boolean = false
 ) {
     val shape = RoundedCornerShape(percent = 50)
+    val (background, tint) = scGlassButtonColors()
     Box(
-        Modifier.size(42.dp).scSoftShadow(6.dp, shape).clip(shape).background(Color.White)
+        Modifier.size(42.dp).scSoftShadow(6.dp, shape).clip(shape).background(background)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(icon, label, tint = Sc.BrandDark, modifier = Modifier.size(20.dp))
+        Icon(icon, label, tint = tint, modifier = Modifier.size(20.dp))
         if (badge) {
             Box(
                 Modifier.align(Alignment.TopEnd).padding(top = 7.dp, end = 8.dp).size(8.dp)

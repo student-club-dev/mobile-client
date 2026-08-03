@@ -493,7 +493,7 @@ private fun UniversitySheet(
                 .statusBarsPadding()
                 .padding(top = 46.dp)
                 .clip(RoundedCornerShape(topStart = 34.dp, topEnd = 34.dp))
-                .background(Color.White),
+                .background(Sc.Card),
         ) {
             ScSheetHandle()
             Column(Modifier.padding(start = 22.dp, end = 22.dp, top = 10.dp, bottom = 14.dp)) {
@@ -584,7 +584,7 @@ private fun UniversityPickRow(uni: University, index: Int, selected: Boolean, on
     Row(
         Modifier.fillMaxWidth()
             .clip(shape)
-            .background(Color.White)
+            .background(Sc.Card)
             .border(if (selected) 2.dp else 1.dp, if (selected) Sc.Brand else Sc.Border, shape)
             .clickable(onClick = onClick)
             .padding(if (selected) 12.dp else 13.dp),
@@ -739,7 +739,7 @@ private fun OfferDetailSheet(shop: DiscountOffer, onClose: () -> Unit) {
             Modifier.align(Alignment.BottomCenter)
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp))
-                .background(Color.White)
+                .background(Sc.Card)
                 .navigationBarsPadding()
                 .padding(start = 22.dp, end = 22.dp, bottom = 20.dp),
         ) {
@@ -811,7 +811,7 @@ private fun OffersMapSection(
         ) {
             ScCircleButton(ScIcons.ChevronLeft, onClose, size = 46.dp, contentDescription = "Orqaga")
             Box(
-                Modifier.clip(RoundedCornerShape(16.dp)).background(Color.White)
+                Modifier.clip(RoundedCornerShape(16.dp)).background(Sc.Card)
                     .padding(horizontal = 14.dp, vertical = 10.dp),
             ) { ScText(title, 15f, FontWeight.ExtraBold, Sc.Ink, maxLines = 1) }
         }

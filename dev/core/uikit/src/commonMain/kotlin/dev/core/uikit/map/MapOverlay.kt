@@ -130,7 +130,9 @@ fun OffersMapOverlay(
             // Natija soni — filtr xaritaga ham tegishli ekanini ko'rsatadi.
             Box(
                 Modifier.padding(top = 10.dp).clip(RoundedCornerShape(11.dp))
-                    .background(palette.ink.copy(alpha = 0.82f)).padding(horizontal = 12.dp, vertical = 6.dp),
+                    // `palette.ink` EMAS: to'q rejimda u oqarib ketadi va ustidagi oq
+                    // yozuv ko'rinmay qolardi. `InkSurface` ikkala rejimda ham to'q.
+                    .background(Sc.InkSurface.copy(alpha = 0.82f)).padding(horizontal = 12.dp, vertical = 6.dp),
             ) {
                 Text(
                     // Marker soni EMAS, e'lonlar soni: bitta marker ortida bir biznesning

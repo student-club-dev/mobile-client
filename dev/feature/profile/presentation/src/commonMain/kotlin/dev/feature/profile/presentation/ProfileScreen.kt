@@ -289,7 +289,9 @@ private fun MyBusinessCard(onClick: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(13.dp),
     ) {
-        ScIconTile(Color.White, size = 46.dp, radius = 15.dp) {
+        // Karta foni `TintBlue` — plitka undan ochroq YUZA bo'lishi kerak, qat'iy oq emas
+        // (to'q rejimda oq kvadrat karta ustida yorqin dog' bo'lib qolardi).
+        ScIconTile(Sc.Card, size = 46.dp, radius = 15.dp) {
             Icon(AppIcons.Store, null, tint = Sc.Brand, modifier = Modifier.size(21.dp))
         }
         Column(Modifier.weight(1f)) {

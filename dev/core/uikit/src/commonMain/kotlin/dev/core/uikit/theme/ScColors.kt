@@ -46,6 +46,14 @@ data class ScColors(
     val chipInk: Color,
     val fieldBg: Color,
     val chatBg: Color,
+    /**
+     * To'q yuza — ustidagi matn/ikona DOIM oq: bir martalik xabar (toast), xaritadagi
+     * natija yorlig'i, galereyadagi kamera katagi.
+     *
+     * [ink] dan ALOHIDA: to'q rejimda matn rangi oqarib ketadi va uni fon sifatida
+     * ishlatgan yuzalar oq matn bilan birga ko'rinmay qolardi.
+     */
+    val inkSurface: Color,
     // --- Holat ---
     val success: Color,
     val danger: Color,
@@ -110,6 +118,7 @@ val LightScColors = ScColors(
     chipInk = Color(0xFF4A5A6A),
     fieldBg = Color(0xFFF6F9FC),
     chatBg = Color(0xFFE8EEF4),
+    inkSurface = Color(0xFF0F2A43),
     success = Color(0xFF16B364),
     danger = Color(0xFFFF5A5A),
     navIdle = Color(0xFF93A2B2),
@@ -177,6 +186,8 @@ val DarkScColors = ScColors(
     chipInk = Color(0xFFA8B8C8),
     fieldBg = Color(0xFF131F2B),
     chatBg = Color(0xFF0D1823),
+    // Fondan bir pog'ona OCHROQ (yorug' rejimda esa to'q) — ikkala holatda ham oq matn o'qiladi.
+    inkSurface = Color(0xFF2A3846),
     success = Color(0xFF22C97A),
     danger = Color(0xFFFF6B6B),
     navIdle = Color(0xFF6B7C8D),

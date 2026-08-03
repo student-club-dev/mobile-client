@@ -248,7 +248,7 @@ fun ChatScreen(
                     .navigationBarsPadding()
                     .padding(horizontal = Sc.ScreenPadding, vertical = 90.dp)
                     .clip(RoundedCornerShape(14.dp))
-                    .background(Sc.Ink.copy(alpha = 0.92f))
+                    .background(Sc.InkSurface.copy(alpha = 0.92f))
                     .padding(horizontal = 16.dp, vertical = 12.dp),
             ) { ScText(message, 13.5f, FontWeight.SemiBold, Color.White) }
         }
@@ -1481,9 +1481,11 @@ private fun ChatThreadHeader(
                     Box(
                         Modifier.align(Alignment.BottomEnd)
                             .size(12.dp)
-                            .background(Color(0xFF17A8DC), RoundedCornerShape(percent = 50))
+                            // Halqa — topbar gradientining rangi: nuqta undan kesib
+                            // olingandek ko'rinadi (to'q rejimda ham panelga mos tushadi).
+                            .background(Sc.HeaderMid, RoundedCornerShape(percent = 50))
                             .padding(2.5.dp)
-                            .background(Color(0xFF2BD66A), RoundedCornerShape(percent = 50)),
+                            .background(Sc.Success, RoundedCornerShape(percent = 50)),
                     )
                 }
             }
@@ -1921,7 +1923,7 @@ private fun Composer(
     onPickStickerRef: (StickerSearchItem) -> Unit,
     onPickGif: (GifItem) -> Unit,
 ) {
-    Column(Modifier.fillMaxWidth().background(Color.White).navigationBarsPadding()) {
+    Column(Modifier.fillMaxWidth().background(Sc.Card).navigationBarsPadding()) {
         Box(Modifier.fillMaxWidth().height(1.dp).background(Sc.Border))
         Row(
             Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 10.dp, bottom = 10.dp),

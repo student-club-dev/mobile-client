@@ -65,7 +65,8 @@ fun ListingFilterSheet(
     onApply: () -> Unit,
     onClose: () -> Unit,
 ) {
-    // Dizaynda filtr — modal bottom sheet: pastda oq varaq, orqasi qoraytirilgan.
+    // Dizaynda filtr — modal bottom sheet: pastda karta yuzasidagi varaq (to'q rejimda
+    // u ham to'qlashadi), orqasi qoraytirilgan.
     Box(Modifier.fillMaxSize()) {
         Box(Modifier.fillMaxSize().background(Color(0xFF0B1622).copy(alpha = 0.42f)).clickable(onClick = onClose))
         Column(
@@ -74,7 +75,7 @@ fun ListingFilterSheet(
                 .statusBarsPadding()
                 .padding(top = 60.dp)
                 .clip(RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp))
-                .background(Color.White),
+                .background(Sc.Card),
         ) {
             ScSheetHandle()
             Row(

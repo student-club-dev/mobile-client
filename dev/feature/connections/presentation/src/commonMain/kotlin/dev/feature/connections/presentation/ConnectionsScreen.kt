@@ -160,7 +160,7 @@ fun ConnectionsScreen(
                 Modifier.align(Alignment.BottomCenter)
                     .padding(horizontal = Sc.ScreenPadding, vertical = 24.dp)
                     .clip(RoundedCornerShape(14.dp))
-                    .background(Sc.Ink.copy(alpha = 0.92f))
+                    .background(Sc.InkSurface.copy(alpha = 0.92f))
                     .padding(horizontal = 16.dp, vertical = 12.dp),
             ) { ScText(message, 13.5f, FontWeight.SemiBold, Color.White) }
         }

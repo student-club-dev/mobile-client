@@ -414,12 +414,14 @@ private fun BranchMapScreen(state: PostListingUiState, palette: AppPalette, vm: 
                         .padding(horizontal = 12.dp, vertical = 8.dp)
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(14.dp))
-                        .background(Color.White),
+                        // Xarita ustidagi varaq — mavzuga ergashadi (to'q rejimda ham oq
+                        // qolib ketmasin, ustidagi matn Sc tokenlaridan chiziladi).
+                        .background(Sc.Card),
                 ) {
                     if (state.searching) {
                         Text(
                             "Qidirilmoqda...",
-                            style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF6B6880)),
+                            style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Sc.InkSoft),
                             modifier = Modifier.padding(12.dp),
                         )
                     }
@@ -436,14 +438,14 @@ private fun BranchMapScreen(state: PostListingUiState, palette: AppPalette, vm: 
                         ) {
                             Text(
                                 place.title,
-                                style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, color = Color(0xFF14102D)),
+                                style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, color = Sc.Ink),
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                             )
                             if (place.subtitle.isNotBlank()) {
                                 Text(
                                     place.subtitle,
-                                    style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.sp, color = Color(0xFF8A87A0)),
+                                    style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.sp, color = Sc.Muted),
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                 )
@@ -458,7 +460,7 @@ private fun BranchMapScreen(state: PostListingUiState, palette: AppPalette, vm: 
                     Modifier.align(Alignment.BottomStart)
                         .padding(start = 12.dp, bottom = 92.dp)
                         .clip(RoundedCornerShape(12.dp))
-                        .background(Color.White)
+                        .background(Sc.Card)
                         .clickable {
                             requestId++
                             centerRequest = MapCenterRequest(userLocation, requestId)
@@ -470,7 +472,7 @@ private fun BranchMapScreen(state: PostListingUiState, palette: AppPalette, vm: 
                     Text("📍", style = TextStyle(fontSize = 13.sp))
                     Text(
                         "Mening joylashuvim",
-                        style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.sp, fontWeight = FontWeight.ExtraBold, color = Color(0xFF14102D)),
+                        style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.sp, fontWeight = FontWeight.ExtraBold, color = Sc.Ink),
                     )
                 }
             }

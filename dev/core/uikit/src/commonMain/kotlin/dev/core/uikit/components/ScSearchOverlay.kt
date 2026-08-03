@@ -74,21 +74,21 @@ fun ScSearchOverlay(
                 Modifier.weight(1f)
                     .shadow(16.dp, pill, ambientColor = Color(0xFF0B1622), spotColor = Color(0xFF0B1622))
                     .clip(pill)
-                    .background(Color.White)
+                    .background(Sc.Card)
                     .padding(horizontal = 18.dp, vertical = 13.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                Icon(ScIcons.Search, null, tint = Color(0xFF3A3A3C), modifier = Modifier.size(20.dp))
+                Icon(ScIcons.Search, null, tint = Sc.InkSoft, modifier = Modifier.size(20.dp))
                 Box(Modifier.weight(1f)) {
                     if (query.isEmpty()) {
-                        ScText(placeholder, 17f, FontWeight.Normal, Color(0xFFA0A0A5), maxLines = 1)
+                        ScText(placeholder, 17f, FontWeight.Normal, Sc.NavIdle, maxLines = 1)
                     }
                     BasicTextField(
                         value = query,
                         onValueChange = onQuery,
                         singleLine = true,
-                        textStyle = scStyle(17f, FontWeight.Medium, Color(0xFF1D1D1F)),
+                        textStyle = scStyle(17f, FontWeight.Medium, Sc.Ink),
                         cursorBrush = SolidColor(Sc.Brand),
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                         keyboardActions = KeyboardActions(onSearch = { keyboard?.hide(); onClose() }),
@@ -99,37 +99,45 @@ fun ScSearchOverlay(
                     Box(
                         Modifier.size(22.dp)
                             .clip(RoundedCornerShape(percent = 50))
-                            .background(Color(0xFFC7C7CC))
+                            .background(Sc.Handle)
                             .clickable { onQuery("") },
                         contentAlignment = Alignment.Center,
-                    ) { Icon(ScIcons.Close, "Tozalash", tint = Color.White, modifier = Modifier.size(12.dp)) }
+                    ) {
+                        // Kulrang doira ustidagi "×": yorug'da oq, to'qda esa oqish matn rangi
+                        // (to'q rejimda doira ham to'qlashadi va oq belgi ko'zni qamashtirardi).
+                        Icon(
+                            ScIcons.Close, "Tozalash",
+                            tint = if (Sc.IsDark) Sc.Ink else Color.White,
+                            modifier = Modifier.size(12.dp),
+                        )
+                    }
                 } else {
-                    Icon(ScIcons.Mic, null, tint = Color(0xFF8A8A8E), modifier = Modifier.size(19.dp))
+                    Icon(ScIcons.Mic, null, tint = Sc.Muted, modifier = Modifier.size(19.dp))
                 }
             }
             ScCircleButton(
                 ScIcons.Close, { keyboard?.hide(); onClose() },
-                size = 48.dp, background = Color.White.copy(alpha = 0.92f),
-                tint = Color(0xFF3A3A3C), contentDescription = "Yopish",
+                size = 48.dp, background = Sc.Card.copy(alpha = 0.92f),
+                tint = Sc.InkSoft, contentDescription = "Yopish",
             )
         }
 
         // Takliflar tasmasi — klaviatura ustida (iOS uslubidagi kulrang tasma).
         if (suggestions.isNotEmpty()) {
             Row(
-                Modifier.fillMaxWidth().background(Color(0xFFD1D5DB)).height(46.dp),
+                Modifier.fillMaxWidth().background(Sc.Handle).height(46.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 // Uch-to'rttadan ortig'i tasmaga sig'maydi — qolgani kesiladi.
                 suggestions.take(MAX_SUGGESTIONS).forEachIndexed { index, suggestion ->
                     if (index > 0) {
-                        Box(Modifier.width(1.dp).height(22.dp).background(Color(0xFFB4BAC2)))
+                        Box(Modifier.width(1.dp).height(22.dp).background(Sc.MutedLight.copy(alpha = 0.5f)))
                     }
                     Box(
                         Modifier.weight(1f).fillMaxSize()
                             .clickable { onSuggestionPick(suggestion); keyboard?.hide(); onClose() },
                         contentAlignment = Alignment.Center,
-                    ) { ScText(suggestion, 15.5f, FontWeight.Medium, Color(0xFF1D1D1F), maxLines = 1) }
+                    ) { ScText(suggestion, 15.5f, FontWeight.Medium, Sc.Ink, maxLines = 1) }
                 }
             }
         }

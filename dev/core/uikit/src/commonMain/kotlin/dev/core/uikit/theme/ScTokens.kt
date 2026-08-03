@@ -65,6 +65,15 @@ object Sc {
     /** Suhbat ekrani foni — nuqtali pattern ostida. */
     val ChatBg: Color @Composable @ReadOnlyComposable get() = LocalScColors.current.chatBg
 
+    /** To'q yuza, ustidagi matn/ikona doim oq (toast, xarita yorlig'i, kamera katagi). */
+    val InkSurface: Color @Composable @ReadOnlyComposable get() = LocalScColors.current.inkSurface
+
+    /**
+     * Topbar gradientining o'rta rangi — panel USTIDAGI belgi uning fonidan "kesib
+     * olingandek" ko'rinishi kerak bo'lganda (masalan avatardagi "onlayn" nuqtasi halqasi).
+     */
+    val HeaderMid: Color @Composable @ReadOnlyComposable get() = LocalScColors.current.headerMid
+
     // --- Holat ranglari ----------------------------------------------------
     val Success: Color @Composable @ReadOnlyComposable get() = LocalScColors.current.success
     val Danger: Color @Composable @ReadOnlyComposable get() = LocalScColors.current.danger
