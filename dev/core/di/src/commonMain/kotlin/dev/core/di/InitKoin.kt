@@ -5,7 +5,7 @@ import dev.feature.listings.presentation.di.listingsModule
 import dev.feature.jobs.presentation.di.jobsModule
 import dev.feature.students.presentation.di.studentsModule
 import dev.feature.notifications.presentation.di.notificationsModule
-import dev.feature.clubs.presentation.di.clubsModule
+import dev.feature.clubs.data.di.clubsModule
 import dev.feature.settings.presentation.di.settingsModule
 import dev.feature.university.presentation.di.universityModule
 import dev.feature.ads.presentation.di.adsModule

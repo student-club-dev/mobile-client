@@ -94,7 +94,8 @@ actual fun rememberMultiImagePicker(
     }
 }
 
-private fun Context.readImage(uri: Uri): PickedImage? {
+/** Bitta rasmni baytlari bilan o'qiydi — rasm+video tanlagichi ham shundan foydalanadi. */
+internal fun Context.readImage(uri: Uri): PickedImage? {
     val bytes = contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: return null
     return PickedImage(bytes = bytes, fileName = "image." + pickedExtension(uri))
 }

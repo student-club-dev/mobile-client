@@ -268,7 +268,16 @@ private fun ImageCell(
         val bytes = image.localBytes
         when {
             image.url != null -> AsyncImage(
-                model = image.url,
+                // ⚠️ Bu yerda **to'liq nusxa** (1920px WebP) so'raladi, `?variant=thumb` emas.
+                // Thumb — 320px, pufak esa 280dp keng (3x qurilmada ~840px): kichik nusxa
+                // 2.6 baravar cho'zilib xira ko'rinardi, o'sha rasm ochilganda esa tiniq
+                // edi — foydalanuvchi buni darhol sezadi.
+                //
+                // Trafik xavfi yo'q: server rasmni 1920px WebP ga siqib qo'yadi
+                // (`02-API-CHANGES.md` §media), ya'ni "to'liq" ham bir necha yuz KB.
+                // Coil dekodlashda katakning o'lchamiga qadar kichraytiradi — xotira
+                // katakning o'zicha qoladi. Havola bo'lmasa thumb'ga qaytamiz.
+                model = image.fullUrl ?: image.url,
                 contentDescription = "Rasm",
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),

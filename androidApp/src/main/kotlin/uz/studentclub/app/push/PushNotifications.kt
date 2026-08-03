@@ -14,10 +14,16 @@ import uz.studentclub.app.R
 /**
  * Push bildirishnomalarini ko'rsatish (Android).
  *
- * Server yuboradigan tana — `03-WEBSOCKET.md` §10:
+ * Server yuboradigan tana — `handoff/05-PUSH-SETUP.md` §4:
  * ```jsonc
- * { "title": "Yangi xabar", "body": "<matn>", "data": { "conversationId": "cnv_01H8X" } }
+ * {
+ *   "title": "Aziz Karimov",           // yuboruvchining ismi; ism topilmasa "Yangi xabar"
+ *   "body": "<matn>",
+ *   "data": { "conversationId": "cnv_01H8X", "senderId": "…", "senderName": "Aziz Karimov" }
+ * }
  * ```
+ * Sarlavhani **server** beradi va biz uni o'zgartirmasdan ko'rsatamiz: fondagi `notification`
+ * xabarini tizim o'zi chizadi, ya'ni ismni ilova tomonda qo'yib bo'lmaydi.
  *
  * ⚠️ Ikki xil holat bor va ikkalasi ham qo'llab-quvvatlanishi kerak:
  * - **Ilova fonda** va xabarda `notification` bloki bo'lsa — bildirishnomani **tizim** o'zi

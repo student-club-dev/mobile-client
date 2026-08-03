@@ -568,10 +568,15 @@ class ChatRepositoryImpl(
     override suspend fun sendImages(
         conversationId: String,
         images: List<OutgoingImage>,
+        caption: String?,
     ): Resource<Unit> {
         if (images.isEmpty()) return Resource.Success(Unit)
         if (images.size > MAX_ALBUM_SIZE) {
             return errorOf(AppException.Validation("Bir martada $MAX_ALBUM_SIZE tagacha rasm yuboriladi."))
+        }
+        val text = caption?.trim()?.takeIf { it.isNotEmpty() }
+        if (text != null && text.length > SendPayload.MAX_CAPTION) {
+            return errorOf(AppException.Validation("Izoh ${SendPayload.MAX_CAPTION} belgidan uzun bo'lmasin."))
         }
         val me = currentUserId ?: return errorOf(AppException.Unauthorized())
 
@@ -584,10 +589,13 @@ class ChatRepositoryImpl(
 
         // 1-qadam: HAMMASI darhol ekranga chiqadi. Yuklash sekundlab davom etadi, foydalanuvchi
         // esa tanlagan rasmlarini shu zahoti ko'rishi kerak.
-        val pending = images.map { image ->
+        val pending = images.mapIndexed { index, image ->
             val clientMsgId = randomClientMsgId()
             val localId = LOCAL_ID_PREFIX + clientMsgId
             val now = Clock.System.now().toEpochMilliseconds()
+            // Izoh faqat BIRINCHISIDA: albom ekranda bitta to'r bo'lib chiziladi va matn
+            // har katak ostida takrorlansa bitta izoh o'n marta ko'rinardi.
+            val body = text.takeIf { index == 0 }.orEmpty()
             withContext(dispatchers.io) {
                 q.transaction {
                     q.insert(
@@ -597,19 +605,19 @@ class ChatRepositoryImpl(
                             senderId = me,
                             seq = 0L,
                             type = image.messageType.name,
-                            // Media xabarda tana bo'sh — havola endi TANAGA yozilmaydi.
-                            body = "",
+                            // Media xabarda tana — faqat izoh. Havola TANAGA yozilmaydi.
+                            body = body,
                             createdAt = now,
                             clientMsgId = clientMsgId,
                             status = MessageStatus.SENDING.name,
                             albumId = if (image.isGif) null else albumId,
                         ),
                     )
-                    q.touchConversation("", me, image.messageType.name, now, 0L, conversationId)
+                    q.touchConversation(body, me, image.messageType.name, now, 0L, conversationId)
                 }
             }
             localImages.update { it + (localId to image.bytes) }
-            PendingImage(image, clientMsgId, localId)
+            PendingImage(image, clientMsgId, localId, caption = body.takeIf { it.isNotEmpty() })
         }
 
         // 2-qadam: KETMA-KET yuklaymiz. Parallel qilinsa mobil tarmoqda hammasi birdek
@@ -628,6 +636,8 @@ class ChatRepositoryImpl(
         val image: OutgoingImage,
         val clientMsgId: String,
         val localId: String,
+        /** Albom izohi — faqat birinchi rasmda to'ldiriladi. */
+        val caption: String? = null,
     )
 
     /** Bitta rasmni yuklaydi va xabar sifatida yuboradi. */
@@ -662,6 +672,7 @@ class ChatRepositoryImpl(
             conversationId = conversationId,
             payload = SendPayload(
                 type = item.image.messageType,
+                body = item.caption,
                 mediaId = attachment.id,
                 albumId = if (item.image.isGif) null else albumId,
             ),

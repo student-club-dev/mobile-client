@@ -159,11 +159,13 @@ Bu ekranlar A bosqichdagi buttonlar ochishi kerak bo'lgan joylar.
   `SettingsViewModel` + `SettingsScreen`: mavzu tanlovi + push/email toggle'lari **doimiy saqlanadi**.
   Barcha modullar + androidApp build ✅.
 
-- [x] **C4 — Clubs ekrani.** ✅
-  `ClubsScreen` (to'liq ro'yxat, **ishlaydigan "Qo'shilish/A'zosiz"** tugmasi) + `ClubsViewModel`.
+- [x] **C4 — Klublar.** ✅
   DB: `Club.sq`ga `joined` ustuni + `setJoined` query + migratsiya `3.sqm` (v4).
   Model/mapper/repo (`setJoined`) yangilandi. Seeder 6 ta namuna klub qo'shadi.
-  Home'ga "Klublar" bo'limi (gorizontal kartalar + "Barchasi" → `clubs` route). androidApp APK ✅.
+  ⚠️ Alohida `ClubsScreen`/`ClubsViewModel` va `clubs:presentation` moduli **olib tashlandi**:
+  klub — jamoaviy suhbat, shuning uchun ro'yxat ham, "Qo'shilish/A'zosiz" ham "Xabarlar"
+  ekranining **"Klublar" papkasida** (`ChatScreen` + `ChatViewModel`). Koin bog'lami —
+  `clubs:data` dagi `clubsModule()`.
 
 ---
 

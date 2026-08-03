@@ -3,6 +3,7 @@ package dev.feature.auth.presentation.main
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.core.common.Resource
+import dev.core.domain.model.CatalogRules
 import dev.core.domain.model.DiscountCategory
 import dev.core.domain.model.DiscountGroup
 import dev.core.domain.model.DiscountOffer
@@ -43,11 +44,18 @@ data class FilterValues(
      * Home'dagi "Barchasi" tugmasi aynan shu filtr bilan ekranni ochadi.
      */
     val groupKey: String? = null,
+    /**
+     * Bo'lim ichidagi turlar — guruh ilovada ikkiga bo'lingan holat ("Savdo" / "Xizmatlar",
+     * qarang [CatalogRules]). Bo'sh — butun guruh. So'rovlar baribir [groupKey] bilan ketadi,
+     * bu esa keshdagi e'lonlarni bo'lim doirasiga qisqartiradi.
+     */
+    val typeKeys: Set<String> = emptySet(),
     val categoryId: String? = null,
     val subcategories: Set<String> = emptySet(),
     val gender: String? = null,
     val sort: OfferSort = OfferSort.RELEVANCE,
 ) {
+    // [typeKeys] sanalmaydi: u alohida filtr emas, ochiq bo'limning o'zi.
     val activeCount: Int
         get() = listOf(
             discountFilter != DiscountFilter.ALL,
@@ -58,6 +66,62 @@ data class FilterValues(
             sort != OfferSort.RELEVANCE,
         ).count { it }
 }
+
+/**
+ * Katalogdagi bitta BO'LIM — ekranda ko'rinadigan yakuniy bo'linish.
+ *
+ * "Somsa", "Fast food", "Milliy taomlar" alohida katak bo'lib turgani foydalanuvchini
+ * ko'mib tashlardi (27 ta tur); endi ular bitta "Ovqatlanish" katagiga yig'iladi va
+ * ichkarida — feed tepasidagi chiplarda — toraytiriladi.
+ *
+ * Odatda bo'lim = serverning guruhi, lekin bitta guruh ikkiga bo'linishi mumkin
+ * ("Savdo va xizmat" → "Savdo" + "Xizmatlar", qarang [CatalogRules]). Shu holda [partial]
+ * `true` bo'ladi va feed guruh ichida yana shu bo'limning turlari bo'yicha qisqaradi.
+ */
+data class CatalogSection(
+    /** Ro'yxat kaliti: "FOOD" yoki bo'lingan holda "SHOPPING:SERVICES". */
+    val key: String,
+    val name: String,
+    val emoji: String,
+    val accent: Long,
+    /** Server guruhi — barcha so'rovlar SHU kalit bilan ketadi. */
+    val groupKey: String,
+    /** Bo'limdagi turlar — e'lonlari ko'pi birinchi. */
+    val types: List<DiscountCategory> = emptyList(),
+    /** Bo'lim guruhning faqat bir qismimi (guruh ilovada bo'lingan). */
+    val partial: Boolean = false,
+) {
+    /** Bo'limdagi e'lonlar soni — turlarning sonlari yig'indisi (serverdan). */
+    val offerCount: Int get() = types.sumOf { it.offerCount }
+
+    /** Feed filtriga tushadigan tur kalitlari (faqat [partial] bo'limlar uchun kerak). */
+    val typeKeys: Set<String> get() = types.map { it.id }.toSet()
+
+    /** Kartadagi ikkinchi qator: "Milliy taomlar · Fast food · Somsa". */
+    val typesPreview: String get() = types.joinToString(" · ") { it.name }
+}
+
+/**
+ * Ekranga kirilganda ko'rinadigan KATALOG — backend guruhlari (`POST /v1/catalog/groups`)
+ * bo'yicha BIRLASHTIRILGAN biznes turlari (`POST /v1/catalog/types`, hozircha 27 ta).
+ * Bo'lim bosilgach uning barcha turlari bitta feed'da ochiladi.
+ *
+ * Ro'yxat ilovada qat'iy yozilmagan: yangi tur/guruh qo'shilsa yoki nomi o'zgarsa
+ * ekran o'zgarishsiz ishlayveradi ([CatalogRules] dagi tuzatishlardan tashqari).
+ */
+data class CatalogUiState(
+    /** Bo'limlar — server tartibida (Ovqatlanish, Sport, Ta'lim...). */
+    val sections: List<CatalogSection> = emptyList(),
+    /**
+     * Guruhi noma'lum turlar (eski kesh yoki server hali guruhga bog'lamagan) — bo'limlardan
+     * keyin alohida katak bo'lib chiziladi, ya'ni yo'qolib ketmaydi.
+     */
+    val looseTypes: List<DiscountCategory> = emptyList(),
+    /** Keshdagi e'lonlar soni — "Barchasi" kartasida ko'rsatiladi. */
+    val totalOffers: Int = 0,
+    /** Katalog hali kelmagan — bo'limlar o'rniga skelet chiziladi. */
+    val loading: Boolean = false,
+)
 
 /** Filter ekranidagi viloyat ro'yxati holati. */
 data class RegionPickerState(
@@ -80,10 +144,20 @@ data class DiscountsUiState(
      */
     val loading: Boolean = false,
     /**
-     * Ochiq katalog guruhi — sarlavha shu bo'lim nomi bilan chiziladi ("🍕 Ovqatlar").
-     * `null` — guruh filtri yo'q, sarlavha "Siz uchun".
+     * Ochiq katalog bo'limi — sarlavha shu bo'lim nomi bilan chiziladi ("🍽 Ovqatlanish").
+     * `null` — bo'lim filtri yo'q, sarlavha "Barcha takliflar".
      */
-    val group: DiscountGroup? = null,
+    val section: CatalogSection? = null,
+    /**
+     * Ochiq biznes turi — feed tepasidagi chipdan tanlangani ("🥟 Somsa"). Sarlavhada
+     * [group] dan USTUN turadi: tur aniqroq.
+     */
+    val type: DiscountCategory? = null,
+    /**
+     * Ochiq bo'limdagi turlar — feed tepasidagi chiplar shu ro'yxatdan chiziladi
+     * ("Hammasi · Milliy taomlar · Fast food · Somsa"). Bo'lim ochilmagan bo'lsa — bo'sh.
+     */
+    val sectionTypes: List<DiscountCategory> = emptyList(),
     /** Qo'llangan bo'lim (kategoriya) tanlovi — xaritadagi chiplar shuni yoqib turadi. */
     val subcategories: Set<String> = emptySet(),
 )
@@ -96,8 +170,8 @@ data class DiscountsUiState(
  * hisoblangan zaxira ro'yxat.
  */
 data class FilterDraftState(
-    /** Katalog guruhlari — bosh ekrandagi bo'limlar (server tartibida). */
-    val groups: List<DiscountGroup> = emptyList(),
+    /** Katalog bo'limlari — katalog ekranidagi kataklar bilan bir xil ro'yxat. */
+    val sections: List<CatalogSection> = emptyList(),
     val categories: List<DiscountCategory> = emptyList(),
     val draft: FilterValues = FilterValues(),
     val availableSubcategories: List<String> = emptyList(),
@@ -184,26 +258,54 @@ class DiscountsViewModel(
     /** Birinchi `refresh()` tugaguncha `true` — feed skeletini shu boshqaradi. */
     private val refreshing = MutableStateFlow(true)
 
-    // Guruhlar + yuklanish bayrog'i bitta oqimda: `state` allaqachon beshta manbadan quriladi.
-    private val groupsAndLoading = combine(groupsFlow, refreshing) { groups, loading -> groups to loading }
+    private val categoriesFlow = discountRepository.observeCategories()
 
-    // Guruhlar + biznes turlari bitta oqimga yig'iladi: `filterState` allaqachon beshta
-    // manbadan quriladi, oltinchisi uchun typed `combine` overload'i qolmaydi.
+    // Guruhlar + biznes turlari + yuklanish bayrog'i bitta oqimga yig'iladi: `state` va
+    // `filterState` allaqachon beshta manbadan quriladi, oltinchisi uchun typed `combine`
+    // overload'i qolmaydi.
     private val catalog = combine(
-        groupsFlow, discountRepository.observeCategories(),
-    ) { groups, categories -> groups to categories }
+        groupsFlow, categoriesFlow, refreshing,
+    ) { groups, categories, loading -> Triple(groups, categories, loading) }
+
+    /**
+     * Ekranga kirilganda katalog (bo'limlar) ko'rinadi; bo'lim tanlangach e'lonlar ro'yxatiga
+     * o'tiladi. Home'dagi "Barchasi" tugmasi katalogni chetlab o'tadi ([openGroup]).
+     */
+    private val _catalogOpen = MutableStateFlow(true)
+    val catalogOpen: StateFlow<Boolean> = _catalogOpen
+
+    val catalogState: StateFlow<CatalogUiState> = combine(
+        catalog, offersFlow,
+    ) { (groups, types, loading), offers ->
+        CatalogUiState(
+            sections = sectionsOf(groups, types),
+            // Guruhi noma'lum turlar (eski kesh) — bo'limlardan keyin alohida.
+            looseTypes = types
+                .filterNot { CatalogRules.isHidden(it.id) }
+                .filter { t -> t.groupKey.isBlank() || groups.none { it.key == t.groupKey } }
+                .sortedBy { it.name },
+            totalOffers = offers.count { !CatalogRules.isHidden(it.categoryId) },
+            loading = loading && types.isEmpty(),
+        )
+    }
+        .catch { emit(CatalogUiState()) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), CatalogUiState())
 
     val state: StateFlow<DiscountsUiState> = combine(
-        offersFlow, query, applied, savedIdsFlow, groupsAndLoading,
-    ) { offers, q, f, savedIds, (groups, loading) ->
+        offersFlow, query, applied, savedIdsFlow, catalog,
+    ) { offers, q, f, savedIds, (groups, types, loading) ->
         val filtered = filter(offers, f, q)
+        val section = sectionsOf(groups, types).find(f)
         DiscountsUiState(
             offers = filtered,
             query = q,
             savedIds = savedIds,
             totalCount = filtered.size,
             activeFilterCount = f.activeCount,
-            group = groups.firstOrNull { it.key == f.groupKey },
+            section = section,
+            type = types.firstOrNull { it.id == f.categoryId },
+            // Chiplar faqat bo'lim ochiq bo'lganda: "hamma turlar" ro'yxati juda uzun.
+            sectionTypes = section?.types.orEmpty(),
             subcategories = f.subcategories,
             loading = loading && offers.isEmpty(),
         )
@@ -213,14 +315,15 @@ class DiscountsViewModel(
 
     val filterState: StateFlow<FilterDraftState> = combine(
         offersFlow, catalog, draft, query, schema,
-    ) { offers, (groups, allCategories), d, q, sc ->
-        // Guruh tanlangan bo'lsa biznes turlari ham shu guruh doirasida ko'rsatiladi
-        // ("Ovqatlar" ichida "Game Club" turi chiqib qolmasin).
-        val categories =
-            if (d.groupKey == null) allCategories else allCategories.filter { it.groupKey == d.groupKey }
+    ) { offers, (groups, allCategories, _), d, q, sc ->
+        val sections = sectionsOf(groups, allCategories)
+        // Bo'lim tanlangan bo'lsa biznes turlari ham shu bo'lim doirasida ko'rsatiladi
+        // ("Ovqatlanish" ichida "Game Club", "Xizmatlar" ichida "Kiyim" chiqib qolmasin).
+        val categories = sections.find(d)?.types
+            ?: allCategories.filterNot { CatalogRules.isHidden(it.id) }
         // Zaxira ro'yxat (sxema kelmagan holat) ham ochiq bo'lim doirasida bo'lsin —
         // aks holda ovqat ekranida keshdagi sport bo'limlari chiqib qolardi.
-        val inGroup = if (d.groupKey == null) offers else offers.filter { it.groupKey == d.groupKey }
+        val inGroup = filterSection(offers, d)
         val inCategory = if (d.categoryId == null) inGroup else inGroup.filter { it.categoryId == d.categoryId }
         // Bo'limlar: sxema kelgan bo'lsa serverdan (sonlari bilan), aks holda keshdan.
         val schemaSubs = sc?.categories.orEmpty().filter { d.categoryId == null || it.typeKey == d.categoryId }
@@ -230,7 +333,7 @@ class DiscountsViewModel(
             inCategory.map { it.subcategory }.filter { it.isNotBlank() }.distinct().sorted()
         }
         FilterDraftState(
-            groups = groups,
+            sections = sections,
             categories = categories,
             draft = d,
             availableSubcategories = availableSubs,
@@ -316,8 +419,8 @@ class DiscountsViewModel(
 
     fun closeOffer() { _detail.value = null }
 
-    private fun filter(offers: List<DiscountOffer>, f: FilterValues, q: String): List<DiscountOffer> = offers
-        .let { list -> if (f.groupKey == null) list else list.filter { it.groupKey == f.groupKey } }
+    private fun filter(offers: List<DiscountOffer>, f: FilterValues, q: String): List<DiscountOffer> =
+        filterSection(offers, f)
         .let { list -> if (f.categoryId == null) list else list.filter { it.categoryId == f.categoryId } }
         .let { list -> if (f.gender == null) list else list.filter { it.gender == f.gender } }
         .let { list -> if (f.subcategories.isEmpty()) list else list.filter { it.subcategory in f.subcategories } }
@@ -346,7 +449,88 @@ class DiscountsViewModel(
         }
 
     // Qidiruv — feed'ga darrov ta'sir qiladi (filter ekranidan tashqarida).
-    fun onQuery(q: String) { query.value = q }
+    fun onQuery(q: String) {
+        query.value = q
+        // Katalogda turib qidirilsa natijalar ko'rinmay qolardi — e'lonlar ro'yxatiga o'tamiz.
+        if (q.isNotBlank()) _catalogOpen.value = false
+    }
+
+    // -----------------------------------------------------------------------
+    // Katalog (bo'limlar) ↔ e'lonlar ro'yxati
+    // -----------------------------------------------------------------------
+
+    /**
+     * Katalogdan BO'LIM tanlandi — bo'limning barcha turlari bitta feed'da ochiladi
+     * ("Ovqatlanish" → Milliy taomlar + Fast food + Somsa birga). Tur esa feed tepasidagi
+     * chiplar orqali toraytiriladi ([selectType]).
+     *
+     * Guruh alohida to'liq tortiladi ([DiscountRepository.refreshGroup]): umumiy feed har
+     * guruhdan atigi bir nechtasini oladi, aks holda bo'limda 2-3 ta e'lon ko'rinib qolardi.
+     */
+    fun openSection(section: CatalogSection) {
+        val values = FilterValues(
+            groupKey = section.groupKey,
+            // Bo'lingan guruhda faqat shu bo'limning turlari ko'rinadi ("Xizmatlar" ichida
+            // kiyim chiqmasin); server so'rovi baribir butun guruh bilan ketadi.
+            typeKeys = if (section.partial) section.typeKeys else emptySet(),
+        )
+        applied.value = values
+        draft.value = values
+        _catalogOpen.value = false
+        viewModelScope.launch {
+            // `join()` — umumiy yangilanish keshni tozalab qayta yozadi; undan oldin
+            // tortsak natija o'chib ketardi (qarang [openGroup]).
+            feedRefresh.join()
+            runCatching { discountRepository.refreshGroup(section.groupKey) }
+        }
+    }
+
+    /**
+     * Feed tepasidagi tur chipi bosildi — bo'lim ichida tur bo'yicha toraytiriladi
+     * (`null` — "Hammasi", ya'ni butun bo'lim). Bo'lim filtri saqlanadi.
+     */
+    fun selectType(id: String?) {
+        applied.value = applied.value.copy(categoryId = id, subcategories = emptySet(), gender = null)
+        draft.value = applied.value
+    }
+
+    /**
+     * Katalogdan tur tanlandi — feed shu turga qisqaradi. Endi faqat guruhi noma'lum
+     * turlar uchun ishlatiladi (qarang [CatalogUiState.looseTypes]).
+     *
+     * Turning GURUHI ham qo'llanadi: umumiy feed har guruhdan atigi bir nechtasini tortadi,
+     * shuning uchun guruh alohida to'liq tortiladi ([DiscountRepository.refreshGroup]) —
+     * aks holda tur ichida 2-3 ta e'lon ko'rinib qolardi.
+     */
+    fun openType(type: DiscountCategory) {
+        val groupKey = type.groupKey.takeIf { it.isNotBlank() }
+        val values = FilterValues(groupKey = groupKey, categoryId = type.id)
+        applied.value = values
+        draft.value = values
+        _catalogOpen.value = false
+        if (groupKey == null) return
+        viewModelScope.launch {
+            // `join()` — umumiy yangilanish keshni tozalab qayta yozadi; undan oldin
+            // tortsak natija o'chib ketardi (qarang [openGroup]).
+            feedRefresh.join()
+            runCatching { discountRepository.refreshGroup(groupKey) }
+        }
+    }
+
+    /** "Barchasi" — turlarsiz to'liq feed. */
+    fun openAllOffers() {
+        applied.value = FilterValues()
+        draft.value = FilterValues()
+        _catalogOpen.value = false
+    }
+
+    /** E'lonlar ro'yxatidan katalogga qaytish — filtrlar va qidiruv tozalanadi. */
+    fun backToCatalog() {
+        applied.value = FilterValues()
+        draft.value = FilterValues()
+        query.value = ""
+        _catalogOpen.value = true
+    }
 
     /**
      * Ekran konkret bo'lim bilan ochildi (Home'dagi "Ovqatlar → Barchasi").
@@ -357,8 +541,11 @@ class DiscountsViewModel(
      */
     fun openGroup(key: String?) {
         val groupKey = key?.takeIf { it.isNotBlank() } ?: return
-        applied.value = applied.value.copy(groupKey = groupKey)
-        draft.value = draft.value.copy(groupKey = groupKey)
+        // Butun guruh ochiladi — ilovadagi bo'linish (Savdo/Xizmatlar) qo'llanmaydi.
+        applied.value = applied.value.copy(groupKey = groupKey, typeKeys = emptySet())
+        draft.value = draft.value.copy(groupKey = groupKey, typeKeys = emptySet())
+        // Bo'lim bilan kelindi — katalog oralig'i o'tkazib yuboriladi.
+        _catalogOpen.value = false
         // Bosh ekran uchun har guruhdan faqat bir nechtasi tortilgan edi — bo'lim ekranida
         // esa hammasi kerak (ro'yxat ham, xarita ham shu keshdan ishlaydi).
         // `join()` — umumiy yangilanish tugagach: aks holda u keshni tozalab, shu yerda
@@ -373,7 +560,7 @@ class DiscountsViewModel(
     /** Filter ekrani ochilganda qoralamani qo'llangan holat bilan tenglaymiz va sxemani tortamiz. */
     fun openFilter() {
         draft.value = applied.value
-        loadSchema(applied.value.categoryId, applied.value.groupKey)
+        loadSchema(applied.value)
     }
 
     /**
@@ -382,7 +569,7 @@ class DiscountsViewModel(
      * va xaritada chiplar chiqmasdi.
      */
     fun ensureSchema() {
-        if (schema.value == null) loadSchema(applied.value.categoryId, applied.value.groupKey)
+        if (schema.value == null) loadSchema(applied.value)
     }
 
     /**
@@ -402,18 +589,20 @@ class DiscountsViewModel(
      *
      * Doira quyidagicha toraytiriladi:
      * - biznes turi tanlangan bo'lsa — faqat o'sha tur;
+     * - guruh ilovada bo'lingan bo'lsa ("Xizmatlar") — faqat shu bo'limning turlari;
      * - tanlanmagan, lekin katalog bo'limi ochiq bo'lsa ("Ovqatlanish") — SHU bo'limdagi
      *   turlar. Busiz javob butun katalogdan kelardi va ovqat ekranida "Darvozabon maktabi"
      *   kabi sport kategoriyalari chiqib qolardi;
-     * - ikkalasi ham yo'q bo'lsa — butun katalog.
+     * - hech biri yo'q bo'lsa — butun katalog.
      *
      * Xato bo'lsa sxema `null` qoladi va ekran keshdan ishlaydi.
      */
-    private fun loadSchema(typeKey: String?, groupKey: String?) = viewModelScope.launch {
+    private fun loadSchema(f: FilterValues) = viewModelScope.launch {
         val typeKeys = when {
-            typeKey != null -> listOf(typeKey)
-            groupKey != null -> discountRepository.observeCategories().first()
-                .filter { it.groupKey == groupKey }
+            f.categoryId != null -> listOf(f.categoryId)
+            f.typeKeys.isNotEmpty() -> f.typeKeys.toList()
+            f.groupKey != null -> discountRepository.observeCategories().first()
+                .filter { it.groupKey == f.groupKey && !CatalogRules.isHidden(it.id) }
                 .map { it.id }
             else -> emptyList()
         }
@@ -424,21 +613,23 @@ class DiscountsViewModel(
     fun onDraftDiscountFilter(f: DiscountFilter) { draft.value = draft.value.copy(discountFilter = f) }
 
     /**
-     * Bo'lim (katalog guruhi) o'zgardi. Tur guruhga bog'liq bo'lgani uchun tanlangan
-     * biznes turi va undan keyingi tanlovlar tozalanadi.
+     * Katalog bo'limi o'zgardi. Tur bo'limga bog'liq bo'lgani uchun tanlangan biznes turi
+     * va undan keyingi tanlovlar tozalanadi. `null` — bo'limsiz (butun katalog).
      */
-    fun onDraftGroup(key: String?) {
+    fun onDraftSection(section: CatalogSection?) {
         draft.value = draft.value.copy(
-            groupKey = key, categoryId = null, subcategories = emptySet(), gender = null,
+            groupKey = section?.groupKey,
+            typeKeys = section?.takeIf { it.partial }?.typeKeys ?: emptySet(),
+            categoryId = null, subcategories = emptySet(), gender = null,
         )
-        loadSchema(null, key)
+        loadSchema(draft.value)
     }
 
     /** Biznes turi o'zgarsa — unga bog'liq sub-kategoriya va jins tanlovlari tozalanadi. */
     fun onDraftCategory(id: String?) {
         draft.value = draft.value.copy(categoryId = id, subcategories = emptySet(), gender = null)
-        // bo'limlar va sonlar yangi turga moslanadi (tur bo'sh bo'lsa — ochiq guruh doirasida)
-        loadSchema(id, draft.value.groupKey)
+        // bo'limlar va sonlar yangi turga moslanadi (tur bo'sh bo'lsa — ochiq bo'lim doirasida)
+        loadSchema(draft.value)
     }
 
     fun toggleDraftSubcategory(sub: String) {
@@ -463,3 +654,58 @@ class DiscountsViewModel(
         viewModelScope.launch { discountRepository.setSaved(offerId, !currentlySaved) }
     }
 }
+
+/**
+ * Server guruhlari va turlaridan ekrandagi BO'LIMLAR ro'yxati.
+ *
+ * Ikki tuzatish qo'llanadi ([CatalogRules]): yashirin turlar (ijara) tashlanadi va xizmat
+ * turlari o'z bo'limiga ajratiladi ("Savdo va xizmat" → "Savdo" + "Xizmatlar"). Guruhda
+ * faqat savdo yoki faqat xizmat bo'lsa bo'linish bo'lmaydi — bitta bo'lim qoladi.
+ */
+private fun sectionsOf(
+    groups: List<DiscountGroup>,
+    types: List<DiscountCategory>,
+): List<CatalogSection> {
+    val byGroup = types.filterNot { CatalogRules.isHidden(it.id) }.groupBy { it.groupKey }
+    return groups.flatMap { g ->
+        val list = byGroup[g.key].orEmpty().sortedByDescending { it.offerCount }
+        val (services, goods) = list.partition { CatalogRules.isService(it.id) }
+        when {
+            // Turi qolmagan guruh (masalan butunlay ijaradan iborat) — katakcha chizilmaydi.
+            list.isEmpty() -> emptyList()
+            services.isEmpty() || goods.isEmpty() ->
+                listOf(CatalogSection(g.key, g.name, g.emoji, g.accent, g.key, list))
+            else -> listOf(
+                CatalogSection(
+                    key = g.key, name = CatalogRules.goodsName(g.name), emoji = g.emoji,
+                    accent = g.accent, groupKey = g.key, types = goods, partial = true,
+                ),
+                CatalogSection(
+                    key = g.key + CatalogRules.SERVICES_SUFFIX, name = CatalogRules.SERVICES_NAME,
+                    emoji = CatalogRules.SERVICES_EMOJI, accent = g.accent, groupKey = g.key,
+                    types = services, partial = true,
+                ),
+            )
+        }
+    }
+}
+
+/**
+ * Filtr qiymatlariga mos bo'lim. Avval aniq mos kelgani (bo'lingan bo'limda turlar to'plami
+ * ham bir xil), keyin — butun guruh. `null` — bo'lim ochilmagan.
+ */
+private fun List<CatalogSection>.find(f: FilterValues): CatalogSection? {
+    val key = f.groupKey ?: return null
+    return firstOrNull { it.groupKey == key && it.typeKeys == f.typeKeys }
+        ?: firstOrNull { it.groupKey == key && !it.partial }
+}
+
+/**
+ * E'lonlarni ochiq BO'LIM doirasiga qisqartiradi: guruh + (guruh bo'lingan bo'lsa) o'sha
+ * bo'limning turlari. Yashirin turlar (ijara) har doim tashlanadi — eski keshda qolgan
+ * qatorlar ham ko'rinib qolmasin.
+ */
+private fun filterSection(offers: List<DiscountOffer>, f: FilterValues): List<DiscountOffer> = offers
+    .filterNot { CatalogRules.isHidden(it.categoryId) }
+    .let { list -> if (f.groupKey == null) list else list.filter { it.groupKey == f.groupKey } }
+    .let { list -> if (f.typeKeys.isEmpty()) list else list.filter { it.categoryId in f.typeKeys } }

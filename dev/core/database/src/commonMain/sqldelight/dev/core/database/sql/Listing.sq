@@ -118,5 +118,9 @@ UPDATE ListingEntity SET status = ?, updatedAt = ? WHERE id = ?;
 deleteById:
 DELETE FROM ListingEntity WHERE id = ?;
 
+-- Turdagi e'lonlar soni — namuna ma'lumot (seed) faqat jadval bo'sh bo'lganda yoziladi.
+countByKind:
+SELECT count(*) FROM ListingEntity WHERE kind = ?;
+
 clear:
 DELETE FROM ListingEntity;

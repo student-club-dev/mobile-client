@@ -118,8 +118,16 @@ interface ChatRepository {
      * Bittasi yiqilsa qolganlari yuborilaveradi; yiqilgani `FAILED` bo'lib qoladi va
      * [retry] bilan qayta urinish mumkin — fayl **qayta yuklanmaydi**, chunki biriktirma
      * bir martalik (`422 MEDIA_ALREADY_USED`).
+     *
+     * [caption] — butun albomga bitta izoh (Telegramdagi kabi). U **birinchi** rasmning
+     * tanasiga yoziladi: albom to'ri bitta xabar bo'lib ko'rinadi, ya'ni izohni har bir
+     * katakka takrorlash matnni bir necha marta chizardi.
      */
-    suspend fun sendImages(conversationId: String, images: List<OutgoingImage>): Resource<Unit>
+    suspend fun sendImages(
+        conversationId: String,
+        images: List<OutgoingImage>,
+        caption: String? = null,
+    ): Resource<Unit>
 
     /**
      * Hujjat yuboradi — `kind = FILE` (48 MB, oq ro'yxatdagi turlar).

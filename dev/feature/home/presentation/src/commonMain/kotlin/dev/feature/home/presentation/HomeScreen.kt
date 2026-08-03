@@ -75,7 +75,6 @@ import dev.feature.stories.presentation.StoriesRow
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
 import dev.core.domain.model.DiscountOffer
-import dev.feature.clubs.domain.model.Club
 import dev.feature.listings.domain.model.Listing
 import dev.feature.listings.domain.model.formatSum
 import dev.feature.connections.domain.model.ConnectionView
@@ -83,8 +82,11 @@ import dev.feature.connections.domain.model.SearchedStudent
 import org.koin.compose.viewmodel.koinViewModel
 import androidx.compose.runtime.ReadOnlyComposable
 
-/** Dizayndagi `cubic-bezier(.4,0,.2,1)` — topbar kichrayishi shu egri bilan. */
-private val ScEasing = CubicBezierEasing(0.4f, 0f, 0.2f, 1f)
+/**
+ * Dizayndagi `cubic-bezier(.4,0,.2,1)` — topbar kichrayishi shu egri bilan.
+ * `internal`: yon panel ham ([HomeSideNav]) aynan shu egridan foydalanadi.
+ */
+internal val ScEasing = CubicBezierEasing(0.4f, 0f, 0.2f, 1f)
 
 /** Shu masofadan ortiq scroll qilinganda topbar siqiladi (maketda `scrollTop > 36`). */
 private val CondenseThreshold = 36.dp
@@ -97,16 +99,13 @@ fun HomeScreen(
     onOpenProfile: () -> Unit = {},
     onOpenChat: () -> Unit = {},
     onOpenNotifications: () -> Unit = {},
-    onOpenClubs: () -> Unit = {},
     /**
      * "Siz uchun" feed'i. Argument — katalog guruhi kaliti ([HomeOfferSection.key]): bo'lim
      * sarlavhasidagi "Barchasi" AYNAN o'sha bo'limni (masalan "Ovqatlar") ochadi. `null` —
      * filtrsiz butun feed.
      */
     onOpenDiscounts: (String?) -> Unit = {},
-    onOpenJobs: () -> Unit = {},
     onOpenRentals: () -> Unit = {},
-    onOpenTasks: () -> Unit = {},
     onOpenListing: (String) -> Unit = {},
     /** "Do'stlar" — `Connections` ekrani bog'langanlar bo'limi bilan. */
     onOpenStudents: () -> Unit = {},
@@ -116,6 +115,12 @@ fun HomeScreen(
     onOpenStudentRequests: () -> Unit = {},
     /** Bog'langan talaba kartasidagi "Xabar" — chat tab'ini o'sha odam bilan ochadi. */
     onOpenChatWith: (String) -> Unit = {},
+    /** Yon paneldagi "Universitetim" — pastki paneldagi o'sha tab. */
+    onOpenUniversity: () -> Unit = {},
+    /** Yon paneldagi "E'lonlar" — talaba e'lonlari tab'i (ijara, xizmat, ish). */
+    onOpenListings: () -> Unit = {},
+    /** Yon paneldagi "Sozlamalar". Ekranda boshqa kirish nuqtasi yo'q (profil ichida). */
+    onOpenSettings: () -> Unit = {},
     vm: HomeViewModel = koinViewModel(),
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
@@ -139,65 +144,96 @@ fun HomeScreen(
      */
     var profileStudent by remember { mutableStateOf<StudentSummary?>(null) }
 
-    Column(Modifier.fillMaxSize().background(Sc.Bg)) {
-        HomeHeader(
+    /**
+     * Yon panel ([HomeSideNav]) holati: `»` tutqichi bosilganda ham, chap chetdan
+     * o'ngga surilganda ham shu bitta qiymat harakatlantiradi.
+     */
+    val sideNav = rememberSideNavState()
+
+    // Surish ishlovchisi ILDIZ `Box` da — u butun ekranni qamraydi, lekin harakat
+    // aniq gorizontal bo'lgunicha hech narsani yutmaydi (`sideNavEdgeDrag` izohiga q.).
+    Box(Modifier.fillMaxSize().background(Sc.Bg).sideNavEdgeDrag(sideNav)) {
+        Column(Modifier.fillMaxSize()) {
+            HomeHeader(
+                state = state,
+                p = p,
+                onOpenProfile = onOpenProfile,
+                onOpenChat = onOpenChat,
+                onOpenNotifications = onOpenNotifications,
+                // Yig'ilgan to'plam bosilsa — lenta yana ko'rinsin.
+                onOpenStories = { scope.launch { scroll.animateScrollTo(0) } },
+            )
+            // Yon panel tutqichi — topbar bilan story lentasi CHEGARASIDA, chap chetda.
+            // Ustunda joy EGALLAMAYDI (`sideNavHandleSeam`): kontentni pastga surmaydi,
+            // uning ustida "suzadi". Scroll qilinadigan ustundan tashqarida — ro'yxat
+            // surilganda ham joyida qoladi.
+            SideNavHandle(sideNav::open, Modifier.sideNavHandleSeam())
+
+            Column(
+                Modifier.fillMaxWidth().weight(1f).verticalScroll(scroll).padding(top = 22.dp),
+                verticalArrangement = Arrangement.spacedBy(26.dp),
+            ) {
+                // Story lentasi — eng tepada, bo'limlardan oldin (`handoff/07-STORIES.md` §2).
+                // O'z holatini o'zi boshqaradi: lenta bo'sh bo'lsa ham «Lavham» katakchasi
+                // qoladi, ya'ni bu yerda shart tekshirilmaydi.
+                StoriesRow(
+                    myName = state.userName,
+                    myAvatarUrl = state.avatarUrl,
+                    // Lavha muallifi ustiga bosilganda uning profili — CHATDAGI bilan bir xil
+                    // varaq va bir xil bo'limlar (`rememberPeerProfileSections`). Varaqni shu
+                    // yerda chizamiz: story moduli chat moduliga bog'lanolmaydi.
+                    onOpenProfile = { author -> profileStudent = author },
+                )
+
+                // Birinchi yuklanish, keshda hech narsa yo'q — bo'limlar o'rniga skelet.
+                if (state.loading) {
+                    HomeSkeleton()
+                }
+                // Home'da FAQAT uchta e'lon bo'limi: ovqat, kiyim (jinsga mos) va kvartiralar.
+                // Birinchi ikkitasi katalogdan keladi (sarlavhalar serverniki), uchinchisi —
+                // ijara e'lonlari. Qolgan turlar ("Siz uchun", ish, yordam) o'z ekranlarida.
+                state.offerSections.forEach { section ->
+                    OfferSection(section, onOpenDiscounts)
+                }
+                RentalsSection(state.rentals, onOpenRentals, onOpenListing)
+                StudentsSearchSection(onOpenStudentSearch, onOpenStudents, onOpenStudentRequests)
+                StudentsSection(
+                    title = "Universitetimda",
+                    subtitle = "Bir universitetda o'qiyotgan talabalar",
+                    students = state.universityStudents,
+                    onSeeAll = onOpenStudentSearch,
+                    onConnect = vm::connect,
+                    onMessage = onOpenChatWith,
+                )
+                StudentsSection(
+                    title = "Barcha talabalar",
+                    subtitle = "Yangi qo'shilganlar birinchi",
+                    students = state.allStudents,
+                    onSeeAll = onOpenStudentSearch,
+                    onConnect = vm::connect,
+                    onMessage = onOpenChatWith,
+                )
+                // Pastki navigatsiya + FAB uchun joy.
+                Spacer(Modifier.height(96.dp))
+            }
+        }
+
+        HomeSideNav(
+            nav = sideNav,
             state = state,
-            p = p,
             onOpenProfile = onOpenProfile,
+            onOpenUniversity = onOpenUniversity,
+            onOpenListings = onOpenListings,
+            // Kalitsiz — butun "Takliflar" feed'i (bo'lim filtri yo'q).
+            onOpenOffers = { onOpenDiscounts(null) },
+            onOpenRentals = onOpenRentals,
             onOpenChat = onOpenChat,
             onOpenNotifications = onOpenNotifications,
-            // Yig'ilgan to'plam bosilsa — lenta yana ko'rinsin.
-            onOpenStories = { scope.launch { scroll.animateScrollTo(0) } },
+            onOpenStudents = onOpenStudents,
+            onOpenStudentSearch = onOpenStudentSearch,
+            onOpenStudentRequests = onOpenStudentRequests,
+            onOpenSettings = onOpenSettings,
         )
-        Column(
-            Modifier.fillMaxWidth().weight(1f).verticalScroll(scroll).padding(top = 22.dp),
-            verticalArrangement = Arrangement.spacedBy(26.dp),
-        ) {
-            // Story lentasi — eng tepada, bo'limlardan oldin (`handoff/07-STORIES.md` §2).
-            // O'z holatini o'zi boshqaradi: lenta bo'sh bo'lsa ham «Lavham» katakchasi
-            // qoladi, ya'ni bu yerda shart tekshirilmaydi.
-            StoriesRow(
-                myName = state.userName,
-                myAvatarUrl = state.avatarUrl,
-                // Lavha muallifi ustiga bosilganda uning profili — CHATDAGI bilan bir xil
-                // varaq va bir xil bo'limlar (`rememberPeerProfileSections`). Varaqni shu
-                // yerda chizamiz: story moduli chat moduliga bog'lanolmaydi.
-                onOpenProfile = { author -> profileStudent = author },
-            )
-
-            // Birinchi yuklanish, keshda hech narsa yo'q — bo'limlar o'rniga skelet.
-            if (state.loading) {
-                HomeSkeleton()
-            }
-            // Bo'limlar ro'yxati backend katalogidan (`/v1/catalog/groups`) — ilovada qat'iy
-            // yozilmagan, tartib ham serverniki.
-            state.offerSections.forEach { section ->
-                OfferSection(section, onOpenDiscounts)
-            }
-            TasksSection(state.tasks, onOpenTasks, onOpenListing)
-            ClubsSection(state.clubs, onOpenClubs)
-            RentalsSection(state.rentals, onOpenRentals, onOpenListing)
-            JobsSection(state.jobs, onOpenJobs, onOpenListing)
-            StudentsSearchSection(onOpenStudentSearch, onOpenStudents, onOpenStudentRequests)
-            StudentsSection(
-                title = "Universitetimda",
-                subtitle = "Bir universitetda o'qiyotgan talabalar",
-                students = state.universityStudents,
-                onSeeAll = onOpenStudentSearch,
-                onConnect = vm::connect,
-                onMessage = onOpenChatWith,
-            )
-            StudentsSection(
-                title = "Barcha talabalar",
-                subtitle = "Yangi qo'shilganlar birinchi",
-                students = state.allStudents,
-                onSeeAll = onOpenStudentSearch,
-                onConnect = vm::connect,
-                onMessage = onOpenChatWith,
-            )
-            // Pastki navigatsiya + FAB uchun joy.
-            Spacer(Modifier.height(96.dp))
-        }
     }
 
     profileStudent?.let { author ->
@@ -263,7 +299,6 @@ private fun HomeHeader(
     onOpenNotifications: () -> Unit,
     onOpenStories: () -> Unit,
 ) {
-    val fade = 1f - p
     ScHeader(
         bottomRadius = lerp(36.dp, 26.dp, p),
         bottomPadding = lerp(28.dp, 12.dp, p),
@@ -359,10 +394,11 @@ private fun HomeHeader(
                 horizontalArrangement = Arrangement.spacedBy(9.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Chat tugmasi siqilganda butunlay yo'qoladi (eni 0 ga tushadi).
-                Box(Modifier.width(lerp(42.dp, 0.dp, p)).clipToBounds().alpha(fade)) {
-                    HeaderCircleButton(ScIcons.ChatRound, "Xabarlar", onOpenChat)
-                }
+                // Chat tugmasi HAR DOIM ko'rinadi — siqilganda ham. Suhbatlar pastki
+                // panelda tab emas (u yerda "Takliflar" turibdi), ya'ni bu ilovadagi
+                // YAGONA kirish nuqtasi: ilgarigidek scroll'da yo'qolsa, foydalanuvchi
+                // xabarlarga tepaga qaytmasdan kirolmay qolardi.
+                HeaderCircleButton(ScIcons.ChatRound, "Xabarlar", onOpenChat)
                 HeaderCircleButton(
                     ScIcons.Bell,
                     "Bildirishnomalar",
@@ -635,84 +671,6 @@ private fun Long.spaced(): String = toString().reversed().chunked(3).joinToStrin
 private val InkOnLight = Color(0xFF0F2A43)
 
 // ---------------------------------------------------------------------------
-// Yordam e'lonlari
-// ---------------------------------------------------------------------------
-
-@Composable
-private fun TasksSection(tasks: List<Listing>, onSeeAll: () -> Unit, onOpen: (String) -> Unit) {
-    if (tasks.isEmpty()) return
-    Column(verticalArrangement = Arrangement.spacedBy(13.dp)) {
-        PaddedHeader(
-            "Yordam e'lonlari", "Referat, masala, qo'lyozma va IT ishlari", onAction = onSeeAll
-        )
-        Column(
-            Modifier.padding(horizontal = Sc.ScreenPadding),
-            verticalArrangement = Arrangement.spacedBy(11.dp),
-        ) {
-            tasks.take(3).forEach { TaskCard(it, onOpen) }
-        }
-    }
-}
-
-@Composable
-private fun TaskCard(listing: Listing, onOpen: (String) -> Unit) {
-    val book = ScIcons.Book
-    Row(
-        Modifier.fillMaxWidth().scCard(radius = 24.dp, onClick = { onOpen(listing.id) })
-            .padding(15.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(13.dp),
-    ) {
-        ScIconTile(Sc.TintPink, size = 52.dp, radius = 18.dp) { ScGlyph(book, 26.dp) }
-        // Nom + narx + manzil. Muddat chipi va tavsif kartadan olib tashlangan —
-        // ular e'lon tafsilotida (chegirma kartalari bilan bir xil qoida).
-        Column(Modifier.weight(1f)) {
-            ScText(listing.title, 15.5f, FontWeight.ExtraBold, Sc.Ink, maxLines = 1)
-            Spacer(Modifier.height(7.dp))
-            ScText(listing.priceLabel(), 14.5f, FontWeight.ExtraBold, Sc.Success, maxLines = 1)
-            listing.locationLabel()?.let { location ->
-                Spacer(Modifier.height(3.dp))
-                ScText("📍 $location", 11.5f, FontWeight.SemiBold, Sc.MutedLight, maxLines = 1)
-            }
-        }
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Klublar
-// ---------------------------------------------------------------------------
-
-/** Klub kartalari dizaynda navbat bilan ko'k / binafsha / yashil bo'ladi. */
-@Composable
-private fun clubVisual(index: Int): Triple<Color, Color, ImageVector> = when (index.mod(3)) {
-    0 -> Triple(Sc.TintBlue, Sc.Brand, ScIcons.Laptop)
-    1 -> Triple(Sc.TintViolet, Sc.Violet, ScIcons.MessageLines)
-    else -> Triple(Sc.TintGreen, Sc.Success, ScIcons.Medal)
-}
-
-@Composable
-private fun ClubsSection(clubs: List<Club>, onOpenClubs: () -> Unit) {
-    if (clubs.isEmpty()) return
-    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        PaddedHeader("Klublar", onAction = onOpenClubs)
-        EdgeRow(clubs.take(6), spacing = 12.dp) { _, club ->
-            val (tint, accent, icon) = clubVisual((club.id - 1).toInt())
-            Column(
-                Modifier.width(138.dp).scCard(radius = 24.dp, onClick = onOpenClubs).padding(15.dp),
-            ) {
-                ScIconTile(tint, size = 48.dp, radius = 17.dp) {
-                    Icon(icon, null, tint = accent, modifier = Modifier.size(24.dp))
-                }
-                Spacer(Modifier.height(14.dp))
-                ScText(club.name, 15.5f, FontWeight.ExtraBold, Sc.Ink, maxLines = 1)
-                Spacer(Modifier.height(4.dp))
-                ScText("${club.membersCount} a'zo", 13f, FontWeight.Bold, accent, maxLines = 1)
-            }
-        }
-    }
-}
-
-// ---------------------------------------------------------------------------
 // Ijara kvartiralar
 // ---------------------------------------------------------------------------
 
@@ -736,56 +694,6 @@ private fun RentalsSection(rentals: List<Listing>, onSeeAll: () -> Unit, onOpen:
                 listing.locationLabel()?.let { location ->
                     Spacer(Modifier.height(4.dp))
                     ScText("📍 $location", 11.5f, FontWeight.SemiBold, Sc.MutedLight, maxLines = 1)
-                }
-            }
-        }
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Ish e'lonlari
-// ---------------------------------------------------------------------------
-
-@Composable
-private fun JobsSection(jobs: List<Listing>, onSeeAll: () -> Unit, onOpen: (String) -> Unit) {
-    if (jobs.isEmpty()) return
-    Column(verticalArrangement = Arrangement.spacedBy(13.dp)) {
-        PaddedHeader("Ish e'lonlari", "Kunlik va doimiy ishlar", onAction = onSeeAll)
-        Column(
-            Modifier.padding(horizontal = Sc.ScreenPadding),
-            verticalArrangement = Arrangement.spacedBy(11.dp),
-        ) {
-            jobs.take(3).forEach { listing ->
-                Row(
-                    Modifier.fillMaxWidth().scCard(radius = 24.dp, onClick = { onOpen(listing.id) })
-                        .padding(15.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(13.dp),
-                ) {
-                    ScIconTile(Sc.TintBlue, size = 52.dp, radius = 18.dp) {
-                        Icon(
-                            ScIcons.Briefcase,
-                            null,
-                            tint = Sc.Brand,
-                            modifier = Modifier.size(26.dp)
-                        )
-                    }
-                    // Nom + maosh + manzil; kompaniya nomi va kategoriya tafsilotda.
-                    Column(Modifier.weight(1f)) {
-                        ScText(listing.title, 15.5f, FontWeight.ExtraBold, Sc.Ink, maxLines = 1)
-                        Spacer(Modifier.height(7.dp))
-                        ScText(
-                            listing.salaryLabel(),
-                            14.5f,
-                            FontWeight.ExtraBold,
-                            Sc.Success,
-                            maxLines = 1
-                        )
-                        listing.locationLabel()?.let { location ->
-                            Spacer(Modifier.height(3.dp))
-                            ScText("📍 $location", 11.5f, FontWeight.SemiBold, Sc.MutedLight, maxLines = 1)
-                        }
-                    }
                 }
             }
         }
@@ -953,23 +861,10 @@ private fun StudentsSection(
 private fun Listing.locationLabel(): String? =
     branches.firstOrNull()?.address?.takeIf { it.isNotBlank() }
 
-/** "50 000 so'm" yoki "Kelishilgan". */
-private fun Listing.priceLabel(): String =
-    if (isNegotiable) "Kelishilgan" else "${price.formatSum()} so'm"
-
 /** "1 500 000 so'm / oy". */
 private fun Listing.rentLabel(): String {
     if (isNegotiable) return "Kelishilgan"
     val suffix = rentalDetails?.period?.priceUnit?.suffix
     return listOfNotNull("${price.formatSum()} so'm", suffix).joinToString(" / ")
-}
-
-/** "40 000 so'm / kun" yoki oraliq. */
-private fun Listing.salaryLabel(): String {
-    if (isNegotiable) return "Kelishilgan"
-    val suffix = jobDetails?.payPeriod?.suffix
-    val amount = priceMax?.takeIf { it > price }?.let { "${price.formatSum()} — ${it.formatSum()}" }
-        ?: price.formatSum()
-    return listOfNotNull("$amount so'm", suffix).joinToString(" / ")
 }
 

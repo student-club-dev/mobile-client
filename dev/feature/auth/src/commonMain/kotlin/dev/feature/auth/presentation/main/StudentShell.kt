@@ -35,8 +35,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -74,7 +72,6 @@ import dev.feature.connections.presentation.BlockedStudentsScreen
 import dev.feature.connections.presentation.ConnectionsScreen
 import dev.feature.connections.presentation.ConnectionsTab
 import dev.feature.notifications.presentation.NotificationsScreen
-import dev.feature.clubs.presentation.ClubsScreen
 import dev.feature.settings.presentation.SettingsScreen
 import dev.feature.university.presentation.MyUniversityScreen
 import dev.feature.chat.presentation.ChatScreen
@@ -91,7 +88,14 @@ private enum class StudentTab(val route: String, val label: String) {
     // Ilgari faqat "Ishlar" edi; endi bitta ekranda Ijara, Xizmatlar va Ish e'lonlari
     // tab bilan almashadi, shuning uchun umumiy nom.
     LISTINGS("listings", "E'lonlar"),
-    CHAT("chat", "Xabarlar"),
+    /**
+     * Bizneslardan keladigan e'lonlar ("Siz uchun" feed'i) — chegirmali va chegirmasiz.
+     * [LISTINGS] dan farqi: u yerda TALABALAR e'lonlari (ijara, ish, yordam).
+     *
+     * Chat tab'i o'rniga keldi: suhbatlar bosh ekran sarlavhasidagi tugmadan ochiladi,
+     * ya'ni pastki panelda ikkinchi kirish nuqtasi ortiqcha edi.
+     */
+    OFFERS("discounts", "Takliflar"),
 }
 
 /**
@@ -103,10 +107,14 @@ private val StudentTab.icon: ImageVector
         StudentTab.HOME -> ScIcons.Home
         StudentTab.UNIVERSITY -> ScIcons.Cap
         StudentTab.LISTINGS -> ScIcons.FileText
-        StudentTab.CHAT -> ScIcons.Message
+        StudentTab.OFFERS -> ScIcons.DiscountTag
     }
 
-private const val DISCOUNTS = "discounts"
+/**
+ * Suhbatlar — tab EMAS: bosh ekran sarlavhasidagi tugmadan, "Do'stlar" dagi "Xabar" dan
+ * va push bildirishnomasidan ochiladi. Orqaga tugmasi bilan chiziladi.
+ */
+private const val CHAT = "chat"
 private const val LISTING_DETAIL = "listing_detail"
 private const val POST_LISTING = "post_listing"
 
@@ -135,7 +143,6 @@ private const val SETTINGS = "settings"
 
 /** "Bloklanganlar" — Sozlamalar → Maxfiylik'dan ochiladi (tab emas, tafsilot ekrani). */
 private const val BLOCKED = "blocked"
-private const val CLUBS = "clubs"
 
 private val tabRoutes = StudentTab.entries.map { it.route }.toSet()
 
@@ -152,19 +159,17 @@ private fun String?.toListingKind(): ListingKind =
     ListingKind.entries.firstOrNull { it.name == this } ?: ListingKind.JOB
 
 /**
- * Talaba karkasi — pastki navigatsiya (Home / Chegirma / Ishlar / Student) + markaziy "Elon" FAB
- * (talaba e'lonlari: ish, sotuv, xizmat). Biznesmen chegirma e'lonlari bu yerda YO'Q — ular
- * [BusinessShell] da.
+ * Talaba karkasi — pastki navigatsiya (Home / Universitet / E'lonlar / Takliflar) + markaziy
+ * "E'lon" FAB (talaba e'lonlari: ijara, ish, xizmat, yordam).
+ *
+ * "Takliflar" — bizneslardan keladigan e'lonlar feed'i, faqat O'QISH uchun. Biznesmenning
+ * e'lon qo'yish oqimi bu yerda YO'Q — u [BusinessShell] da.
  */
 @Composable
 fun StudentShell(onLoggedOut: () -> Unit) {
     val nav = rememberNavController()
     val backStack by nav.currentBackStackEntryAsState()
     val current = backStack?.destination?.route?.toTabRoute() ?: StudentTab.HOME.route
-
-    // "Xabarlar" tab'ida suhbat ochiqmi. Suhbat alohida route EMAS (ChatScreen'ning ichki
-    // holati), shuning uchun route'dan bilib bo'lmaydi — ekranning o'zi xabar beradi.
-    var chatThreadOpen by remember { mutableStateOf(false) }
 
     // Tab almashish — holat saqlanadi/tiklanadi, dublikat yaratmaydi (navigateSafe).
     val selectTab: (String) -> Unit = { route ->
@@ -188,21 +193,19 @@ fun StudentShell(onLoggedOut: () -> Unit) {
         }
     }
 
-    /**
-     * Chat tab'ini konkret talaba bilan ochadi ("Do'stlar" → "Xabar").
-     *
-     * [openListingsKind] dagi kabi `restoreState` YO'Q: saqlangan holat tiklanganda
-     * Navigation eski argumentlarni qaytaradi va yangi `?studentId=` bekor bo'lardi.
-     */
     /** `Connections` ekranini konkret bo'lim ochilgan holda ochadi (Home'dagi tugmalar). */
     val openConnectionsTab: (ConnectionsTab) -> Unit = { tab ->
         nav.navigateSafe("$CONNECTIONS?tab=${tab.name}")
     }
 
+    /**
+     * Suhbatni konkret talaba bilan ochadi ("Do'stlar" → "Xabar").
+     *
+     * Chat tab bo'lmagani uchun oddiy tafsilot ekrani kabi stack'ga qo'yiladi — orqaga
+     * bosilsa kelingan joyga qaytadi.
+     */
     val openChatWith: (String) -> Unit = { studentId ->
-        nav.navigateSafe("${StudentTab.CHAT.route}?studentId=${encodeArg(studentId)}") {
-            popUpTo(StudentTab.HOME.route) { saveState = true }
-        }
+        nav.navigateSafe("$CHAT?studentId=${encodeArg(studentId)}")
     }
 
     // --- Push -----------------------------------------------------------------------------
@@ -219,10 +222,10 @@ fun StudentShell(onLoggedOut: () -> Unit) {
     LaunchedEffect(pendingConversationId) {
         val conversationId = pendingConversationId ?: return@LaunchedEffect
         PushRoute.consume()
-        nav.navigateSafe(
-            "${StudentTab.CHAT.route}?conversationId=${encodeArg(conversationId)}",
-        ) {
-            popUpTo(StudentTab.HOME.route) { saveState = true }
+        // Push'dan kelinganda suhbat Home ustiga qo'yiladi: orqaga bosilsa ilova yopilmay,
+        // bosh ekranga tushadi.
+        nav.navigateSafe("$CHAT?conversationId=${encodeArg(conversationId)}") {
+            popUpTo(StudentTab.HOME.route)
         }
     }
 
@@ -245,24 +248,32 @@ fun StudentShell(onLoggedOut: () -> Unit) {
             ) {
                 HomeScreen(
                     onOpenProfile = { nav.navigateSafe(PROFILE) },
-                    onOpenChat = { selectTab(StudentTab.CHAT.route) },
+                    onOpenChat = { nav.navigateSafe(CHAT) },
                     onOpenNotifications = { nav.navigateSafe(NOTIFICATIONS) },
-                    onOpenClubs = { nav.navigateSafe(CLUBS) },
-                    // Bo'lim kaliti bilan — "Ovqatlar → Barchasi" aynan Ovqatlar ekranini ochadi.
-                    // Kalitsiz (yoki noma'lum bo'lsa) — odatdagi "Siz uchun" feed'i.
+                    // "Takliflar" tab'ini KONKRET bo'lim ochilgan holda ochadi ("Ovqatlar →
+                    // Barchasi"). [openListingsKind] dagi kabi `restoreState` YO'Q: saqlangan
+                    // holat tiklansa Navigation eski argumentlarni qaytarib, yangi `?group=`
+                    // bekor bo'lardi. Kalitsiz — odatdagi to'liq feed.
                     onOpenDiscounts = { groupKey ->
                         val key = encodeArg(groupKey)
-                        nav.navigateSafe(if (key == null) DISCOUNTS else "$DISCOUNTS?group=$key")
+                        val route = StudentTab.OFFERS.route
+                        nav.navigateSafe(if (key == null) route else "$route?group=$key") {
+                            popUpTo(StudentTab.HOME.route) { saveState = true }
+                        }
                     },
-                    // Ikkalasi ham o'sha ekran, lekin darrov kerakli tab ochilgan holda.
-                    onOpenJobs = { openListingsKind(ListingKind.JOB) },
+                    // "E'lonlar" ekrani, darrov ijara tab'i ochilgan holda.
                     onOpenRentals = { openListingsKind(ListingKind.RENTAL) },
-                    onOpenTasks = { openListingsKind(ListingKind.TASK) },
                     onOpenListing = { id -> nav.navigateSafe("$LISTING_DETAIL/${encodeArg(id)}") },
                     onOpenStudents = { nav.navigateSafe(CONNECTIONS) },
                     onOpenStudentSearch = { openConnectionsTab(ConnectionsTab.SEARCH) },
                     onOpenStudentRequests = { openConnectionsTab(ConnectionsTab.REQUESTS) },
                     onOpenChatWith = openChatWith,
+                    // Yon paneldagi bo'limlar. Universitet va E'lonlar — pastki paneldagi
+                    // TABLAR, shuning uchun oddiy tab almashish (holat saqlanadi).
+                    onOpenUniversity = { selectTab(StudentTab.UNIVERSITY.route) },
+                    onOpenListings = { selectTab(StudentTab.LISTINGS.route) },
+                    // Sozlamalar — tafsilot ekrani, stack'ga qo'yiladi (orqaga → Home).
+                    onOpenSettings = { nav.navigateSafe(SETTINGS) },
                 )
             }
             composable(
@@ -271,17 +282,17 @@ fun StudentShell(onLoggedOut: () -> Unit) {
                 popEnterTransition = TabEnter, popExitTransition = TabExit,
             ) { MyUniversityScreen() }
             composable(
-                // "Siz uchun" — Home'dan ochiladi (endi pastki tab emas). Orqaga qaytadi.
+                // "Takliflar" — bizneslardan keladigan e'lonlar, pastki paneldagi tab.
                 // `?group=` — Home'dagi bo'lim ("Ovqatlar") tugmasidan; bo'sh bo'lsa butun feed.
-                route = "$DISCOUNTS?group={group}",
+                route = "${StudentTab.OFFERS.route}?group={group}",
+                enterTransition = TabEnter, exitTransition = TabExit,
+                popEnterTransition = TabEnter, popExitTransition = TabExit,
                 arguments = listOf(
                     navArgument("group") { type = NavType.StringType; nullable = true; defaultValue = null },
                 ),
             ) { entry ->
-                DiscountsScreen(
-                    onBack = { nav.popSafe() },
-                    initialGroupKey = entry.arguments?.getString("group"),
-                )
+                // Tab — orqaga tugmasisiz (`onBack` berilmaydi).
+                DiscountsScreen(initialGroupKey = entry.arguments?.getString("group"))
             }
             // Ijara / Xizmatlar / Ish e'lonlari — uchalasi bitta ekranda, tepadagi tab bilan.
             // `kind` argumenti Home'dan konkret bo'limga o'tish uchun (masalan to'g'ridan-to'g'ri
@@ -312,20 +323,18 @@ fun StudentShell(onLoggedOut: () -> Unit) {
             }
             composable(
                 // `?studentId=` — "Do'stlar" ekranidan "Xabar" bosilganda;
-                // `?conversationId=` — push bosilganda. Argumentsiz — oddiy tab (ro'yxat).
-                route = "${StudentTab.CHAT.route}?studentId={studentId}&conversationId={conversationId}",
-                enterTransition = TabEnter, exitTransition = TabExit,
-                popEnterTransition = TabEnter, popExitTransition = TabExit,
+                // `?conversationId=` — push bosilganda. Argumentsiz — suhbatlar ro'yxati.
+                route = "$CHAT?studentId={studentId}&conversationId={conversationId}",
                 arguments = listOf(
                     navArgument("studentId") { type = NavType.StringType; nullable = true; defaultValue = null },
                     navArgument("conversationId") { type = NavType.StringType; nullable = true; defaultValue = null },
                 ),
             ) { entry ->
-                // tab — orqaga tugmasisiz
                 ChatScreen(
+                    // Tab emas — sarlavhada orqaga tugmasi turadi.
+                    onBack = { nav.popSafe() },
                     openStudentId = entry.arguments?.getString("studentId"),
                     openConversationId = entry.arguments?.getString("conversationId"),
-                    onThreadOpenChange = { chatThreadOpen = it },
                 )
             }
             composable(
@@ -369,7 +378,6 @@ fun StudentShell(onLoggedOut: () -> Unit) {
                 )
             }
             composable(NOTIFICATIONS) { NotificationsScreen(onBack = { nav.popSafe() }) }
-            composable(CLUBS) { ClubsScreen(onBack = { nav.popSafe() }) }
             composable(EDIT_PROFILE) { EditProfileScreen(onBack = { nav.popSafe() }) }
             composable(SETTINGS) {
                 SettingsScreen(
@@ -385,10 +393,8 @@ fun StudentShell(onLoggedOut: () -> Unit) {
         // Klaviatura ochilganda pastki panel ko'rsatilmaydi: kontent klaviatura ustiga
         // ko'tarilgani uchun panel matn maydonining tagida osilib qolardi va joy egallardi.
         val keyboardOpen = WindowInsets.ime.getBottom(LocalDensity.current) > 0
-        // Ochilgan suhbat — to'liq ekran: panel yozish maydonining ustida turib joy egallardi.
-        // `current` sharti bayroq boshqa ekranga o'tilganda osilib qolmasligi uchun.
-        val inChatThread = chatThreadOpen && current == StudentTab.CHAT.route
-        if (current in tabRoutes && !keyboardOpen && !inChatThread) {
+        // Chat endi tab emas — panel u yerda o'z-o'zidan chizilmaydi (`current in tabRoutes`).
+        if (current in tabRoutes && !keyboardOpen) {
             BottomBar(
                 current = current,
                 onSelect = selectTab,
@@ -426,7 +432,7 @@ private fun BottomBar(
             // O'rtadagi joy FAB uchun bo'sh qoldiriladi (o'yiq shu yerda).
             Spacer(Modifier.weight(1f))
             NavBarItem(StudentTab.LISTINGS, current, onSelect)
-            NavBarItem(StudentTab.CHAT, current, onSelect)
+            NavBarItem(StudentTab.OFFERS, current, onSelect)
         }
 
         // FAB panelning BOLASI emas — panel `clip` qilingan, ichida bo'lsa kesilib qolardi.
@@ -500,15 +506,11 @@ private fun RowScope.NavBarItem(tab: StudentTab, current: String, onSelect: (Str
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
+        // Tanlangan tab faqat rang bilan ajratiladi — ikonka ostida nuqta yo'q.
         Icon(
             tab.icon, tab.label,
             tint = if (active) Sc.Brand else Sc.NavIdle,
             modifier = Modifier.size(24.dp),
-        )
-        Spacer(Modifier.height(5.dp))
-        Box(
-            Modifier.size(5.dp)
-                .background(if (active) Sc.Brand else Color.Transparent, CircleShape),
         )
     }
 }

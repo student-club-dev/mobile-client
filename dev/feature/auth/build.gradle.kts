@@ -27,8 +27,6 @@ kotlin {
             implementation(projects.dev.feature.connections.presentation)
             implementation(projects.dev.feature.notifications.domain)
             implementation(projects.dev.feature.notifications.presentation)
-            implementation(projects.dev.feature.clubs.domain)
-            implementation(projects.dev.feature.clubs.presentation)
             implementation(projects.dev.feature.settings.domain)
             implementation(projects.dev.feature.settings.presentation)
             api(projects.dev.feature.university.domain)

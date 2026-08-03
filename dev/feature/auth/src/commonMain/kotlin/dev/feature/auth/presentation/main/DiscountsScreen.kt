@@ -20,6 +20,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -52,6 +56,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
+import dev.core.domain.model.DiscountCategory
 import dev.core.domain.model.DiscountOffer
 import dev.core.domain.model.DiscountTag
 import dev.core.uikit.components.AppFontFamily
@@ -98,18 +103,35 @@ fun DiscountsScreen(
     val filterState by vm.filterState.collectAsStateWithLifecycle()
     val suggestions by vm.suggestions.collectAsStateWithLifecycle()
     val detail by vm.detail.collectAsStateWithLifecycle()
+    val catalogOpen by vm.catalogOpen.collectAsStateWithLifecycle()
+    val catalog by vm.catalogState.collectAsStateWithLifecycle()
     var showFilter by remember { mutableStateOf(false) }
     var showMap by remember { mutableStateOf(false) }
     var showSearch by remember { mutableStateOf(false) }
 
     Box(Modifier.fillMaxSize()) {
-        FeedContent(
-            state, palette, vm,
-            onBack = onBack,
-            onOpenFilter = { vm.openFilter(); showFilter = true },
-            onOpenMap = { showMap = true },
-            onOpenSearch = { showSearch = true },
-        )
+        // Ekranga kirilganda avval KATALOG: biznes turlari bo'limlarga birlashtirilgan holda.
+        // Bo'lim bosilgach uning barcha turlari bitta feed'da ochiladi.
+        if (catalogOpen) {
+            CatalogContent(
+                catalog, palette,
+                onBack = onBack,
+                onOpenSection = vm::openSection,
+                onOpenType = vm::openType,
+                onOpenAll = vm::openAllOffers,
+                onOpenSearch = { showSearch = true },
+            )
+        } else {
+            FeedContent(
+                state, palette, vm,
+                // Orqaga — katalogga qaytadi. Tashqi `onBack` (ekran stack'da ochilgan
+                // holat) faqat katalogda ishlaydi: ikki qadam bitta tugmaga sig'maydi.
+                onBack = vm::backToCatalog,
+                onOpenFilter = { vm.openFilter(); showFilter = true },
+                onOpenMap = { showMap = true },
+                onOpenSearch = { showSearch = true },
+            )
+        }
         // Qidiruv — klaviatura ustidagi suzuvchi maydon (E'lonlar ekranidagi bilan bir xil).
         // Server takliflari (`/v1/discounts/suggest`) maydon ostidagi tasmaga chiqadi.
         if (showSearch) {
@@ -152,6 +174,244 @@ fun DiscountsScreen(
 }
 
 // ---------------------------------------------------------------------------
+// Katalog — biznes turlari (ekranga kirilgandagi birinchi ko'rinish)
+// ---------------------------------------------------------------------------
+
+/**
+ * Katalog — biznes turlari BO'LIMLARGA birlashtirilgan holda, ikki ustunli to'r.
+ *
+ * Ilgari 27 ta tur alohida katak edi ("Somsa", "Fast food", "Milliy taomlar" — uchtasi
+ * yonma-yon); endi ular serverdagi guruh bo'yicha bitta "Ovqatlanish" katagiga yig'iladi,
+ * turlar esa bo'lim ichida chip bo'lib chiqadi.
+ *
+ * Ro'yxat ILOVADA yozilmagan: bo'limlar ham, turlar ham (nomi/emojisi/rangi) serverdan
+ * (`POST /v1/catalog/groups` + `/v1/catalog/types`). Yangi tur qo'shilsa ekranga tegish
+ * shart emas — u o'z bo'limi ichida paydo bo'ladi.
+ */
+@Composable
+private fun CatalogContent(
+    catalog: CatalogUiState,
+    palette: AppPalette,
+    onBack: (() -> Unit)?,
+    onOpenSection: (CatalogSection) -> Unit,
+    onOpenType: (DiscountCategory) -> Unit,
+    onOpenAll: () -> Unit,
+    onOpenSearch: () -> Unit,
+) {
+    Column(Modifier.fillMaxSize().background(Sc.Bg)) {
+        ScHeader {
+            Row(
+                Modifier.fillMaxWidth().padding(top = 18.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                if (onBack != null) {
+                    ScCircleButton(ScIcons.ChevronLeft, onBack, contentDescription = "Orqaga")
+                }
+                Column(Modifier.weight(1f)) {
+                    ScHeaderTitle("Takliflar", size = 21f)
+                    Spacer(Modifier.height(3.dp))
+                    ScHeaderSubtitle("Yo'nalishni tanlang")
+                }
+                ScCircleButton(ScIcons.Search, onClick = onOpenSearch, contentDescription = "Qidiruv")
+            }
+        }
+
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(2),
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 110.dp),
+            horizontalArrangement = Arrangement.spacedBy(11.dp),
+            verticalArrangement = Arrangement.spacedBy(11.dp),
+        ) {
+            // "Barchasi" — turlarsiz to'liq feed. Butun qatorni egallaydi.
+            item(span = { GridItemSpan(maxLineSpan) }) {
+                AllOffersCard(catalog.totalOffers, palette, onOpenAll)
+            }
+
+            if (catalog.loading) {
+                items(6) { ScShimmerCard() }
+            }
+
+            items(catalog.sections, key = { it.key }) { section ->
+                CatalogSectionCard(section, palette) { onOpenSection(section) }
+            }
+
+            // Bo'limga bog'lanmagan turlar — o'z katagi bilan (aks holda ular yo'qolardi).
+            items(catalog.looseTypes, key = { it.id }) { type ->
+                CatalogTypeCard(type, palette) { onOpenType(type) }
+            }
+
+            if (!catalog.loading && catalog.sections.isEmpty() && catalog.looseTypes.isEmpty()) {
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    Box(
+                        Modifier.fillMaxWidth().padding(top = 40.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            "Katalog hali yuklanmadi.",
+                            style = TextStyle(
+                                fontFamily = AppFontFamily, fontSize = 13.sp, color = palette.inkFaint,
+                            ),
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Katalogdagi bitta BO'LIM: emoji plitka + nom + ichidagi turlar + e'lonlar soni.
+ *
+ * Turlar qatori ("Milliy taomlar · Fast food · Somsa") ataylab ko'rsatiladi: foydalanuvchi
+ * qidirayotgan turi qaysi bo'limga tushganini kartaning o'zidan ko'radi.
+ */
+@Composable
+private fun CatalogSectionCard(
+    item: CatalogSection,
+    palette: AppPalette,
+    onClick: () -> Unit,
+) {
+    val accent = Color(item.accent)
+    Column(
+        Modifier.fillMaxWidth()
+            .clip(RoundedCornerShape(18.dp))
+            .background(palette.glass)
+            .border(1.dp, palette.border, RoundedCornerShape(18.dp))
+            .clickable(onClick = onClick)
+            .padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Box(
+            Modifier.size(44.dp).clip(RoundedCornerShape(15.dp)).background(accent.copy(alpha = 0.14f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                item.emoji.ifBlank { "🏷" },
+                style = TextStyle(fontFamily = AppFontFamily, fontSize = 21.sp),
+            )
+        }
+        Text(
+            item.name,
+            style = TextStyle(
+                fontFamily = AppFontFamily, fontSize = 14.sp,
+                fontWeight = FontWeight.ExtraBold, color = palette.ink,
+            ),
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Text(
+            item.typesPreview,
+            style = TextStyle(
+                fontFamily = AppFontFamily, fontSize = 11.sp, color = palette.inkFaint,
+            ),
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
+        // Sonni server beradi (turlarning `listingsCount` yig'indisi). `0` bo'lsa chizilmaydi.
+        if (item.offerCount > 0) {
+            Text(
+                "${item.offerCount} ta e'lon",
+                style = TextStyle(
+                    fontFamily = AppFontFamily, fontSize = 11.5f.sp,
+                    fontWeight = FontWeight.Bold, color = accent,
+                ),
+                maxLines = 1,
+            )
+        }
+    }
+}
+
+/** Katalogdagi bitta biznes turi: emoji plitka + nom + e'lonlar soni. */
+@Composable
+private fun CatalogTypeCard(
+    type: DiscountCategory,
+    palette: AppPalette,
+    onClick: () -> Unit,
+) {
+    val accent = Color(type.accent)
+    Column(
+        Modifier.fillMaxWidth()
+            .clip(RoundedCornerShape(18.dp))
+            .background(palette.glass)
+            .border(1.dp, palette.border, RoundedCornerShape(18.dp))
+            .clickable(onClick = onClick)
+            .padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Box(
+            Modifier.size(44.dp).clip(RoundedCornerShape(15.dp)).background(accent.copy(alpha = 0.14f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                type.emoji.ifBlank { "🏷" },
+                style = TextStyle(fontFamily = AppFontFamily, fontSize = 21.sp),
+            )
+        }
+        Text(
+            type.name,
+            style = TextStyle(
+                fontFamily = AppFontFamily, fontSize = 14.sp,
+                fontWeight = FontWeight.ExtraBold, color = palette.ink,
+            ),
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
+        // Sonni server beradi (`CatalogTypeDto.offerCount`) — keshdagi e'lonlar emas,
+        // shuning uchun bu yerda hisoblanmaydi. `0` bo'lsa qator umuman chizilmaydi.
+        if (type.offerCount > 0) {
+            Text(
+                "${type.offerCount} ta e'lon",
+                style = TextStyle(
+                    fontFamily = AppFontFamily, fontSize = 11.5f.sp,
+                    fontWeight = FontWeight.Bold, color = accent,
+                ),
+                maxLines = 1,
+            )
+        }
+    }
+}
+
+/** Katalog tepasidagi "Barchasi" kartasi — turlarsiz to'liq feed. */
+@Composable
+private fun AllOffersCard(totalOffers: Int, palette: AppPalette, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth()
+            .clip(RoundedCornerShape(18.dp))
+            .background(palette.primaryBrush)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(
+                "Barcha takliflar",
+                style = TextStyle(
+                    fontFamily = AppFontFamily, fontSize = 15.sp,
+                    fontWeight = FontWeight.ExtraBold, color = palette.onPrimary,
+                ),
+            )
+            Text(
+                if (totalOffers > 0) "$totalOffers ta e'lon — barcha yo'nalishlar"
+                else "Barcha yo'nalishlar bo'yicha",
+                style = TextStyle(
+                    fontFamily = AppFontFamily, fontSize = 11.5f.sp,
+                    color = palette.onPrimary.copy(alpha = 0.85f),
+                ),
+                maxLines = 1,
+            )
+        }
+        Icon(
+            ScIcons.ChevronRight, null,
+            tint = palette.onPrimary,
+            modifier = Modifier.size(18.dp),
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Feed — sarlavha + qidiruv + Filter tugma + e'lonlar
 // ---------------------------------------------------------------------------
 @Composable
@@ -175,17 +435,24 @@ private fun FeedContent(
                     ScCircleButton(ScIcons.ChevronLeft, onBack, contentDescription = "Orqaga")
                 }
                 Column(Modifier.weight(1f)) {
-                    // Home'dan bo'lim bilan kelinsa — sarlavha o'sha bo'lim ("🍕 Ovqatlar").
-                    val group = state.group
-                    val title = group?.let { "${it.emoji} ${it.name}".trim() } ?: "Siz uchun"
+                    // Chipdan tur tanlangan bo'lsa — sarlavha o'sha tur ("🥟 Somsa");
+                    // aks holda ochiq bo'lim nomi ("🍽 Ovqatlanish", "🛠 Xizmatlar").
+                    val type = state.type
+                    val section = state.section
+                    val title = type?.let { "${it.emoji} ${it.name}".trim() }
+                        ?: section?.let { "${it.emoji} ${it.name}".trim() }
+                        ?: "Barcha takliflar"
                     // 26f da "🍽 Ovqatlanish" ikkita tugma yonida sig'may kesilardi.
                     ScHeaderTitle(title, size = 21f)
                     Spacer(Modifier.height(3.dp))
                     // Sarlavha yonida ikkita tugma turgani uchun izoh QISQA: uzun matn
                     // ikki qatorga tushib, topbarni cho'zib yuborardi.
                     ScHeaderSubtitle(
-                        if (group == null) "${state.totalCount} ta e'lon — chegirma va takliflar"
-                        else "${state.totalCount} ta e'lon",
+                        if (type == null && section == null) {
+                            "${state.totalCount} ta e'lon — chegirma va takliflar"
+                        } else {
+                            "${state.totalCount} ta e'lon"
+                        },
                     )
                 }
                 // Qidiruv — klaviatura ustidagi suzuvchi maydonni ochadi. Qidiruv matni
@@ -210,6 +477,15 @@ private fun FeedContent(
         Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(top = 16.dp)) {
             MapLinkButton(palette, onOpenMap)
         }
+
+        // Bo'lim ichidagi biznes turlari — katalogda birlashtirilgani shu yerda ochiladi
+        // ("Ovqatlanish" → Milliy taomlar / Fast food / Somsa).
+        TypeChips(
+            types = state.sectionTypes,
+            selected = state.type?.id,
+            palette = palette,
+            onSelect = vm::selectType,
+        )
 
         Spacer(Modifier.height(12.dp))
 
@@ -242,6 +518,56 @@ private fun FeedContent(
                 }
             }
         }
+    }
+}
+
+/**
+ * Feed tepasidagi biznes turi chiplari ("Hammasi · 🍛 Milliy taomlar · 🍔 Fast food · 🥟 Somsa").
+ *
+ * Katalogda turlar bo'limga birlashtirilgani uchun toraytirish AYNAN shu yerda bo'ladi —
+ * Filter ekranini ochish shart emas. Tanlov darhol qo'llanadi; ikkinchi marta bosilsa bekor
+ * bo'ladi. Bo'lim ochilmagan yoki ichida bitta tur bo'lsa qator umuman chizilmaydi.
+ */
+@Composable
+private fun TypeChips(
+    types: List<DiscountCategory>,
+    selected: String?,
+    palette: AppPalette,
+    onSelect: (String?) -> Unit,
+) {
+    if (types.size < 2) return
+    LazyRow(
+        Modifier.fillMaxWidth().padding(top = 12.dp),
+        contentPadding = PaddingValues(horizontal = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        item { TypeChip("Hammasi", selected == null, palette) { onSelect(null) } }
+        items(types, key = { it.id }) { type ->
+            val label = "${type.emoji} ${type.name}".trim().withCount(type.offerCount.takeIf { it > 0 })
+            TypeChip(label, type.id == selected, palette) {
+                onSelect(if (type.id == selected) null else type.id)
+            }
+        }
+    }
+}
+
+@Composable
+private fun TypeChip(label: String, selected: Boolean, palette: AppPalette, onClick: () -> Unit) {
+    Box(
+        Modifier.clip(RoundedCornerShape(11.dp))
+            .background(if (selected) palette.primary else palette.glass)
+            .border(1.dp, if (selected) palette.primary else palette.border, RoundedCornerShape(11.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 13.dp, vertical = 8.dp),
+    ) {
+        Text(
+            label,
+            style = TextStyle(
+                fontFamily = AppFontFamily, fontSize = 12.5f.sp, fontWeight = FontWeight.Bold,
+                color = if (selected) Color.White else palette.ink,
+            ),
+            maxLines = 1,
+        )
     }
 }
 
@@ -537,15 +863,19 @@ private fun FilterScreen(
             // (`filter.geo.regionIds`) va feed qayta tortiladi.
             RegionSelect(vm, palette)
 
-            // Katalog bo'limi — bosh ekrandagi bo'limlar ("Ovqatlar", "Sport"). Home'dan
-            // "Barchasi" bilan kelinganda shu yerda tanlangan bo'lib turadi.
-            if (fs.groups.isNotEmpty()) {
+            // Katalog bo'limi — katalog ekranidagi kataklar bilan bir xil ro'yxat
+            // ("Ovqatlanish", "Sport", "Savdo", "Xizmatlar"). Home'dan "Barchasi" bilan
+            // kelinganda shu yerda tanlangan bo'lib turadi.
+            if (fs.sections.isNotEmpty()) {
                 FilterSection("Katalog bo'limi", palette) {
-                    CategoryPill("Barchasi", null, d.groupKey == null, palette) { vm.onDraftGroup(null) }
-                    fs.groups.forEach { g ->
+                    CategoryPill("Barchasi", null, d.groupKey == null, palette) { vm.onDraftSection(null) }
+                    fs.sections.forEach { s ->
+                        // Bo'lingan guruhda (Savdo/Xizmatlar) turlar to'plami ham mos kelishi shart.
+                        val selected = d.groupKey == s.groupKey &&
+                            (if (s.partial) d.typeKeys == s.typeKeys else d.typeKeys.isEmpty())
                         CategoryPill(
-                            "${g.emoji} ${g.name}".trim(), g.accent, d.groupKey == g.key, palette,
-                        ) { vm.onDraftGroup(g.key) }
+                            "${s.emoji} ${s.name}".trim(), s.accent, selected, palette,
+                        ) { vm.onDraftSection(s) }
                     }
                 }
             }

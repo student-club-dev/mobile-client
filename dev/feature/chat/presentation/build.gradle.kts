@@ -12,6 +12,8 @@ kotlin { sourceSets { commonMain.dependencies {
     // Suhbatdosh profilidagi universitet nomi: backend faqat `universityId` beradi
     // (katalogi yo'q), nomni local katalogdan topamiz.
     implementation(projects.dev.feature.university.domain)
+    // Klublar lentasi — suhbatlar ro'yxatining tepasida (avval bosh ekranda edi).
+    implementation(projects.dev.feature.clubs.domain)
     // Koin moduli `ChatApi`, WS klienti va `TokenStore` ni quradi.
     implementation(projects.dev.core.database)
     implementation(projects.dev.core.network)

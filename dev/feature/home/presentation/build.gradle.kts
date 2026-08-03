@@ -1,6 +1,6 @@
 // Home — sof agregator presentation moduli. O'z domeni/data'si yo'q; boshqa feature'lar
-// domenlaridan (listings, connections, clubs, notifications, university, profile) va core:domain
-// (discounts) repository/model'larini o'qib, bosh ekranни quradi.
+// domenlaridan (listings, connections, notifications, university, profile) va core:domain
+// (discounts) repository/model'larini o'qib, bosh ekranni quradi.
 plugins { id("sc.module-ui") }
 kotlin { sourceSets { commonMain.dependencies {
     // Ish e'lonlari endi Listing modeli (feature:listings), eski feature:jobs emas.
@@ -8,7 +8,6 @@ kotlin { sourceSets { commonMain.dependencies {
     // "Bog'lanishlarim" bo'limi — haqiqiy `GET /v1/connections`. Eski feature:students
     // (seed'dan yuradigan soxta ro'yxat) bu yerda ishlatilmaydi.
     implementation(projects.dev.feature.connections.domain)
-    implementation(projects.dev.feature.clubs.domain)
     implementation(projects.dev.feature.notifications.domain)
     implementation(projects.dev.feature.university.domain)
     implementation(projects.dev.feature.profile.domain)

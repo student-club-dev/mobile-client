@@ -16,6 +16,20 @@
     <!-- Chatdagi ovozli xabar. Ruxsat ish vaqtida, mikrofon tugmasi bosilganda so'raladi
          (`uikit/media/AudioRecorder`); berilmasa ilova ishlayveradi, faqat ovoz yozilmaydi. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
+    <!-- Biriktirish varag'idagi galereya to'ri (`uikit/media/DeviceGallery`). Ruxsat ish
+         vaqtida, varaq ochilganda so'raladi. ⚠️ Berilmasa ham rasm yuborish ishlaydi:
+         varaqdagi «Galereya» tizim tanlagichini ochadi, u esa ruxsat talab qilmaydi. -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+    <!-- ⚠️ `READ_MEDIA_VISUAL_USER_SELECTED` ATAYLAB YO'Q. U e'lon qilinsa Android 14+ da
+         tizim oynasida «faqat tanlanganlar» varianti paydo bo'ladi va foydalanuvchi uni
+         bosgach to'rda butun galereya emas, faqat o'sha bir nechta rasm ko'rinadi — bu
+         "rasmlarim qani?" degan savolni tug'diradi. Bizga to'liq ro'yxat kerak. -->
+    <!-- Android 12 va undan eskilarida media ruxsatlari hali ajratilmagan edi. -->
+    <uses-permission
+        android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
     <uses-feature android:name="android.hardware.microphone" android:required="false" />
 
     <application

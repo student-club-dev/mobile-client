@@ -23,7 +23,8 @@ kotlin {
             api(projects.dev.feature.jobs.presentation)
             api(projects.dev.feature.students.presentation)
             api(projects.dev.feature.notifications.presentation)
-            api(projects.dev.feature.clubs.presentation)
+            // clubsModule() — klublar UI'si chatda, shuning uchun faqat data qatlami.
+            api(projects.dev.feature.clubs.data)
             api(projects.dev.feature.settings.presentation)
             api(projects.dev.feature.university.presentation)
             api(projects.dev.feature.ads.presentation)

@@ -115,7 +115,7 @@ private class VideoPickerDelegate : NSObject(), PHPickerViewControllerDelegatePr
  * yuborishdan oldin siqish chegaraga sig'diradi ([VideoPreparer]). Siqib ham sig'masa —
  * o'sha yerda rad etiladi.
  */
-private fun describeVideo(staged: NSURL): PickedVideo? {
+internal fun describeVideo(staged: NSURL): PickedVideo? {
     val asset = AVURLAsset(uRL = staged, options = null)
     val durationMs = asset.durationMsOrNull()
     // Uzun videoni siqib ham chegaraga sig'dirib bo'lmaydi — vaqtni yo'qotmaymiz.

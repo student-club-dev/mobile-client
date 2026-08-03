@@ -41,6 +41,8 @@
 	<string>Suhbatda ovozli xabar yozib yuborish uchun mikrofonga ruxsat kerak.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Suhbatda video yozib yuborish uchun kameraga ruxsat kerak.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Suhbatga rasm va video yuborish uchun galereyani ko'rsatamiz. Ruxsat bermasangiz ham tizim tanlagichi orqali yuborishingiz mumkin.</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UIApplicationSceneManifest</key>

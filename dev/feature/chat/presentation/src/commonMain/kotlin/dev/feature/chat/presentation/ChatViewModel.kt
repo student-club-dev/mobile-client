@@ -18,6 +18,8 @@ import dev.feature.chat.domain.model.Sticker
 import dev.feature.chat.domain.model.StickerSearchItem
 import dev.feature.chat.domain.model.UploadState
 import dev.feature.chat.domain.repository.ChatRepository
+import dev.feature.clubs.domain.model.Club
+import dev.feature.clubs.domain.repository.ClubRepository
 import dev.feature.connections.domain.model.ReportReason
 import dev.feature.connections.domain.repository.ConnectionsRepository
 import dev.feature.university.domain.repository.UniversityRepository
@@ -27,6 +29,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
@@ -187,6 +190,18 @@ data class ChatMessageUi(
     val upload: ChatUploadUi? = null,
 )
 
+/**
+ * Xabarlar ekranidagi papka — Telegramdagi papkalar kabi, bir vaqtda faqat bittasi tanlangan.
+ *
+ * Hozircha ikkitasi: yakka suhbatlar va klublar. **Guruhlar keyin qo'shiladi** — u backendda
+ * hali yo'q, shuning uchun bu yerda ham bo'sh papka bo'lib turmaydi: yangi qiymat qo'shilishi
+ * bilan tepa qatorda o'zi paydo bo'ladi ([ChatFolder.entries] bo'yicha chiziladi).
+ */
+enum class ChatFolder(val label: String) {
+    PERSONAL("Shaxsiy"),
+    CLUBS("Klublar"),
+}
+
 data class ChatUiState(
     val conversations: List<ConversationItem> = emptyList(),
     val archivedConversations: List<ConversationItem> = emptyList(),
@@ -295,10 +310,47 @@ class ChatViewModel(
     private val chatRepository: ChatRepository,
     private val connectionsRepository: ConnectionsRepository,
     universityRepository: UniversityRepository,
+    private val clubRepository: ClubRepository,
     private val tokenStore: TokenStore,
 ) : ViewModel() {
 
     private val myId: String? = tokenStore.userId()
+
+    /**
+     * Klublar — "Klublar" papkasining ro'yxati.
+     *
+     * Alohida klublar ekrani YO'Q: qo'shilish/chiqish ham shu yerda bo'ladi, chunki klub —
+     * jamoaviy suhbat va uning o'rni xabarlar ichida.
+     *
+     * [state] ga qo'shilmaydi: suhbat oqimi bilan hech qanday aloqasi yo'q va uni o'sha
+     * combine'ga tiqish faqat qatlamni chuqurlashtirardi. Xato bo'lsa ro'yxat bo'sh qoladi.
+     */
+    val clubs: StateFlow<List<Club>> = clubRepository.observeClubs()
+        .catch { emit(emptyList()) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    /** Klubga qo'shilish / undan chiqish (hozircha local). */
+    fun toggleJoin(club: Club) {
+        viewModelScope.launch {
+            clubRepository.setJoined(club.id, !club.joined)
+            showMessage(if (club.joined) "Klubdan chiqdingiz" else "Klubga qo'shildingiz")
+        }
+    }
+
+    private val _folder = MutableStateFlow(ChatFolder.PERSONAL)
+
+    /**
+     * Tanlangan papka. [state] dan tashqarida — u ro'yxat ham, ochilgan suhbat ham bo'lgan
+     * katta combine, papka esa unga umuman ta'sir qilmaydi (faqat qaysi ro'yxat chizilishi).
+     *
+     * ViewModel'da, ekranda emas: suhbat ochilib yopilganda ro'yxat kompozitsiyadan chiqadi
+     * va `remember` tanlovni unutardi — foydalanuvchi har safar "Shaxsiy" ga qaytib tushardi.
+     */
+    val folder: StateFlow<ChatFolder> = _folder.asStateFlow()
+
+    fun selectFolder(value: ChatFolder) {
+        _folder.value = value
+    }
 
     private val selectedId = MutableStateFlow<String?>(null)
     private val draft = MutableStateFlow("")
@@ -683,12 +735,12 @@ class ChatViewModel(
      * tugagach havolaga almashadi, ya'ni foydalanuvchi kutib turmaydi va boshqa xabar
      * yozishi mumkin.
      */
-    fun sendImages(images: List<OutgoingImage>) {
+    fun sendImages(images: List<OutgoingImage>, caption: String? = null) {
         val id = selectedId.value ?: return
         if (images.isEmpty()) return
         stopTyping()
         viewModelScope.launch {
-            when (val res = chatRepository.sendImages(id, images)) {
+            when (val res = chatRepository.sendImages(id, images, caption)) {
                 // Yiqilganlari ro'yxatda `FAILED` bo'lib qoladi — qayta urinish mumkin.
                 is Resource.Error -> extra.update { it.copy(message = res.message) }
                 else -> Unit

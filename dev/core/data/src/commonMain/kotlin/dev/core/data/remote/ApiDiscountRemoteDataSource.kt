@@ -5,6 +5,7 @@ import dev.core.data.dto.DiscountCategoryDto
 import dev.core.data.dto.DiscountGroupDto
 import dev.core.data.dto.DiscountOfferDto
 import dev.core.data.dto.DiscountsResponseDto
+import dev.core.domain.model.CatalogRules
 import dev.core.domain.model.DiscountTag
 import dev.core.domain.model.OfferAttribute
 import dev.core.domain.model.OfferBranch
@@ -131,7 +132,9 @@ class ApiDiscountRemoteDataSource(
             groups = cachedGroups.map { it.toGroupDto() },
             categories = types.values.map { it.toCategoryDto() },
             // Emoji/rang kartada emas, tur ma'lumotida keladi — shu jadval orqali bog'lanadi.
-            offers = cards.map { it.toOfferDto(types[it.businessType]) }.withFeatured(),
+            // Yashirin turlar (ijara) aralash guruhdan kelib qolishi mumkin — tashlanadi.
+            offers = cards.filterNot { CatalogRules.isHidden(it.businessType) }
+                .map { it.toOfferDto(types[it.businessType]) }.withFeatured(),
         )
     }
 
@@ -152,7 +155,9 @@ class ApiDiscountRemoteDataSource(
                 sort = SearchSortDto(by = SearchSortDto.By.NEWEST),
                 page = SearchPageDto(number = 0, propertySize = GROUP_PAGE_SIZE),
             ),
-        ).body().items.map { it.toOfferDto(types[it.businessType]) }
+        ).body().items
+            .filterNot { CatalogRules.isHidden(it.businessType) }
+            .map { it.toOfferDto(types[it.businessType]) }
     }
 
     override suspend fun setFavorite(listingId: String, saved: Boolean): Resource<Boolean> =
@@ -181,6 +186,8 @@ class ApiDiscountRemoteDataSource(
             }.awaitAll()
         }.flatten()
             .map { it.toDomain() }
+            // Ijara Takliflarda yo'q — taklif bo'lib ham chiqmasin.
+            .filterNot { s -> s.typeKey?.let(CatalogRules::isHidden) == true }
             .sortedWith(compareBy<OfferSuggestion> { it.kind.ordinal }.thenByDescending { it.count })
             .take(SUGGEST_LIMIT)
     }
@@ -191,17 +198,23 @@ class ApiDiscountRemoteDataSource(
 
     /**
      * Guruhlar → turlar. `/catalog/types` bir so'rovda 3 tadan ko'p guruhni qabul qilmagani
-     * uchun 8 ta guruh bo'laklab so'raladi; natija 27 ta turdan iborat `key → tur` jadvali.
+     * uchun guruhlar bo'laklab so'raladi; natija `key → tur` jadvali.
+     *
+     * Ilovada ko'rinmaydigan turlar ([CatalogRules.HIDDEN_TYPES] — ijara) shu yerda tushib
+     * qoladi: butun guruh o'shalardan iborat bo'lsa guruh ham so'ralmaydi, ya'ni ularning
+     * e'lonlari umuman tortilmaydi.
      */
     private suspend fun loadTypes(): Map<String, CatalogTypeDto> {
-        val groups = catalog.getGroups(CatalogGroupsRequestDto()).body().sortedBy { it.sortOrder }
+        val groups = catalog.getGroups(CatalogGroupsRequestDto()).body()
+            .filter { g -> g.types.any { !CatalogRules.isHidden(it) } }
+            .sortedBy { it.sortOrder }
         val types = coroutineScope {
             groups.map { it.key }.chunked(MAX_GROUPS_PER_REQUEST).map { keys ->
                 async { catalog.getTypes(CatalogTypesRequestDto(groupKeys = keys)).body() }
             }.awaitAll()
         }.flatten()
         cachedGroups = groups
-        cachedTypes = types.associateBy { it.key }
+        cachedTypes = types.filterNot { CatalogRules.isHidden(it.key) }.associateBy { it.key }
         return cachedTypes
     }
 

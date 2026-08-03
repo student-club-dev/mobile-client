@@ -26,6 +26,7 @@ class LocalDataSeeder(
         seedJobs()
         seedStudents()
         seedAds()
+        seedRentals()
         seedNotifications()
         seedClubs()
     }
@@ -141,6 +142,107 @@ class LocalDataSeeder(
         }
     }
 
+    /**
+     * Ijara kvartiralari — bosh ekrandagi uchinchi e'lon bo'limi ("Kvartiralar").
+     *
+     * `listing` jadvalida hozircha faqat foydalanuvchi o'zi joylagan e'lon bo'ladi
+     * (ro'yxatni tortadigan endpoint hali yo'q), shuning uchun bo'lim bo'sh turardi.
+     *
+     * `detailsJson` — `ListingMappers` dagi `DetailsJson.Rental` shakli, `kind`
+     * diskriminatori bilan. Bu yerda qo'lda yoziladi: seed core:data da yashaydi va
+     * feature:listings ga bog'lanmaydi.
+     */
+    private fun seedRentals() {
+        val q = db.listingQueries
+        if (q.countByKind("RENTAL").executeAsOne() > 0) return
+        q.transaction {
+            insertRental(
+                id = "rent-chilonzor",
+                title = "Chilonzorda 2 xonali kvartira",
+                description = "Metroga 5 daqiqa, jihozlangan. Bitta o'g'il bola sherik izlanmoqda.",
+                price = 1_200_000,
+                details = """
+                    {"kind":"RENTAL","propertyType":"APARTMENT","roomCount":2,"currentTenants":1,
+                    "neededTenants":1,"gender":"MALE","period":"MONTHLY","utilitiesIncluded":false,
+                    "depositMonths":1,"floor":4,"totalFloors":9,
+                    "amenities":["WIFI","FURNITURE","WASHER","NEAR_METRO"]}
+                """.compactJson(),
+                branch = branchJson("br-chilonzor", 41.2758, 69.2035, "Chilonzor, 11-kvartal", "Chilonzor"),
+                updatedAt = SEED_TIME,
+            )
+            insertRental(
+                id = "rent-yunusobod",
+                title = "Yunusobodda qizlar uchun xona",
+                description = "Alohida xona, oshxona va kir yuvish mashinasi umumiy.",
+                price = 900_000,
+                details = """
+                    {"kind":"RENTAL","propertyType":"ROOM","roomCount":3,"currentTenants":2,
+                    "neededTenants":1,"gender":"FEMALE","period":"MONTHLY","utilitiesIncluded":true,
+                    "floor":2,"totalFloors":5,
+                    "amenities":["WIFI","FRIDGE","KITCHEN","SEPARATE_ROOM"]}
+                """.compactJson(),
+                branch = branchJson("br-yunusobod", 41.3647, 69.2896, "Yunusobod, 12-kvartal", "Yunusobod"),
+                updatedAt = SEED_TIME - 1,
+            )
+            insertRental(
+                id = "rent-olmazor",
+                title = "TATU yonida koyka joy",
+                description = "Universitetga piyoda 10 daqiqa. Oylik to'lov, depozitsiz.",
+                price = 600_000,
+                details = """
+                    {"kind":"RENTAL","propertyType":"BED_SPACE","roomCount":4,"currentTenants":3,
+                    "neededTenants":1,"gender":"ANY","period":"MONTHLY","utilitiesIncluded":true,
+                    "amenities":["WIFI","HOT_WATER","NEAR_UNIVERSITY"]}
+                """.compactJson(),
+                branch = branchJson("br-olmazor", 41.3500, 69.2050, "Olmazor, Amir Temur ko'chasi", "Olmazor"),
+                updatedAt = SEED_TIME - 2,
+            )
+        }
+    }
+
+    private fun insertRental(
+        id: String,
+        title: String,
+        description: String,
+        price: Long,
+        details: String,
+        branch: String,
+        updatedAt: Long,
+    ) = db.listingQueries.upsert(
+        id = id,
+        ownerId = SEED_OWNER,
+        businessId = null,
+        kind = "RENTAL",
+        detailsJson = details,
+        title = title,
+        description = description,
+        imagesJson = "[]",
+        priceUnit = "PER_MONTH",
+        price = price,
+        priceMax = null,
+        currency = "UZS",
+        isNegotiable = 0,
+        // Chegirmasiz e'londa talaba to'laydigan narx = narxning o'zi.
+        finalPrice = price,
+        contactPhone = null,
+        branchesJson = "[$branch]",
+        validFrom = 0,
+        validTo = FAR_FUTURE,
+        attributesJson = "{}",
+        optionGroupsJson = "[]",
+        status = "ACTIVE",
+        rejectionReason = null,
+        viewsCount = 0,
+        createdAt = updatedAt,
+        updatedAt = updatedAt,
+    )
+
+    private fun branchJson(id: String, lat: Double, lng: Double, address: String, name: String) =
+        """{"id":"$id","lat":$lat,"lng":$lng,"address":"$address","name":"$name"}"""
+
+    /** Ko'p qatorli JSON literalini bir qatorga yig'adi (satr uzilishlari faqat o'qish uchun). */
+    private fun String.compactJson(): String = trimIndent().lines().joinToString("") { it.trim() }
+
     private fun seedNotifications() {
         val q = db.notificationQueries
         if (q.count().executeAsOne() > 0) return
@@ -240,10 +342,23 @@ class LocalDataSeeder(
     private companion object {
         val seedJson = Json { ignoreUnknownKeys = true }
 
+        /** Namuna e'lonlarning egasi — haqiqiy foydalanuvchi id'si bilan to'qnashmaydi. */
+        const val SEED_OWNER = "seed-user"
+
+        /**
+         * Namuna e'lonlarning vaqti — QAT'IY qiymat, `Clock` emas: seed har qurilmada
+         * bir xil tartibda tushsin va testlar vaqtga bog'lanib qolmasin.
+         * 2026-01-01 (epoch millis).
+         */
+        const val SEED_TIME = 1_767_225_600_000L
+
+        /** Namuna e'lonlar muddati o'tmasin — 2100-01-01 (epoch millis). */
+        const val FAR_FUTURE = 4_102_444_800_000L
+
         // "Siz uchun" seed'i shu versiyada. listings.json o'zgarsa bu qiymatni oshiring.
         const val DISCOUNTS_SEED_KEY = "discounts_seed_version"
-        // v5 — seed'ga bosh ekran bo'limlari (`groups`) va turlarning `groupKey` i qo'shildi.
-        const val DISCOUNTS_SEED_VERSION = "5"
+        // v6 — "Savdo va xizmat" ikkiga bo'lindi: "Savdo" va "Xizmatlar" (printerxona).
+        const val DISCOUNTS_SEED_VERSION = "6"
 
         val TASHKENT_CENTER = 41.311081 to 69.240562
 

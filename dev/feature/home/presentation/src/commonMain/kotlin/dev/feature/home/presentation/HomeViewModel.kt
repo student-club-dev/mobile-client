@@ -2,8 +2,9 @@ package dev.feature.home.presentation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import dev.feature.clubs.domain.model.Club
 import dev.core.common.Resource
+import dev.core.domain.model.DiscountCategory
+import dev.core.domain.model.DiscountGroup
 import dev.core.domain.model.DiscountOffer
 import dev.feature.connections.domain.model.ConnectionStatus
 import dev.feature.connections.domain.model.ConnectionView
@@ -13,7 +14,6 @@ import dev.feature.connections.domain.repository.ConnectionsRepository
 import dev.feature.listings.domain.model.Listing
 import dev.feature.listings.domain.model.ListingKind
 import dev.feature.listings.domain.usecase.ObserveListingsByKindUseCase
-import dev.feature.clubs.domain.repository.ClubRepository
 import dev.core.domain.repository.DiscountRepository
 import dev.core.domain.repository.RegionRepository
 import dev.feature.notifications.domain.repository.NotificationRepository
@@ -36,10 +36,14 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /**
- * Bosh ekrandagi bitta chegirma bo'limi — katalog GURUHI (`POST /v1/catalog/groups`).
+ * Bosh ekrandagi bitta e'lon bo'limi.
  *
- * Sarlavha, emoji va tartib — hammasi serverdan; ilovada bo'limlar ro'yxati qat'iy
- * yozilmagan. Yangi guruh qo'shilsa yoki nomi o'zgarsa ilovaga tegish shart emas.
+ * Sarlavha va emoji katalogdan (`POST /v1/catalog/groups` va `/types`) olinadi — matn
+ * ilovada qat'iy yozilmagan, server nomini o'zgartirsa bo'lim sarlavhasi ham o'zgaradi.
+ *
+ * [key] — "Barchasi" bosilganda ochiladigan katalog GURUHI (`DiscountGroup.key`). Kiyim
+ * alohida guruh emas (u `SHOPPING` ichidagi biznes turi), shuning uchun uning bo'limida
+ * ham guruh kaliti turadi.
  */
 data class HomeOfferSection(
     val key: String,
@@ -56,16 +60,13 @@ data class HomeUiState(
     val universityMonogram: String? = null,
     val courseLabel: String? = null,
     /**
-     * Chegirma bo'limlari — katalog guruhlari (Ovqatlanish, Sport, Ta'lim...), server
-     * tartibida. E'loni yo'q guruh ro'yxatga umuman tushmaydi.
+     * Chegirma bo'limlari — Home'da ATIGI IKKITASI: "Ovqatlanish" (butun `FOOD` guruhi) va
+     * "Kiyim-kechak" (talabaning jinsiga mos). Uchinchi e'lon bo'limi — [rentals].
+     * E'loni yo'q bo'lim ro'yxatga tushmaydi.
      */
     val offerSections: List<HomeOfferSection> = emptyList(),
-    /** Faol ish e'lonlari ([ListingKind.JOB]) — "E'lonlar" bo'limidagi bilan bir xil manba. */
-    val jobs: List<Listing> = emptyList(),
     /** Faol ijara e'lonlari ([ListingKind.RENTAL]) — sherik izlayotgan kvartiralar. */
     val rentals: List<Listing> = emptyList(),
-    /** Faol yordam e'lonlari ([ListingKind.TASK]) — bir martalik topshiriqlar. */
-    val tasks: List<Listing> = emptyList(),
     /**
      * Universitetim talabalari — `GET /v1/students?universityId=<profil>&connectionStatus=NONE`,
      * ya'ni hali bog'lanmaganlar. Profilda universitet ko'rsatilmagan bo'lsa bo'sh qoladi
@@ -77,7 +78,6 @@ data class HomeUiState(
      * bo'limida ko'ringanlar bu ro'yxatdan chiqarib tashlanadi (takrorlanmasin).
      */
     val allStudents: List<SearchedStudent> = emptyList(),
-    val clubs: List<Club> = emptyList(),
     val hasUnreadNotifications: Boolean = false,
     /**
      * Birinchi yuklanish tugamagan va ko'rsatadigan bo'lim yo'q — ekran o'rniga skelet
@@ -96,7 +96,6 @@ class HomeViewModel(
     private val regionRepository: RegionRepository,
     observeListingsByKind: ObserveListingsByKindUseCase,
     private val connectionsRepository: ConnectionsRepository,
-    clubRepository: ClubRepository,
     notificationRepository: NotificationRepository,
 ) : ViewModel() {
 
@@ -118,7 +117,7 @@ class HomeViewModel(
         refreshStudents()
         // Offline-first: universitetlarni backend'dan sinxronlashga urinamiz.
         viewModelScope.launch { universityRepository.refresh() }
-        // Bosh ekrandagi uchta bo'lim ham backend feed'idan yuradi — `POST /v1/catalog/*` +
+        // Chegirma bo'limlari backend feed'idan yuradi — `POST /v1/catalog/*` +
         // `/v1/discounts/search`. Busiz ekran faqat local seed'ni ko'rsatib turardi.
         // Xato bo'lsa kesh saqlanadi (repository o'zi hal qiladi).
         //
@@ -166,35 +165,36 @@ class HomeViewModel(
         )
     }
 
-    // E'lon turlari bitta oqimga yig'iladi — aks holda `content` 6+ manbaga aylanib,
-    // typed `combine` overload'i qolmaydi.
-    private val listings = combine(
-        observeListingsByKind(ListingKind.JOB),
-        observeListingsByKind(ListingKind.RENTAL),
-        observeListingsByKind(ListingKind.TASK),
-    ) { jobs, rentals, tasks -> Triple(jobs, rentals, tasks) }
+    /**
+     * Bosh ekranning chegirma bo'limlari — **faqat ikkitasi**: ovqat va kiyim. Butun katalog
+     * guruhlari ro'yxati Home'da chizilmaydi; qolganlari "Siz uchun" ekranida.
+     *
+     * Jins profildan kuzatiladi: talaba profilida jinsni o'zgartirsa, kiyim bo'limi
+     * qayta so'rov yubormasdan (kesh local) darrov almashadi.
+     */
+    private val catalogSections = combine(
+        discountRepository.observeGroups(),
+        discountRepository.observeCategories(),
+        discountRepository.observeAllOffers(),
+        observeProfileUseCase().map { it?.gender }.distinctUntilChanged(),
+    ) { groups, categories, offers, gender ->
+        listOfNotNull(
+            foodSection(groups, categories, offers),
+            clothingSection(categories, offers, gender),
+        )
+    }
 
     private val content = combine(
-        discountRepository.observeGroups(),
-        discountRepository.observeAllOffers(),
-        listings,
-        clubRepository.observeClubs(),
+        catalogSections,
+        observeListingsByKind(ListingKind.RENTAL),
         refreshing,
-    ) { groups, offers, (jobs, rentals, tasks), clubs, loading ->
-        // E'lon bo'limga `groupKey` bo'yicha AYNAN tushadi — nomidan taxmin qilinmaydi.
-        // Guruhlar allaqachon server tartibida (`selectGroups` — `ORDER BY sortOrder`).
-        val byGroup = offers.groupBy { it.groupKey }
+    ) { sections, rentals, loading ->
         Content(
-            sections = groups.mapNotNull { g ->
-                val list = byGroup[g.key].orEmpty()
-                // Bo'sh bo'lim chizilmaydi — sarlavha osilib qolmasin.
-                if (list.isEmpty()) null
-                else HomeOfferSection(g.key, g.name, g.emoji, list)
-            },
-            jobs = jobs, rentals = rentals, tasks = tasks, clubs = clubs,
+            sections = sections,
+            rentals = rentals,
             // Skelet faqat KO'RSATADIGAN HECH NARSA yo'q bo'lganda: keshdagi e'lonlar
             // bo'lsa ekran darrov to'ladi va yangilanish jimgina bo'ladi.
-            loading = loading && offers.isEmpty() && jobs.isEmpty() && rentals.isEmpty() && tasks.isEmpty(),
+            loading = loading && sections.isEmpty() && rentals.isEmpty(),
         )
     }
 
@@ -207,15 +207,12 @@ class HomeViewModel(
             universityMonogram = h.monogram,
             courseLabel = h.course,
             offerSections = c.sections,
-            jobs = c.jobs,
             rentals = c.rentals,
-            tasks = c.tasks,
             universityStudents = universityStudents,
             // Yuqoridagi "Universitetimda" bo'limida ko'ringanlar takrorlanmasin.
             allStudents = students.filterNot { s ->
                 universityStudents.any { it.student.id == s.student.id }
             },
-            clubs = c.clubs,
             hasUnreadNotifications = unread > 0,
             loading = c.loading,
         )
@@ -295,13 +292,55 @@ class HomeViewModel(
     )
     private data class Content(
         val sections: List<HomeOfferSection>,
-        val jobs: List<Listing>,
         val rentals: List<Listing>,
-        val tasks: List<Listing>,
-        val clubs: List<Club>,
         val loading: Boolean = false,
     )
 }
+
+/** Home'dagi "Ovqatlanish" bo'limi — butun `FOOD` katalog guruhi. */
+private fun foodSection(
+    groups: List<DiscountGroup>,
+    categories: List<DiscountCategory>,
+    offers: List<DiscountOffer>,
+): HomeOfferSection? {
+    val group = groups.firstOrNull { it.key == FOOD_GROUP }
+    // Odatda e'londa `groupKey` turadi; eski keshda bo'sh bo'lsa — biznes turi orqali.
+    val foodTypes = categories.filter { it.groupKey == FOOD_GROUP }.map { it.id }.toSet()
+    val list = offers.filter { it.groupKey == FOOD_GROUP || it.categoryId in foodTypes }
+    if (list.isEmpty()) return null
+    // Guruh hali yuklanmagan bo'lsa ham bo'lim ko'rinadi — sarlavha zaxira matndan.
+    return HomeOfferSection(FOOD_GROUP, group?.name ?: "Ovqatlanish", group?.emoji ?: "🍽", list)
+}
+
+/**
+ * "Kiyim-kechak" bo'limi — talabaning jinsiga mos e'lonlar: profilda `FEMALE` bo'lsa
+ * ayollar kiyimi, aks holda (`MALE` yoki umuman ko'rsatilmagan) erkaklar kiyimi.
+ * Jinsi belgilanmagan (uniseks) e'lonlar ikkala holatda ham ko'rinadi.
+ *
+ * Biznes turi id bo'yicha topiladi; backend kaliti boshqacha bo'lsa nomdan izlanadi —
+ * shu sabab local seed ("kiyim") ham, server katalogi ham ishlaydi.
+ */
+private fun clothingSection(
+    categories: List<DiscountCategory>,
+    offers: List<DiscountOffer>,
+    profileGender: String?,
+): HomeOfferSection? {
+    val type = categories.firstOrNull { it.id.equals(CLOTHING_TYPE, ignoreCase = true) }
+        ?: categories.firstOrNull { it.name.startsWith("Kiyim", ignoreCase = true) }
+        ?: return null
+    val wanted = if (profileGender.equals("FEMALE", ignoreCase = true)) "FEMALE" else "MALE"
+    val list = offers.filter {
+        it.categoryId == type.id && (it.gender.isBlank() || it.gender.equals(wanted, ignoreCase = true))
+    }
+    if (list.isEmpty()) return null
+    return HomeOfferSection(type.groupKey, type.name, type.emoji, list)
+}
+
+/** Ovqat bo'limining katalog guruhi kaliti. */
+private const val FOOD_GROUP = "FOOD"
+
+/** Kiyim biznes turining kaliti (local seed'dagi `listings.json` bilan bir xil). */
+private const val CLOTHING_TYPE = "kiyim"
 
 /** Home'da faqat bir nechta karta ko'rinadi — butun ro'yxatni tortishning hojati yo'q. */
 private const val HOME_STUDENTS_SIZE = 10

@@ -82,7 +82,7 @@ ariza yetadi.
 ⛔ **Telegram stikerlarini olib ishlatmang.** Mobil jamoa buni to'g'ri ogohlantirgan: mualliflik
 huquqi buzilishi va ilovaning App Store / Google Play dan olib tashlanishi xavfi.
 
-## 7. 🟡 FCM push — backend ✅, mobil tomon qoldi
+## 7. 🟡 Push — backend ✅ (Android FCM + iOS APNs), kalitlar qoldi
 
 `FcmPushProvider` yozildi, testlandi va **production'da yoqildi** (2026-07-31). Firebase loyihasi:
 **`studentclub-191b0`** (Spark tarifi — FCM uchun yetarli). Tasdiqlandi:
@@ -100,11 +100,29 @@ yo'q va backend kimga push yuborishni bilmaydi.
 | Kim | Ish |
 |---|---|
 | ✅ Backend | Service account kaliti `.env` da, autentifikatsiya tekshirilgan |
-| ⏳ Mobil (Android) | Firebase'ga Android ilovasini qo'shish → `google-services.json` |
-| ⏳ Mobil (iOS) | iOS ilovasini qo'shish → `GoogleService-Info.plist` **va** APNs `.p8` kalitini Firebase'ga yuklash |
+| ✅ Android | `google-services.json` qo'yildi va **haqiqiy qurilmada push kelishi tasdiqlandi** — 2026-08-02 |
+| ⛔ iOS | APNs `.p8` — **Apple Developer Program a'zoligiga taqaldi**, §7.1 |
 
 ⚠️ `google-services.json` ichidagi `project_id` **`studentclub-191b0`** bo'lishi shart. Boshqa
-loyiha bo'lsa tokenlar mos kelmaydi va push jimgina yo'qoladi.
+loyiha bo'lsa tokenlar mos kelmaydi va push jimgina yo'qoladi. Ilgari fayl `studentclubs-d2905`
+niki edi — Android push shu sababli umuman ishlamagan (2026-08-02 da to'g'rilandi).
+
+ℹ️ Backend endi `SENDER_ID_MISMATCH` ni alohida **ERROR** log bilan ajratadi va har yuborishda
+`fcm deviceId=… status=…` trace yozadi — bunday nosozlik boshqa jimgina o'tmaydi.
+
+✅ **Sarlavha — yuboruvchining ismi** (2026-08-03, `PUSH_SENDER_NAME_BACKEND.md` yopildi —
+javob: Desktop'dagi `PUSH_SENDER_NAME_RESPONSE.md`). Push `title` endi `Yangi xabar` emas,
+chatdagi bilan bir xil ko'rinadigan ism; `data` da qo'shimcha `senderId` / `senderName` /
+`senderAvatarUrl` keladi. API kontrakti tegilmagan — Kotlin klientini qayta generatsiya qilish
+shart emas. Ilova tomonida ham o'zgarish yo'q: sarlavha nima kelsa shu ko'rsatiladi, ism
+bo'lmaganda backend `Yangi xabar` ga, `SYSTEM` xabarda `StudentClub` ga qaytadi. Payload:
+`05-PUSH-SETUP.md` §4.
+
+⏳ Bitta qoldiq: o'zgarish hali **`main` ga chiqmagan** — prod deploy bo'lgan zahoti hozirgi
+build'da ko'rinadi, ilovadan hech narsa talab qilmaydi.
+
+⛔ **iOS'ga Firebase kerak emas** (2026-08-02 dan). `GoogleService-Info.plist` ham, Firebase
+konsoliga `.p8` yuklash ham shart emas — batafsil §7.1.
 
 ### Kalitni `.env` ga qo'yish (takrorlash kerak bo'lsa)
 
@@ -142,13 +160,54 @@ new JWT({ email: process.env.FCM_CLIENT_EMAIL,
 `DECODER routines::unsupported` → kalit `.env` ga noto'g'ri yozilgan (qisqargan, qo'shtirnoq ichida,
 yoki `\n` belgilari yo'q), kalitning o'zi emas.
 
-### iOS uchun alohida integratsiya kerak emas
+### 7.1 iOS — to'g'ridan-to'g'ri APNs (2026-08-02 da o'zgardi)
 
-FCM Android **va** iOS ga yetkazadi — Firebase loyihasiga APNs kalitini yuklaganingizdan keyin u
-o'zi APNs ga uzatadi. Ya'ni ikkita emas, bitta integratsiya.
+~~FCM Android **va** iOS ga yetkazadi~~ — bu **eskirgan**. Backend iPhone'larga endi Apple'ning
+APNs xizmatiga to'g'ridan-to'g'ri yuboradi (`PlatformRoutingPushProvider`: `IOS`→APNs,
+`ANDROID`/`WEB`→FCM). Sabab: FCM oralig'ida push jimgina yo'qolardi — FCM «muvaffaqiyat» deb
+javob berardi, xabar esa yetib bormasdi.
 
-**Apple Developer → Keys → APNs kaliti (`.p8`)** kerak bo'ladi, lekin u bizning `.env` ga emas,
-**Firebase konsoliga** yuklanadi (Project settings → Cloud Messaging → APNs Authentication Key).
+**Ilova tomonida o'zgarish yo'q** — `iOSApp.swift` allaqachon xom APNs tokenini (64 hex)
+`POST /v1/devices` ga `platform: "IOS"` bilan yuboradi, bundle id `uz.studentclub.ios`.
+
+⛔ **Bloklangan (2026-08-02):** backend `.p8` ni yaratmoqchi bo'ldi, Apple ruxsat bermadi —
+*«Access Unavailable — only for developers enrolled in a developer program»*. Ularning Apple ID'si
+**pullik Apple Developer Program'da a'zo emas**, shuning uchun *Keys* bo'limi ochilmaydi.
+
+**Savol ochiq: `uz.studentclub.ios` kimning Apple Developer hisobida?** A'zolikka ega hisob
+egasi ikki yo'ldan birini qiladi:
+
+1. Kalitni **o'zi yaratib beradi** (osonroq): *Certificates, Identifiers & Profiles → Keys → ＋* →
+   Key Name `StudentClub APNs` → **Apple Push Notifications service (APNs)** belgilanadi →
+   Register → Download. Backendga kerak: **`.p8` fayl** + **Key ID** (fayl nomida) +
+   **Team ID** (Membership details).
+2. Yoki backendni jamoaga **Admin** roli bilan qo'shadi — kalitni o'zlari yaratadi.
+
+⚠️ A'zolik yillik **$99** — busiz nafaqat push, TestFlight ham, App Store ham yo'q. Ya'ni bu
+baribir kerak bo'ladigan xarajat.
+
+Kalit topilgach serverdagi `.env` ga (git'ga hech qachon emas):
+
+```dotenv
+PUSH_PROVIDER=fcm               # "haqiqiy provayderlar": Android→FCM, iOS→APNs
+APNS_KEY_P8=                    # .p8 fayl ichi, yangi qatorlar \n bilan (FCM kalitidagidek)
+APNS_KEY_ID=                    # kalit nomidagi 10 belgili id
+APNS_TEAM_ID=                   # Team ID
+APNS_TOPIC=uz.studentclub.ios   # iOS bundle id — Android'nikidan (uz.studentclub.app) BOSHQA
+APNS_ENV=production             # TestFlight/App Store; Xcode'dan o'rnatilgan build → sandbox
+```
+
+Keyin **`docker compose up -d --force-recreate backend`** — `restart` `.env` ni qayta o'qimaydi.
+
+⚠️ To'rttasidan bittasi yetishmasa iOS qurilmalari **o'tkazib yuboriladi**, boot'da va har
+yuborishda ERROR log yoziladi (jimgina yo'qolmaydi). Android push'i bundan ta'sirlanmaydi.
+
+⚠️ `APNS_ENV` noto'g'ri bo'lsa ham halokat emas: backend `400 BadDeviceToken` da ikkinchi xostni
+bir marta sinaydi va qaysi biri ishlaganini qatorga yozib qo'yadi. Lekin test qilayotganda
+qaysi build (Xcode = sandbox, TestFlight = production) ekanini bilib turing.
+
+Tekshirish: haqiqiy iPhone (simulyator APNs tokeni bermaydi) → ilovaga kiring → ilovani
+**butunlay yoping** (WS uzilishi kerak) → boshqa hisobdan xabar yuboring.
 
 ### Qo'ng'iroq uchun keyinroq
 
@@ -306,7 +365,8 @@ keyin ishlatilmaydi, o'chirish mumkin.
 |---|---|---|---|
 | 6 | **`.env` sirlarini almashtirish** | siz | xavfsizlik — eng ustuvor |
 | 7 | `APPLE_ALLOWED_CLIENT_IDS` nomini to'g'rilash | siz | Apple orqali kirish |
-| 8 | Firebase'ga Android/iOS ilovalarini qo'shish + APNs `.p8` | mobil jamoa | push haqiqiy qurilmaga |
+| ~~8a~~ | ~~Android `google-services.json`~~ — ✅ **bajarildi 2026-08-02** | — | — |
+| 8b | Apple Developer Program a'zoligi → APNs `.p8` → serverdagi `APNS_*` (§7.1) | Apple hisobi egasi | **iOS push** — ilova va backend tayyor, faqat kalit kutilyapti |
 | 9 | KLIPY **production access** (test kaliti 100/soat) | siz + mobil jamoa | GIF **va stiker** qidiruvi prod'da |
 | 10 | ~~Stiker tasvirlari~~ — **bekor qilindi**, §6 ga qarang | — | — |
 | 11 | coturn | devops | qo'ng'iroq (keyinroq) |

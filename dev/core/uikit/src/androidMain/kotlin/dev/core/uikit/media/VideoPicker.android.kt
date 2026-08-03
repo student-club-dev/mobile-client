@@ -66,14 +66,24 @@ internal fun CoroutineScope.launchStaging(
 ): Job = launch {
     // ⚠️ Metama'lumot ham arzon emas (retriever poster kadrini dekodlaydi) — asosiy oqimni
     // bloklamasligi uchun IO'da.
-    val picked = withContext(Dispatchers.IO) {
-        runCatching {
-            val meta = context.readVideoMeta(uri) ?: return@runCatching null
-            context.stageVideo(uri, meta, ownedFile)
-        }.getOrNull()
-    }
+    val picked = withContext(Dispatchers.IO) { context.stagePickedVideo(uri, ownedFile) }
     onResult(picked)
 }
+
+/**
+ * [launchStaging] ning **bloklovchi o'zagi** — chaqiruvchi o'z oqimini o'zi tanlaydi.
+ *
+ * Rasm+video tanlagichiga ([rememberMultiMediaPicker]) shu ko'rinishda kerak: u bir nechta
+ * faylni bitta `withContext(IO)` ichida ketma-ket qayta ishlaydi va har biri uchun alohida
+ * korutina ochish bekor ish bo'lardi.
+ *
+ * Qaytishi `null` — video yaroqsiz (3 daqiqadan uzun, buzuq yoki o'qib bo'lmadi).
+ */
+internal fun Context.stagePickedVideo(uri: Uri, ownedFile: File? = null): PickedVideo? =
+    runCatching {
+        val meta = readVideoMeta(uri) ?: return@runCatching null
+        stageVideo(uri, meta, ownedFile)
+    }.getOrNull()
 
 /** Baytlarni o'qishdan oldin ma'lum bo'ladigan narsalar. */
 private class VideoMeta(

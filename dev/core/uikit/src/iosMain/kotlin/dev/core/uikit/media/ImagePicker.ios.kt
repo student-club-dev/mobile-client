@@ -37,7 +37,7 @@ private const val UTI_WEBP = "org.webmproject.webp"
  * ga o'giradi, ~20 barobar yengil). Ilgari bu yerda hamma narsa `jpg` deb atalardi va GIF
  * jimgina oddiy rasmga aylanib, **animatsiyasini yo'qotardi**.
  */
-private fun NSItemProvider.pickedExtension(): String = when {
+internal fun NSItemProvider.pickedExtension(): String = when {
     hasItemConformingToTypeIdentifier(UTI_GIF) -> "gif"
     hasItemConformingToTypeIdentifier(UTI_PNG) -> "png"
     hasItemConformingToTypeIdentifier(UTI_WEBP) -> "webp"
@@ -150,7 +150,7 @@ private class MultiPhotoPickerDelegate : NSObject(), PHPickerViewControllerDeleg
 }
 
 @OptIn(ExperimentalForeignApi::class)
-private fun NSData.toByteArray(): ByteArray {
+internal fun NSData.toByteArray(): ByteArray {
     val size = length.toInt()
     if (size == 0) return ByteArray(0)
     return ByteArray(size).apply {

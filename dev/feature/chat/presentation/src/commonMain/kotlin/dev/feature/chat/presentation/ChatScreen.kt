@@ -39,6 +39,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -59,6 +61,7 @@ import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerInputScope
@@ -87,7 +90,8 @@ import dev.core.uikit.components.scStyle
 import dev.core.uikit.media.PickedVideo
 import dev.core.uikit.media.deleteMediaFile
 import dev.core.uikit.media.ownsFile
-import dev.core.uikit.media.rememberMultiImagePicker
+import dev.core.uikit.media.PickedMedia
+import dev.core.uikit.media.rememberMultiMediaPicker
 import dev.core.uikit.media.ScVideoPlayer
 import dev.core.uikit.media.rememberAudioPlayer
 import dev.core.uikit.media.rememberAudioRecorder
@@ -96,7 +100,6 @@ import dev.feature.connections.presentation.StudentProfileSheet
 import dev.core.uikit.media.rememberVideoCapture
 import dev.core.uikit.media.rememberVideoPreparer
 import dev.core.uikit.media.videoNeedsPreparing
-import dev.core.uikit.media.rememberVideoPicker
 import dev.core.uikit.media.rememberFilePicker
 import dev.core.uikit.theme.Sc
 import dev.feature.chat.domain.model.ConversationItem
@@ -109,6 +112,7 @@ import dev.feature.chat.domain.model.OutgoingVideo
 import dev.feature.chat.domain.model.Sticker
 import dev.feature.chat.domain.model.StickerSearchItem
 import dev.feature.chat.presentation.gif.ChatMediaPanel
+import dev.feature.clubs.domain.model.Club
 import dev.feature.connections.domain.model.ReportReason
 import kotlinx.coroutines.delay
 import org.koin.compose.viewmodel.koinViewModel
@@ -137,6 +141,8 @@ fun ChatScreen(
     vm: ChatViewModel = koinViewModel(),
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
+    val clubs by vm.clubs.collectAsStateWithLifecycle()
+    val folder by vm.folder.collectAsStateWithLifecycle()
 
     val threadOpen = state.selected != null
     LaunchedEffect(threadOpen) { onThreadOpenChange(threadOpen) }
@@ -153,6 +159,11 @@ fun ChatScreen(
             ConversationList(
                 conversations = state.conversations,
                 archivedConversations = state.archivedConversations,
+                clubs = clubs,
+                folder = folder,
+                onFolder = vm::selectFolder,
+                onToggleJoin = vm::toggleJoin,
+                onClubSoon = { vm.showMessage("Klub suhbati tez orada ochiladi") },
                 onBack = onBack,
                 onOpen = vm::open,
                 onArchive = { vm.setArchived(it.id, true) },
@@ -245,6 +256,11 @@ private val avatarVisuals: List<Pair<Color, Color>>
 private fun ConversationList(
     conversations: List<ConversationItem>,
     archivedConversations: List<ConversationItem>,
+    clubs: List<Club>,
+    folder: ChatFolder,
+    onFolder: (ChatFolder) -> Unit,
+    onToggleJoin: (Club) -> Unit,
+    onClubSoon: () -> Unit,
     onBack: (() -> Unit)?,
     onOpen: (ConversationItem) -> Unit,
     onArchive: (ConversationItem) -> Unit,
@@ -279,7 +295,26 @@ private fun ConversationList(
             }
         }
 
-        if (list.isEmpty()) {
+        // Papkalar — arxivda ko'rinmaydi: arxiv o'zi alohida ro'yxat va uning ichida
+        // "Klublar" degan tanlov ma'nosiz bo'lardi (klub suhbati arxivlanmaydi).
+        if (!showArchived) {
+            FolderTabs(
+                folder = folder,
+                onFolder = onFolder,
+                unread = conversations.sumOf { it.unreadCount },
+                clubCount = clubs.size,
+            )
+        }
+
+        // Tab rejimida pastda navigatsiya paneli turadi — oxirgi qator berkilmasin.
+        val listPadding = PaddingValues(
+            start = Sc.ScreenPadding, end = Sc.ScreenPadding,
+            top = 20.dp, bottom = if (onBack == null) 110.dp else 24.dp,
+        )
+
+        if (!showArchived && folder == ChatFolder.CLUBS) {
+            ClubList(clubs, listPadding, onToggleJoin, onClubSoon, Modifier.fillMaxWidth().weight(1f))
+        } else if (list.isEmpty()) {
             Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
                 ScText(
                     if (showArchived) "Arxiv bo'sh" else "Suhbatlar yo'q.\n\"Do'stlar\" bo'limidan yozishni boshlang.",
@@ -289,11 +324,7 @@ private fun ConversationList(
         } else {
             LazyColumn(
                 Modifier.fillMaxWidth().weight(1f),
-                // Tab rejimida pastda navigatsiya paneli turadi — oxirgi suhbat berkilmasin.
-                contentPadding = PaddingValues(
-                    start = Sc.ScreenPadding, end = Sc.ScreenPadding,
-                    top = 20.dp, bottom = if (onBack == null) 110.dp else 24.dp,
-                ),
+                contentPadding = listPadding,
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 itemsIndexed(list, key = { _, c -> c.id }) { index, c ->
@@ -355,6 +386,178 @@ private fun ConversationList(
             title = "Shikoyat: ${reportTarget.other.displayName}",
             onSend = { reason, note -> onReport(reportTarget, reason, note); reportFor = null },
             onDismiss = { reportFor = null },
+        )
+    }
+}
+
+/** Klub kartalari dizaynda navbat bilan ko'k / binafsha / yashil bo'ladi. */
+@Composable
+private fun clubVisual(index: Int): Triple<Color, Color, ImageVector> = when (index.mod(3)) {
+    0 -> Triple(Sc.TintBlue, Sc.Brand, ScIcons.Laptop)
+    1 -> Triple(Sc.TintViolet, Sc.Violet, ScIcons.MessageLines)
+    else -> Triple(Sc.TintGreen, Sc.Success, ScIcons.Medal)
+}
+
+/**
+ * Papkalar qatori — Telegramdagi kabi: "Shaxsiy" va "Klublar", bittasi tanlangan.
+ *
+ * Qator [ChatFolder.entries] bo'yicha quriladi, ya'ni "Guruhlar" qo'shilganda bu yerda
+ * hech narsa o'zgarmaydi. Chiziqlar teng ulushda: ikki-uch papkada ular butun kenglikni
+ * to'ldiradi va gorizontal sudralish kerak bo'lmaydi.
+ */
+@Composable
+private fun FolderTabs(
+    folder: ChatFolder,
+    onFolder: (ChatFolder) -> Unit,
+    unread: Int,
+    clubCount: Int,
+) {
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = Sc.ScreenPadding).padding(top = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        ChatFolder.entries.forEach { entry ->
+            FolderChip(
+                label = entry.label,
+                active = folder == entry,
+                modifier = Modifier.weight(1f),
+                // Belgicha faqat o'qilmagan suhbatlar sonida ma'noli; klublarda esa
+                // hozircha xabar yo'q, shuning uchun u yerda oddiy klublar soni.
+                badge = when (entry) {
+                    ChatFolder.PERSONAL -> unread
+                    ChatFolder.CLUBS -> clubCount
+                },
+                badgeAccent = entry == ChatFolder.PERSONAL,
+            ) { onFolder(entry) }
+        }
+    }
+}
+
+@Composable
+private fun FolderChip(
+    label: String,
+    active: Boolean,
+    modifier: Modifier = Modifier,
+    badge: Int = 0,
+    /** `true` — o'qilmagan (qizil/oq) belgicha; `false` — shunchaki son (kulrang). */
+    badgeAccent: Boolean = true,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier.clip(RoundedCornerShape(999.dp))
+            .background(if (active) Sc.Brand else Sc.Chip)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 10.dp, vertical = 9.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(5.dp, Alignment.CenterHorizontally),
+    ) {
+        ScText(label, 12.5f, FontWeight.Bold, if (active) Color.White else Sc.ChipInk, maxLines = 1)
+        if (badge > 0) {
+            val background = when {
+                active -> Color.White
+                badgeAccent -> Sc.Danger
+                else -> Sc.MutedLight
+            }
+            Box(
+                Modifier.size(17.dp).background(background, RoundedCornerShape(percent = 50)),
+                contentAlignment = Alignment.Center,
+            ) { ScText("$badge", 9.5f, FontWeight.ExtraBold, if (active) Sc.Brand else Color.White) }
+        }
+    }
+}
+
+/**
+ * "Klublar" papkasi — klublar xuddi suhbatlar kabi qator bo'lib turadi.
+ *
+ * Alohida klublar ekrani YO'Q: qo'shilish/chiqish shu qatorning o'zida, chunki klub —
+ * jamoaviy suhbat va uning joyi xabarlar ichida. Qatorning o'zi bosilganda esa klub suhbati
+ * ochilishi kerak — u backendda hali yo'q, shuning uchun hozircha ogohlantirish chiqadi.
+ */
+@Composable
+private fun ClubList(
+    clubs: List<Club>,
+    contentPadding: PaddingValues,
+    onToggleJoin: (Club) -> Unit,
+    onOpen: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    if (clubs.isEmpty()) {
+        Box(modifier, contentAlignment = Alignment.Center) {
+            ScText(
+                "Klublar yo'q.\nUlar tez orada qo'shiladi.",
+                14f, FontWeight.Medium, Sc.Muted,
+                Modifier.padding(horizontal = Sc.ScreenPadding),
+                lineHeight = 21f,
+            )
+        }
+        return
+    }
+
+    LazyColumn(
+        modifier,
+        contentPadding = contentPadding,
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        // A'zo bo'lganlar tepada — Telegramda ham o'zing turgan suhbat birinchi.
+        items(clubs.sortedByDescending { it.joined }, key = { it.id }) { club ->
+            ClubRow(club, onClick = onOpen, onToggleJoin = { onToggleJoin(club) })
+        }
+    }
+}
+
+@Composable
+private fun ClubRow(club: Club, onClick: () -> Unit, onToggleJoin: () -> Unit) {
+    val (tint, accent, icon) = clubVisual((club.id - 1).toInt())
+    Row(
+        Modifier.fillMaxWidth()
+            .scCard(radius = 22.dp, elevation = 6.dp, onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(13.dp),
+    ) {
+        // Rasmi bo'lsa — o'zi, bo'lmasa klub belgisi: bosh harf odam ismidek ko'rinardi.
+        if (club.imageUrl.isNullOrBlank()) {
+            ScIconTile(tint, size = 50.dp, radius = 18.dp) {
+                Icon(icon, null, tint = accent, modifier = Modifier.size(24.dp))
+            }
+        } else {
+            ScAvatar(
+                name = club.name,
+                size = 50.dp,
+                avatarUrl = club.imageUrl,
+                background = tint,
+                initialColor = accent,
+            )
+        }
+        Column(Modifier.weight(1f)) {
+            ScText(club.name, 15.5f, FontWeight.ExtraBold, Sc.Ink, maxLines = 1)
+            Spacer(Modifier.height(2.dp))
+            ScText(
+                club.description.ifBlank { "${club.membersCount} a'zo" },
+                13.5f, FontWeight.Medium, Sc.Muted, maxLines = 1,
+            )
+            Spacer(Modifier.height(3.dp))
+            ScText("${club.membersCount} a'zo", 12f, FontWeight.Bold, accent, maxLines = 1)
+        }
+        JoinButton(club.joined, accent, onToggleJoin)
+    }
+}
+
+/** Qo'shilish / chiqish — avval klublar ekranida edi, endi shu qatorning o'zida. */
+@Composable
+private fun JoinButton(joined: Boolean, accent: Color, onClick: () -> Unit) {
+    Box(
+        Modifier.clip(RoundedCornerShape(12.dp))
+            .background(if (joined) Sc.Chip else accent)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 9.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        ScText(
+            if (joined) "A'zosiz" else "Qo'shilish",
+            12f, FontWeight.ExtraBold,
+            if (joined) Sc.ChipInk else Color.White,
+            maxLines = 1,
         )
     }
 }
@@ -427,7 +630,8 @@ private fun ChatThread(
     onBack: () -> Unit,
     onDraft: (String) -> Unit,
     onSend: () -> Unit,
-    onSendImages: (List<OutgoingImage>) -> Unit,
+    /** Rasmlar + albomga bitta izoh (bo'sh bo'lishi mumkin). */
+    onSendImages: (List<OutgoingImage>, String?) -> Unit,
     onSendSticker: (Sticker) -> Unit,
     onSendStickerRef: (StickerSearchItem) -> Unit,
     onSendGif: (GifItem) -> Unit,
@@ -485,8 +689,15 @@ private fun ChatThread(
     /** To'liq ekranda ochilgan video. */
     var videoViewer by remember { mutableStateOf<ChatAttachmentUi?>(null) }
 
-    /** Biriktirma menyusi — qog'oz qisqich bosilganda: Rasm / Video / Fayl. */
-    var attachMenu by remember { mutableStateOf(false) }
+    /**
+     * Qo'shimcha biriktirmalar varag'i — qog'oz qisqichni **uzoq bosganda** pastdan
+     * ochiladi (fayl, kamera).
+     *
+     * Qisqa bosish menyu ko'rsatmaydi: u darhol galereyani ochadi. Ilgari har safar
+     * «Rasm / Video / Kamera / Fayl» ro'yxati chiqardi va eng ko'p ishlatiladigan yo'l —
+     * rasm yuborish — ortiqcha bitta bosish orqasida qolardi.
+     */
+    var attachSheet by remember { mutableStateOf(false) }
 
     val filePicker = rememberFilePicker { picked ->
         if (picked != null) onSendFile(picked.bytes, picked.fileName)
@@ -509,17 +720,6 @@ private fun ChatThread(
     // emas, yuboriladigan videoga biriktiriladi va repozitoriy uni halqa ichida chaqiradi.
     val videoPreparer = rememberVideoPreparer()
 
-    val videoPicker = rememberVideoPicker { picked ->
-        if (picked != null) {
-            previewVideo = picked
-        } else {
-            // Sabab deyarli doim bitta: server chegarasi — 3 daqiqa. Undan uzunini siqib
-            // ham sig'dirib bo'lmaydi, shuning uchun buni ochiq aytamiz (ilgari tanlov
-            // jimgina yo'qolardi va "bosdim, hech nima bo'lmadi" bo'lib qolardi).
-            onSoon("Videoni yuborib bo'lmadi — u 3 daqiqadan uzun yoki formati qo'llab-quvvatlanmaydi.")
-        }
-    }
-
     var recording by remember { mutableStateOf(false) }
     val recorder = rememberAudioRecorder { audio ->
         recording = false
@@ -539,11 +739,40 @@ private fun ChatThread(
         },
     )
 
-    val picker = rememberMultiImagePicker { picked ->
-        if (picked.isNotEmpty()) {
-            onSendImages(picked.map { OutgoingImage(it.bytes, it.fileName) })
+    /**
+     * Asosiy biriktirish yo'li — **rasm va video birga** (Telegramdagi kabi).
+     *
+     * Rasmlar albom bo'lib ketadi. Video esa ikki xil: yakka tanlangani ko'rish/izoh
+     * ekranidan o'tadi (noto'g'ri faylni yuborish tuzatib bo'lmaydigan xato edi), aralash
+     * yoki bir nechta tanlovda esa darrov ketadi — u yerda izoh oynasini har biriga
+     * ketma-ket ko'rsatish foydalanuvchini charchatardi.
+     */
+    /**
+     * Tanlangan media bilan nima qilish — ilova ichidagi galereya varag'i ham, tizim
+     * tanlagichi ham shu yerga keladi (natija turi bir xil).
+     */
+    val sendPickedMedia: (PickedMedia, String?) -> Unit = { picked, caption ->
+        if (picked.images.isNotEmpty()) {
+            onSendImages(picked.images.map { OutgoingImage(it.bytes, it.fileName) }, caption)
+        }
+        if (picked.videos.size == 1 && picked.images.isEmpty() && caption.isNullOrBlank()) {
+            // Izohsiz yakka video — ko'rish/izoh ekranidan o'tadi (u yerda izoh yoziladi).
+            previewVideo = picked.videos.first()
+        } else {
+            // Izoh varaqda allaqachon yozilgan bo'lsa uni takroran so'ramaymiz; albom
+            // bilan birga kelgan videoga esa o'sha izoh biriktiriladi.
+            val videoCaption = caption.takeIf { picked.images.isEmpty() }.orEmpty()
+            picked.videos.forEach { onSendVideo(it.toOutgoing(caption = videoCaption, videoPreparer)) }
+        }
+        // Tushib qolganlar jimgina yo'qolmasin: sabab deyarli doim bitta — server
+        // chegarasi (3 daqiqa), undan uzunini siqib ham sig'dirib bo'lmaydi.
+        if (picked.skipped > 0) {
+            onSoon("${picked.skipped} ta fayl yuborilmadi — video 3 daqiqadan uzun yoki format qo'llab-quvvatlanmaydi.")
         }
     }
+
+    /** Zaxira yo'l: ruxsatsiz ham ishlaydigan tizim tanlagichi (rasm+video birga). */
+    val mediaPicker = rememberMultiMediaPicker { picked -> sendPickedMedia(picked, null) }
 
     val listState = rememberLazyListState()
     val messages = state.messages
@@ -837,9 +1066,11 @@ private fun ChatThread(
             draft = state.draft,
             onDraft = onDraft,
             onSend = onSend,
+            // Bitta bosish — ilova ichidagi galereya varag'i: to'r + pastda «Galereya ·
+            // Fayl · Kamera». Alohida menyu yo'q, hamma yo'l ko'rinib turadi.
             onPickImages = {
                 stickersOpen = false
-                attachMenu = true
+                attachSheet = true
             },
             recording = recording,
             onToggleRecording = {
@@ -861,13 +1092,14 @@ private fun ChatThread(
         )
     }
 
-    if (attachMenu) {
-        AttachMenu(
-            onDismiss = { attachMenu = false },
-            onPickImages = { attachMenu = false; picker.pick() },
-            onPickVideo = { attachMenu = false; videoPicker.pick() },
-            onCaptureVideo = { attachMenu = false; videoCapture.pick() },
-            onPickFile = { attachMenu = false; filePicker.pick() },
+    if (attachSheet) {
+        AttachGallerySheet(
+            onDismiss = { attachSheet = false },
+            onSend = sendPickedMedia,
+            // To'liq galereya — ruxsat berilmagan bo'lsa ham ishlaydigan yagona yo'l.
+            onOpenSystemPicker = { attachSheet = false; mediaPicker.pick() },
+            onPickFile = { attachSheet = false; filePicker.pick() },
+            onCaptureVideo = { attachSheet = false; videoCapture.pick() },
         )
     }
 
@@ -1583,10 +1815,13 @@ private fun TextBubble(message: ChatMessageUi, onTap: () -> Unit) {
  * Pastdagi kiritish paneli — biriktirish + pill maydon + gradient tugma, tagida ochiladigan
  * stiker paneli.
  *
- * Qog'oz qisqich biriktirma menyusini ochadi (Rasm / Video / Fayl), tabassum stikerlarni.
+ * Qog'oz qisqich biriktirish varag'ini ochadi: qurilma galereyasi to'ri va pastda
+ * «Galereya · Fayl · Kamera» ([AttachGallerySheet]). Tabassum stikerlarni ochadi.
+ *
  * Matn maydoni bo'sh bo'lsa o'ng tugma **ovoz yozadi**: bosilganda yozish boshlanadi,
  * qayta bosilganda to'xtaydi va xabar ketadi.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun Composer(
     draft: String,
@@ -1619,7 +1854,7 @@ private fun Composer(
             ) {
                 Icon(
                     ScIcons.Paperclip,
-                    "Rasm biriktirish",
+                    "Rasm yoki video biriktirish",
                     tint = Sc.Muted,
                     modifier = Modifier.size(21.dp).clickable(onClick = onPickImages),
                 )
@@ -1672,39 +1907,6 @@ private fun Composer(
                 onPickStickerRef = onPickStickerRef,
                 onPickGif = onPickGif,
             )
-        }
-    }
-}
-
-/**
- * Biriktirma menyusi — qog'oz qisqich bosilganda.
- *
- * Uchta yo'l uch xil `kind` bilan yuklanadi (rasm 12 MB, video 64 MB · ≤3 daq, fayl 48 MB),
- * shuning uchun ular bitta tanlagichga birlashtirilmagan: tizim tanlagichlari ham har xil
- * (galereya va hujjatlar provayderi).
- */
-@Composable
-private fun AttachMenu(
-    onDismiss: () -> Unit,
-    onPickImages: () -> Unit,
-    onPickVideo: () -> Unit,
-    onCaptureVideo: () -> Unit,
-    onPickFile: () -> Unit,
-) {
-    Dialog(onDismissRequest = onDismiss) {
-        Column(
-            Modifier.clip(RoundedCornerShape(20.dp)).background(Sc.Card).padding(vertical = 8.dp),
-        ) {
-            // Har band o'z ikonkasi bilan: ilgari «Rasm» qidiruv lupasini, «Video» bilan
-            // «Kamera» esa bitta kamera ikonkasini ulashardi va menyuni faqat matndan
-            // o'qib tushunish mumkin edi.
-            ActionRow(AppIcons.ImageIcon, "Rasm", onClick = onPickImages)
-            ActionRow(AppIcons.Video, "Video", onClick = onPickVideo)
-            // Kamera galereyadan ALOHIDA band: "Video" galereyani ochadi va u yerdan
-            // kamerani topib bo'lmaydi — hozir suratga olishni xohlagan foydalanuvchi
-            // ilovadan chiqib, kamerani ochib, qaytib kelishi kerak bo'lardi.
-            ActionRow(AppIcons.Camera, "Kamera", onClick = onCaptureVideo)
-            ActionRow(ScIcons.Paperclip, "Fayl", onClick = onPickFile)
         }
     }
 }
