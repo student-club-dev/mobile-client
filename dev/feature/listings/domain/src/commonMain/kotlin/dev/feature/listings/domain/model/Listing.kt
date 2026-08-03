@@ -51,6 +51,17 @@ data class Listing(
     val contactPhone: String? = null,
 
     /**
+     * E'lon bog'langan universitet (spec §7.2.4). Odatiy qiymati — **egasining universiteti**
+     * (profildan olinadi): talaba uchun asosiy moslik shu, chunki sherik, repetitor yoki
+     * fandan yordam o'z OTM atrofida izlanadi. "Mening universitetim" ekrani topshiriq
+     * e'lonlarini aynan shu maydon bo'yicha ajratadi.
+     *
+     * `null` — universitetga bog'lanmagan e'lon: u umumiy ro'yxatlarda ko'rinaveradi,
+     * lekin hech qaysi universitetning bo'limiga tushmaydi.
+     */
+    val universityId: String? = null,
+
+    /**
      * Manzillar — e'lon shu joylarning **hammasida** amal qiladi. Chegirmada bu filiallar,
      * ijarada uyning joyi, ishda ish joyi. Har biri xaritadan tanlanadi, shuning uchun
      * koordinatasi bor (qo'lda kiritilmaydi).

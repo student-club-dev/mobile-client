@@ -1,7 +1,12 @@
 package dev.core.uikit.map
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /** Xaritada tanlangan nuqta. */
 data class MapPoint(val lat: Double, val lng: Double)
@@ -42,6 +47,21 @@ expect fun MapPicker(
 
 /** Xarita surilganda JS shu ko'prik orqali koordinatani Kotlin'ga uzatadi. */
 internal const val MAP_BRIDGE = "StudentClubMap"
+
+/**
+ * Joy tanlash sahifasi — **fon oqimida** yig'iladi; tayyor bo'lmaguncha `null`
+ * ([rememberOffersMapHtml] bilan bir xil sabab: sahifa ichida ~870 KB MapLibre matni bor).
+ *
+ * [initial] faqat birinchi chaqiruvdan olinadi — keyingi ko'chishlar `centerRequest` orqali.
+ */
+@Composable
+internal fun rememberPickerMapHtml(initial: MapPoint?, dark: Boolean): String? {
+    val initialCenter = remember { initial ?: DefaultMapCenter }
+    val html by produceState<String?>(null, dark) {
+        value = withContext(Dispatchers.Default) { pickerMapHtml(initialCenter, dark) }
+    }
+    return html
+}
 
 /** Kotlin tomondan chaqiriladi: xaritani (va u bilan belgini) boshqa joyga olib boradi. */
 internal fun jsSetCenter(point: MapPoint): String = "setCenter(${point.lat}, ${point.lng})"

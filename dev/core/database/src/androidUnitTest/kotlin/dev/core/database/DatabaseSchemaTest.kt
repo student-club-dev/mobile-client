@@ -178,8 +178,10 @@ class DatabaseSchemaTest {
         // `MessageEntity.hiddenAt` (`CHAT_SELECTION_AND_HISTORY_BACKEND.md` §A1),
         // 26.sqm — sitata bilan javob (`MessageEntity.replyTo*`), tarix suv belgisi
         // (`ConversationEntity.clearedBeforeSeq`) va suhbatni ro'yxatdan yashirish
-        // (`ConversationEntity.hidden`) — `CHAT_SELECTION_AND_HISTORY_RESPONSE.md` §B, §C.
-        assertEquals(27L, StudentClubDatabase.Schema.version)
+        // (`ConversationEntity.hidden`) — `CHAT_SELECTION_AND_HISTORY_RESPONSE.md` §B, §C,
+        // 27.sqm — e'lon universitetga bog'landi (`ListingEntity.universityId`,
+        // `STUDENT_LISTINGS_BACKEND.md` §7.2.4): "Universitetimda" bo'limi shu ustundan.
+        assertEquals(28L, StudentClubDatabase.Schema.version)
     }
 
     @Test
@@ -865,6 +867,7 @@ class DatabaseSchemaTest {
             detailsJson: String = """{"kind":"DISCOUNT","businessType":"CAFE_RESTAURANT",""" +
                 """"businessName":"Chaykhana Navruz","categoryKey":"PIZZA",""" +
                 """"isDiscounted":true,"discountType":"PERCENT","discountValue":20}""",
+            universityId: String? = null,
         ) = q.upsert(
             id = id,
             ownerId = "u1",
@@ -881,6 +884,7 @@ class DatabaseSchemaTest {
             isNegotiable = 0,
             finalPrice = 44_000,
             contactPhone = "+998901234567",
+            universityId = universityId,
             branchesJson = """[{"id":"br1","lat":41.2856,"lng":69.2034,"address":"Chilonzor 9-kvartal, 42-uy"}]""",
             validFrom = 0,
             validTo = validTo,
@@ -911,6 +915,14 @@ class DatabaseSchemaTest {
         assertEquals(1, rentals.size)
         assertEquals("l-rental", rentals.single().id)
         assertTrue(rentals.single().detailsJson.contains("\"gender\":\"MALE\""))
+
+        // Universitetga bog'lash (27.sqm) — "Universitetim" ekrani shu ustundan filtrlaydi.
+        insert("l-task-tatu", "ACTIVE", validTo = 2_000, kind = "TASK", universityId = "tatu")
+        insert("l-task-free", "ACTIVE", validTo = 2_000, kind = "TASK")
+        val tasks = q.selectActiveByKind(kind = "TASK", now = 1_000).executeAsList()
+        assertEquals(listOf("tatu", null), tasks.map { it.universityId }.sortedBy { it == null })
+        q.deleteById("l-task-tatu")
+        q.deleteById("l-task-free")
 
         assertEquals(1, q.selectActiveByKind(kind = "DISCOUNT", now = 1_000).executeAsList().size)
         q.deleteById("l-rental")

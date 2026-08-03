@@ -49,6 +49,7 @@ import androidx.compose.ui.zIndex
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.lerp
+import dev.core.uikit.components.AppIcons
 import dev.core.uikit.components.ScAvatar
 import dev.core.uikit.components.ScIconTile
 import dev.core.uikit.components.ScIcons
@@ -353,7 +354,9 @@ internal fun HomeSideNav(
 
                 // "Profilim" qatori YO'Q — panel sarlavhasining o'zi profilga olib boradi.
                 SideNavLabel("Hisob")
-                SideNavItem("Sozlamalar", ScIcons.Wrench, Sc.Chip, Sc.ChipInk, go(onOpenSettings))
+                // Ikona profildagi "Sozlamalar" bilan AYNAN bir xil (`AppIcons.Settings`):
+                // bir bo'lim ikki joyda ikki xil belgi bilan turmasin.
+                SideNavItem("Sozlamalar", AppIcons.Settings, Sc.Chip, Sc.ChipInk, go(onOpenSettings))
 
                 // Pastki navigatsiya paneli panelning USTIDA turadi.
                 Spacer(Modifier.navigationBarsPadding().height(BottomBarGap))

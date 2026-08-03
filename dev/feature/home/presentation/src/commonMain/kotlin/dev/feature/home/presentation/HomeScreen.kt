@@ -4,7 +4,6 @@ import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -77,6 +76,10 @@ import kotlinx.coroutines.launch
 import dev.core.domain.model.DiscountOffer
 import dev.feature.listings.domain.model.Listing
 import dev.feature.listings.domain.model.formatSum
+import kotlinx.datetime.Clock
+import kotlinx.datetime.Instant
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 import dev.feature.connections.domain.model.ConnectionView
 import dev.feature.connections.domain.model.SearchedStudent
 import org.koin.compose.viewmodel.koinViewModel
@@ -105,6 +108,8 @@ fun HomeScreen(
      * filtrsiz butun feed.
      */
     onOpenDiscounts: (String?) -> Unit = {},
+    /** "Fanlardan yordam" bo'limi — talaba e'lonlari ekrani, Yordam tab'i bilan. */
+    onOpenTasks: () -> Unit = {},
     onOpenRentals: () -> Unit = {},
     onOpenListing: (String) -> Unit = {},
     /** "Do'stlar" — `Connections` ekrani bog'langanlar bo'limi bilan. */
@@ -189,14 +194,15 @@ fun HomeScreen(
                 if (state.loading) {
                     HomeSkeleton()
                 }
-                // Home'da FAQAT uchta e'lon bo'limi: ovqat, kiyim (jinsga mos) va kvartiralar.
-                // Birinchi ikkitasi katalogdan keladi (sarlavhalar serverniki), uchinchisi —
-                // ijara e'lonlari. Qolgan turlar ("Siz uchun", ish, yordam) o'z ekranlarida.
+                // Bo'limlar TARTIBI qat'iy: Ovqatlanish → Kiyim-kechak → Fanlardan yordam →
+                // Ijara kvartiralar. Birinchi ikkitasi katalogdan keladi (sarlavhalar
+                // serverniki), keyingi ikkitasi — talaba e'lonlari. Qolgan turlar
+                // ("Siz uchun", ish, xizmat) o'z ekranlarida.
                 state.offerSections.forEach { section ->
                     OfferSection(section, onOpenDiscounts)
                 }
+                TasksSection(state.tasks, onOpenTasks, onOpenListing)
                 RentalsSection(state.rentals, onOpenRentals, onOpenListing)
-                StudentsSearchSection(onOpenStudentSearch, onOpenStudents, onOpenStudentRequests)
                 StudentsSection(
                     title = "Universitetimda",
                     subtitle = "Bir universitetda o'qiyotgan talabalar",
@@ -671,6 +677,93 @@ private fun Long.spaced(): String = toString().reversed().chunked(3).joinToStrin
 private val InkOnLight = Color(0xFF0F2A43)
 
 // ---------------------------------------------------------------------------
+// Fanlardan yordam — bir martalik topshiriqlar
+// ---------------------------------------------------------------------------
+
+/**
+ * "Fanlardan yordam" — talabalar qo'ygan topshiriq e'lonlari (referat, masala, qo'lyozma,
+ * IT ishi). Chegirma bo'limlaridan farqli: bu **so'rov**, taklif emas, shuning uchun
+ * gorizontal lenta emas, vertikal qatorlar — har qatorda muddat ko'rinib turadi.
+ *
+ * E'lon bo'lmasa bo'lim butunlay yashiriladi (Home'da bo'sh sarlavha osilib qolmaydi).
+ */
+@Composable
+private fun TasksSection(tasks: List<Listing>, onSeeAll: () -> Unit, onOpen: (String) -> Unit) {
+    if (tasks.isEmpty()) return
+    Column(verticalArrangement = Arrangement.spacedBy(13.dp)) {
+        PaddedHeader(
+            "📚 Fanlardan yordam",
+            "Referat, masala, qo'lyozma va IT ishlari",
+            onAction = onSeeAll,
+        )
+        Column(
+            Modifier.padding(horizontal = Sc.ScreenPadding),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            tasks.take(3).forEach { listing -> TaskRow(listing, onOpen) }
+        }
+    }
+}
+
+@Composable
+private fun TaskRow(listing: Listing, onOpen: (String) -> Unit) {
+    val task = listing.taskDetails
+    Row(
+        Modifier.fillMaxWidth().scCard(radius = 20.dp, onClick = { onOpen(listing.id) }).padding(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(11.dp),
+    ) {
+        ScIconTile(Sc.TintPink, size = 44.dp, radius = 15.dp) {
+            Text(listing.emoji, style = TextStyle(fontSize = 20.sp))
+        }
+        Column(Modifier.weight(1f)) {
+            ScText(listing.title, 14f, FontWeight.ExtraBold, Sc.Ink, maxLines = 1)
+            // "Referat · 20 bet · Onlayn"
+            val summary = task?.summary().orEmpty()
+            if (summary.isNotBlank()) {
+                Spacer(Modifier.height(3.dp))
+                ScText(summary, 11.5f, FontWeight.Medium, Sc.Muted, maxLines = 1)
+            }
+            Spacer(Modifier.height(5.dp))
+            ScText(listing.taskPriceLabel(), 13f, FontWeight.ExtraBold, Sc.Success, maxLines = 1)
+        }
+        // Muddat — bajaruvchi uchun eng muhim ma'lumot, shuning uchun o'ng chekkada ajratilgan.
+        deadlineLabel(task?.deadline)?.let { deadline ->
+            Box(
+                Modifier.clip(RoundedCornerShape(10.dp)).background(Sc.TintPink)
+                    .padding(horizontal = 9.dp, vertical = 5.dp),
+            ) {
+                ScText(deadline, 10.5f, FontWeight.ExtraBold, Sc.Pink, maxLines = 1)
+            }
+        }
+    }
+}
+
+/** "150 000 so'm" yoki "Kelishilgan". */
+private fun Listing.taskPriceLabel(): String =
+    if (isNegotiable) "Kelishilgan" else "${price.formatSum()} so'm"
+
+/**
+ * Muddat yorlig'i: "Bugun 18:00", "Ertaga 12:00", "5 kundan keyin" yoki "24.12".
+ * O'tib ketgan muddat ko'rsatilmaydi — e'lon hali faol bo'lsa ham foyda bermaydi.
+ */
+private fun deadlineLabel(deadline: Long?): String? {
+    if (deadline == null) return null
+    val zone = TimeZone.currentSystemDefault()
+    val at = Instant.fromEpochMilliseconds(deadline).toLocalDateTime(zone)
+    val today = Clock.System.now().toLocalDateTime(zone).date
+    val days = at.date.toEpochDays() - today.toEpochDays()
+    val time = "${at.hour.toString().padStart(2, '0')}:${at.minute.toString().padStart(2, '0')}"
+    return when {
+        days < 0 -> null
+        days == 0 -> "Bugun $time"
+        days == 1 -> "Ertaga $time"
+        days in 2..13 -> "$days kundan keyin"
+        else -> "${at.date.dayOfMonth}.${at.date.monthNumber}"
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Ijara kvartiralar
 // ---------------------------------------------------------------------------
 
@@ -711,75 +804,6 @@ private val studentVisuals: List<Pair<Color, Color>>
     Sc.TintBlue to Sc.Brand,
     Sc.TintGreen to Sc.Success,
 )
-
-/**
- * Talabalar bloki: qidiruvga kirish + "Do'stlar" / "Kutilayotganlar" ga o'tish.
- *
- * Qidiruv maydoni bu yerda **ishlamaydi** — bosilganda `Connections` ekrani Qidiruv bo'limi
- * ochilgan holda keladi. Sabab: to'liq qidiruv (debounce, filtrlar, bog'lanish tugmalari,
- * "⋮" menyusi, blok/shikoyat) o'sha ekranda allaqachon bor, uni Home'da takrorlash ikki
- * nusxa kod bo'lardi.
- */
-@Composable
-private fun StudentsSearchSection(
-    onOpenSearch: () -> Unit,
-    onOpenConnected: () -> Unit,
-    onOpenRequests: () -> Unit,
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(13.dp)) {
-        PaddedHeader("Talabalar", "Do'st toping va bog'laning", action = null)
-
-        // Haqiqiy maydon emas — butun qatorning o'zi tugma.
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = Sc.ScreenPadding)
-                .clip(RoundedCornerShape(16.dp))
-                .background(Sc.FieldBg)
-                .border(1.dp, Sc.Border, RoundedCornerShape(16.dp))
-                .clickable(onClick = onOpenSearch)
-                .padding(horizontal = 14.dp, vertical = 13.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            Icon(ScIcons.Search, null, tint = Sc.Muted, modifier = Modifier.size(18.dp))
-            ScText(
-                "Ism yoki username…", 14.5f, FontWeight.Medium, Sc.NavIdle,
-                maxLines = 1, modifier = Modifier.weight(1f),
-            )
-        }
-
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = Sc.ScreenPadding),
-            horizontalArrangement = Arrangement.spacedBy(11.dp),
-        ) {
-            NavTile("Do'stlar", ScIcons.Users, Sc.TintBlue, Sc.Brand, Modifier.weight(1f), onOpenConnected)
-            // "Kutilayotganlar" kartaga sig'maydi; Connections ekranidagi tab ham "So'rovlar".
-            NavTile("So'rovlar", ScIcons.Bell, Sc.TintViolet, Sc.Violet, Modifier.weight(1f), onOpenRequests)
-        }
-    }
-}
-
-/** Talabalar blokidagi o'tish kartasi — ikona + yorliq + ">" belgisi. */
-@Composable
-private fun NavTile(
-    label: String,
-    icon: ImageVector,
-    tint: Color,
-    accent: Color,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit,
-) {
-    Row(
-        modifier.scCard(radius = 18.dp).clickable(onClick = onClick).padding(12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        ScIconTile(tint, size = 36.dp, radius = 13.dp) {
-            Icon(icon, null, tint = accent, modifier = Modifier.size(18.dp))
-        }
-        ScText(label, 13.5f, FontWeight.Bold, Sc.Ink, maxLines = 1, modifier = Modifier.weight(1f))
-        Icon(ScIcons.ChevronRight, null, tint = Sc.MutedLight, modifier = Modifier.size(15.dp))
-    }
-}
 
 /**
  * Talabalar kartalari qatori — Home'dagi ikkala bo'lim ham shu (faqat sarlavha va manba

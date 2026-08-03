@@ -29,10 +29,10 @@ actual fun MapPicker(
     // aks holda sahifa kutubxonasiz yuklanib bo'sh qolardi.
     if (!rememberMapLibreReady()) return
 
-    // Boshlang'ich markaz FAQAT bir marta olinadi: keyingi ko'chishlar `centerRequest` orqali
-    // JS bilan bajariladi, sahifa qayta yuklanmaydi.
-    val initialCenter = remember { initial ?: DefaultMapCenter }
-    val html = remember(dark) { pickerMapHtml(initialCenter, dark) }
+    // Sahifa fon oqimida yig'iladi — tayyor bo'lmaguncha WebView qurilmaydi. Boshlang'ich
+    // markaz FAQAT bir marta olinadi: keyingi ko'chishlar `centerRequest` orqali JS bilan
+    // bajariladi, sahifa qayta yuklanmaydi.
+    val html = rememberPickerMapHtml(initial, dark) ?: return
 
     // Bu holatlar Compose snapshot'i EMAS — `update` ichida o'qish/yozish sikl keltirmaydi.
     val pageReady = remember { Holder(false) }

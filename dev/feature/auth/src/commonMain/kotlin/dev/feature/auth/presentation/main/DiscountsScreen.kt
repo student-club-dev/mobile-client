@@ -301,12 +301,14 @@ private fun CatalogSectionCard(
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
+        // Izoh BITTA qatorda, sig'magani "…" bilan kesiladi: turlar ro'yxati uzun bo'lgan
+        // bo'limlar (Ovqatlanish) katagini ikki barobar cho'zib, to'rni notekis qilardi.
         Text(
             item.typesPreview,
             style = TextStyle(
                 fontFamily = AppFontFamily, fontSize = 11.sp, color = palette.inkFaint,
             ),
-            maxLines = 2,
+            maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
         // Sonni server beradi (turlarning `listingsCount` yig'indisi). `0` bo'lsa chizilmaydi.

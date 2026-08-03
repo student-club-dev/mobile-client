@@ -21,6 +21,16 @@ data class ScColors(
     val brand: Color,
     val brandDark: Color,
     val brandLight: Color,
+    // --- Gradient topbar (`Sc.headerBrush`) --------------------------------
+    /**
+     * Topbar gradientining uch to'xtash nuqtasi. Brend rangidan ALOHIDA: yorug' rejimda
+     * ular aynan brend ko'ki, qorong'ida esa bir necha pog'ona to'q variant. Ilgari topbar
+     * to'g'ridan-to'g'ri `brandLight/brand/brandDark` dan qurilardi va dark rejimda
+     * o'zgarishsiz — ekranning qolgan qismi to'q, tepasi esa yorqin ko'k bo'lib qolardi.
+     */
+    val headerTop: Color,
+    val headerMid: Color,
+    val headerBottom: Color,
     // --- Matn ---
     val ink: Color,
     val inkSoft: Color,
@@ -83,6 +93,10 @@ val LightScColors = ScColors(
     brand = Color(0xFF00ADEE),
     brandDark = Color(0xFF0091D8),
     brandLight = Color(0xFF23C3F5),
+    // Maketdagi `linear-gradient(150deg, #23C3F5, #00ADEE 48%, #0091D8)`.
+    headerTop = Color(0xFF23C3F5),
+    headerMid = Color(0xFF00ADEE),
+    headerBottom = Color(0xFF0091D8),
     ink = Color(0xFF0F2A43),
     inkSoft = Color(0xFF6B7A8D),
     muted = Color(0xFF8A98A8),
@@ -144,6 +158,12 @@ val DarkScColors = ScColors(
     brand = Color(0xFF23C3F5),
     brandDark = Color(0xFF00ADEE),
     brandLight = Color(0xFF4FD3FA),
+    // Topbar to'q rejimda YORQIN ko'k bo'lib qolmaydi: gradient splash foni bilan bir
+    // oilada (`splashTop/Mid/Bottom`) — to'q ko'k-kobalt. Ustidagi oq matn va oq aylana
+    // tugmalar bu fonda ham to'liq kontrastda qoladi.
+    headerTop = Color(0xFF17688F),
+    headerMid = Color(0xFF0F4C6B),
+    headerBottom = Color(0xFF0A374F),
     ink = Color(0xFFEAF3FA),
     inkSoft = Color(0xFF9DAFBF),
     muted = Color(0xFF8394A5),

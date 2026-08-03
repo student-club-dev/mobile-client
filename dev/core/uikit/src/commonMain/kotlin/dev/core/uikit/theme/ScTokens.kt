@@ -105,11 +105,16 @@ object Sc {
     val HeaderPadding = 22.dp
 
     // --- Gradientlar -------------------------------------------------------
-    /** Topbar: `linear-gradient(150deg, #23C3F5 0%, #00ADEE 48%, #0091D8 100%)`. */
+    /**
+     * Topbar: `linear-gradient(150deg, #23C3F5 0%, #00ADEE 48%, #0091D8 100%)`.
+     *
+     * Ranglar brenddan ALOHIDA tokenlardan olinadi ([ScColors.headerTop] va h.k.) —
+     * qorong'i rejimda topbar to'q ko'k bo'ladi, ekranning qolgani bilan bir oilada.
+     */
     val headerBrush: Brush
         @Composable @ReadOnlyComposable
         get() = with(LocalScColors.current) {
-            angledGradient(150f, 0f to brandLight, 0.48f to brand, 1f to brandDark)
+            angledGradient(150f, 0f to headerTop, 0.48f to headerMid, 1f to headerBottom)
         }
 
     /** Tugma/FAB: `linear-gradient(135deg, #00ADEE, #0091D8)`. */

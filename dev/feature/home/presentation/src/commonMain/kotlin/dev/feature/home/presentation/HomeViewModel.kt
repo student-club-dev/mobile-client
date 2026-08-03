@@ -65,6 +65,11 @@ data class HomeUiState(
      * E'loni yo'q bo'lim ro'yxatga tushmaydi.
      */
     val offerSections: List<HomeOfferSection> = emptyList(),
+    /**
+     * Faol topshiriq e'lonlari ([ListingKind.TASK]) — "Fanlardan yordam": referat, masala,
+     * qo'lyozma, IT ishi. Ovqat va kiyimdan KEYIN, kvartiralardan OLDIN turadi.
+     */
+    val tasks: List<Listing> = emptyList(),
     /** Faol ijara e'lonlari ([ListingKind.RENTAL]) — sherik izlayotgan kvartiralar. */
     val rentals: List<Listing> = emptyList(),
     /**
@@ -186,15 +191,17 @@ class HomeViewModel(
 
     private val content = combine(
         catalogSections,
+        observeListingsByKind(ListingKind.TASK),
         observeListingsByKind(ListingKind.RENTAL),
         refreshing,
-    ) { sections, rentals, loading ->
+    ) { sections, tasks, rentals, loading ->
         Content(
             sections = sections,
+            tasks = tasks,
             rentals = rentals,
             // Skelet faqat KO'RSATADIGAN HECH NARSA yo'q bo'lganda: keshdagi e'lonlar
             // bo'lsa ekran darrov to'ladi va yangilanish jimgina bo'ladi.
-            loading = loading && sections.isEmpty() && rentals.isEmpty(),
+            loading = loading && sections.isEmpty() && tasks.isEmpty() && rentals.isEmpty(),
         )
     }
 
@@ -207,6 +214,7 @@ class HomeViewModel(
             universityMonogram = h.monogram,
             courseLabel = h.course,
             offerSections = c.sections,
+            tasks = c.tasks,
             rentals = c.rentals,
             universityStudents = universityStudents,
             // Yuqoridagi "Universitetimda" bo'limida ko'ringanlar takrorlanmasin.
@@ -292,6 +300,7 @@ class HomeViewModel(
     )
     private data class Content(
         val sections: List<HomeOfferSection>,
+        val tasks: List<Listing>,
         val rentals: List<Listing>,
         val loading: Boolean = false,
     )

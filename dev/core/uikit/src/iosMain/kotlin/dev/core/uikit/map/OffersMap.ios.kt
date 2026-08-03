@@ -37,16 +37,14 @@ actual fun OffersMap(
     // MapLibre ilova ichidan o'qiladi (CDN emas) — tayyor bo'lmaguncha WebView qurilmaydi.
     if (!rememberMapLibreReady()) return
 
-    // Boshlang'ich markaz/markerlar bir marta olinadi; keyingi o'zgarishlar JS orqali (reload YO'Q).
-    val initialCenter = remember { center }
-    val initialMarkers = remember { markers }
-    val html = remember(dark, bottomInset) {
-        offersMapHtml(initialCenter, initialMarkers, dark, userLocation, bottomInset)
-    }
+    // Sahifa (MapLibre matni bilan birga ~870 KB) fon oqimida yig'iladi — aks holda uni
+    // qurish UI oqimini bir necha kadrga bloklardi. Boshlang'ich markaz/markerlar bir marta
+    // olinadi; keyingi o'zgarishlar JS orqali (reload YO'Q).
+    val html = rememberOffersMapHtml(markers, center, dark, userLocation, bottomInset) ?: return
 
     val htmlHolder = remember { Holder("") }
     val lastMe = remember { Holder<MapPoint?>(null) }
-    val lastMarkers = remember { Holder(initialMarkers) }
+    val lastMarkers = remember { Holder(markers) }
 
     // Handler WKWebView'dan uzoq yashashi kerak — aks holda xabar kelguncha yig'iladi.
     val handler = remember { MarkerMessageHandler() }
@@ -64,7 +62,7 @@ actual fun OffersMap(
             webView.opaque = false
             webView.loadHTMLString(html, baseURL = NSURL(string = MAP_BASE_URL))
             htmlHolder.value = html
-            lastMarkers.value = initialMarkers
+            lastMarkers.value = markers
             lastMe.value = userLocation
             webView
         },

@@ -188,6 +188,7 @@ fun ListingEntity.toDomain(): Listing = Listing(
     currency = currency,
     isNegotiable = isNegotiable != 0L,
     contactPhone = contactPhone,
+    universityId = universityId,
     branches = branchesJson.decodeBranches(),
     validFrom = validFrom,
     validTo = validTo,
@@ -310,6 +311,7 @@ fun Listing.toEntity(): ListingEntity = ListingEntity(
     isNegotiable = if (isNegotiable) 1L else 0L,
     finalPrice = finalPrice,
     contactPhone = contactPhone,
+    universityId = universityId,
     branchesJson = json.encodeToString(
         branches.map { branch ->
             BranchJson(

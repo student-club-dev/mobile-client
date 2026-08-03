@@ -32,12 +32,14 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * Albomdagi (yoki yakka) bitta media — **rasm ham, video ham**.
@@ -353,6 +355,16 @@ class ChatViewModel(
     }
 
     private val selectedId = MutableStateFlow<String?>(null)
+
+    /**
+     * Suhbat tanlanganmi — `state.selected` dan farqli, DARHOL to'g'ri javob beradi.
+     *
+     * `state.selected` suhbat local keshdagi ro'yxatda paydo bo'lgandan keyingina to'ladi,
+     * ya'ni ochish tugagan payt u hali `null` bo'lishi mumkin. Ekran shu farqqa qarab
+     * "ochilmoqda" va "ochib bo'lmadi" holatlarini ajratadi.
+     */
+    val hasOpenConversation: Boolean get() = selectedId.value != null
+
     private val draft = MutableStateFlow("")
     private val extra = MutableStateFlow(ExtraState())
 
@@ -630,16 +642,42 @@ class ChatViewModel(
     }
 
     /**
-     * Bog'langan talaba bilan suhbatni ochadi — `POST /v1/conversations` **idempotent**,
-     * shuning uchun "suhbat bormi?" deb tekshirilmaydi.
+     * Bog'langan talaba bilan suhbatni ochadi ("Xabar" tugmasi).
+     *
+     * **Avval kesh, keyin tarmoq.** Shu odam bilan suhbat local bazada bo'lsa u DARHOL
+     * ochiladi va korutina shu yerda tugaydi — ekran tarmoqni umuman kutmaydi. Server
+     * bilan tasdiqlash (`POST /v1/conversations` **idempotent**, ustiga suhbatni
+     * yangilash) fonda davom etadi: u ikkita so'rov, ya'ni sekin aloqada bir necha
+     * soniya — ilgari ekran o'sha vaqt davomida qotib turardi.
+     *
+     * Kesh bo'sh bo'lsagina (birinchi marta yozilyapti) server javobi kutiladi: suhbat
+     * id'sini faqat u beradi.
      */
     fun openWithStudent(studentId: String) = viewModelScope.launch {
+        val cached = chatRepository.cachedDirectId(studentId)
+        if (cached != null) {
+            openById(cached)
+            confirmDirect(studentId)
+            return@launch
+        }
         when (val res = chatRepository.openDirect(studentId)) {
             is Resource.Success -> openById(res.data)
             // `403 NOT_CONNECTED` — avval bog'lanish kerak.
             is Resource.Error -> extra.update { it.copy(message = res.message) }
             Resource.Loading -> Unit
         }
+    }
+
+    /**
+     * Keshdan ochilgan suhbatni server bilan tasdiqlaydi (suhbatdoshning holati, oxirgi
+     * xabari va o'qilmaganlar sanog'i yangilanadi).
+     *
+     * MUHIM: `viewModelScope` da, [openWithStudent] ning ICHIDA `launch` bilan emas — bola
+     * korutina bo'lsa `Job.join()` uni ham kutardi va ekran yana tarmoqqa bog'lanib qolardi.
+     * Xato bo'lsa (tarmoq yo'q) keshdagi yozishma baribir ochiq qoladi.
+     */
+    private fun confirmDirect(studentId: String) {
+        viewModelScope.launch { chatRepository.openDirect(studentId) }
     }
 
     private fun openById(conversationId: String) {
@@ -652,6 +690,17 @@ class ChatViewModel(
             chatRepository.markRead(conversationId)
         }
     }
+
+    /**
+     * Yozishma chizishga tayyor bo'lguncha kutadi (`state.selected` to'lguncha) — `true`
+     * qaytsa ekran uni ko'rsatishi mumkin.
+     *
+     * To'g'ridan-to'g'ri ochish uchun: suhbat id'si bor, lekin uning qatori keshdagi
+     * ro'yxatga tushmaguncha yozishma chizilmaydi. Kutish [OPEN_THREAD_TIMEOUT_MS] bilan
+     * chegaralangan — suhbat umuman topilmasa (eski push) ekran bo'sh qolib ketmasin.
+     */
+    suspend fun awaitThread(): Boolean =
+        withTimeoutOrNull(OPEN_THREAD_TIMEOUT_MS) { state.first { it.selected != null } } != null
 
     fun close() {
         stopTyping()
@@ -953,6 +1002,9 @@ class ChatViewModel(
 
     private companion object {
         const val TYPING_IDLE_MS = 3_000L
+
+        /** To'g'ridan-to'g'ri ochilgan suhbatni kutish chegarasi ([awaitThread]). */
+        const val OPEN_THREAD_TIMEOUT_MS = 5_000L
 
         /** Bir albomdagi rasmlar chegarasi — `ChatRepositoryImpl` dagi bilan bir xil. */
         const val MAX_ALBUM_SIZE = 10

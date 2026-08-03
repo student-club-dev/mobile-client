@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.sp
 import dev.core.uikit.components.AppFontFamily
 import dev.core.uikit.components.AppIcons
 import dev.core.uikit.theme.AppPalette
+import dev.core.uikit.theme.Sc
 
 /**
  * Ro'yxatdan xaritaga o'tish tugmasi.
@@ -90,7 +91,11 @@ fun OffersMapOverlay(
     detail: @Composable BoxScope.() -> Unit = {},
 ) {
     // Xarita to'liq ekran (full-bleed) — ustki panel ustida suzadi, kulrang band yo'q.
-    Box(modifier.fillMaxSize()) {
+    //
+    // Fon RANGI kerak: xarita sahifasi fon oqimida yig'ilgani uchun ([rememberOffersMapHtml])
+    // birinchi kadrlarda WebView hali yo'q — fonsiz o'sha lahzada ostidagi ro'yxat ko'rinib
+    // qolardi, go'yo ekran yarim ochilgandek.
+    Box(modifier.fillMaxSize().background(Sc.Bg)) {
         OffersMap(
             markers = markers,
             center = center,

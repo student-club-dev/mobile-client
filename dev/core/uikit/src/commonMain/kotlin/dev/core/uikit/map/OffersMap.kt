@@ -4,10 +4,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import dev.core.uikit.generated.resources.Res
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.jetbrains.compose.resources.ExperimentalResourceApi
 
 /**
@@ -71,6 +74,10 @@ private object MapLibreAssets {
 /**
  * Kutubxona fayllarini (bir marta) o'qiydi. `false` qaytsa xarita hali qurilmaydi —
  * bu bir necha millisekund, birinchi ochilishda bir marta.
+ *
+ * O'qish va `decodeToString` ATAYLAB fon oqimida ([Dispatchers.Default]): fayllar birgalikda
+ * ~870 KB va ularni UI oqimida matnga aylantirish "Xarita" bosilganda ekranni bir necha
+ * kadrga muzlatib qo'yardi.
  */
 @OptIn(ExperimentalResourceApi::class)
 @Composable
@@ -78,14 +85,48 @@ internal fun rememberMapLibreReady(): Boolean {
     var ready by remember { mutableStateOf(MapLibreAssets.loaded) }
     LaunchedEffect(Unit) {
         if (!MapLibreAssets.loaded) {
-            runCatching {
-                MapLibreAssets.js = Res.readBytes("files/maplibre-gl.js").decodeToString()
-                MapLibreAssets.css = Res.readBytes("files/maplibre-gl.css").decodeToString()
+            withContext(Dispatchers.Default) {
+                runCatching {
+                    MapLibreAssets.js = Res.readBytes("files/maplibre-gl.js").decodeToString()
+                    MapLibreAssets.css = Res.readBytes("files/maplibre-gl.css").decodeToString()
+                }
             }
         }
         ready = MapLibreAssets.loaded
     }
     return ready
+}
+
+/**
+ * Xarita sahifasi — **fon oqimida** yig'iladi; tayyor bo'lmaguncha `null`.
+ *
+ * Sahifa ichida MapLibre'ning butun JS/CSS matni turadi (~870 KB), ya'ni uni qurish oddiy
+ * satr birlashtirish emas — megabaytlik nusxa ko'chirish. Kompozitsiya ichida (`remember`)
+ * qilinganda bu ish UI oqimiga tushar va "Xaritada ko'rish" bosilgach ekran avval qotib,
+ * keyin xarita ochilardi. Endi kompozitsiya darhol qaytadi, HTML esa fonda tayyorlanadi.
+ *
+ * [markers] va [center] FAQAT birinchi chaqiruvdan olinadi (keyingi o'zgarishlar sahifani
+ * qayta yuklamasdan, `setMarkers` orqali qo'llaniladi) — shuning uchun ular kuzatilmaydi.
+ */
+@Composable
+internal fun rememberOffersMapHtml(
+    markers: List<OfferMarker>,
+    center: MapPoint,
+    dark: Boolean,
+    userLocation: MapPoint?,
+    bottomInset: Int,
+): String? {
+    val initialCenter = remember { center }
+    val initialMarkers = remember { markers }
+    // Joylashuv ham boshlang'ich qiymatidan olinadi: u kelganda sahifa qayta qurilmaydi,
+    // `setMe(...)` bilan faqat ko'k nuqta ko'chadi.
+    val initialMe = remember { userLocation }
+    val html by produceState<String?>(null, dark, bottomInset) {
+        value = withContext(Dispatchers.Default) {
+            offersMapHtml(initialCenter, initialMarkers, dark, initialMe, bottomInset)
+        }
+    }
+    return html
 }
 
 /** Sahifaga joylash uchun kutubxona matni — [OffersMap] va [MapPicker] ikkalasi ishlatadi. */

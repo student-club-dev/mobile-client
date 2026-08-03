@@ -82,6 +82,8 @@ import dev.core.uikit.components.ScHeader
 import dev.core.uikit.components.ScHeaderTitle
 import dev.core.uikit.components.ScIconTile
 import dev.core.uikit.components.ScIcons
+import dev.core.uikit.components.ScShimmerBox
+import dev.core.uikit.components.ScShimmerLine
 import dev.core.uikit.components.ScText
 import dev.core.uikit.components.ScUploadRing
 import dev.core.uikit.components.StatusBarAppearance
@@ -147,15 +149,47 @@ fun ChatScreen(
     val threadOpen = state.selected != null
     LaunchedEffect(threadOpen) { onThreadOpenChange(threadOpen) }
 
+    /**
+     * Ekran KONKRET suhbat bilan ochilganmi ("Xabar" tugmasi yoki push).
+     *
+     * Bunda suhbatlar ro'yxati umuman chizilmaydi: suhbat id'si serverdan kelguncha
+     * (`POST /v1/conversations`) ro'yxat bir lahzaga ko'rinib, foydalanuvchi "Xabarlar →
+     * suhbat" degan ortiqcha o'tishni ko'rardi. Endi "Xabar" to'g'ridan-to'g'ri chatga
+     * olib boradi, orqaga bosilsa esa kelingan ekranga qaytadi.
+     */
+    val direct = openStudentId != null || openConversationId != null
+
+    /**
+     * `true` — suhbat ochilmoqda yoki ochilgan: ro'yxat o'rniga bo'sh fon turadi.
+     * FAQAT ochish muvaffaqiyatsiz tugaganda (bog'lanish yo'q, suhbat topilmadi) `false`
+     * bo'ladi — o'shanda ro'yxat va sabab yozuvi ko'rinadi.
+     */
+    var openingDirect by remember { mutableStateOf(direct) }
+
     LaunchedEffect(openStudentId) {
-        if (openStudentId != null) vm.openWithStudent(openStudentId)
+        if (openStudentId == null) return@LaunchedEffect
+        vm.openWithStudent(openStudentId).join()
+        // Suhbat ochilmadi (masalan `403 NOT_CONNECTED`) — ro'yxatga tushamiz, sababi
+        // ekran ostidagi xabarda ko'rinadi.
+        openingDirect = vm.hasOpenConversation && vm.awaitThread()
     }
     LaunchedEffect(openConversationId) {
-        if (openConversationId != null) vm.openConversation(openConversationId)
+        if (openConversationId == null) return@LaunchedEffect
+        vm.openConversation(openConversationId)
+        openingDirect = vm.awaitThread()
+    }
+
+    /** Suhbatdan chiqish: to'g'ridan-to'g'ri ochilgan bo'lsa — butun ekrandan chiqamiz. */
+    val closeThread: () -> Unit = {
+        vm.close()
+        if (direct) onBack?.invoke()
     }
 
     Box(Modifier.fillMaxSize()) {
-        if (state.selected == null) {
+        if (state.selected == null && openingDirect) {
+            // Suhbat ochilguncha (va chiqish animatsiyasi davomida) — yozishmaning skeleti.
+            OpeningThread(onBack)
+        } else if (state.selected == null) {
             ConversationList(
                 conversations = state.conversations,
                 archivedConversations = state.archivedConversations,
@@ -175,7 +209,7 @@ fun ChatScreen(
             ChatThread(
                 conversation = state.selected!!,
                 state = state,
-                onBack = vm::close,
+                onBack = closeThread,
                 onDraft = vm::onDraft,
                 onSend = vm::send,
                 onSendImages = vm::sendImages,
@@ -217,6 +251,56 @@ fun ChatScreen(
                     .background(Sc.Ink.copy(alpha = 0.92f))
                     .padding(horizontal = 16.dp, vertical = 12.dp),
             ) { ScText(message, 13.5f, FontWeight.SemiBold, Color.White) }
+        }
+    }
+}
+
+/**
+ * Suhbat ochilayotgan payt — yozishmaning O'ZI kabi ko'rinadi: gradient sarlavha, orqaga
+ * tugmasi va xabar pufaklari o'rnida skelet.
+ *
+ * Suhbatlar ro'yxati chizilmaydi (foydalanuvchi "Xabarlar → suhbat" o'tishini ko'rmasin),
+ * lekin bo'sh ekran ham qolmaydi: keshda suhbat bo'lmaganda (shu odam bilan birinchi
+ * marta yozilyapti) server `POST /v1/conversations` ga javob bergunicha sekin aloqada
+ * bir necha soniya ketishi mumkin — o'sha payt ekran "qotgandek" ko'rinardi.
+ *
+ * Orqaga tugmasi shu yerda ham ishlaydi: kutish cho'zilsa foydalanuvchi qaytib ketolsin.
+ */
+@Composable
+private fun OpeningThread(onBack: (() -> Unit)?) {
+    Column(Modifier.fillMaxSize().background(Sc.ChatBg)) {
+        ScHeader {
+            Row(
+                Modifier.fillMaxWidth().padding(top = 18.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                if (onBack != null) {
+                    ScCircleButton(ScIcons.ChevronLeft, onBack, contentDescription = "Orqaga")
+                }
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    // Ism hali noma'lum (suhbat qatori kelmagan) — o'rniga skelet qatorlar.
+                    ScShimmerLine(0.42f, 15.dp)
+                    ScShimmerLine(0.24f, 10.dp)
+                }
+            }
+        }
+        Column(
+            Modifier.fillMaxSize().padding(horizontal = Sc.ScreenPadding, vertical = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            // Kiruvchi/chiquvchi pufaklar navbatlashadi — yozishma shakli darrov taniladi.
+            listOf(0.62f to false, 0.44f to true, 0.55f to false, 0.38f to true).forEach { (w, own) ->
+                Box(
+                    Modifier.fillMaxWidth(),
+                    contentAlignment = if (own) Alignment.CenterEnd else Alignment.CenterStart,
+                ) {
+                    ScShimmerBox(
+                        Modifier.fillMaxWidth(w).height(44.dp),
+                        RoundedCornerShape(18.dp),
+                    )
+                }
+            }
         }
     }
 }

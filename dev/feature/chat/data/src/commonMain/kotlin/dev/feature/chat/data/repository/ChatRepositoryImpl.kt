@@ -379,6 +379,10 @@ class ChatRepositoryImpl(
         Resource.Loading -> Resource.Loading
     }
 
+    override suspend fun cachedDirectId(studentId: String): String? = withContext(dispatchers.io) {
+        q.selectConversationIdByOther(studentId).executeAsOneOrNull()
+    }
+
     override suspend fun openDirect(studentId: String): Resource<String> {
         val res = remote.openDirect(studentId)
         // Yangi suhbat keshda yo'q — ro'yxatni yangilab, ikkinchi tomon ma'lumotini olamiz.

@@ -27,6 +27,7 @@ class LocalDataSeeder(
         seedStudents()
         seedAds()
         seedRentals()
+        seedTasks()
         seedNotifications()
         seedClubs()
     }
@@ -208,16 +209,120 @@ class LocalDataSeeder(
         details: String,
         branch: String,
         updatedAt: Long,
+    ) = insertListing(
+        id = id,
+        kind = "RENTAL",
+        details = details,
+        title = title,
+        description = description,
+        priceUnit = "PER_MONTH",
+        price = price,
+        branchesJson = "[$branch]",
+        updatedAt = updatedAt,
+    )
+
+    /**
+     * "Fanlardan yordam" — talabalar qo'ygan topshiriq e'lonlari (bosh ekranning uchinchi
+     * bo'limi va "Universitetim" ekranidagi ro'yxat).
+     *
+     * Har biri UNIVERSITETGA bog'langan (`universityId`): "Universitetim" ekrani aynan shu
+     * maydon bo'yicha filtrlaydi, ya'ni namuna ma'lumotsiz u bo'limni umuman ko'rib bo'lmasdi.
+     * Universitet id'lari [seedUniversities] dagi bilan bir xil.
+     *
+     * Muddat (`deadline`) qat'iy [SEED_DEADLINE] ga bog'langan — sana kelib o'tsa
+     * kartadagi yorliq yo'qoladi, e'lon esa qolaveradi (muddati o'tgani ko'rsatilmaydi).
+     */
+    private fun seedTasks() {
+        val q = db.listingQueries
+        if (q.countByKind("TASK").executeAsOne() > 0) return
+        q.transaction {
+            insertTask(
+                id = "task-tatu-algoritm",
+                universityId = "tatu",
+                title = "Algoritmlar fanidan 12 ta masala",
+                description = "C++ da yechim va qisqacha izoh kerak. Kod ishlashi shart.",
+                price = 150_000,
+                details = """
+                    {"kind":"TASK","category":"EXACT","typeKey":"MATH",
+                    "deadline":$SEED_DEADLINE,"format":"ONLINE","volume":"12 ta masala"}
+                """.compactJson(),
+                branch = branchJson("br-tatu", 41.3500, 69.2050, "Olmazor, TATU", "TATU"),
+                updatedAt = SEED_TIME,
+            )
+            insertTask(
+                id = "task-tatu-referat",
+                universityId = "tatu",
+                title = "Falsafadan 20 betlik referat",
+                description = "Mavzu: «Sharq uyg'onish davri». Plagiat 20% dan oshmasin.",
+                price = 90_000,
+                details = """
+                    {"kind":"TASK","category":"WRITTEN","typeKey":"REFERAT",
+                    "deadline":${SEED_DEADLINE + 2 * DAY_MILLIS},"format":"ONLINE","volume":"20 bet"}
+                """.compactJson(),
+                branch = branchJson("br-tatu-2", 41.3500, 69.2050, "Olmazor, TATU", "TATU"),
+                updatedAt = SEED_TIME - 1,
+            )
+            insertTask(
+                id = "task-nuu-chizma",
+                universityId = "nuu",
+                title = "Chizma geometriyadan qo'lyozma ish",
+                description = "3 ta varaq, qo'lda chiziladi. Universitetda topshiriladi.",
+                price = 120_000,
+                details = """
+                    {"kind":"TASK","category":"DRAWING","typeKey":"CAD",
+                    "deadline":${SEED_DEADLINE - 2 * DAY_MILLIS},"format":"IN_PERSON","volume":"3 varaq"}
+                """.compactJson(),
+                branch = branchJson("br-nuu", 41.3400, 69.2050, "Olmazor, O'zMU", "O'zMU"),
+                updatedAt = SEED_TIME - 2,
+            )
+        }
+    }
+
+    private fun insertTask(
+        id: String,
+        universityId: String,
+        title: String,
+        description: String,
+        price: Long,
+        details: String,
+        branch: String,
+        updatedAt: Long,
+    ) = insertListing(
+        id = id,
+        kind = "TASK",
+        details = details,
+        title = title,
+        description = description,
+        // Topshiriq — bir martalik ish, narx butun ish uchun (`PostListingViewModel` ham shunday).
+        priceUnit = "PER_ITEM",
+        price = price,
+        branchesJson = "[$branch]",
+        updatedAt = updatedAt,
+        universityId = universityId,
+    )
+
+    /** Namuna e'lonining umumiy ustunlari — turga xos qismi `details` da. */
+    private fun insertListing(
+        id: String,
+        kind: String,
+        details: String,
+        title: String,
+        description: String,
+        priceUnit: String,
+        price: Long,
+        branchesJson: String,
+        updatedAt: Long,
+        universityId: String? = null,
     ) = db.listingQueries.upsert(
         id = id,
         ownerId = SEED_OWNER,
         businessId = null,
-        kind = "RENTAL",
+        kind = kind,
         detailsJson = details,
         title = title,
         description = description,
         imagesJson = "[]",
-        priceUnit = "PER_MONTH",
+        priceUnit = priceUnit,
         price = price,
         priceMax = null,
         currency = "UZS",
@@ -225,7 +330,8 @@ class LocalDataSeeder(
         // Chegirmasiz e'londa talaba to'laydigan narx = narxning o'zi.
         finalPrice = price,
         contactPhone = null,
-        branchesJson = "[$branch]",
+        universityId = universityId,
+        branchesJson = branchesJson,
         validFrom = 0,
         validTo = FAR_FUTURE,
         attributesJson = "{}",
@@ -354,6 +460,17 @@ class LocalDataSeeder(
 
         /** Namuna e'lonlar muddati o'tmasin — 2100-01-01 (epoch millis). */
         const val FAR_FUTURE = 4_102_444_800_000L
+
+        /** Bir kun (millis) — topshiriq muddatlarini [SEED_DEADLINE] dan sanash uchun. */
+        const val DAY_MILLIS = 86_400_000L
+
+        /**
+         * Namuna topshiriqlarning muddati — 2026-12-20 12:00 (UTC), QAT'IY qiymat.
+         * `Clock` ishlatilmaydi ([SEED_TIME] dagi sabab bilan): seed hamma qurilmada
+         * bir xil bo'lsin. Sana o'tib ketsa kartadagi muddat yorlig'i chizilmaydi,
+         * e'lonning o'zi esa qolaveradi.
+         */
+        const val SEED_DEADLINE = 1_797_768_000_000L
 
         // "Siz uchun" seed'i shu versiyada. listings.json o'zgarsa bu qiymatni oshiring.
         const val DISCOUNTS_SEED_KEY = "discounts_seed_version"

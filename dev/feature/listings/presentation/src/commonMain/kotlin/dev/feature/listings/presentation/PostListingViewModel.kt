@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.core.common.Resource
 import dev.core.domain.usecase.ObserveCurrentUserUseCase
+import dev.feature.profile.domain.usecase.ObserveProfileUseCase
 import dev.feature.listings.domain.model.BusinessType
 import dev.feature.listings.domain.model.EmploymentType
 import dev.feature.listings.domain.model.JobCatalog
@@ -31,6 +32,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -52,6 +54,7 @@ import kotlinx.datetime.Clock
  */
 class PostListingViewModel(
     observeCurrentUserUseCase: ObserveCurrentUserUseCase,
+    observeProfileUseCase: ObserveProfileUseCase,
     private val publishListing: PublishListingUseCase,
     private val saveDraft: SaveDraftUseCase,
     private val uploadImage: UploadListingImageUseCase,
@@ -63,6 +66,15 @@ class PostListingViewModel(
     private val user = observeCurrentUserUseCase()
         .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
+    /**
+     * E'lon egasining universiteti — `Listing.universityId` ning odatiy qiymati (spec §7.2.4).
+     * Formada so'ralmaydi: talaba o'z e'lonini deyarli har doim o'z OTMiga bog'laydi,
+     * profilda universitet ko'rsatilmagan bo'lsa esa e'lon shunchaki bog'lanmagan qoladi.
+     */
+    private val universityId = observeProfileUseCase()
+        .map { it?.universityId?.takeIf { id -> id.isNotBlank() } }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
     private val _state = MutableStateFlow(PostListingUiState())
     val state: StateFlow<PostListingUiState> = _state.asStateFlow()
 
@@ -70,6 +82,9 @@ class PostListingViewModel(
     private var editingId: String? = null
     private var editingCreatedAt: Long? = null
     private var editingBusinessId: String? = null
+
+    /** Tahrirlanayotgan e'lon qaysi universitetga bog'langan (`null` — bog'lanmagan). */
+    private var editingUniversityId: String? = null
 
     // -----------------------------------------------------------------------
     // Qadamlar: tur → (biznes turi) → forma
@@ -357,6 +372,7 @@ class PostListingViewModel(
             editingId = listing.id
             editingCreatedAt = listing.createdAt
             editingBusinessId = listing.businessId
+            editingUniversityId = listing.universityId
             _state.value = listing.toUiState()
         }
     }
@@ -420,6 +436,8 @@ class PostListingViewModel(
             priceMax = s.priceMax.toLongOrNull(),
             isNegotiable = s.isNegotiable,
             contactPhone = s.contactPhone.trim().ifBlank { null },
+            // Tahrirlashda e'lon o'z universitetida qoladi; yangi e'lon egasinikiga bog'lanadi.
+            universityId = editingUniversityId ?: universityId.value,
             // Chegirmada kategoriyaga xos maydonlar shu yerda saqlanadi.
             attributes = s.discount.attributeValues.takeIf { kind == ListingKind.DISCOUNT }.orEmpty(),
             branches = s.branches,

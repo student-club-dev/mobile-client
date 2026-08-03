@@ -261,6 +261,8 @@ fun StudentShell(onLoggedOut: () -> Unit) {
                             popUpTo(StudentTab.HOME.route) { saveState = true }
                         }
                     },
+                    // "Fanlardan yordam" — o'sha ekran, Yordam tab'i ochilgan holda.
+                    onOpenTasks = { openListingsKind(ListingKind.TASK) },
                     // "E'lonlar" ekrani, darrov ijara tab'i ochilgan holda.
                     onOpenRentals = { openListingsKind(ListingKind.RENTAL) },
                     onOpenListing = { id -> nav.navigateSafe("$LISTING_DETAIL/${encodeArg(id)}") },
@@ -280,7 +282,12 @@ fun StudentShell(onLoggedOut: () -> Unit) {
                 StudentTab.UNIVERSITY.route,
                 enterTransition = TabEnter, exitTransition = TabExit,
                 popEnterTransition = TabEnter, popExitTransition = TabExit,
-            ) { MyUniversityScreen() }
+            ) {
+                MyUniversityScreen(
+                    onOpenListing = { id -> nav.navigateSafe("$LISTING_DETAIL/${encodeArg(id)}") },
+                    onOpenTasks = { openListingsKind(ListingKind.TASK) },
+                )
+            }
             composable(
                 // "Takliflar" — bizneslardan keladigan e'lonlar, pastki paneldagi tab.
                 // `?group=` — Home'dagi bo'lim ("Ovqatlar") tugmasidan; bo'sh bo'lsa butun feed.

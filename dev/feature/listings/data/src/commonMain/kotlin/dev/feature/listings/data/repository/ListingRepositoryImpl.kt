@@ -109,6 +109,7 @@ class ListingRepositoryImpl(
             isNegotiable = e.isNegotiable,
             finalPrice = e.finalPrice,
             contactPhone = e.contactPhone,
+            universityId = e.universityId,
             branchesJson = e.branchesJson,
             validFrom = e.validFrom,
             validTo = e.validTo,

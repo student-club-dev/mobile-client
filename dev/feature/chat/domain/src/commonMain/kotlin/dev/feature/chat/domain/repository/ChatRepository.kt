@@ -75,6 +75,17 @@ interface ChatRepository {
      */
     suspend fun openDirect(studentId: String): Resource<String>
 
+    /**
+     * Shu talaba bilan suhbatning **keshdagi** id'si (bo'lmasa `null`) — local o'qish,
+     * tarmoq YO'Q.
+     *
+     * "Xabar" bosilganda ekran shuni birinchi so'raydi: allaqachon yozishgan odam bilan
+     * suhbat darhol ochilsin, [openDirect] ning ikki so'rovi (`POST /v1/conversations` +
+     * suhbatni yangilash) esa fonda bajarilsin. Busiz har "Xabar" bosilganda ekran
+     * tarmoq javobini kutib turardi.
+     */
+    suspend fun cachedDirectId(studentId: String): String?
+
     /** Suhbat ochilganda: oxirgi xabarlarni yuklaydi va uzilib qolganlarini yetishib oladi. */
     suspend fun loadLatest(conversationId: String): Resource<Unit>
 

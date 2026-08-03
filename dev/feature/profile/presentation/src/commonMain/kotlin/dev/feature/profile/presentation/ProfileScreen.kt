@@ -170,7 +170,7 @@ fun ProfileScreen(
                         Modifier.weight(1f),
                         enabled = photos.canAdd,
                     ) { imagePicker.pick() }
-                    ActionTile(AppIcons.Pencil, "Axborotni tahrirlash", Modifier.weight(1f), onClick = onEditProfile)
+                    ActionTile(AppIcons.Pencil, "Tahrirlash", Modifier.weight(1f), onClick = onEditProfile)
                     ActionTile(AppIcons.Settings, "Sozlamalar", Modifier.weight(1f), onClick = onOpenSettings)
                 }
 

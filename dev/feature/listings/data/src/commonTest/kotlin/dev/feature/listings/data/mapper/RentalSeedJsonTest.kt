@@ -60,6 +60,7 @@ class RentalSeedJsonTest {
         isNegotiable = 0,
         finalPrice = 1_200_000,
         contactPhone = null,
+        universityId = null,
         branchesJson = branches,
         validFrom = 0,
         validTo = 4_102_444_800_000L,

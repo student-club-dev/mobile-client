@@ -4,6 +4,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.core.common.Resource
 import dev.core.domain.model.DiscountOffer
+import dev.feature.listings.domain.model.Listing
+import dev.feature.listings.domain.model.ListingKind
+import dev.feature.listings.domain.usecase.ObserveListingsByKindUseCase
 import dev.feature.students.domain.model.FriendStatus
 import dev.feature.students.domain.model.Student
 import dev.feature.university.domain.model.University
@@ -25,6 +28,12 @@ import kotlinx.coroutines.launch
 data class MyUniversityUiState(
     val university: University? = null,       // profildagi universitetim (tanlanmagan bo'lsa null)
     val mates: List<Student> = emptyList(),   // shu universitet talabalari
+    /**
+     * Shu universitetga bog'langan topshiriq e'lonlari ("Fanlardan yordam") —
+     * `Listing.universityId == university.id` (`STUDENT_LISTINGS_BACKEND.md` §7.2.4).
+     * Boshqa OTM e'lonlari bu yerga tushmaydi: ular "E'lonlar" ekranida.
+     */
+    val tasks: List<Listing> = emptyList(),
     // "Siz uchun" listingidagi turlar (ma'lumot ElonUz'dan) — universitet atrofidagi joylar.
     val printShops: List<DiscountOffer> = emptyList(),   // "printerxona"
     val foods: List<DiscountOffer> = emptyList(),        // "ovqat"
@@ -45,6 +54,7 @@ class MyUniversityViewModel(
     private val universityRepository: UniversityRepository,
     private val studentRepository: StudentRepository,
     discountRepository: DiscountRepository,
+    observeListingsByKind: ObserveListingsByKindUseCase,
 ) : ViewModel() {
 
     init {
@@ -57,7 +67,8 @@ class MyUniversityViewModel(
         universityRepository.observeUniversities(),
         studentRepository.observeStudents(),
         discountRepository.observeAllOffers(),
-    ) { profile, universities, students, offers ->
+        observeListingsByKind(ListingKind.TASK),
+    ) { profile, universities, students, offers, taskListings ->
         val uni = universities.firstOrNull { it.id == profile?.universityId }
         // Aynan shu universitet talabalari; topilmasa (prof-emis id local seed'ga mos kelmaydi)
         // do'stlashish uchun barcha talabalarni ko'rsatamiz.
@@ -68,7 +79,17 @@ class MyUniversityViewModel(
         // ovqat esa butun katalog guruhi bo'yicha (`FOOD` — fast-food, milliy taomlar, somsa).
         val printShops = offers.filter { it.categoryId == "PRINTING" || it.categoryId == "printerxona" }
         val foods = offers.filter { it.groupKey == "FOOD" }
-        MyUniversityUiState(university = uni, mates = mates, printShops = printShops, foods = foods, loading = false)
+        // Fanlardan yordam — FAQAT shu universitetga bog'langan topshiriqlar. Universitet
+        // tanlanmagan bo'lsa ro'yxat bo'sh: "mening universitetim" degan tushuncha yo'q.
+        val tasks = uni?.let { u -> taskListings.filter { it.universityId == u.id } }.orEmpty()
+        MyUniversityUiState(
+            university = uni,
+            mates = mates,
+            tasks = tasks,
+            printShops = printShops,
+            foods = foods,
+            loading = false,
+        )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), MyUniversityUiState())
 
     // --- Universitet tanlash (BottomSheet) ---

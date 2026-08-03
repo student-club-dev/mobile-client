@@ -37,9 +37,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.core.uikit.components.ScCircleButton
 import dev.core.uikit.components.ScGlyph
@@ -65,6 +67,8 @@ import dev.core.uikit.map.OffersMap
 import dev.core.uikit.map.rememberUserLocation
 import dev.core.uikit.theme.Sc
 import dev.core.domain.model.DiscountOffer
+import dev.feature.listings.domain.model.Listing
+import dev.feature.listings.domain.model.formatSum
 import dev.feature.students.domain.model.FriendStatus
 import dev.feature.students.domain.model.Student
 import dev.feature.university.domain.model.University
@@ -82,7 +86,13 @@ private val tilePalette: List<Pair<Color, Color>>
 )
 
 @Composable
-fun MyUniversityScreen(vm: MyUniversityViewModel = koinViewModel()) {
+fun MyUniversityScreen(
+    /** Topshiriq e'loni bosilganda uning tafsilot ekrani ochiladi. */
+    onOpenListing: (String) -> Unit = {},
+    /** "Barchasi" — talaba e'lonlari ekrani, Yordam tab'i bilan. */
+    onOpenTasks: () -> Unit = {},
+    vm: MyUniversityViewModel = koinViewModel(),
+) {
     val state by vm.state.collectAsStateWithLifecycle()
     val picker by vm.picker.collectAsStateWithLifecycle()
     var showPicker by remember { mutableStateOf(false) }
@@ -145,6 +155,9 @@ fun MyUniversityScreen(vm: MyUniversityViewModel = koinViewModel()) {
                             }
                         }
                     }
+                    // Universitetimga tegishli topshiriq e'lonlari — talabalardan keyin,
+                    // atrofdagi joylardan oldin (u ham "universitetim" haqidagi ma'lumot).
+                    tasksSection(state.tasks, onSeeAll = onOpenTasks, onOpen = onOpenListing)
                 }
 
                 nearbySection("Ovqatlar", state.foods, onMap = { showFoodMap = true }) { selectedOffer = it }
@@ -329,6 +342,73 @@ private fun FriendButton(student: Student, onFriend: () -> Unit) {
             label, onFriend,
             radius = 16.dp, verticalPadding = 10.dp, fontSize = 13.5f, weight = FontWeight.Bold,
         )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Fanlardan yordam — universitetimga tegishli topshiriqlar
+// ---------------------------------------------------------------------------
+
+/**
+ * "Fanlardan yordam" — AYNAN shu universitetga bog'langan topshiriq e'lonlari
+ * (`Listing.universityId`). Bir OTMdagi talaba bir xil fandan, bir xil o'qituvchining
+ * topshirig'idan yordam so'raydi — shuning uchun bu ro'yxat universitet ekranida turadi.
+ *
+ * E'lon yo'q bo'lsa sarlavha baribir ko'rinadi va nima uchun bo'shligini aytadi: bo'lim
+ * butunlay yashirilsa, foydalanuvchi bunday imkoniyat borligini umuman bilmay qolardi.
+ */
+private fun androidx.compose.foundation.lazy.LazyListScope.tasksSection(
+    tasks: List<Listing>,
+    onSeeAll: () -> Unit,
+    onOpen: (String) -> Unit,
+) {
+    item {
+        ScSectionHeader(
+            "📚 Fanlardan yordam",
+            Modifier.padding(horizontal = Sc.ScreenPadding),
+            subtitle = "Universitetimdagi topshiriq e'lonlari",
+            action = if (tasks.isNotEmpty()) "Barchasi" else null,
+            onAction = onSeeAll,
+        )
+    }
+    if (tasks.isEmpty()) {
+        item {
+            ScText(
+                "Hozircha topshiriq e'loni yo'q.", 13f, FontWeight.Medium, Sc.Muted,
+                Modifier.padding(horizontal = Sc.ScreenPadding),
+            )
+        }
+        return
+    }
+    items(tasks.take(5), key = { it.id }) { listing ->
+        TaskCard(listing, Modifier.padding(horizontal = Sc.ScreenPadding)) { onOpen(listing.id) }
+    }
+}
+
+@Composable
+private fun TaskCard(listing: Listing, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    val task = listing.taskDetails
+    Row(
+        modifier.fillMaxWidth().scCard(radius = 20.dp, onClick = onClick).padding(14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        ScIconTile(Sc.TintPink, size = 46.dp, radius = 15.dp) {
+            Text(listing.emoji, style = TextStyle(fontSize = 21.sp))
+        }
+        Column(Modifier.weight(1f)) {
+            ScText(listing.title, 15f, FontWeight.ExtraBold, Sc.Ink, maxLines = 1)
+            val summary = task?.summary().orEmpty()
+            if (summary.isNotBlank()) {
+                Spacer(Modifier.height(3.dp))
+                ScText(summary, 12f, FontWeight.Medium, Sc.Muted, maxLines = 1)
+            }
+            Spacer(Modifier.height(6.dp))
+            ScText(
+                if (listing.isNegotiable) "Kelishilgan" else "${listing.price.formatSum()} so'm",
+                13.5f, FontWeight.ExtraBold, Sc.Success, maxLines = 1,
+            )
+        }
     }
 }
 
@@ -720,8 +800,10 @@ private fun OffersMapSection(
     val center = if (markers.isEmpty()) MapPoint(41.311081, 69.240562)
     else MapPoint(markers.map { it.lat }.average(), markers.map { it.lng }.average())
 
-    Box(Modifier.fillMaxSize()) {
-        OffersMap(markers, center, false, rememberUserLocation(), 100, Modifier.fillMaxSize(), onMarkerTap = onMarkerTap)
+    // Fon rangi — xarita sahifasi fon oqimida yig'ilgani uchun birinchi kadrlarda WebView
+    // hali yo'q; fonsiz o'sha lahzada ostidagi ro'yxat ko'rinib qolardi.
+    Box(Modifier.fillMaxSize().background(Sc.Bg)) {
+        OffersMap(markers, center, Sc.IsDark, rememberUserLocation(), 100, Modifier.fillMaxSize(), onMarkerTap = onMarkerTap)
         Row(
             Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = Sc.ScreenPadding, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
