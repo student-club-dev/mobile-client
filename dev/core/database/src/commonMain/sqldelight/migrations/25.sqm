@@ -1,0 +1,21 @@
+-- v25 -> v26 — «faqat menda o'chirish» (`CHAT_SELECTION_AND_HISTORY_BACKEND.md` §A1).
+--
+-- Xabarlarni bosib-surib belgilash rejimida ikki xil o'chirish bor (Telegram'dagidek):
+--   • ikkalamiz uchun — `DELETE /v1/messages/{id}`, soft delete (`deletedAt`), tarixda
+--     tombstone qoladi va suhbatdosh ham ko'rmaydi;
+--   • faqat men uchun — xabar SHU QURILMADA ko'rinmaydi, serverda va suhbatdoshda
+--     o'zgarishsiz qoladi.
+--
+-- Ikkinchisi uchun `hiddenAt`. `deletedAt` ni qayta ishlatib bo'lmaydi: u tanani bo'shatadi
+-- va ekranda «Xabar o'chirildi» izini chizadi — bu suhbatdoshga ham ko'ringandek yolg'on
+-- taassurot berardi.
+--
+-- ⚠️ Vaqtinchalik yechim: backendda `scope = ME` va `message_hidden` jadvali hali yo'q,
+-- shuning uchun yashirish qurilmadan tashqariga chiqmaydi (ilova qayta o'rnatilsa xabarlar
+-- qaytadi). Server tayyor bo'lgach shu ustun uning ko'zgusiga aylanadi — sxema
+-- o'zgarmaydi.
+--
+-- Migratsiya FAQAT QO'SHADI: ustun nullable, eski qatorlarda `NULL` — ya'ni hech nima
+-- yashirilmagan.
+
+ALTER TABLE MessageEntity ADD COLUMN hiddenAt INTEGER;

@@ -1,0 +1,14 @@
+-- v17 -> v18 — backend yangi maydonlarni ochdi (spec: 2026-07-28).
+--
+-- 1) Suhbatdoshning YETKAZILDI kursori. Avval faqat "o'qildi" (`otherReadSeq`) bor edi va
+--    u ham faqat WS'dan kelardi. Endi `GET /v1/conversations` uchala kursorni ham
+--    qaytaradi (`myReadSeq`/`peerReadSeq`/`peerDeliveredSeq`), ya'ni ilova qayta
+--    ishga tushganda ✓/✓✓ holati tiklanadi.
+-- 2) Profil jinsi — `GET /v1/students?gender=` filtri aynan shu maydonga tayanadi;
+--    talaba uni profilida ko'rsatmasa, jins bo'yicha qidiruvga tushmaydi.
+-- 3) "Oxirgi ko'rilgan" maxfiyligi (`lastSeenVisibility`): EVERYONE | CONNECTIONS | NOBODY.
+
+ALTER TABLE ConversationEntity ADD COLUMN otherDeliveredSeq INTEGER NOT NULL DEFAULT 0;
+
+ALTER TABLE ProfileEntity ADD COLUMN gender TEXT;
+ALTER TABLE ProfileEntity ADD COLUMN lastSeenVisibility TEXT;

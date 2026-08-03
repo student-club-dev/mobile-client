@@ -44,6 +44,7 @@ import dev.core.uikit.components.scCard
 import dev.core.uikit.components.scStyle
 import dev.core.uikit.components.scTopInset
 import dev.core.uikit.theme.Sc
+import dev.core.uikit.components.ScShimmerList
 import dev.feature.listings.domain.model.Listing
 import dev.feature.listings.domain.model.ListingStatus
 import dev.feature.listings.domain.model.formatSum
@@ -99,7 +100,14 @@ fun MyListingsScreen(
             Spacer(Modifier.height(16.dp))
         }
 
-        if (listings.isEmpty() && !state.loading) {
+        if (listings.isEmpty() && state.loading) {
+            // Ro'yxat kelguncha — kartalarning skeleti.
+            ScShimmerList(
+                rows = 4,
+                modifier = Modifier.padding(horizontal = Sc.ScreenPadding, vertical = 8.dp),
+                rowHeight = 58.dp,
+            )
+        } else if (listings.isEmpty()) {
             EmptyState(onCreate, filterDiscount)
         } else {
             LazyColumn(

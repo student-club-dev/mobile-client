@@ -4,5 +4,8 @@ import io.ktor.client.HttpClient
 import io.ktor.client.HttpClientConfig
 import io.ktor.client.engine.darwin.Darwin
 
-actual fun platformHttpClient(config: HttpClientConfig<*>.() -> Unit): HttpClient =
-    HttpClient(Darwin, config)
+// iOS'da debug interceptor'lar yo'q (ular OkHttp tushunchasi) — parametr e'tiborsiz.
+actual fun platformHttpClient(
+    debugInterceptors: Boolean,
+    config: HttpClientConfig<*>.() -> Unit,
+): HttpClient = HttpClient(Darwin, config)

@@ -9,10 +9,15 @@ sdk.dir=/Users/<foydalanuvchi>/Library/Android/sdk
 # Android turidagi client ID EMAS: Android client faqat imzoni (SHA-1) ro'yxatdan o'tkazadi,
 # ilova esa serverga yuboriladigan ID token uchun WEB client ID ni ishlatadi.
 #
-# Google Cloud → APIs & Services → Credentials → Create credentials → OAuth client ID
+# Google Cloud → proyekt `studentclub-503706` → APIs & Services → Credentials →
+# Create credentials → OAuth client ID
+# (E'tibor: bu Firebase proyekti EMAS. Firebase — `studentclubs-d2905`, u faqat chat uchun.)
 #   1) Application type: Web application  → ID ni shu yerga qo'ying
-#   2) Application type: Android          → package `com.studentclubs.android` + SHA-1
+#   2) Application type: Android          → package `uz.studentclub.app` + SHA-1
 #      (debug va release uchun alohida; `./gradlew :androidApp:signingReport`)
+#
+# Ikkalasi ham AYNAN bitta proyektda bo'lishi shart — aks holda Credential Manager
+# so'rovni Google'ga yubormasdan rad etadi.
 #
 # Backend ham tokenni AYNAN shu Web client ID bilan tekshirishi shart.
 GOOGLE_WEB_CLIENT_ID=1234567890-abcdefghijklmnop.apps.googleusercontent.com

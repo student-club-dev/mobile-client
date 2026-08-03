@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+        <!--
+            Kamerada yozilgan video (`media/VideoCapture`) ilova keshiga tushadi va kamera
+            ilovasi u yerga YOZA olishi kerak. Android 7+ da boshqa ilovaga `file://`
+            uzatib bo'lmaydi (`FileUriExposedException`), shuning uchun `FileProvider`.
+
+            E'lon ataylab SHU MODULDA: kamera kodi ham shu yerda va uni ishlatadigan har bir
+            ilovadan manifestga qo'l bilan qator qo'shishni talab qilish oson unutiladigan
+            qadam bo'lardi. `${applicationId}` — manifest birlashtirilganda o'rniga ilovaning
+            paketi qo'yiladi, ya'ni ikkita ilova bir qurilmada to'qnashmaydi.
+        -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.scfileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/sc_media_paths" />
+        </provider>
+
+        <!--
+            Ilova kontekstini erta ushlab qolish uchun (qarang `ScMediaContextProvider`) —
+            «StudentClub» papkasiga saqlash ViewModel'dan, ya'ni Compose'dan tashqarida
+            chaqiriladi. `initOrder` yuqori: u boshqa provider'lardan oldin ishga tushsin.
+        -->
+        <provider
+            android:name="dev.core.uikit.media.ScMediaContextProvider"
+            android:authorities="${applicationId}.scmediacontext"
+            android:exported="false"
+            android:initOrder="1000" />
+    </application>
+</manifest>

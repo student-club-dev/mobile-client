@@ -23,29 +23,27 @@ kotlin {
             api(projects.dev.feature.jobs.domain)
             implementation(projects.dev.feature.jobs.presentation)
             api(projects.dev.feature.students.domain)
-            implementation(projects.dev.feature.students.presentation)
+            // "Do'stlar" (Connections) ekrani — StudentShell uni ochadi.
+            implementation(projects.dev.feature.connections.presentation)
             implementation(projects.dev.feature.notifications.domain)
             implementation(projects.dev.feature.notifications.presentation)
-            implementation(projects.dev.feature.clubs.domain)
-            implementation(projects.dev.feature.clubs.presentation)
             implementation(projects.dev.feature.settings.domain)
             implementation(projects.dev.feature.settings.presentation)
             api(projects.dev.feature.university.domain)
             implementation(projects.dev.feature.university.presentation)
             // E'lonlar feature'i — StudentShell PostAdScreen'ni ochadi.
             implementation(projects.dev.feature.ads.presentation)
-            // Chat feature'i — FirestoreChatRealtimeSource chat.domain'ni implement qiladi;
-            // StudentShell ChatScreen'ni ochadi.
-            api(projects.dev.feature.chat.domain)
+            // Chat feature'i — StudentShell ChatScreen'ni ochadi.
             implementation(projects.dev.feature.chat.presentation)
             // Home agregator ekrani — StudentShell HomeScreen'ni ochadi.
             implementation(projects.dev.feature.home.presentation)
-            // Biznesmen ekranlari alohida modulda (sof UI) — auth uni ishlatadi.
-            implementation(projects.dev.feature.business)
 
             // Local sessiya keshi (offline + avtomatik kirish)
             implementation(libs.sqldelight.runtime)
             implementation(libs.sqldelight.coroutines)
+
+            // "Siz uchun" feed kartalaridagi e'lon rasmlari (`DiscountOffer.imageUrl`).
+            implementation(libs.coil.compose)
 
             implementation(libs.androidx.navigation.compose)
             implementation(projects.dev.core.navigation)
@@ -53,24 +51,14 @@ kotlin {
             implementation(libs.ktor.client.core)
             // JWT payload'ini o'qish (JwtClaims) uchun
             implementation(libs.kotlinx.serialization.json)
-
-            // GitLive Firebase — faqat CHAT real-time (Firestore) uchun.
-            // Autentifikatsiya Firebase'da EMAS: u backend tokenlariga tayanadi.
-            implementation(libs.gitlive.firebase.auth)
-            implementation(libs.gitlive.firebase.firestore)
         }
 
         androidMain.dependencies {
-            // GitLive Firestore Android tomonda Firebase SDK'sini talab qiladi (chat).
-            implementation(project.dependencies.platform(libs.firebase.bom))
-            implementation(libs.firebase.auth)
             // Google Sign-In — Credential Manager + Google ID (backendga ID token beradi)
             implementation(libs.androidx.credentials)
             implementation(libs.androidx.credentials.playServicesAuth)
             implementation(libs.googleid)
             implementation(libs.androidx.activity.compose)
-            // Biometrik login (F1) — Face ID / barmoq izi
-            implementation(libs.androidx.biometric)
             implementation(libs.androidx.fragment)
         }
     }

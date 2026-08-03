@@ -4,13 +4,13 @@ import app.cash.sqldelight.coroutines.asFlow
 import app.cash.sqldelight.coroutines.mapToOneOrNull
 import dev.core.common.AppDispatchers
 import dev.core.common.Resource
+import dev.core.common.auth.TokenStore
 import dev.core.database.sql.StudentClubDatabase
 import dev.feature.profile.data.mapper.toDomain
 import dev.feature.profile.data.remote.ProfileRemoteDataSource
+import dev.feature.profile.domain.model.ProfilePhoto
 import dev.feature.profile.domain.model.UserProfile
 import dev.feature.profile.domain.repository.ProfileRepository
-import dev.gitlive.firebase.Firebase
-import dev.gitlive.firebase.auth.auth
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
@@ -19,19 +19,20 @@ import kotlinx.coroutines.withContext
  * Offline-first profil repository'si.
  *
  * UI **faqat** local DB'ni (`ProfileEntity`) kuzatadi — shu sabab tarmoq bo'lmasa ham
- * profil ko'rinadi. [refresh]/[saveProfile] masofaviy manba bilan gaplashib keshni yangilaydi.
- * Masofaviy manba REST'mi yoki Firestore'mi — bu klass bilmaydi ([ProfileRemoteDataSource]).
+ * profil ko'rinadi. [refresh]/[saveProfile] masofaviy manba bilan gaplashib keshni yangilaydi
+ * ([ProfileRemoteDataSource] — hozir backend REST'i).
  */
 class ProfileRepositoryImpl(
     private val db: StudentClubDatabase,
     private val dispatchers: AppDispatchers,
     private val remote: ProfileRemoteDataSource,
+    private val tokenStore: TokenStore,
 ) : ProfileRepository {
 
     private val q get() = db.profileQueries
 
-    /** Kesh kaliti — Firebase sessiyasidagi uid (REST rejimida ham auth Firebase orqali). */
-    private val currentUid: String? get() = Firebase.auth.currentUser?.uid
+    /** Kesh kaliti — backend sessiyasidagi uid (JWT `sub`, [TokenStore] da saqlanadi). */
+    private val currentUid: String? get() = tokenStore.userId()
 
     override fun observeProfile(): Flow<UserProfile?> =
         q.selectCurrent()
@@ -87,6 +88,28 @@ class ProfileRepositoryImpl(
         }
     }
 
+    // --- Profil rasmlari (`handoff/08-PROFILE.md` §2) --------------------------------------
+
+    override suspend fun photos(): Resource<List<ProfilePhoto>> = remote.photos()
+
+    /**
+     * Rasm qo'shilgach profil ham **yangilanadi**: `avatarUrl` — hosila maydon va server
+     * uni o'zi almashtiradi, ya'ni local keshdagi eski avatar noto'g'ri bo'lib qolardi.
+     * Shuning uchun muvaffaqiyatdan keyin `refresh()` chaqiriladi (bitta arzon so'rov).
+     */
+    override suspend fun addPhoto(
+        bytes: ByteArray,
+        fileName: String,
+        onProgress: ((Float) -> Unit)?,
+    ): Resource<ProfilePhoto> =
+        remote.addPhoto(bytes, fileName, onProgress).also { if (it is Resource.Success) refresh() }
+
+    override suspend fun makeMainPhoto(photoId: String): Resource<Unit> =
+        remote.makeMainPhoto(photoId).also { if (it is Resource.Success) refresh() }
+
+    override suspend fun deletePhoto(photoId: String): Resource<Unit> =
+        remote.deletePhoto(photoId).also { if (it is Resource.Success) refresh() }
+
     override suspend fun hasProfile(): Boolean {
         // Offline-first: kesh bo'lsa tarmoqni kutmaymiz.
         if (cachedProfile() != null) return true
@@ -116,10 +139,14 @@ class ProfileRepositoryImpl(
                 universityEmail = p.universityEmail,
                 birthYear = p.birthYear?.toLong(),
                 courseYear = p.courseYear,
+                gender = p.gender,
+                lastSeenVisibility = p.lastSeenVisibility,
                 avatarUrl = p.avatarUrl,
                 businessName = p.businessName,
                 businessType = p.businessType,
                 email = p.email,
+                bio = p.bio,
+                phoneVisibility = p.phoneVisibility,
             )
         }
     }

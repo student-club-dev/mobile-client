@@ -15,7 +15,7 @@ import kotlin.math.sqrt
  *
  * Nega shunday: chegirma e'lonida "nechi kishi kerak", ijara e'lonida esa "promokod"
  * degan maydon ma'nosiz. Ularni bitta yassi modelga yig'ish — yarmi doim `null` turadigan
- * va qaysi biri qachon to'ldirilishi faqat kod o'qib bilинadigan model demakdir. Sealed
+ * va qaysi biri qachon to'ldirilishi faqat kod o'qib bilinadigan model demakdir. Sealed
  * tur esa kompilyator darajasida kafolat beradi: ijara e'lonini qurayotganda chegirma
  * maydonlariga umuman kirib bo'lmaydi.
  *
@@ -49,6 +49,17 @@ data class Listing(
 
     /** Aloqa telefoni. Ilgari `attributes` ichida edi — endi hamma turga kerak. */
     val contactPhone: String? = null,
+
+    /**
+     * E'lon bog'langan universitet (spec §7.2.4). Odatiy qiymati — **egasining universiteti**
+     * (profildan olinadi): talaba uchun asosiy moslik shu, chunki sherik, repetitor yoki
+     * fandan yordam o'z OTM atrofida izlanadi. "Mening universitetim" ekrani topshiriq
+     * e'lonlarini aynan shu maydon bo'yicha ajratadi.
+     *
+     * `null` — universitetga bog'lanmagan e'lon: u umumiy ro'yxatlarda ko'rinaveradi,
+     * lekin hech qaysi universitetning bo'limiga tushmaydi.
+     */
+    val universityId: String? = null,
 
     /**
      * Manzillar — e'lon shu joylarning **hammasida** amal qiladi. Chegirmada bu filiallar,

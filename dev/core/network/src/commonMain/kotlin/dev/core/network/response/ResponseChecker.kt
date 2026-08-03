@@ -5,7 +5,7 @@ import dev.core.network.appJson
 import kotlinx.serialization.json.JsonElement
 
 /**
- * **Checker** — javob konvertini bir joyда tekshiradi (IYM-business naqshi).
+ * **Checker** — javob konvertini bir joyda tekshiradi (IYM-business naqshi).
  *
  * Muvaffaqiyat bo'lsa [BaseResponse.payload] ni qaytaradi; aks holda status/xato bo'yicha
  * typed [AppException] tashlaydi. Shu sabab har bir data-source'da `if (response.status...)`
@@ -33,14 +33,21 @@ fun <T> BaseResponse<T>.check(): T = ResponseChecker.check(this)
  *
  * [httpStatus] — konvertda `status` bo'lmaganda ishlatiladigan zaxira (HTTP javob kodi).
  */
-fun BaseResponse<*>.toAppException(httpStatus: Int? = null): AppException {
+fun BaseResponse<*>.toAppException(httpStatus: Int? = null): AppException =
+    // `error.code` — HTTP statusi ayta olmaydigan yagona narsa (403 «bog'lanmagan» mi yoki
+    // «bloklangan» mi, 503 «server yiqildi» mi yoki «xususiyat o'chirilgan» mi).
+    typedException(httpStatus).withCode(error?.code ?: code)
+
+private fun BaseResponse<*>.typedException(httpStatus: Int?): AppException {
     val text = error?.message ?: message
     val fields = error?.fields.orEmpty()
     // Maydon xatolari bor bo'lsa status qanday bo'lishidan qat'i nazar bu — validatsiya.
     return when (val s = status ?: httpStatus) {
         401 -> AppException.Unauthorized()
-        403 -> AppException.PermissionDenied()
-        404 -> AppException.NotFound()
+        // 403/404 da backendning o'zbekcha `message` i umumiy matndan aniqroq
+        // (masalan `NOT_CONNECTED` → "Avval bog'lanish kerak").
+        403 -> AppException.PermissionDenied(reason = text)
+        404 -> AppException.NotFound(reason = text)
         408 -> AppException.Timeout()
         null -> validationOrUnknown(text, fields)
         in 400..499 -> AppException.Validation(text ?: "So'rov noto'g'ri.", fields)

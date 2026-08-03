@@ -11,12 +11,22 @@ CREATE TABLE ProfileEntity (
     universityEmail TEXT,
     birthYear INTEGER,
     courseYear TEXT,
+    -- MALE | FEMALE — `GET /v1/students?gender=` filtri aynan shu maydonga tayanadi.
+    gender TEXT,
+    -- EVERYONE | CONNECTIONS (sukut) | NOBODY — kim `online`/`lastSeenAt` ni ko'radi.
+    lastSeenVisibility TEXT,
     -- Profil rasmining URL manzili (POST /v1/profile/me/avatar qaytaradi)
     avatarUrl TEXT,
     -- Biznes egasi profili (rol BUSINESS bo'lganda)
     businessName TEXT,
     businessType TEXT,
-    email TEXT
+    email TEXT,
+    -- Tarjimayi hol (140 belgi). Havola/`@handle`/telefon SERVERDA rad etiladi
+    -- (`422 BIO_NOT_ALLOWED`), shuning uchun bu yerda doim oddiy matn.
+    bio TEXT,
+    -- EVERYONE | CONNECTIONS | NOBODY (sukut) — raqamni kim ko'radi.
+    -- `lastSeenVisibility` dan MUSTAQIL sozlama.
+    phoneVisibility TEXT
 );
 
 selectCurrent:
@@ -24,8 +34,9 @@ SELECT * FROM ProfileEntity LIMIT 1;
 
 upsert:
 INSERT OR REPLACE INTO ProfileEntity(
-    uid, firstName, lastName, phoneNumber, role, universityId, universityEmail, birthYear, courseYear, avatarUrl, businessName, businessType, email
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+    uid, firstName, lastName, phoneNumber, role, universityId, universityEmail, birthYear, courseYear,
+    gender, lastSeenVisibility, avatarUrl, businessName, businessType, email, bio, phoneVisibility
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 clear:
 DELETE FROM ProfileEntity;

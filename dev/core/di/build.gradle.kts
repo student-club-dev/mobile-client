@@ -23,11 +23,18 @@ kotlin {
             api(projects.dev.feature.jobs.presentation)
             api(projects.dev.feature.students.presentation)
             api(projects.dev.feature.notifications.presentation)
-            api(projects.dev.feature.clubs.presentation)
+            // clubsModule() — klublar UI'si chatda, shuning uchun faqat data qatlami.
+            api(projects.dev.feature.clubs.data)
             api(projects.dev.feature.settings.presentation)
             api(projects.dev.feature.university.presentation)
             api(projects.dev.feature.ads.presentation)
+            // connectionsModule() — "Do'stlar" (Connections). chatModule() undan foydalanadi.
+            api(projects.dev.feature.connections.presentation)
             api(projects.dev.feature.chat.presentation)
+            // callsModule() — 1:1 audio/video qo'ng'iroq (`/calls` + WebRTC).
+            api(projects.dev.feature.calls.presentation)
+            // storiesModule() — 24 soatlik lavhalar (bosh ekrandagi lenta + viewer).
+            api(projects.dev.feature.stories.presentation)
             api(projects.dev.feature.home.presentation)
             api(libs.koin.core)
             implementation(libs.ktor.client.core)

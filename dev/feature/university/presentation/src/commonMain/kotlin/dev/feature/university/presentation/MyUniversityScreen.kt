@@ -25,7 +25,6 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -38,9 +37,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.core.uikit.components.ScCircleButton
 import dev.core.uikit.components.ScGlyph
@@ -49,6 +50,7 @@ import dev.core.uikit.components.ScHeader
 import dev.core.uikit.components.ScHeaderTitle
 import dev.core.uikit.components.ScIconTile
 import dev.core.uikit.components.ScIcons
+import dev.core.uikit.components.ScAvatar
 import dev.core.uikit.components.ScMonogramTile
 import dev.core.uikit.components.ScSectionHeader
 import dev.core.uikit.components.ScSheetHandle
@@ -56,12 +58,17 @@ import dev.core.uikit.components.ScSoftButton
 import dev.core.uikit.components.ScText
 import dev.core.uikit.components.scCard
 import dev.core.uikit.components.scStyle
+import dev.core.uikit.components.ScShimmerBox
+import dev.core.uikit.components.ScShimmerLine
+import dev.core.uikit.components.ScShimmerList
 import dev.core.uikit.map.MapPoint
 import dev.core.uikit.map.OfferMarker
 import dev.core.uikit.map.OffersMap
 import dev.core.uikit.map.rememberUserLocation
 import dev.core.uikit.theme.Sc
 import dev.core.domain.model.DiscountOffer
+import dev.feature.listings.domain.model.Listing
+import dev.feature.listings.domain.model.formatSum
 import dev.feature.students.domain.model.FriendStatus
 import dev.feature.students.domain.model.Student
 import dev.feature.university.domain.model.University
@@ -79,7 +86,13 @@ private val tilePalette: List<Pair<Color, Color>>
 )
 
 @Composable
-fun MyUniversityScreen(vm: MyUniversityViewModel = koinViewModel()) {
+fun MyUniversityScreen(
+    /** Topshiriq e'loni bosilganda uning tafsilot ekrani ochiladi. */
+    onOpenListing: (String) -> Unit = {},
+    /** "Barchasi" — talaba e'lonlari ekrani, Yordam tab'i bilan. */
+    onOpenTasks: () -> Unit = {},
+    vm: MyUniversityViewModel = koinViewModel(),
+) {
     val state by vm.state.collectAsStateWithLifecycle()
     val picker by vm.picker.collectAsStateWithLifecycle()
     var showPicker by remember { mutableStateOf(false) }
@@ -142,6 +155,9 @@ fun MyUniversityScreen(vm: MyUniversityViewModel = koinViewModel()) {
                             }
                         }
                     }
+                    // Universitetimga tegishli topshiriq e'lonlari — talabalardan keyin,
+                    // atrofdagi joylardan oldin (u ham "universitetim" haqidagi ma'lumot).
+                    tasksSection(state.tasks, onSeeAll = onOpenTasks, onOpen = onOpenListing)
                 }
 
                 nearbySection("Ovqatlar", state.foods, onMap = { showFoodMap = true }) { selectedOffer = it }
@@ -261,16 +277,21 @@ private fun EmptyUniversity(loading: Boolean, modifier: Modifier = Modifier) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
+        // Yuklanayotganda kartaning O'ZI skelet bo'ladi: plitka + ikki qator matn.
+        if (loading) {
+            ScShimmerBox(Modifier.size(66.dp), RoundedCornerShape(20.dp))
+            ScShimmerLine(0.55f, 15.dp)
+            ScShimmerLine(0.75f, 11.dp)
+            return@Column
+        }
         ScIconTile(Sc.TintBlue, size = 66.dp, radius = 20.dp) {
             Icon(ScIcons.CapBadge, null, tint = Sc.Brand, modifier = Modifier.size(30.dp))
         }
-        ScText(if (loading) "Yuklanmoqda…" else "Universitet tanlanmagan", 17f, FontWeight.ExtraBold, Sc.Ink)
-        if (!loading) {
-            ScText(
-                "Yuqoridagi \"Universitetlar\" tugmasidan universitetingizni tanlang.",
-                13f, FontWeight.Medium, Sc.Muted, lineHeight = 19f,
-            )
-        }
+        ScText("Universitet tanlanmagan", 17f, FontWeight.ExtraBold, Sc.Ink)
+        ScText(
+            "Yuqoridagi \"Universitetlar\" tugmasidan universitetingizni tanlang.",
+            13f, FontWeight.Medium, Sc.Muted, lineHeight = 19f,
+        )
     }
 }
 
@@ -285,7 +306,14 @@ private fun MateCard(student: Student, index: Int, onFriend: () -> Unit) {
         Modifier.width(150.dp).scCard(radius = 26.dp).padding(horizontal = 16.dp, vertical = 18.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        ScMonogramTile(student.initial, tint, accent)
+        ScAvatar(
+            name = student.firstName,
+            size = 62.dp,
+            avatarUrl = student.avatarUrl,
+            background = tint,
+            initialColor = accent,
+            shape = RoundedCornerShape(24.dp),
+        )
         Spacer(Modifier.height(12.dp))
         ScText(student.firstName, 16f, FontWeight.ExtraBold, Sc.Ink, maxLines = 1)
         Spacer(Modifier.height(3.dp))
@@ -314,6 +342,73 @@ private fun FriendButton(student: Student, onFriend: () -> Unit) {
             label, onFriend,
             radius = 16.dp, verticalPadding = 10.dp, fontSize = 13.5f, weight = FontWeight.Bold,
         )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Fanlardan yordam — universitetimga tegishli topshiriqlar
+// ---------------------------------------------------------------------------
+
+/**
+ * "Fanlardan yordam" — AYNAN shu universitetga bog'langan topshiriq e'lonlari
+ * (`Listing.universityId`). Bir OTMdagi talaba bir xil fandan, bir xil o'qituvchining
+ * topshirig'idan yordam so'raydi — shuning uchun bu ro'yxat universitet ekranida turadi.
+ *
+ * E'lon yo'q bo'lsa sarlavha baribir ko'rinadi va nima uchun bo'shligini aytadi: bo'lim
+ * butunlay yashirilsa, foydalanuvchi bunday imkoniyat borligini umuman bilmay qolardi.
+ */
+private fun androidx.compose.foundation.lazy.LazyListScope.tasksSection(
+    tasks: List<Listing>,
+    onSeeAll: () -> Unit,
+    onOpen: (String) -> Unit,
+) {
+    item {
+        ScSectionHeader(
+            "📚 Fanlardan yordam",
+            Modifier.padding(horizontal = Sc.ScreenPadding),
+            subtitle = "Universitetimdagi topshiriq e'lonlari",
+            action = if (tasks.isNotEmpty()) "Barchasi" else null,
+            onAction = onSeeAll,
+        )
+    }
+    if (tasks.isEmpty()) {
+        item {
+            ScText(
+                "Hozircha topshiriq e'loni yo'q.", 13f, FontWeight.Medium, Sc.Muted,
+                Modifier.padding(horizontal = Sc.ScreenPadding),
+            )
+        }
+        return
+    }
+    items(tasks.take(5), key = { it.id }) { listing ->
+        TaskCard(listing, Modifier.padding(horizontal = Sc.ScreenPadding)) { onOpen(listing.id) }
+    }
+}
+
+@Composable
+private fun TaskCard(listing: Listing, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    val task = listing.taskDetails
+    Row(
+        modifier.fillMaxWidth().scCard(radius = 20.dp, onClick = onClick).padding(14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        ScIconTile(Sc.TintPink, size = 46.dp, radius = 15.dp) {
+            Text(listing.emoji, style = TextStyle(fontSize = 21.sp))
+        }
+        Column(Modifier.weight(1f)) {
+            ScText(listing.title, 15f, FontWeight.ExtraBold, Sc.Ink, maxLines = 1)
+            val summary = task?.summary().orEmpty()
+            if (summary.isNotBlank()) {
+                Spacer(Modifier.height(3.dp))
+                ScText(summary, 12f, FontWeight.Medium, Sc.Muted, maxLines = 1)
+            }
+            Spacer(Modifier.height(6.dp))
+            ScText(
+                if (listing.isNegotiable) "Kelishilgan" else "${listing.price.formatSum()} so'm",
+                13.5f, FontWeight.ExtraBold, Sc.Success, maxLines = 1,
+            )
+        }
     }
 }
 
@@ -398,7 +493,7 @@ private fun UniversitySheet(
                 .statusBarsPadding()
                 .padding(top = 46.dp)
                 .clip(RoundedCornerShape(topStart = 34.dp, topEnd = 34.dp))
-                .background(Color.White),
+                .background(Sc.Card),
         ) {
             ScSheetHandle()
             Column(Modifier.padding(start = 22.dp, end = 22.dp, top = 10.dp, bottom = 14.dp)) {
@@ -408,7 +503,12 @@ private fun UniversitySheet(
             }
             Box(Modifier.fillMaxWidth().weight(1f, fill = false)) {
                 when {
-                    picker.loading -> CenterNote { CircularProgressIndicator(color = Sc.Brand) }
+                    // Universitet qatorlarining skeleti (chapda monogramma plitkasi bor).
+                    picker.loading -> ScShimmerList(
+                        rows = 6,
+                        modifier = Modifier.padding(horizontal = 22.dp, vertical = 4.dp),
+                        rowHeight = 46.dp,
+                    )
                     picker.error != null -> CenterNote {
                         ScText("Ro'yxatni yuklab bo'lmadi.\nInternetni tekshiring.", 13f, FontWeight.Medium, Sc.Muted)
                     }
@@ -484,7 +584,7 @@ private fun UniversityPickRow(uni: University, index: Int, selected: Boolean, on
     Row(
         Modifier.fillMaxWidth()
             .clip(shape)
-            .background(Color.White)
+            .background(Sc.Card)
             .border(if (selected) 2.dp else 1.dp, if (selected) Sc.Brand else Sc.Border, shape)
             .clickable(onClick = onClick)
             .padding(if (selected) 12.dp else 13.dp),
@@ -589,7 +689,13 @@ private fun DetailedStudentCard(student: Student, index: Int, onFriend: (Student
     val (tint, accent) = tilePalette[index.mod(tilePalette.size)]
     Column(Modifier.fillMaxWidth().scCard(radius = 22.dp).padding(15.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(13.dp)) {
-            ScMonogramTile(student.initial, tint, accent, size = 52.dp, radius = 26.dp, fontSize = 19f)
+            ScAvatar(
+                name = student.fullName,
+                size = 52.dp,
+                avatarUrl = student.avatarUrl,
+                background = tint,
+                initialColor = accent,
+            )
             Column(Modifier.weight(1f)) {
                 ScText(student.fullName, 15.5f, FontWeight.ExtraBold, Sc.Ink, maxLines = 1)
                 Spacer(Modifier.height(3.dp))
@@ -633,7 +739,7 @@ private fun OfferDetailSheet(shop: DiscountOffer, onClose: () -> Unit) {
             Modifier.align(Alignment.BottomCenter)
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp))
-                .background(Color.White)
+                .background(Sc.Card)
                 .navigationBarsPadding()
                 .padding(start = 22.dp, end = 22.dp, bottom = 20.dp),
         ) {
@@ -694,8 +800,10 @@ private fun OffersMapSection(
     val center = if (markers.isEmpty()) MapPoint(41.311081, 69.240562)
     else MapPoint(markers.map { it.lat }.average(), markers.map { it.lng }.average())
 
-    Box(Modifier.fillMaxSize()) {
-        OffersMap(markers, center, false, rememberUserLocation(), 100, Modifier.fillMaxSize(), onMarkerTap = onMarkerTap)
+    // Fon rangi — xarita sahifasi fon oqimida yig'ilgani uchun birinchi kadrlarda WebView
+    // hali yo'q; fonsiz o'sha lahzada ostidagi ro'yxat ko'rinib qolardi.
+    Box(Modifier.fillMaxSize().background(Sc.Bg)) {
+        OffersMap(markers, center, Sc.IsDark, rememberUserLocation(), 100, Modifier.fillMaxSize(), onMarkerTap = onMarkerTap)
         Row(
             Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = Sc.ScreenPadding, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -703,7 +811,7 @@ private fun OffersMapSection(
         ) {
             ScCircleButton(ScIcons.ChevronLeft, onClose, size = 46.dp, contentDescription = "Orqaga")
             Box(
-                Modifier.clip(RoundedCornerShape(16.dp)).background(Color.White)
+                Modifier.clip(RoundedCornerShape(16.dp)).background(Sc.Card)
                     .padding(horizontal = 14.dp, vertical = 10.dp),
             ) { ScText(title, 15f, FontWeight.ExtraBold, Sc.Ink, maxLines = 1) }
         }

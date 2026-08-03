@@ -33,21 +33,16 @@ actual fun OffersMap(
     // aks holda sahifa kutubxonasiz yuklanib bo'sh qolardi.
     if (!rememberMapLibreReady()) return
 
+    // Sahifa fon oqimida yig'iladi (~870 KB matn) — tayyor bo'lmaguncha WebView qurilmaydi.
     // Boshlang'ich markaz/markerlar FAQAT bir marta olinadi. Keyingi o'zgarishlar (qidiruv,
     // filtr, joylashuv) sahifani qayta yuklamasdan JS orqali qo'llaniladi — aks holda har
     // bosilgan harfda MapLibre skripti va barcha plitkalar qaytadan tortilib xarita qotardi.
-    val initialCenter = remember { center }
-    val initialMarkers = remember { markers }
-
-    // HTML faqat MAVZU yoki pastki inset o'zgarganda qayta quriladi (kamdan-kam hodisa).
-    val html = remember(dark, bottomInset) {
-        offersMapHtml(initialCenter, initialMarkers, dark, userLocation, bottomInset)
-    }
+    val html = rememberOffersMapHtml(markers, center, dark, userLocation, bottomInset) ?: return
 
     // Bu holatlar Compose snapshot'i EMAS — `update` ichida o'qish/yozish sikl keltirmaydi.
     val pageReady = remember { Holder(false) }
     val lastMe = remember { Holder<MapPoint?>(null) }
-    val lastMarkers = remember { Holder(initialMarkers) }
+    val lastMarkers = remember { Holder(markers) }
     val lastHtml = remember { Holder("") }
 
     AndroidView(
@@ -73,7 +68,7 @@ actual fun OffersMap(
                     OFFERS_MAP_BRIDGE,
                 )
                 lastHtml.value = html
-                lastMarkers.value = initialMarkers
+                lastMarkers.value = markers
                 lastMe.value = userLocation
                 loadDataWithBaseURL(MAP_BASE_URL, html, "text/html", "utf-8", null)
             }

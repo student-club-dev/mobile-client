@@ -10,13 +10,11 @@ kotlin {
             // Koin moduli implementatsiyalarni bog'laydi (repository + remote manbalar).
             implementation(projects.dev.feature.profile.data)
 
-            // "Mening e'lonlarim / Saqlangan / Arizalar" bo'limlari umumiy domen repository'laridan o'qiydi.
+            // Sessiya (ObserveCurrentUserUseCase) va chiqish (LogoutUseCase).
             implementation(projects.dev.core.domain)
             implementation(projects.dev.feature.university.domain)
-            // "Ish arizalarim" bo'limi ishlar feature'ining domain'idan o'qiydi (JobApplication, JobRepository).
-            implementation(projects.dev.feature.jobs.domain)
-            // "Mening e'lonlarim" bo'limi — Ad, AdRepository.
-            implementation(projects.dev.feature.ads.domain)
+            // Profildagi «Postlar» / «Arxivlangan postlar» bo'limi — post = lavha (story).
+            implementation(projects.dev.feature.stories.presentation)
             implementation(projects.dev.core.network)
             // Koin moduli `ProfileRepositoryImpl(database, ...)` ni quradi.
             implementation(projects.dev.core.database)

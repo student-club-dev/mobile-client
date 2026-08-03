@@ -1,5 +1,5 @@
 -- Ilova sozlamalari — kalit/qiymat (mavzu, til, bildirishnoma bayroqlari...).
--- Foydalanuvchi sessiyasidan mustaqil: chiqib ketilса ham saqlanadi.
+-- Foydalanuvchi sessiyasidan mustaqil: chiqib ketilsa ham saqlanadi.
 CREATE TABLE AppSettingEntity (
     key TEXT NOT NULL PRIMARY KEY,
     value TEXT NOT NULL

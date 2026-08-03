@@ -10,7 +10,7 @@ import kotlinx.serialization.json.Json
 
 /**
  * Local bazani dizayndagi namuna ma'lumot bilan to'ldiradi (jadval bo'sh bo'lsagina).
- * Backend ulanганда bu seed o'rniga API'dan sinxronlash keladi — tuzilma bir xil.
+ * Backend ulanganda bu seed o'rniga API'dan sinxronlash keladi — tuzilma bir xil.
  */
 class LocalDataSeeder(
     private val db: StudentClubDatabase,
@@ -26,7 +26,8 @@ class LocalDataSeeder(
         seedJobs()
         seedStudents()
         seedAds()
-        seedChat()
+        seedRentals()
+        seedTasks()
         seedNotifications()
         seedClubs()
     }
@@ -68,12 +69,21 @@ class LocalDataSeeder(
         if (settings.selectByKey(DISCOUNTS_SEED_KEY).executeAsOneOrNull() == DISCOUNTS_SEED_VERSION) return
 
         val counts = catalog.offers.groupingBy { it.categoryId }.eachCount()
+        // E'lonning bo'limi turidan olinadi — backend'da ham shunday (`CatalogTypeDto.groupKey`),
+        // shuning uchun seed'da har bir e'longa alohida yozib chiqilmaydi.
+        val groupOf = catalog.categories.associate { it.id to it.groupKey }
         q.transaction {
             settings.upsert(DISCOUNTS_SEED_KEY, DISCOUNTS_SEED_VERSION)
             q.clearOffers()
             q.clearCategories()
+            q.clearGroups()
+            catalog.groups.forEach { g ->
+                q.upsertGroup(g.key, g.name, g.emoji, g.accent.toLong(16), g.sortOrder.toLong())
+            }
             catalog.categories.forEach { c ->
-                q.upsertCategory(c.id, c.name, c.emoji, (counts[c.id] ?: 0).toLong(), c.accent.toLong(16))
+                q.upsertCategory(
+                    c.id, c.name, c.emoji, (counts[c.id] ?: 0).toLong(), c.accent.toLong(16), c.groupKey,
+                )
             }
             catalog.offers.forEach { o ->
                 val finalPrice = when {
@@ -83,11 +93,12 @@ class LocalDataSeeder(
                 }
                 val (lat, lng) = if (o.lat != 0.0 && o.lng != 0.0) o.lat to o.lng else coordsFor(o.location, o.id)
                 q.upsertOffer(
-                    o.id, o.categoryId, o.subcategory, o.gender, o.merchant, o.title,
+                    o.id, o.categoryId, groupOf[o.categoryId].orEmpty(),
+                    o.subcategory, o.gender, o.merchant, o.title,
                     if (o.isDiscount) 1L else 0L, o.discountPercent.toLong(),
                     o.originalPrice, finalPrice, o.priceUnit,
                     o.tag, o.promoCode, o.location, o.expiry, o.emoji, o.bannerAccent.toLong(16),
-                    if (o.featured) 1L else 0L, lat, lng,
+                    if (o.featured) 1L else 0L, lat, lng, o.imageUrl,
                 )
             }
         }
@@ -110,13 +121,14 @@ class LocalDataSeeder(
         val q = db.studentQueries
         if (q.countStudents().executeAsOne() > 0) return
         q.transaction {
-            // id, first, last, initial, uniId, uniMono, course, faculty, friendStatus, interests, friends, ads, rating
-            q.upsert("st-dilnoza", "Dilnoza", "Rahimova", "D", "tatu", "TATU", 2, "IT", "NONE",
+            // id, first, last, initial, avatarUrl, uniId, uniMono, course, faculty, friendStatus,
+            // interests, friends, ads, rating. Namuna ma'lumotda rasm yo'q — avatarda bosh harf.
+            q.upsert("st-dilnoza", "Dilnoza", "Rahimova", "D", null, "tatu", "TATU", 2, "IT", "NONE",
                 listOf("🎨 Dizayn", "💻 Frontend", "📷 Foto", "🏀 Sport").joinDb(), 148, 12, 4.9)
-            q.upsert("st-sardor", "Sardor", "Aliyev", "S", "tatu", "TATU", 3, "Telekom", "NONE", "", 96, 3, 4.7)
-            q.upsert("st-malika", "Malika", "Yo‘ldosheva", "M", "nuu", "O‘zMU", 2, "Iqtisod", "PENDING", "", 54, 1, 4.5)
-            q.upsert("st-kamron", "Kamron", "Yusupov", "K", "tatu", "TATU", 2, "Dasturiy inj.", "NONE", "", 71, 5, 4.8)
-            q.upsert("st-nigora", "Nigora", "Tosheva", "N", "tatu", "TATU", 1, "Kiberxavfsizlik", "NONE", "", 33, 0, 4.6)
+            q.upsert("st-sardor", "Sardor", "Aliyev", "S", null, "tatu", "TATU", 3, "Telekom", "NONE", "", 96, 3, 4.7)
+            q.upsert("st-malika", "Malika", "Yo‘ldosheva", "M", null, "nuu", "O‘zMU", 2, "Iqtisod", "PENDING", "", 54, 1, 4.5)
+            q.upsert("st-kamron", "Kamron", "Yusupov", "K", null, "tatu", "TATU", 2, "Dasturiy inj.", "NONE", "", 71, 5, 4.8)
+            q.upsert("st-nigora", "Nigora", "Tosheva", "N", null, "tatu", "TATU", 1, "Kiberxavfsizlik", "NONE", "", 33, 0, 4.6)
         }
     }
 
@@ -131,21 +143,211 @@ class LocalDataSeeder(
         }
     }
 
-    private fun seedChat() {
-        val q = db.chatQueries
-        if (q.countConversations().executeAsOne() > 0) return
+    /**
+     * Ijara kvartiralari — bosh ekrandagi uchinchi e'lon bo'limi ("Kvartiralar").
+     *
+     * `listing` jadvalida hozircha faqat foydalanuvchi o'zi joylagan e'lon bo'ladi
+     * (ro'yxatni tortadigan endpoint hali yo'q), shuning uchun bo'lim bo'sh turardi.
+     *
+     * `detailsJson` — `ListingMappers` dagi `DetailsJson.Rental` shakli, `kind`
+     * diskriminatori bilan. Bu yerda qo'lda yoziladi: seed core:data da yashaydi va
+     * feature:listings ga bog'lanmaydi.
+     */
+    private fun seedRentals() {
+        val q = db.listingQueries
+        if (q.countByKind("RENTAL").executeAsOne() > 0) return
         q.transaction {
-            q.upsertConversation("c-dilnoza", "Dilnoza Rahimova", "D", "PEER", true.toDb(), "Konspekt bormi? 😊", "14:22", 2)
-            q.upsertConversation("c-sardor", "Sardor Aliyev", "S", "PEER", false.toDb(), "Rahmat, ko‘rishguncha!", "12:05", 0)
-            q.upsertConversation("c-uzumhr", "Uzum Market · HR", "U", "HR", false.toDb(), "Suhbatga taklif qilamiz", "Kecha", 1)
-
-            // Dilnoza suhbati xabarlari
-            q.insertMessage("c-dilnoza-1", "c-dilnoza", "Salom! Diskret matematikadan konspekt bormi? 😊", false.toDb(), "14:20", 1000)
-            q.insertMessage("c-dilnoza-2", "c-dilnoza", "Ha, bor! Hozir yuboraman 👍", true.toDb(), "14:21", 2000)
-            q.insertMessage("c-dilnoza-3", "c-dilnoza", "Ertaga kutubxonada uchrashamizmi?", false.toDb(), "14:22", 3000)
-            q.insertMessage("c-dilnoza-4", "c-dilnoza", "Albatta, soat 10 da 👌", true.toDb(), "14:22", 4000)
+            insertRental(
+                id = "rent-chilonzor",
+                title = "Chilonzorda 2 xonali kvartira",
+                description = "Metroga 5 daqiqa, jihozlangan. Bitta o'g'il bola sherik izlanmoqda.",
+                price = 1_200_000,
+                details = """
+                    {"kind":"RENTAL","propertyType":"APARTMENT","roomCount":2,"currentTenants":1,
+                    "neededTenants":1,"gender":"MALE","period":"MONTHLY","utilitiesIncluded":false,
+                    "depositMonths":1,"floor":4,"totalFloors":9,
+                    "amenities":["WIFI","FURNITURE","WASHER","NEAR_METRO"]}
+                """.compactJson(),
+                branch = branchJson("br-chilonzor", 41.2758, 69.2035, "Chilonzor, 11-kvartal", "Chilonzor"),
+                updatedAt = SEED_TIME,
+            )
+            insertRental(
+                id = "rent-yunusobod",
+                title = "Yunusobodda qizlar uchun xona",
+                description = "Alohida xona, oshxona va kir yuvish mashinasi umumiy.",
+                price = 900_000,
+                details = """
+                    {"kind":"RENTAL","propertyType":"ROOM","roomCount":3,"currentTenants":2,
+                    "neededTenants":1,"gender":"FEMALE","period":"MONTHLY","utilitiesIncluded":true,
+                    "floor":2,"totalFloors":5,
+                    "amenities":["WIFI","FRIDGE","KITCHEN","SEPARATE_ROOM"]}
+                """.compactJson(),
+                branch = branchJson("br-yunusobod", 41.3647, 69.2896, "Yunusobod, 12-kvartal", "Yunusobod"),
+                updatedAt = SEED_TIME - 1,
+            )
+            insertRental(
+                id = "rent-olmazor",
+                title = "TATU yonida koyka joy",
+                description = "Universitetga piyoda 10 daqiqa. Oylik to'lov, depozitsiz.",
+                price = 600_000,
+                details = """
+                    {"kind":"RENTAL","propertyType":"BED_SPACE","roomCount":4,"currentTenants":3,
+                    "neededTenants":1,"gender":"ANY","period":"MONTHLY","utilitiesIncluded":true,
+                    "amenities":["WIFI","HOT_WATER","NEAR_UNIVERSITY"]}
+                """.compactJson(),
+                branch = branchJson("br-olmazor", 41.3500, 69.2050, "Olmazor, Amir Temur ko'chasi", "Olmazor"),
+                updatedAt = SEED_TIME - 2,
+            )
         }
     }
+
+    private fun insertRental(
+        id: String,
+        title: String,
+        description: String,
+        price: Long,
+        details: String,
+        branch: String,
+        updatedAt: Long,
+    ) = insertListing(
+        id = id,
+        kind = "RENTAL",
+        details = details,
+        title = title,
+        description = description,
+        priceUnit = "PER_MONTH",
+        price = price,
+        branchesJson = "[$branch]",
+        updatedAt = updatedAt,
+    )
+
+    /**
+     * "Fanlardan yordam" — talabalar qo'ygan topshiriq e'lonlari (bosh ekranning uchinchi
+     * bo'limi va "Universitetim" ekranidagi ro'yxat).
+     *
+     * Har biri UNIVERSITETGA bog'langan (`universityId`): "Universitetim" ekrani aynan shu
+     * maydon bo'yicha filtrlaydi, ya'ni namuna ma'lumotsiz u bo'limni umuman ko'rib bo'lmasdi.
+     * Universitet id'lari [seedUniversities] dagi bilan bir xil.
+     *
+     * Muddat (`deadline`) qat'iy [SEED_DEADLINE] ga bog'langan — sana kelib o'tsa
+     * kartadagi yorliq yo'qoladi, e'lon esa qolaveradi (muddati o'tgani ko'rsatilmaydi).
+     */
+    private fun seedTasks() {
+        val q = db.listingQueries
+        if (q.countByKind("TASK").executeAsOne() > 0) return
+        q.transaction {
+            insertTask(
+                id = "task-tatu-algoritm",
+                universityId = "tatu",
+                title = "Algoritmlar fanidan 12 ta masala",
+                description = "C++ da yechim va qisqacha izoh kerak. Kod ishlashi shart.",
+                price = 150_000,
+                details = """
+                    {"kind":"TASK","category":"EXACT","typeKey":"MATH",
+                    "deadline":$SEED_DEADLINE,"format":"ONLINE","volume":"12 ta masala"}
+                """.compactJson(),
+                branch = branchJson("br-tatu", 41.3500, 69.2050, "Olmazor, TATU", "TATU"),
+                updatedAt = SEED_TIME,
+            )
+            insertTask(
+                id = "task-tatu-referat",
+                universityId = "tatu",
+                title = "Falsafadan 20 betlik referat",
+                description = "Mavzu: «Sharq uyg'onish davri». Plagiat 20% dan oshmasin.",
+                price = 90_000,
+                details = """
+                    {"kind":"TASK","category":"WRITTEN","typeKey":"REFERAT",
+                    "deadline":${SEED_DEADLINE + 2 * DAY_MILLIS},"format":"ONLINE","volume":"20 bet"}
+                """.compactJson(),
+                branch = branchJson("br-tatu-2", 41.3500, 69.2050, "Olmazor, TATU", "TATU"),
+                updatedAt = SEED_TIME - 1,
+            )
+            insertTask(
+                id = "task-nuu-chizma",
+                universityId = "nuu",
+                title = "Chizma geometriyadan qo'lyozma ish",
+                description = "3 ta varaq, qo'lda chiziladi. Universitetda topshiriladi.",
+                price = 120_000,
+                details = """
+                    {"kind":"TASK","category":"DRAWING","typeKey":"CAD",
+                    "deadline":${SEED_DEADLINE - 2 * DAY_MILLIS},"format":"IN_PERSON","volume":"3 varaq"}
+                """.compactJson(),
+                branch = branchJson("br-nuu", 41.3400, 69.2050, "Olmazor, O'zMU", "O'zMU"),
+                updatedAt = SEED_TIME - 2,
+            )
+        }
+    }
+
+    private fun insertTask(
+        id: String,
+        universityId: String,
+        title: String,
+        description: String,
+        price: Long,
+        details: String,
+        branch: String,
+        updatedAt: Long,
+    ) = insertListing(
+        id = id,
+        kind = "TASK",
+        details = details,
+        title = title,
+        description = description,
+        // Topshiriq — bir martalik ish, narx butun ish uchun (`PostListingViewModel` ham shunday).
+        priceUnit = "PER_ITEM",
+        price = price,
+        branchesJson = "[$branch]",
+        updatedAt = updatedAt,
+        universityId = universityId,
+    )
+
+    /** Namuna e'lonining umumiy ustunlari — turga xos qismi `details` da. */
+    private fun insertListing(
+        id: String,
+        kind: String,
+        details: String,
+        title: String,
+        description: String,
+        priceUnit: String,
+        price: Long,
+        branchesJson: String,
+        updatedAt: Long,
+        universityId: String? = null,
+    ) = db.listingQueries.upsert(
+        id = id,
+        ownerId = SEED_OWNER,
+        businessId = null,
+        kind = kind,
+        detailsJson = details,
+        title = title,
+        description = description,
+        imagesJson = "[]",
+        priceUnit = priceUnit,
+        price = price,
+        priceMax = null,
+        currency = "UZS",
+        isNegotiable = 0,
+        // Chegirmasiz e'londa talaba to'laydigan narx = narxning o'zi.
+        finalPrice = price,
+        contactPhone = null,
+        universityId = universityId,
+        branchesJson = branchesJson,
+        validFrom = 0,
+        validTo = FAR_FUTURE,
+        attributesJson = "{}",
+        optionGroupsJson = "[]",
+        status = "ACTIVE",
+        rejectionReason = null,
+        viewsCount = 0,
+        createdAt = updatedAt,
+        updatedAt = updatedAt,
+    )
+
+    private fun branchJson(id: String, lat: Double, lng: Double, address: String, name: String) =
+        """{"id":"$id","lat":$lat,"lng":$lng,"address":"$address","name":"$name"}"""
+
+    /** Ko'p qatorli JSON literalini bir qatorga yig'adi (satr uzilishlari faqat o'qish uchun). */
+    private fun String.compactJson(): String = trimIndent().lines().joinToString("") { it.trim() }
 
     private fun seedNotifications() {
         val q = db.notificationQueries
@@ -180,8 +382,19 @@ class LocalDataSeeder(
     // --- listings.json tuzilmasi ("Siz uchun" e'lonlari) ---------------------
     @Serializable
     private data class SeedCatalog(
+        val groups: List<SeedGroup> = emptyList(),
         val categories: List<SeedCategory> = emptyList(),
         val offers: List<SeedOffer> = emptyList(),
+    )
+
+    /** Bosh ekran bo'limi — backend'dagi `catalog/groups` javobining local ko'rinishi. */
+    @Serializable
+    private data class SeedGroup(
+        val key: String,
+        val name: String,
+        val emoji: String,
+        val accent: String,   // ARGB hex
+        val sortOrder: Int = 0,
     )
 
     @Serializable
@@ -190,6 +403,8 @@ class LocalDataSeeder(
         val name: String,
         val emoji: String,
         val accent: String,   // ARGB hex, masalan "FFF97316"
+        /** Tur qaysi bo'limda ([SeedGroup.key]) — e'lonlar ham shu orqali bo'limga tushadi. */
+        val groupKey: String = "",
     )
 
     @Serializable
@@ -214,6 +429,7 @@ class LocalDataSeeder(
         val featured: Boolean = false,
         val lat: Double = 0.0,   // 0.0 → `location` matnidan tuman koordinatasi aniqlanadi
         val lng: Double = 0.0,
+        val imageUrl: String? = null,   // null → kartada emoji ko'rinadi
     )
 
     /**
@@ -232,9 +448,34 @@ class LocalDataSeeder(
     private companion object {
         val seedJson = Json { ignoreUnknownKeys = true }
 
+        /** Namuna e'lonlarning egasi — haqiqiy foydalanuvchi id'si bilan to'qnashmaydi. */
+        const val SEED_OWNER = "seed-user"
+
+        /**
+         * Namuna e'lonlarning vaqti — QAT'IY qiymat, `Clock` emas: seed har qurilmada
+         * bir xil tartibda tushsin va testlar vaqtga bog'lanib qolmasin.
+         * 2026-01-01 (epoch millis).
+         */
+        const val SEED_TIME = 1_767_225_600_000L
+
+        /** Namuna e'lonlar muddati o'tmasin — 2100-01-01 (epoch millis). */
+        const val FAR_FUTURE = 4_102_444_800_000L
+
+        /** Bir kun (millis) — topshiriq muddatlarini [SEED_DEADLINE] dan sanash uchun. */
+        const val DAY_MILLIS = 86_400_000L
+
+        /**
+         * Namuna topshiriqlarning muddati — 2026-12-20 12:00 (UTC), QAT'IY qiymat.
+         * `Clock` ishlatilmaydi ([SEED_TIME] dagi sabab bilan): seed hamma qurilmada
+         * bir xil bo'lsin. Sana o'tib ketsa kartadagi muddat yorlig'i chizilmaydi,
+         * e'lonning o'zi esa qolaveradi.
+         */
+        const val SEED_DEADLINE = 1_797_768_000_000L
+
         // "Siz uchun" seed'i shu versiyada. listings.json o'zgarsa bu qiymatni oshiring.
         const val DISCOUNTS_SEED_KEY = "discounts_seed_version"
-        const val DISCOUNTS_SEED_VERSION = "4"
+        // v6 — "Savdo va xizmat" ikkiga bo'lindi: "Savdo" va "Xizmatlar" (printerxona).
+        const val DISCOUNTS_SEED_VERSION = "6"
 
         val TASHKENT_CENTER = 41.311081 to 69.240562
 

@@ -46,6 +46,8 @@ import dev.core.uikit.components.scCard
 import dev.core.uikit.components.scStyle
 import dev.core.uikit.components.scTopInset
 import dev.core.uikit.theme.Sc
+import dev.core.uikit.components.ScShimmerLine
+import dev.core.uikit.components.ScShimmerBox
 import dev.feature.listings.domain.model.JobCatalog
 import dev.feature.listings.domain.model.Listing
 import dev.feature.listings.domain.model.ListingDetails
@@ -80,11 +82,22 @@ fun ListingDetailScreen(
     val listing = state.listing
 
     when {
-        state.loading -> Box(
+        // E'lon kelguncha — sahifaning skeleti: rasm, sarlavha, narx, matn qatorlari.
+        state.loading -> Column(
             Modifier.fillMaxSize().background(Sc.Bg),
-            contentAlignment = Alignment.Center,
+            verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            ScText("Yuklanmoqda...", 13.5f, FontWeight.Bold, Sc.Muted)
+            ScShimmerBox(Modifier.fillMaxWidth().height(260.dp), RoundedCornerShape(0.dp))
+            Column(
+                Modifier.padding(horizontal = Sc.ScreenPadding),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                ScShimmerLine(0.7f, 18.dp)
+                ScShimmerLine(0.35f, 15.dp)
+                ScShimmerLine(0.9f, 11.dp)
+                ScShimmerLine(0.8f, 11.dp)
+                ScShimmerLine(0.5f, 11.dp)
+            }
         }
 
         state.notFound || listing == null -> Column(

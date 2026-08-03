@@ -1,10 +1,14 @@
 package dev.core.data.mapper
 
 import dev.core.database.sql.DiscountCategoryEntity
+import dev.core.database.sql.DiscountGroupEntity
 import dev.core.database.sql.DiscountOfferEntity
 import dev.core.domain.model.DiscountCategory
+import dev.core.domain.model.DiscountGroup
 import dev.core.domain.model.DiscountOffer
 import dev.core.domain.model.DiscountTag
+import dev.core.domain.model.OfferBranch
+import dev.core.domain.model.OfferDetail
 
 // --- List <-> TEXT ("|" bilan) ---
 internal fun List<String>.joinDb(): String = joinToString("|")
@@ -19,13 +23,48 @@ internal fun Long.toBool(): Boolean = this != 0L
 private inline fun <reified T : Enum<T>> parseEnum(value: String, default: T): T =
     runCatching { enumValueOf<T>(value) }.getOrDefault(default)
 
+fun DiscountGroupEntity.toDomain(): DiscountGroup = DiscountGroup(
+    key = key, name = name, emoji = emoji, accent = accent, sortOrder = sortOrder.toInt(),
+)
+
 fun DiscountCategoryEntity.toDomain(): DiscountCategory = DiscountCategory(
     id = id, name = name, emoji = emoji, offerCount = offerCount.toInt(), accent = accent,
+    groupKey = groupKey,
+)
+
+/**
+ * Keshdagi kartadan yig'ilgan tafsilot — tarmoq yo'q bo'lganda ekran bo'sh qolmasin uchun.
+ * Promo-kod, filiallar va shartlar faqat `POST /v1/discounts/detail` da bo'lgani uchun bu
+ * yerda yo'q; UI buni [OfferDetail.fromNetwork] orqali biladi.
+ */
+fun DiscountOffer.toOfflineDetail(saved: Boolean): OfferDetail = OfferDetail(
+    id = id,
+    categoryId = categoryId,
+    subcategory = subcategory,
+    merchant = merchant,
+    title = title,
+    emoji = emoji,
+    bannerAccent = bannerAccent,
+    isDiscount = isDiscount,
+    discountPercent = discountPercent,
+    originalPrice = originalPrice,
+    finalPrice = finalPrice,
+    savedAmount = savedAmount,
+    priceUnit = priceUnit,
+    tag = tag,
+    promoCode = promoCode,
+    validTo = expiry,
+    saved = saved,
+    branches = listOfNotNull(
+        location?.let { OfferBranch(id = "$id-branch", name = it, address = "", lat = lat, lng = lng) },
+    ),
+    fromNetwork = false,
 )
 
 fun DiscountOfferEntity.toDomain(): DiscountOffer = DiscountOffer(
     id = id,
     categoryId = categoryId,
+    groupKey = groupKey,
     subcategory = subcategory,
     gender = gender,
     merchant = merchant,
@@ -44,4 +83,5 @@ fun DiscountOfferEntity.toDomain(): DiscountOffer = DiscountOffer(
     featured = featured.toBool(),
     lat = lat,
     lng = lng,
+    imageUrl = imageUrl,
 )

@@ -18,7 +18,7 @@ import kotlinx.serialization.serializer
  * `.body()` bilan **xom DTO** kutadi. Bu plagin konvertni **shaffof ochadi**:
  *
  * - muvaffaqiyat → `result` (yoki `data`) so'ralgan DTO sifatida deserializatsiya qilinadi;
- * - konvertда xato (`success=false` / `error != null`) → typed [AppException] tashlanadi
+ * - konvertda xato (`success=false` / `error != null`) → typed [AppException] tashlanadi
  *   ([toAppException]) — data-source'lardagi `catch` bloklari uni tushunadi. `error.fields`
  *   bo'lsa u [AppException.Validation.fields] ga o'tadi va formagacha yetib boradi.
  *
@@ -28,7 +28,7 @@ import kotlinx.serialization.serializer
  * birinchi bo'lib shu plagin ushlaydi, aks holda ContentNegotiation konvertni bo'sh DTO'ga
  * aylantirib yuboradi (kalitlar mos kelmaydi).
  *
- * Non-2xx javoblar bu yergача yetmaydi — `expectSuccess=true` ularni body-transform'дан oldin
+ * Non-2xx javoblar bu yergacha yetmaydi — `expectSuccess=true` ularni body-transform'dan oldin
  * `ResponseException` bilan tashlaydi (masalan profil yo'q → HTTP 404). Ularning tanasi
  * `safeApiCall`/`safeCall` da — [toAppExceptionWithFields] orqali — o'qiladi.
  *
@@ -48,7 +48,7 @@ val EnvelopeUnwrapPlugin = createClientPlugin("EnvelopeUnwrap") {
         val serializer = appJson.serializersModule.serializer(kType)
         val root = appJson.parseToJsonElement(text)
 
-        // Konvert belgisi — backend har doim `success` maydonini qo'shadi. Xom DTO'да u yo'q.
+        // Konvert belgisi — backend har doim `success` maydonini qo'shadi. Xom DTO'da u yo'q.
         val payload: JsonElement = if (root is JsonObject && "success" in root) {
             val envelope = appJson.decodeFromJsonElement(
                 BaseResponse.serializer(JsonElement.serializer()),

@@ -1,5 +1,5 @@
 -- Migratsiya v2 -> v3
--- Mavjud o'rnatilган bazalarga Notification jadvalini qo'shadi.
+-- Mavjud o'rnatilgan bazalarga Notification jadvalini qo'shadi.
 CREATE TABLE NotificationEntity (
     id TEXT NOT NULL PRIMARY KEY,
     title TEXT NOT NULL,

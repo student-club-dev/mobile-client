@@ -2,7 +2,7 @@ package dev.feature.university.domain.model
 
 /**
  * Universitet — profil to'ldirish va student bo'limlari uchun.
- * Backend kelганда `id` server ID'siga mos keladi.
+ * Backend kelganda `id` server ID'siga mos keladi.
  */
 data class University(
     val id: String,

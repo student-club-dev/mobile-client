@@ -1,13 +1,21 @@
 {
+  "groups": [
+    { "key": "FOOD",          "name": "Ovqatlanish",         "emoji": "🍽", "accent": "FFF97316", "sortOrder": 1 },
+    { "key": "GAMES",         "name": "O'yin va bo'sh vaqt", "emoji": "🎮", "accent": "FF7C5CFF", "sortOrder": 3 },
+    { "key": "ENTERTAINMENT", "name": "Ko'ngilochar",        "emoji": "🎬", "accent": "FFEF4444", "sortOrder": 4 },
+    { "key": "EDUCATION",     "name": "Ta'lim",              "emoji": "📚", "accent": "FF3B82F6", "sortOrder": 5 },
+    { "key": "SHOPPING",      "name": "Savdo",               "emoji": "🛍", "accent": "FF06B6D4", "sortOrder": 7 },
+    { "key": "SERVICES",      "name": "Xizmatlar",           "emoji": "🛠", "accent": "FF14B8A6", "sortOrder": 8 }
+  ],
   "categories": [
-    { "id": "game",     "name": "Game Club",       "emoji": "🎮", "accent": "FF7C5CFF" },
-    { "id": "ovqat",    "name": "Kafe & Restoran", "emoji": "🍕", "accent": "FFF97316" },
-    { "id": "market",   "name": "Oziq-ovqat",      "emoji": "🛒", "accent": "FF22C55E" },
-    { "id": "kiyim",    "name": "Kiyim-kechak",    "emoji": "👕", "accent": "FFEC4899" },
-    { "id": "kurslar",  "name": "O'quv markaz",    "emoji": "📚", "accent": "FF3B82F6" },
-    { "id": "kino",     "name": "Kino & Ko'ngil",  "emoji": "🎬", "accent": "FFEF4444" },
-    { "id": "texnika",  "name": "Texnikalar",      "emoji": "💻", "accent": "FF06B6D4" },
-    { "id": "printerxona", "name": "Printerxona",  "emoji": "🖨️", "accent": "FF14B8A6" }
+    { "id": "game",     "name": "Game Club",       "emoji": "🎮", "accent": "FF7C5CFF", "groupKey": "GAMES"          },
+    { "id": "ovqat",    "name": "Kafe & Restoran", "emoji": "🍕", "accent": "FFF97316", "groupKey": "FOOD"           },
+    { "id": "market",   "name": "Oziq-ovqat",      "emoji": "🛒", "accent": "FF22C55E", "groupKey": "FOOD"           },
+    { "id": "kiyim",    "name": "Kiyim-kechak",    "emoji": "👕", "accent": "FFEC4899", "groupKey": "SHOPPING"       },
+    { "id": "kurslar",  "name": "O'quv markaz",    "emoji": "📚", "accent": "FF3B82F6", "groupKey": "EDUCATION"      },
+    { "id": "kino",     "name": "Kino & Ko'ngil",  "emoji": "🎬", "accent": "FFEF4444", "groupKey": "ENTERTAINMENT"  },
+    { "id": "texnika",  "name": "Texnikalar",      "emoji": "💻", "accent": "FF06B6D4", "groupKey": "SHOPPING"       },
+    { "id": "printerxona", "name": "Printerxona",  "emoji": "🖨️", "accent": "FF14B8A6", "groupKey": "SERVICES"       }
   ],
   "offers": [
     { "id": "g-ps5-1",  "categoryId": "game", "subcategory": "PlayStation", "merchant": "GameZone",  "title": "PS5 — 1 soat o'yin",       "isDiscount": true,  "discountPercent": 30, "originalPrice": 30000, "priceUnit": "soat", "tag": "STUDENT_ID", "location": "Yunusobod", "expiry": "shu hafta", "emoji": "🎮", "bannerAccent": "FF7C5CFF", "featured": true, "lat": 41.3520, "lng": 69.2730 },

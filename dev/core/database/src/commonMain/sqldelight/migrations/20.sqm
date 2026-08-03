@@ -1,0 +1,9 @@
+-- v20 -> v21 — "Siz uchun" e'lonining karta rasmi.
+--
+-- Rasm serverdan ALLAQACHON kelardi (`DiscountCardDto.imageUrl`), lekin keshga yozilmay
+-- tashlab yuborilardi. Endi Bosh ekrandagi Ovqatlar / Kiyim-kechak kartalari rasm bilan
+-- chiziladi va oflayn ham o'sha rasmni ko'rsatadi.
+--
+-- NULL bo'lishi normal: local seed'da rasm yo'q, bunday kartada emoji ko'rinadi.
+
+ALTER TABLE DiscountOfferEntity ADD COLUMN imageUrl TEXT;

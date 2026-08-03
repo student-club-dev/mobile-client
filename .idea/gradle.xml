@@ -40,7 +40,6 @@
             <option value="$PROJECT_DIR$/dev/feature/ads/domain" />
             <option value="$PROJECT_DIR$/dev/feature/ads/presentation" />
             <option value="$PROJECT_DIR$/dev/feature/auth" />
-            <option value="$PROJECT_DIR$/dev/feature/business" />
             <option value="$PROJECT_DIR$/dev/feature/chat" />
             <option value="$PROJECT_DIR$/dev/feature/chat/data" />
             <option value="$PROJECT_DIR$/dev/feature/chat/domain" />
@@ -48,7 +47,10 @@
             <option value="$PROJECT_DIR$/dev/feature/clubs" />
             <option value="$PROJECT_DIR$/dev/feature/clubs/data" />
             <option value="$PROJECT_DIR$/dev/feature/clubs/domain" />
-            <option value="$PROJECT_DIR$/dev/feature/clubs/presentation" />
+            <option value="$PROJECT_DIR$/dev/feature/connections" />
+            <option value="$PROJECT_DIR$/dev/feature/connections/data" />
+            <option value="$PROJECT_DIR$/dev/feature/connections/domain" />
+            <option value="$PROJECT_DIR$/dev/feature/connections/presentation" />
             <option value="$PROJECT_DIR$/dev/feature/home" />
             <option value="$PROJECT_DIR$/dev/feature/home/presentation" />
             <option value="$PROJECT_DIR$/dev/feature/jobs" />
@@ -71,6 +73,10 @@
             <option value="$PROJECT_DIR$/dev/feature/settings/data" />
             <option value="$PROJECT_DIR$/dev/feature/settings/domain" />
             <option value="$PROJECT_DIR$/dev/feature/settings/presentation" />
+            <option value="$PROJECT_DIR$/dev/feature/stories" />
+            <option value="$PROJECT_DIR$/dev/feature/stories/data" />
+            <option value="$PROJECT_DIR$/dev/feature/stories/domain" />
+            <option value="$PROJECT_DIR$/dev/feature/stories/presentation" />
             <option value="$PROJECT_DIR$/dev/feature/students" />
             <option value="$PROJECT_DIR$/dev/feature/students/data" />
             <option value="$PROJECT_DIR$/dev/feature/students/domain" />

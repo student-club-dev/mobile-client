@@ -21,7 +21,37 @@ class DatabaseSchemaTest {
      * ClubEntity (3.sqm `joined` qo'shadi), ConversationEntity (4.sqm `archived` qo'shadi),
      * UserEntity (5.sqm profilni ajratib oladi — profil ustunlari hali ichida).
      */
+    /**
+     * `StudentEntity` **v1 dan beri** mavjud (`Student.sq` birinchi migratsiyadan oldin
+     * qo'shilgan), shuning uchun 21.sqm unga ustun QO'SHADI. Migratsiya testlarining
+     * boshlang'ich bazasida ham jadval bo'lishi shart, aks holda zanjir uziladi.
+     */
+    private fun createV1StudentTable(driver: JdbcSqliteDriver) {
+        driver.execute(
+            null,
+            """
+            CREATE TABLE StudentEntity (
+                id TEXT NOT NULL PRIMARY KEY,
+                firstName TEXT NOT NULL,
+                lastName TEXT NOT NULL,
+                initial TEXT NOT NULL,
+                universityId TEXT NOT NULL,
+                universityMonogram TEXT NOT NULL,
+                course INTEGER NOT NULL,
+                faculty TEXT NOT NULL,
+                friendStatus TEXT NOT NULL,
+                interests TEXT NOT NULL,
+                friendsCount INTEGER NOT NULL,
+                adsCount INTEGER NOT NULL,
+                rating REAL NOT NULL
+            )
+            """.trimIndent(),
+            0,
+        )
+    }
+
     private fun createV1Tables(driver: JdbcSqliteDriver) {
+        createV1StudentTable(driver)
         driver.execute(
             null,
             """
@@ -129,8 +159,31 @@ class DatabaseSchemaTest {
         // 12.sqm — e'lon jinsi (kiyim uchun Erkak/Ayol), 13.sqm — e'lon koordinatasi (xarita),
         // 14.sqm — e'lonning to'rt turi (chegirma/ijara/xizmat/ish): ListingEntity qayta qurildi,
         // turga xos maydonlar detailsJson ga ko'chdi, 15.sqm — sessiya backend tokenlariga
-        // ko'chdi: UserEntity.userId olib tashlandi, `uid` = JWT `sub`.
-        assertEquals(16L, StudentClubDatabase.Schema.version)
+        // ko'chdi: UserEntity.userId olib tashlandi, `uid` = JWT `sub`, 16.sqm — chat backendga
+        // ulandi: suhbat ikkinchi tomonning qisqa profilini, xabar esa `seq`/`senderId`/holatini
+        // saqlaydi (eski demo jadvallar tashlab yuborildi), 17.sqm — suhbatdoshning
+        // "yetkazildi" kursori (`otherDeliveredSeq`) + profil jinsi va "oxirgi ko'rilgan"
+        // maxfiyligi (backend 2026-07-28 spec'i), 18.sqm — chatda media: rasm biriktirmasi
+        // (`attachmentUrl`/`attachmentThumbUrl`/o'lchamlar) va albom kaliti (`albumId`),
+        // 19.sqm — suhbatdosh profili (universitet/jins/kurs) chat ichidagi profil ekrani
+        // uchun, 20.sqm — "Siz uchun" e'lonining karta rasmi (`DiscountOfferEntity.imageUrl`),
+        // 21.sqm — talaba ro'yxatlaridagi profil rasmi (`StudentEntity.avatarUrl`),
+        // 22.sqm — chat media yangi backend kontraktiga ko'chdi: xabar o'chirilishi
+        // (`deletedAt`), to'liq biriktirma metama'lumoti (`attachmentId`/`kind`/`status`/
+        // `waveform`…), stiker ustunlari va suhbat qatoridagi `lastMessageType`,
+        // 23.sqm — bosh ekran bo'limlari katalog guruhiga bog'landi: `DiscountGroupEntity`
+        // jadvali + `DiscountCategoryEntity.groupKey` va `DiscountOfferEntity.groupKey`,
+        // 24.sqm — boyitilgan profil: `ProfileEntity.bio` va `ProfileEntity.phoneVisibility`
+        // (`handoff/08-PROFILE.md` §4–§5), 25.sqm — «faqat menda o'chirish»:
+        // `MessageEntity.hiddenAt` (`CHAT_SELECTION_AND_HISTORY_BACKEND.md` §A1),
+        // 26.sqm — sitata bilan javob (`MessageEntity.replyTo*`), tarix suv belgisi
+        // (`ConversationEntity.clearedBeforeSeq`) va suhbatni ro'yxatdan yashirish
+        // (`ConversationEntity.hidden`) — `CHAT_SELECTION_AND_HISTORY_RESPONSE.md` §B, §C,
+        // 27.sqm — e'lon universitetga bog'landi (`ListingEntity.universityId`,
+        // `STUDENT_LISTINGS_BACKEND.md` §7.2.4): "Universitetimda" bo'limi shu ustundan,
+        // 28.sqm — chat lentasidagi qo'ng'iroq yozuvi (`MessageEntity.call*`) va ovozli
+        // xabar matni (`attachmentTranscript`) — `handoff/09-CALLS-REST.md` §4.
+        assertEquals(29L, StudentClubDatabase.Schema.version)
     }
 
     @Test
@@ -167,22 +220,374 @@ class DatabaseSchemaTest {
             universityEmail = null,
             birthYear = 2004L,
             courseYear = "3",
+            gender = "MALE",
+            lastSeenVisibility = "NOBODY",
             avatarUrl = "https://cdn.studentclub.uz/avatars/uid-1.jpg",
             businessName = null,
             businessType = null,
             email = null,
+            bio = "5/5 · Dasturiy injiniring",
+            // Sukut `NOBODY` — raqam ko'pchilikda yopiq (`handoff/08-PROFILE.md` §4).
+            phoneVisibility = "NOBODY",
         )
         val profile = db.profileQueries.selectCurrent().executeAsOne()
         assertEquals("Quvonchbek", profile.firstName)
         assertEquals("tuit", profile.universityId)
         assertEquals(2004L, profile.birthYear)
+        assertEquals("MALE", profile.gender)
+        assertEquals("NOBODY", profile.lastSeenVisibility)
         assertEquals("https://cdn.studentclub.uz/avatars/uid-1.jpg", profile.avatarUrl)
+        assertEquals("5/5 · Dasturiy injiniring", profile.bio)
+        assertEquals("NOBODY", profile.phoneVisibility)
 
         db.profileQueries.clear()
         assertNull(db.profileQueries.selectCurrent().executeAsOneOrNull())
 
         driver.close()
     }
+
+    /**
+     * Chat keshi (16.sqm) — eng nozik joyi: serverdan kelgan ro'yxat **local** ustunlarni
+     * (`archived`, `lastReadSeq`) bosib ketmasligi kerak. Shu sabab `upsert` bitta so'rov
+     * emas, `insertConversationIfNew` + `updateConversation` juftligi.
+     */
+    @Test
+    fun chatCacheKeepsLocalColumnsOnRefresh() {
+        val driver = freshDriver()
+        StudentClubDatabase.Schema.create(driver)
+        val db = StudentClubDatabase(driver)
+        val q = db.chatQueries
+
+        q.insertConversationIfNew(
+            id = "cnv_1", type = "DIRECT", lastMessageAt = 1_000L,
+            otherId = "std_ali", otherUsername = "alisher", otherFullName = "Alisher Valiyev",
+            otherAvatarUrl = "https://cdn.example.uz/a.jpg", otherOnline = 1L, otherLastSeenAt = null,
+            otherUniversityId = "emis-142", otherGender = "MALE", otherCourseYear = "3",
+            lastMessageBody = "Salom!", lastMessageSenderId = "std_ali",
+            lastMessageType = "TEXT", lastMessageDeleted = 0L,
+            unreadCount = 3L, lastReadSeq = 0L, otherReadSeq = 0L, otherDeliveredSeq = 0L,
+        )
+        // Foydalanuvchi suhbatni arxivlab, 42-xabargacha o'qidi. WS esa suhbatdosh
+        // 40-xabargacha o'qiganini aytdi.
+        q.setArchived(1L, "cnv_1")
+        q.markRead(42L, "cnv_1")
+        q.setOtherReadSeq(40L, "cnv_1")
+        q.setOtherDeliveredSeq(41L, "cnv_1")
+
+        // Serverdan yangi ro'yxat keldi (u arxivni bilmaydi, kursorlari esa eskirgan
+        // bo'lishi mumkin — WS ulardan oldinroq kelgan bo'lardi).
+        q.insertConversationIfNew(
+            id = "cnv_1", type = "DIRECT", lastMessageAt = 2_000L,
+            otherId = "std_ali", otherUsername = "alisher", otherFullName = "Alisher Valiyev",
+            otherAvatarUrl = "https://cdn.example.uz/a.jpg", otherOnline = 0L, otherLastSeenAt = 1_500L,
+            otherUniversityId = "emis-142", otherGender = "MALE", otherCourseYear = "3",
+            lastMessageBody = "Yangi xabar", lastMessageSenderId = "std_ali",
+            lastMessageType = "TEXT", lastMessageDeleted = 0L,
+            unreadCount = 1L, lastReadSeq = 0L, otherReadSeq = 0L, otherDeliveredSeq = 0L,
+        )
+        q.updateConversation(
+            type = "DIRECT", lastMessageAt = 2_000L,
+            otherId = "std_ali", otherUsername = "alisher", otherFullName = "Alisher Valiyev",
+            otherAvatarUrl = "https://cdn.example.uz/b.jpg", otherOnline = 0L, otherLastSeenAt = 1_500L,
+            otherUniversityId = "emis-142", otherGender = "MALE", otherCourseYear = "3",
+            lastMessageBody = "Yangi xabar", lastMessageSenderId = "std_ali",
+            lastMessageType = "TEXT", lastMessageDeleted = 0L,
+            unreadCount = 1L, lastReadSeq = 0L, otherReadSeq = 10L, otherDeliveredSeq = 10L,
+            id = "cnv_1",
+        )
+
+        val row = q.selectConversation("cnv_1").executeAsOne()
+        assertEquals("Yangi xabar", row.lastMessageBody) // server ma'lumoti yangilandi
+        assertEquals(1L, row.unreadCount)
+        assertEquals(1L, row.archived) // ...local arxiv bayrog'i saqlandi
+        assertEquals(42L, row.lastReadSeq) // ...va kursorlarning hech biri
+        assertEquals(40L, row.otherReadSeq) // ...ortga surilmadi
+        assertEquals(41L, row.otherDeliveredSeq)
+        // Profil maydonlari (19.sqm) — avatar va universitet serverdan yangilandi.
+        assertEquals("https://cdn.example.uz/b.jpg", row.otherAvatarUrl)
+        assertEquals("emis-142", row.otherUniversityId)
+        assertEquals("3", row.otherCourseYear)
+
+        // Arxivlangan suhbat oddiy ro'yxatda ko'rinmaydi.
+        assertEquals(0, q.selectConversations().executeAsList().size)
+        assertEquals(1, q.selectArchivedConversations().executeAsList().size)
+
+        // Xabarlar: `seq = 0` (yuborilayotgan) ENG OXIRIDA turishi kerak.
+        q.message("m2", seq = 42L, sender = "std_ali", body = "Salom!", createdAt = 2_000L)
+        q.message("m1", seq = 41L, sender = "std_men", body = "Assalomu alaykum", createdAt = 1_000L)
+        q.message(
+            "local:x", seq = 0L, sender = "std_men", body = "Ketyapti…", createdAt = 3_000L,
+            clientMsgId = "cmid-1", status = "SENDING",
+        )
+        assertEquals(
+            listOf("m1", "m2", "local:x"),
+            q.selectMessages("cnv_1").executeAsList().map { it.id },
+        )
+
+        // Kursorlar: eng eski (0 dan katta) va eng yangi `seq`.
+        assertEquals(41L, q.minSeq("cnv_1").executeAsOne())
+        assertEquals(42L, q.maxSeq("cnv_1").executeAsOne())
+
+        // `message:new` o'z xabarimiz bo'lib qaytganda optimistik nusxa `clientMsgId` bo'yicha o'chadi.
+        q.deleteSendingByClientMsgId("cnv_1", "cmid-1")
+        assertEquals(2, q.selectMessages("cnv_1").executeAsList().size)
+
+        driver.close()
+    }
+
+    /**
+     * Regressiya: ketma-ket **bir xil matnli** ikkita xabar.
+     *
+     * Avval moslik tana bo'yicha edi (`deleteSendingByBody`) va bu yerda ikkala qator ham
+     * o'chib ketardi — foydalanuvchi aynan shu xatoni xabar qilgan. `clientMsgId` bo'yicha
+     * moslik faqat serverdan qaytgan bittasini oladi (`handoff/03-WEBSOCKET.md`).
+     */
+    @Test
+    fun deleteSendingByClientMsgIdRemovesOnlyTheAcknowledgedRow() {
+        val driver = freshDriver()
+        val db = StudentClubDatabase(driver).also { StudentClubDatabase.Schema.create(driver) }
+        val q = db.chatQueries
+
+        q.message(
+            "local:a", seq = 0L, sender = "std_men", body = "ha", createdAt = 1_000L,
+            clientMsgId = "cmid-a", status = "SENDING",
+        )
+        q.message(
+            "local:b", seq = 0L, sender = "std_men", body = "ha", createdAt = 2_000L,
+            clientMsgId = "cmid-b", status = "SENDING",
+        )
+
+        q.deleteSendingByClientMsgId("cnv_1", "cmid-a")
+
+        assertNull(q.selectMessageById("local:a").executeAsOneOrNull())
+        assertEquals("cmid-b", q.selectMessageById("local:b").executeAsOne().clientMsgId)
+
+        // Ack allaqachon almashtirgan HAQIQIY qator (status SENT) tegilmasin — u ham
+        // qayta yuborish uchun o'sha `clientMsgId` ni saqlaydi.
+        q.message(
+            "msg_real", seq = 42L, sender = "std_men", body = "ha", createdAt = 3_000L,
+            clientMsgId = "cmid-b", status = "SENT",
+        )
+        q.deleteSendingByClientMsgId("cnv_1", "cmid-b")
+
+        assertNull(q.selectMessageById("local:b").executeAsOneOrNull())
+        assertEquals(42L, q.selectMessageById("msg_real").executeAsOne().seq)
+
+        driver.close()
+    }
+
+    /**
+     * Rasm xabari (22.sqm): yuklanayotganda tanasi ham, biriktirmasi ham bo'sh; yuklangach
+     * `setMessageAttachment` uni to'ldiradi. `attachmentId` **saqlanishi shart** — biriktirma
+     * bir martalik, ya'ni qayta yuborishda fayl qaytadan yuklanmaydi.
+     *
+     * `clientMsgId` esa o'zgarmaydi — server javobi aynan shu kalit bo'yicha topiladi, ya'ni
+     * tanasi bo'sh media xabar ham to'g'ri moslashadi.
+     */
+    @Test
+    fun imageMessageStoresAttachmentAndAlbum() {
+        val driver = freshDriver()
+        val db = StudentClubDatabase(driver).also { StudentClubDatabase.Schema.create(driver) }
+        val q = db.chatQueries
+
+        q.message(
+            "local:img", seq = 0L, sender = "std_men", body = "", createdAt = 1_000L,
+            clientMsgId = "cmid-img", status = "SENDING", type = "IMAGE", albumId = "alb_1",
+        )
+        val pending = q.selectMessageById("local:img").executeAsOne()
+        assertEquals("IMAGE", pending.type)
+        assertEquals("alb_1", pending.albumId)
+        assertNull(pending.attachmentUrl)
+        assertNull(pending.attachmentId)
+        assertEquals(0L, pending.attachmentWidth)
+
+        val url = "/v1/media/med_01H8X/raw"
+        q.setMessageAttachment(
+            attachmentId = "med_01H8X",
+            attachmentUrl = url,
+            attachmentThumbUrl = "$url?variant=thumb",
+            attachmentWidth = 1920L,
+            attachmentHeight = 1080L,
+            attachmentKind = "IMAGE",
+            attachmentStatus = "READY",
+            attachmentMime = "image/webp",
+            attachmentSizeBytes = 284_100L,
+            attachmentDurationMs = null,
+            attachmentWaveform = null,
+            attachmentFileName = null,
+            attachmentBlurHash = "LKO2?U%2Tw=w",
+            attachmentIsAnimated = 0L,
+            // Server maydonni zaxiralagan, lekin bugun doim `null` yuboradi.
+            attachmentTranscript = null,
+            id = "local:img",
+        )
+
+        val uploaded = q.selectMessageById("local:img").executeAsOne()
+        // Tana BO'SH qoladi — havola endi tanaga yozilmaydi (eski hiyla olib tashlandi).
+        assertEquals("", uploaded.body)
+        assertEquals("med_01H8X", uploaded.attachmentId)
+        assertEquals(url, uploaded.attachmentUrl)
+        assertEquals(1920L, uploaded.attachmentWidth)
+        assertEquals("READY", uploaded.attachmentStatus)
+        assertEquals("cmid-img", uploaded.clientMsgId)
+
+        // Server o'sha xabarni qaytarganda optimistik qator `clientMsgId` bo'yicha topiladi —
+        // tanasi bo'sh bo'lishi moslikka ta'sir qilmaydi.
+        q.deleteSendingByClientMsgId("cnv_1", "cmid-img")
+        assertNull(q.selectMessageById("local:img").executeAsOneOrNull())
+
+        driver.close()
+    }
+
+    /**
+     * Soft delete (22.sqm): qator **o'chirilmaydi**, `seq` joyida qoladi va u
+     * o'qilmaganlar sanog'idan chiqadi (`handoff/02-API-CHANGES.md` §4b).
+     *
+     * Qator yo'q qilinsa `seq` da teshik qolardi va `?before=`/`?after=` sahifalash hamda
+     * o'qildi arifmetikasi buzilardi — shuning uchun faqat tanasi bo'shatiladi.
+     */
+    @Test
+    fun softDeleteKeepsRowAndDropsUnread() {
+        val driver = freshDriver()
+        val db = StudentClubDatabase(driver).also { StudentClubDatabase.Schema.create(driver) }
+        val q = db.chatQueries
+
+        q.insertConversationIfNew(
+            id = "cnv_1", type = "DIRECT", lastMessageAt = 2_000L,
+            otherId = "std_ali", otherUsername = "alisher", otherFullName = "Alisher Valiyev",
+            otherAvatarUrl = null, otherOnline = 0L, otherLastSeenAt = null,
+            otherUniversityId = null, otherGender = null, otherCourseYear = null,
+            lastMessageBody = "Salom!", lastMessageSenderId = "std_ali",
+            lastMessageType = "TEXT", lastMessageDeleted = 0L,
+            unreadCount = 2L, lastReadSeq = 41L, otherReadSeq = 0L, otherDeliveredSeq = 0L,
+        )
+        q.message("m41", seq = 41L, sender = "std_ali", body = "Salom!", createdAt = 1_000L)
+        q.message("m42", seq = 42L, sender = "std_ali", body = "Qalaysan?", createdAt = 2_000L)
+
+        q.setMessageDeleted(9_000L, "m42")
+        q.decrementUnreadForDeleted("cnv_1", 42L)
+        q.setLastMessageDeleted("cnv_1")
+
+        val row = q.selectMessageById("m42").executeAsOne()
+        assertEquals(42L, row.seq) // `seq` joyida — tarixda teshik yo'q
+        assertEquals("", row.body) // tana HAQIQATAN bo'shatildi
+        assertEquals(9_000L, row.deletedAt)
+        // Ikkala xabar ham ro'yxatda qoladi — o'chirilgani tombstone bo'lib.
+        assertEquals(listOf("m41", "m42"), q.selectMessages("cnv_1").executeAsList().map { it.id })
+        assertEquals(42L, q.maxSeq("cnv_1").executeAsOne())
+
+        val conversation = q.selectConversation("cnv_1").executeAsOne()
+        assertEquals(1L, conversation.unreadCount)
+        assertEquals(1L, conversation.lastMessageDeleted)
+        assertEquals("", conversation.lastMessageBody)
+
+        // Allaqachon o'qilgan xabar (`seq <= lastReadSeq`) sanoqni pasaytirmaydi — aks
+        // holda badge manfiyga ketardi.
+        q.setMessageDeleted(9_100L, "m41")
+        q.decrementUnreadForDeleted("cnv_1", 41L)
+        assertEquals(1L, q.selectConversation("cnv_1").executeAsOne().unreadCount)
+
+        driver.close()
+    }
+
+    /**
+     * «Faqat menda o'chirish» (25.sqm): xabar ro'yxatdan chiqadi, lekin qator, tana va
+     * `seq` joyida qoladi — u serverda hamon bor.
+     *
+     * Eng muhimi oxirgi tekshiruv: tarix serverdan qayta yuklanganda (`upsertMessage`)
+     * yashirish **saqlanadi**. `INSERT OR REPLACE` qatorni o'chirib qayta yozadi, ya'ni
+     * ustun so'rovda ataylab qayta o'qilmasa har `loadLatest` da xabarlar qaytib chiqardi.
+     */
+    @Test
+    fun hiddenMessagesLeaveHistoryIntact() {
+        val driver = freshDriver()
+        val db = StudentClubDatabase(driver).also { StudentClubDatabase.Schema.create(driver) }
+        val q = db.chatQueries
+
+        q.message("m1", seq = 1L, sender = "std_ali", body = "Salom!", createdAt = 1_000L)
+        q.message("m2", seq = 2L, sender = "me", body = "Qalaysan?", createdAt = 2_000L)
+        q.message("m3", seq = 3L, sender = "std_ali", body = "Yaxshi", createdAt = 3_000L)
+
+        q.hideMessages(9_000L, listOf("m2", "m3"))
+
+        assertEquals(listOf("m1"), q.selectMessages("cnv_1").executeAsList().map { it.id })
+        // Sinxronizatsiya kursori yashirilganlarni HISOBGA OLADI — aks holda `?after=`
+        // ularni qayta tortib, tarixda dublikat paydo bo'lardi.
+        assertEquals(3L, q.maxSeq("cnv_1").executeAsOne())
+        // Qator butun: tana ham, `seq` ham joyida (bu — o'chirish emas, yashirish).
+        val hidden = q.selectMessageById("m3").executeAsOne()
+        assertEquals("Yaxshi", hidden.body)
+        assertNull(hidden.deletedAt)
+        // Ro'yxatdagi ko'rinish uchun: ko'rinadigan eng oxirgi xabar.
+        assertEquals("m1", q.selectLastVisibleMessage("cnv_1").executeAsOne().id)
+
+        // Server tarixni qayta yubordi — yashirilgani yashiriligicha qolsin.
+        q.message("m3", seq = 3L, sender = "std_ali", body = "Yaxshi", createdAt = 3_000L)
+        assertEquals(9_000L, q.selectMessageById("m3").executeAsOne().hiddenAt)
+        assertEquals(listOf("m1"), q.selectMessages("cnv_1").executeAsList().map { it.id })
+
+        driver.close()
+    }
+
+    /** `upsertMessage` ning uzun imzosini testlarda takrorlamaslik uchun. */
+    private fun dev.core.database.sql.ChatQueries.message(
+        id: String,
+        seq: Long,
+        sender: String,
+        body: String,
+        createdAt: Long,
+        conversationId: String = "cnv_1",
+        type: String = "TEXT",
+        clientMsgId: String? = null,
+        status: String = "SENT",
+        albumId: String? = null,
+    ) = upsertMessage(
+        id = id,
+        conversationId = conversationId,
+        senderId = sender,
+        seq = seq,
+        type = type,
+        body = body,
+        createdAt = createdAt,
+        clientMsgId = clientMsgId,
+        status = status,
+        deletedAt = null,
+        attachmentId = null,
+        attachmentUrl = null,
+        attachmentThumbUrl = null,
+        attachmentWidth = 0L,
+        attachmentHeight = 0L,
+        attachmentKind = null,
+        attachmentStatus = null,
+        attachmentMime = null,
+        attachmentSizeBytes = null,
+        attachmentDurationMs = null,
+        attachmentWaveform = null,
+        attachmentFileName = null,
+        attachmentBlurHash = null,
+        attachmentIsAnimated = null,
+        stickerId = null,
+        stickerEmoji = null,
+        stickerUrl = null,
+        albumId = albumId,
+        // Sitata — bu yordamchi oddiy xabar yozadi; javob xabari alohida sinaladi.
+        replyToId = null,
+        replyToSeq = null,
+        replyToSenderId = null,
+        replyToSenderName = null,
+        replyToType = null,
+        replyToPreview = null,
+        replyToQuoteText = null,
+        replyToQuoteOffset = null,
+        replyToOriginalDeleted = null,
+        attachmentTranscript = null,
+        // Qo'ng'iroq qatori — bu yordamchi oddiy xabar yozadi; `CALL` alohida sinaladi.
+        callId = null,
+        callMedia = null,
+        callStatus = null,
+        callDurationMs = null,
+        callEndReason = null,
+    )
 
     @Test
     fun migrationFromV1AddsNewTablesAndColumn() {
@@ -243,6 +648,44 @@ class DatabaseSchemaTest {
         // v8/v9 (7.sqm + 8.sqm): chegirma e'lonlari jadvali migratsiyadan keyin mavjud
         // va ko'p filialli (branchesJson) ustunga ega bo'lishi kerak.
         db.listingQueries.selectAll().executeAsList().also { assertEquals(0, it.size) }
+
+        driver.close()
+    }
+
+    /**
+     * 23.sqm — bosh ekran bo'limlari katalog guruhiga bog'landi. Keshdagi eski e'lon qatori
+     * yo'qolmasligi (`groupKey` bo'sh qolib, keyingi `refresh()` uni to'ldiradi) va guruhlar
+     * HAR DOIM server tartibida o'qilishi kerak — bo'limlar ketma-ketligi shundan.
+     */
+    @Test
+    fun migrationV23AddsGroupsAndKeepsCachedOffers() {
+        val driver = freshDriver()
+        createV1Tables(driver)
+        driver.execute(
+            null,
+            """
+            INSERT INTO DiscountOfferEntity(
+                id, categoryId, merchant, title, discountPercent, tag, promoCode, location,
+                expiry, emoji, bannerAccent, featured
+            ) VALUES ('o-1', 'ovqat', 'Evos', 'Lavash', 20, 'STUDENT_ID', NULL, 'Chilonzor', NULL, '🍕', 1, 0)
+            """.trimIndent(),
+            0,
+        )
+
+        StudentClubDatabase.Schema.migrate(driver, 1L, StudentClubDatabase.Schema.version)
+        val db = StudentClubDatabase(driver)
+
+        val cached = db.discountQueries.selectOfferById("o-1").executeAsOne()
+        assertEquals("ovqat", cached.categoryId)
+        assertEquals("", cached.groupKey, "eski kesh qatori guruhsiz qolishi kerak")
+
+        // Tartib ataylab teskari kiritildi — `selectGroups` uni `sortOrder` bo'yicha qaytaradi.
+        db.discountQueries.upsertGroup("SHOPPING", "Savdo va xizmat", "🛍", 0xFF06B6D4L, 7L)
+        db.discountQueries.upsertGroup("FOOD", "Ovqatlanish", "🍽", 0xFFF97316L, 1L)
+        assertEquals(
+            listOf("FOOD", "SHOPPING"),
+            db.discountQueries.selectGroups().executeAsList().map { it.key },
+        )
 
         driver.close()
     }
@@ -324,6 +767,7 @@ class DatabaseSchemaTest {
             0,
         )
         createV1DiscountTables(driver)
+        createV1StudentTable(driver)
 
         // Koordinatasi bor e'lon — filialga aylanishi kerak.
         driver.execute(
@@ -434,6 +878,7 @@ class DatabaseSchemaTest {
             detailsJson: String = """{"kind":"DISCOUNT","businessType":"CAFE_RESTAURANT",""" +
                 """"businessName":"Chaykhana Navruz","categoryKey":"PIZZA",""" +
                 """"isDiscounted":true,"discountType":"PERCENT","discountValue":20}""",
+            universityId: String? = null,
         ) = q.upsert(
             id = id,
             ownerId = "u1",
@@ -450,6 +895,7 @@ class DatabaseSchemaTest {
             isNegotiable = 0,
             finalPrice = 44_000,
             contactPhone = "+998901234567",
+            universityId = universityId,
             branchesJson = """[{"id":"br1","lat":41.2856,"lng":69.2034,"address":"Chilonzor 9-kvartal, 42-uy"}]""",
             validFrom = 0,
             validTo = validTo,
@@ -480,6 +926,14 @@ class DatabaseSchemaTest {
         assertEquals(1, rentals.size)
         assertEquals("l-rental", rentals.single().id)
         assertTrue(rentals.single().detailsJson.contains("\"gender\":\"MALE\""))
+
+        // Universitetga bog'lash (27.sqm) — "Universitetim" ekrani shu ustundan filtrlaydi.
+        insert("l-task-tatu", "ACTIVE", validTo = 2_000, kind = "TASK", universityId = "tatu")
+        insert("l-task-free", "ACTIVE", validTo = 2_000, kind = "TASK")
+        val tasks = q.selectActiveByKind(kind = "TASK", now = 1_000).executeAsList()
+        assertEquals(listOf("tatu", null), tasks.map { it.universityId }.sortedBy { it == null })
+        q.deleteById("l-task-tatu")
+        q.deleteById("l-task-free")
 
         assertEquals(1, q.selectActiveByKind(kind = "DISCOUNT", now = 1_000).executeAsList().size)
         q.deleteById("l-rental")
@@ -520,7 +974,7 @@ class DatabaseSchemaTest {
         val db = StudentClubDatabase(driver)
 
         assertNull(db.profileQueries.selectCurrent().executeAsOneOrNull())
-        // 15.sqm eski (Firebase) sessiyani o'chiradi — yangi backendда u yaroqsiz.
+        // 15.sqm eski (Firebase) sessiyani o'chiradi — yangi backendda u yaroqsiz.
         assertNull(db.userQueries.selectCurrent().executeAsOneOrNull())
 
         driver.close()

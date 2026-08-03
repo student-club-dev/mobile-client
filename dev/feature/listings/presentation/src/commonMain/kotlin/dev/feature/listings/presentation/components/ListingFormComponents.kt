@@ -44,15 +44,16 @@ import dev.core.uikit.components.AppIcons
 import dev.core.uikit.media.toImageBitmapOrNull
 import dev.core.uikit.theme.AppPalette
 import dev.core.uikit.theme.appPalette
+import dev.core.uikit.components.ScShimmerBox
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 
-/** Bo'lim yon (horizontal) padding'i — flat dizaynда sarlavha/maydonlar shu qadar ichkariда. */
+/** Bo'lim yon (horizontal) padding'i — flat dizaynda sarlavha/maydonlar shu qadar ichkarida. */
 val SectionHPad = 16.dp
 
 /**
  * Forma bo'limi — FLAT (kartasiz): faqat sarlavha + izoh + tarkib. Kartachalar yo'q, hamma narsa
- * fonда to'g'ridan-to'g'ri. Yon padding shu yerda beriladi (horizontal scroll bo'limlari esa
+ * fonda to'g'ridan-to'g'ri. Yon padding shu yerda beriladi (horizontal scroll bo'limlari esa
  * o'zi edge-to-edge chiqadi).
  */
 @Composable
@@ -79,7 +80,7 @@ fun FormSection(
     }
 }
 
-/** Bo'lim sarlavhasi (flat). Horizontal-scroll bo'limlarда alohida ishlatiladi. */
+/** Bo'lim sarlavhasi (flat). Horizontal-scroll bo'limlarda alohida ishlatiladi. */
 @Composable
 fun SectionHeader(title: String, subtitle: String?, palette: AppPalette = appPalette) {
     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -101,7 +102,7 @@ val ErrorColor = Color(0xFFEF4444)
 
 /**
  * Tanlanadigan chip — iym-native uikit2 uslubi: 36dp balandlik, yumshoq squircle-simon shakl,
- * tanlanганда SOLID brand fon (gradient emas), tanlanmaganда nozik chegara.
+ * tanlanganda SOLID brand fon (gradient emas), tanlanmaganda nozik chegara.
  */
 @Composable
 fun SelectChip(
@@ -282,7 +283,8 @@ fun AddImageTile(onClick: () -> Unit, loading: Boolean, palette: AppPalette = ap
         contentAlignment = Alignment.Center,
     ) {
         if (loading) {
-            Text("...", style = TextStyle(fontFamily = AppFontFamily, fontSize = 16.sp, color = palette.inkFaint))
+            // Rasm yuklanmoqda — plitkaning o'zi skelet bo'lib turadi.
+            ScShimmerBox(Modifier.fillMaxSize(), RoundedCornerShape(14.dp))
         } else {
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Icon(AppIcons.ImageIcon, null, tint = palette.inkFaint, modifier = Modifier.size(20.dp))

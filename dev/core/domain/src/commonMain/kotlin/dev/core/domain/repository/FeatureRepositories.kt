@@ -2,11 +2,18 @@ package dev.core.domain.repository
 
 import dev.core.common.Resource
 import dev.core.domain.model.DiscountCategory
+import dev.core.domain.model.DiscountGroup
 import dev.core.domain.model.DiscountOffer
+import dev.core.domain.model.OfferDetail
+import dev.core.domain.model.OfferFilterSchema
+import dev.core.domain.model.OfferSuggestion
 import kotlinx.coroutines.flow.Flow
 
 /** Chegirmalar — kategoriyalar, takliflar, saqlangan takliflar. */
 interface DiscountRepository {
+    /** Bosh ekrandagi bo'limlar — katalog guruhlari, server tartibida. */
+    fun observeGroups(): Flow<List<DiscountGroup>>
+
     fun observeCategories(): Flow<List<DiscountCategory>>
 
     /** "Siz uchun" feed'i — barcha e'lonlar (chegirmali + chegirmasiz), UI o'zi filtrlaydi. */
@@ -15,6 +22,31 @@ interface DiscountRepository {
     fun observeFeatured(): Flow<List<DiscountOffer>>
     fun observeSaved(): Flow<List<DiscountOffer>>
     suspend fun setSaved(offerId: String, saved: Boolean)
+
+    /**
+     * Bitta e'lon to'liq holda (promo-kod, shartlar, filiallar). Tarmoq bo'lmasa yoki
+     * sinxronlash o'chirilgan bo'lsa — keshdagi kartadan yig'ilgan minimal variant
+     * ([OfferDetail.fromNetwork] = `false`).
+     */
+    suspend fun getDetail(offerId: String): Resource<OfferDetail>
+
+    /** Qidiruv qatori uchun avtoto'ldirish takliflari. Bo'sh so'rovda — bo'sh ro'yxat. */
+    suspend fun suggest(query: String): Resource<List<OfferSuggestion>>
+
+    /**
+     * BITTA bo'limning (katalog guruhi) e'lonlarini to'liqroq tortadi.
+     *
+     * Umumiy [refresh] bosh ekran uchun har guruhdan atigi bir nechtasini oladi — bo'lim
+     * ekrani ochilganda esa hammasi kerak (ro'yxat ham, xarita ham shu manbadan). Keshdagi
+     * boshqa guruhlarga TEGILMAYDI, faqat shu guruh yozuvlari yangilanadi.
+     */
+    suspend fun refreshGroup(groupKey: String): Resource<Unit>
+
+    /**
+     * Filtr ekrani sxemasi. [typeKeys] berilsa — faqat o'sha biznes turlari doirasida
+     * (bo'limlar va sonlar shunga qarab toraytiriladi).
+     */
+    suspend fun getFilterSchema(typeKeys: List<String> = emptyList()): Resource<OfferFilterSchema>
 
     /**
      * Backend'dan sinxronlab local DB'ni yangilaydi (offline-first).

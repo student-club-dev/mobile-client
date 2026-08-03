@@ -44,6 +44,24 @@ android {
 
     buildFeatures { compose = true }
 
+    /**
+     * Loyihaning **o'z** debug kaliti (`androidApp/debug.keystore`, repoda — `.gitignore`
+     * dagi `!debug.keystore` istisnosi).
+     *
+     * Standart `~/.android/debug.keystore` har bir mashinada boshqacha SHA-1 beradi, ya'ni
+     * har bir ishlab chiquvchi uchun Google Cloud'da alohida Android OAuth client kerak
+     * bo'lardi. Repodagi umumiy kalit bilan SHA-1 hamma joyda bitta:
+     *   DC:18:55:73:19:58:73:89:F7:89:D1:79:3E:E6:16:4A:B9:39:63:30
+     */
+    signingConfigs {
+        getByName("debug") {
+            storeFile = file("debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
@@ -75,9 +93,12 @@ dependencies {
     debugImplementation(libs.chucker)
     releaseImplementation(libs.chucker.noop)
 
-    // Firebase (Google + Phone auth) — google-services.json orqali sozlanadi
+    // Firebase — google-services.json orqali sozlanadi. Auth uchun EMAS (u backendda):
+    // faqat **push** (FCM) uchun — `StudentClubMessagingService` va qurilma tokeni.
     implementation(platform(libs.firebase.bom))
-    implementation(libs.firebase.auth)
+    implementation(libs.firebase.messaging)
+    // Push tokenini bog'lash (`PushTokenBridge`) shu modulda.
+    implementation(projects.dev.feature.notifications.data)
 
     implementation(libs.androidx.core.ktx)
     // Android 12+ tizim splash ekrani (`installSplashScreen()` MainActivity'da).

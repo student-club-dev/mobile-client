@@ -2,10 +2,55 @@
 <project version="4">
   <component name="CompilerConfiguration">
     <bytecodeTargetLevel target="17">
+      <module name="StudentClub.dev.feature.business" target="21" />
+      <module name="StudentClub.dev.feature.clubs.presentation" target="21" />
+      <module name="StudentClubs.dev.api-client" target="21" />
+      <module name="StudentClubs.dev.core.common" target="21" />
+      <module name="StudentClubs.dev.core.data" target="21" />
+      <module name="StudentClubs.dev.core.database" target="21" />
       <module name="StudentClubs.dev.core.designsystem" target="21" />
+      <module name="StudentClubs.dev.core.di" target="21" />
+      <module name="StudentClubs.dev.core.domain" target="21" />
+      <module name="StudentClubs.dev.core.navigation" target="21" />
+      <module name="StudentClubs.dev.core.network" target="21" />
+      <module name="StudentClubs.dev.core.uikit" target="21" />
+      <module name="StudentClubs.dev.feature.ads.data" target="21" />
+      <module name="StudentClubs.dev.feature.ads.domain" target="21" />
+      <module name="StudentClubs.dev.feature.ads.presentation" target="21" />
+      <module name="StudentClubs.dev.feature.auth" target="21" />
+      <module name="StudentClubs.dev.feature.business" target="21" />
+      <module name="StudentClubs.dev.feature.chat.data" target="21" />
+      <module name="StudentClubs.dev.feature.chat.domain" target="21" />
+      <module name="StudentClubs.dev.feature.chat.presentation" target="21" />
+      <module name="StudentClubs.dev.feature.clubs.data" target="21" />
+      <module name="StudentClubs.dev.feature.clubs.domain" target="21" />
+      <module name="StudentClubs.dev.feature.clubs.presentation" target="21" />
       <module name="StudentClubs.dev.feature.discounts.data" target="21" />
       <module name="StudentClubs.dev.feature.discounts.domain" target="21" />
       <module name="StudentClubs.dev.feature.discounts.presentation" target="21" />
+      <module name="StudentClubs.dev.feature.home.presentation" target="21" />
+      <module name="StudentClubs.dev.feature.jobs.data" target="21" />
+      <module name="StudentClubs.dev.feature.jobs.domain" target="21" />
+      <module name="StudentClubs.dev.feature.jobs.presentation" target="21" />
+      <module name="StudentClubs.dev.feature.listings.data" target="21" />
+      <module name="StudentClubs.dev.feature.listings.domain" target="21" />
+      <module name="StudentClubs.dev.feature.listings.presentation" target="21" />
+      <module name="StudentClubs.dev.feature.notifications.data" target="21" />
+      <module name="StudentClubs.dev.feature.notifications.domain" target="21" />
+      <module name="StudentClubs.dev.feature.notifications.presentation" target="21" />
+      <module name="StudentClubs.dev.feature.profile.data" target="21" />
+      <module name="StudentClubs.dev.feature.profile.domain" target="21" />
+      <module name="StudentClubs.dev.feature.profile.presentation" target="21" />
+      <module name="StudentClubs.dev.feature.settings.data" target="21" />
+      <module name="StudentClubs.dev.feature.settings.domain" target="21" />
+      <module name="StudentClubs.dev.feature.settings.presentation" target="21" />
+      <module name="StudentClubs.dev.feature.students.data" target="21" />
+      <module name="StudentClubs.dev.feature.students.domain" target="21" />
+      <module name="StudentClubs.dev.feature.students.presentation" target="21" />
+      <module name="StudentClubs.dev.feature.university.data" target="21" />
+      <module name="StudentClubs.dev.feature.university.domain" target="21" />
+      <module name="StudentClubs.dev.feature.university.presentation" target="21" />
+      <module name="StudentClubs.dev.shared" target="21" />
     </bytecodeTargetLevel>
   </component>
 </project>

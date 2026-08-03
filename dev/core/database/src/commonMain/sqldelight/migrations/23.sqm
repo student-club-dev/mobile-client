@@ -1,0 +1,26 @@
+-- v23 -> v24 — bosh ekran bo'limlari katalog GURUHIGA bog'landi.
+--
+-- Ilgari e'lon qaysi bo'limga tushishi kalit so'z bilan taxmin qilinardi (`categoryId` va
+-- tur nomida "ovqat", "kafe", "game"... qidirilardi). Backend esa `POST /v1/catalog/groups`
+-- da 8 ta tayyor bosh-ekran guruhini beradi va har bir biznes turi aniq bir guruhga
+-- tegishli (`CatalogTypeDto.groupKey`). Endi bo'lim shu kalit bo'yicha aniqlanadi:
+-- yangi biznes turi qo'shilsa ham ilovaga tegish shart emas.
+--
+-- Migratsiya FAQAT QO'SHADI — bitta ham ustun/jadval o'chirilmaydi. Yangi ustunlar eski
+-- qatorlarda '' bo'lib qoladi; keyingi `refresh()` ularni serverdagi qiymat bilan
+-- to'ldiradi (feed baribir har safar to'liq almashtiriladi).
+
+-- Bosh ekrandagi bo'lim: sarlavha, emoji, rang va tartib serverdan keladi.
+CREATE TABLE DiscountGroupEntity (
+    key TEXT NOT NULL PRIMARY KEY,
+    name TEXT NOT NULL,
+    emoji TEXT NOT NULL,
+    accent INTEGER NOT NULL,
+    sortOrder INTEGER NOT NULL
+);
+
+-- Biznes turi qaysi guruhda (`CatalogTypeDto.groupKey`).
+ALTER TABLE DiscountCategoryEntity ADD COLUMN groupKey TEXT NOT NULL DEFAULT '';
+
+-- E'lonning guruhi — bo'limga tegishliligini AYNAN shu ustun hal qiladi.
+ALTER TABLE DiscountOfferEntity ADD COLUMN groupKey TEXT NOT NULL DEFAULT '';

@@ -9,6 +9,7 @@ internal fun StudentEntity.toDomain(): Student = Student(
     firstName = firstName,
     lastName = lastName,
     initial = initial,
+    avatarUrl = avatarUrl,
     universityId = universityId,
     universityMonogram = universityMonogram,
     course = course.toInt(),

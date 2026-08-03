@@ -46,7 +46,7 @@ object ServiceCatalog {
     /** "Boshqa" yo'nalishi — tanlansa erkin nom so'raladi. */
     const val OTHER_SUBJECT_KEY = "OTHER"
 
-    /** "Boshqa" tanlanганda yoziladigan erkin nom. */
+    /** "Boshqa" tanlanganda yoziladigan erkin nom. */
     const val CUSTOM_SUBJECT_KEY = "customSubject"
 
     // -----------------------------------------------------------------------
@@ -139,7 +139,7 @@ object ServiceCatalog {
         ),
         ServiceType.PHOTO_VIDEO to subj(
             "EVENT_PHOTO" to "Tadbir surati",
-            "PORTRAIT" to "Portret / lavhа",
+            "PORTRAIT" to "Portret / lavha",
             "PRODUCT" to "Mahsulot surati",
             "WEDDING" to "To'y",
             "VIDEO_SHOOT" to "Videosuratga olish",

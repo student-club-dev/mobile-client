@@ -17,6 +17,12 @@ interface SettingsRepository {
     companion object {
         const val KEY_NOTIF_PUSH = "notif_push"
         const val KEY_NOTIF_EMAIL = "notif_email"
-        const val KEY_SELECTED_ROLE = "selected_role"
+
+        /**
+         * Tanishtiruv (onboarding) ekranlari bir marta ko'rilganmi. Chiqishda TOZALANMAYDI —
+         * logout'dan keyin foydalanuvchi tanishtiruvga emas, to'g'ridan-to'g'ri kirish ekraniga
+         * tushishi kerak.
+         */
+        const val KEY_ONBOARDING_SEEN = "onboarding_seen"
     }
 }

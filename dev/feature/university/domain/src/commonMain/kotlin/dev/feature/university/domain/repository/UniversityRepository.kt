@@ -8,7 +8,7 @@ import kotlinx.coroutines.flow.Flow
 interface UniversityRepository {
     fun observeUniversities(): Flow<List<University>>
 
-    /** Backend'dan sinxronlab local DB'ni yangilaydi (offline-first). Xatoда cache saqlanadi. */
+    /** Backend'dan sinxronlab local DB'ni yangilaydi (offline-first). Xatoda cache saqlanadi. */
     suspend fun refresh(): Resource<Unit>
 
     /** Tanlash uchun universitetlar ro'yxatini prof-emis'dan oladi (local DB'ga yozmaydi). */

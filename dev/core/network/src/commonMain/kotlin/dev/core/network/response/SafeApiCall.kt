@@ -15,7 +15,7 @@ import kotlinx.coroutines.CancellationException
 /**
  * Barcha API so'rovlari uchun **yagona xavfsiz o'ram** (IYM-business naqshi).
  *
- * Bitta joyда: internet tekshiruvi → so'rov → konvert [check] → barcha istisnolarni typed
+ * Bitta joyda: internet tekshiruvi → so'rov → konvert [check] → barcha istisnolarni typed
  * [AppException] ga aylantirish. Har data-source shuni chaqiradi, o'zi try/catch yozmaydi:
  *
  * ```
@@ -30,7 +30,7 @@ suspend fun <T> safeApiCall(
 ): Resource<T> = runSafely(connectivity) { call().check() }
 
 /**
- * Konvertsiz (raw) variant — generatsiya qilingan API to'g'ridan-to'g'ri modelni qaytarganда
+ * Konvertsiz (raw) variant — generatsiya qilingan API to'g'ridan-to'g'ri modelni qaytarganda
  * yoki uchinchi-tomon xizmatlar uchun. Xato-ishlash aynan bir xil.
  */
 suspend fun <T> safeCall(
@@ -78,7 +78,7 @@ suspend fun ResponseException.toAppExceptionWithFields(): AppException {
     val parsed = parseErrorEnvelope(body, status.value) ?: return status.toAppException(this)
     // Konvertda `cause` yo'q — asl istisnoni log/telemetriya uchun saqlab qo'yamiz.
     return if (parsed is AppException.Validation) {
-        AppException.Validation(parsed.reason, parsed.fields, this)
+        AppException.Validation(parsed.reason, parsed.fields, this).withCode(parsed.errorCode)
     } else {
         parsed
     }

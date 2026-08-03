@@ -16,6 +16,10 @@ kotlin {
             export(projects.dev.core.di)
             // Swift tomonidagi social auth bridge (IosSocialAuthBridge/Delegate) ko'rinsin
             export(projects.dev.feature.auth)
+            // Push ko'prigi (`IosPushBridge`) — APNs tokeni va bosilgan bildirishnoma
+            // Swift'dan shu orqali kiradi. `implementation` bo'lsa Obj-C sarlavhasiga
+            // tushmasdi (u tranzitiv emas), shuning uchun alohida `export`.
+            export(projects.dev.feature.notifications.data)
         }
     }
 
@@ -29,6 +33,8 @@ kotlin {
             implementation(projects.dev.feature.university.domain)
             implementation(projects.dev.core.domain)
             api(projects.dev.feature.auth)
+            // `export(...)` uchun bog'liqlik `api` bo'lishi shart.
+            api(projects.dev.feature.notifications.data)
 
             implementation(compose.runtime)
             implementation(compose.foundation)
@@ -41,6 +47,9 @@ kotlin {
             // Rasm yuklash (avatar) — ilova darajasidagi ImageLoader sozlamasi App.kt'da.
             implementation(libs.coil.compose)
             implementation(libs.coil.network.ktor)
+            // Rasm havolasi tuzatilganini logga yozish (`MediaUrlMapper`) — buzuq havolani
+            // qurilmada tez topish uchun.
+            implementation(libs.napier)
             implementation(libs.ktor.client.core)
         }
     }

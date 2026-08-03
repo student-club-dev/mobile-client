@@ -32,9 +32,9 @@ actual fun MapPicker(
     // MapLibre ilova ichidan o'qiladi (CDN emas) — tayyor bo'lmaguncha WebView qurilmaydi.
     if (!rememberMapLibreReady()) return
 
-    // Boshlang'ich markaz bir marta olinadi; keyingi ko'chishlar JS orqali (reload YO'Q).
-    val initialCenter = remember { initial ?: DefaultMapCenter }
-    val html = remember(dark) { pickerMapHtml(initialCenter, dark) }
+    // Sahifa fon oqimida yig'iladi. Boshlang'ich markaz bir marta olinadi; keyingi
+    // ko'chishlar JS orqali (reload YO'Q).
+    val html = rememberPickerMapHtml(initial, dark) ?: return
 
     // Handler WKWebView'dan uzoq yashashi kerak — aks holda JS xabari kelguncha
     // u yig'ib yuboriladi va callback hech qachon chaqirilmaydi.

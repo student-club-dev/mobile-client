@@ -1,0 +1,44 @@
+-- v22 -> v23 — chat media yangi backend kontraktiga ko'chdi (`handoff/03-WEBSOCKET.md`, `02-API-CHANGES.md` §4c).
+--
+-- Ilgari rasm `POST /v1/media/upload` ga yuklanib, **havolasi xabar tanasi** sifatida
+-- yuborilardi va turi tanadan taxmin qilinardi (`MediaContent` evristikasi). Endi server
+-- tipli xabarni o'zi qaytaradi: `type` + to'liq `attachment` obyekti. Shuning uchun
+-- biriktirmaning barcha metama'lumotlari keshda ham saqlanishi kerak — aks holda ovozli
+-- xabarning to'lqin shakli, video holati yoki faylning nomi oflayn rejimda yo'qolardi.
+--
+-- Migratsiya FAQAT QO'SHADI: bitta ham ustun o'chirilmaydi, mavjud qatorlarda yangi
+-- ustunlar NULL bo'lib qoladi va eski kesh o'qilishda davom etadi.
+
+-- --- Xabar ------------------------------------------------------------------------------
+
+-- Soft delete: qator o'chirilmaydi, `seq` joyida qoladi (u tarix va o'qildi kursorlarining
+-- o'qi), tana bo'shatiladi va ekranda tombstone chiziladi.
+ALTER TABLE MessageEntity ADD COLUMN deletedAt INTEGER;
+
+-- Server `mediaId` si. Biriktirma BIR MARTALIK (`422 MEDIA_ALREADY_USED`), shuning uchun
+-- yuborilmay qolgan xabarni qayta yuborishda fayl QAYTA yuklanmaydi — shu id ishlatiladi.
+ALTER TABLE MessageEntity ADD COLUMN attachmentId TEXT;
+ALTER TABLE MessageEntity ADD COLUMN attachmentKind TEXT;
+-- PROCESSING (video hali transkodlanmoqda) | READY | FAILED.
+ALTER TABLE MessageEntity ADD COLUMN attachmentStatus TEXT;
+ALTER TABLE MessageEntity ADD COLUMN attachmentMime TEXT;
+ALTER TABLE MessageEntity ADD COLUMN attachmentSizeBytes INTEGER;
+ALTER TABLE MessageEntity ADD COLUMN attachmentDurationMs INTEGER;
+-- 48 nuqtali to'lqin shakli, vergul bilan ajratilgan (`0..100`) — ovozli xabar uchun.
+ALTER TABLE MessageEntity ADD COLUMN attachmentWaveform TEXT;
+ALTER TABLE MessageEntity ADD COLUMN attachmentFileName TEXT;
+ALTER TABLE MessageEntity ADD COLUMN attachmentBlurHash TEXT;
+ALTER TABLE MessageEntity ADD COLUMN attachmentIsAnimated INTEGER;
+
+-- STICKER xabarida `body` TAQIQLANGAN — ko'rsatiladigan hamma narsa shu ustunlarda.
+ALTER TABLE MessageEntity ADD COLUMN stickerId TEXT;
+ALTER TABLE MessageEntity ADD COLUMN stickerEmoji TEXT;
+ALTER TABLE MessageEntity ADD COLUMN stickerUrl TEXT;
+
+-- --- Suhbat -----------------------------------------------------------------------------
+
+-- Media xabarda tana bo'sh, shuning uchun ro'yxatdagi ko'rinish uchun turning o'zi kerak
+-- ("📷 Rasm"). Eski qatorlarda NULL — o'shanda tur tanadan taxmin qilinadi.
+ALTER TABLE ConversationEntity ADD COLUMN lastMessageType TEXT;
+-- Oxirgi xabar o'chirilgan bo'lsa ro'yxatda tombstone ko'rinadi (tana haqiqatan bo'sh).
+ALTER TABLE ConversationEntity ADD COLUMN lastMessageDeleted INTEGER NOT NULL DEFAULT 0;

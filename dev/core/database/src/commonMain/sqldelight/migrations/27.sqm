@@ -1,0 +1,16 @@
+-- v27 -> v28 — e'lon universitetga bog'landi (`STUDENT_LISTINGS_BACKEND.md` §7.2.4).
+--
+-- Talaba uchun eng muhim moslik — universitet: kvartira sherigi, repetitor yoki fandan
+-- yordam odatda **o'z OTM atrofida** izlanadi. Shu sabab e'lon `universityId` ni olib
+-- yuradi (odatiy qiymati — egasining universiteti, `ProfileEntity.universityId`), va
+-- "Mening universitetim" ekrani topshiriq e'lonlarini aynan shu ustun bo'yicha filtrlaydi.
+--
+-- Ustun NULL bo'lishi mumkin: universitetga bog'lanmagan e'lon hamma bo'limlarda ko'rinadi,
+-- faqat "Universitetimda" ro'yxatiga tushmaydi. Eski qatorlar aynan shunday qoladi —
+-- ularning egasi universitetini keyin ko'rsatgan bo'lsa, e'lonni qayta saqlaganda bog'lanadi.
+--
+-- Migratsiya FAQAT QO'SHADI: ma'lumot ko'chirilmaydi, hech narsa o'chirilmaydi.
+
+ALTER TABLE ListingEntity ADD COLUMN universityId TEXT;
+
+CREATE INDEX listing_university_idx ON ListingEntity(universityId, kind, status);

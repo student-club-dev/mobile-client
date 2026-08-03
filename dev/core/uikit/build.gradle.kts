@@ -22,6 +22,11 @@ kotlin {
             api(compose.ui)
             api(compose.components.resources)
             implementation(compose.materialIconsExtended)
+            // Foydalanuvchi avatarlari (`ScAvatar`) — serverdagi rasm havolasi bo'yicha.
+            implementation(libs.coil.compose)
+            // Tanlangan video keshdagi **fayl** bo'lib yuriladi (`media/MediaFiles`) —
+            // xotiraga o'qilmaydi. Yo'lni yaratish/o'chirish shu kutubxona orqali.
+            api(libs.kotlinx.io.core)
         }
 
         androidMain.dependencies {
@@ -30,6 +35,16 @@ kotlin {
             implementation(libs.androidx.activity.compose)
             // ContextCompat.checkSelfPermission — `map/UserLocation`.
             implementation(libs.androidx.core.ktx)
+            // Video pleyer (`media/VideoPlayer`) — ExoPlayer + tayyor `PlayerView`.
+            implementation(libs.androidx.media3.exoplayer)
+            implementation(libs.androidx.media3.ui)
+            // Video siqish (`media/VideoCompressor`) — yuborishdan oldin 1080p H.264 ga.
+            implementation(libs.androidx.media3.transformer)
+            implementation(libs.androidx.media3.effect)
+            // `LocalLifecycleOwner` — ekran fonga ketganda videoni to'xtatish uchun.
+            // Compose'dan tranzitiv kelishiga tayanmaymiz: bu API lifecycle 2.8+ da,
+            // `androidx.lifecycle.compose` paketiga ko'chgan.
+            implementation(libs.androidx.lifecycle.runtimeCompose)
         }
     }
 }

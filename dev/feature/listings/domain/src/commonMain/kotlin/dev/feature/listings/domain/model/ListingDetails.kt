@@ -200,7 +200,7 @@ sealed interface ListingDetails {
 
         override val kind: ListingKind get() = ListingKind.SERVICE
 
-        /** Faqat to'ldirilgan maydonlar, ekranда ko'rsatish uchun (label → qiymat). */
+        /** Faqat to'ldirilgan maydonlar, ekranda ko'rsatish uchun (label → qiymat). */
         fun filledFields(): List<Pair<String, String>> {
             val type = serviceType ?: return emptyList()
             return ServiceCatalog.fields(type).mapNotNull { spec ->

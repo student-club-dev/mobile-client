@@ -39,6 +39,12 @@ CREATE TABLE ListingEntity (
 
     contactPhone TEXT,
 
+    -- E'lon bog'langan universitet (`STUDENT_LISTINGS_BACKEND.md` §7.2.4). Odatiy qiymat —
+    -- e'lon EGASINING universiteti: kvartira sherigi, repetitor yoki topshiriq odatda
+    -- o'z OTM atrofida izlanadi, shuning uchun "Universitetim" ekrani shu ustun bo'yicha
+    -- filtrlaydi. NULL — universitetga bog'lanmagan e'lon (hammaga tegishli).
+    universityId TEXT,
+
     -- Manzillar. E'lon bir nechta joyda amal qilishi mumkin, har biri xaritadan
     -- tanlangani uchun koordinatasi bor (talabaga eng yaqinini ko'rsatish uchun).
     -- JSON: [{"id":"br1","lat":41.2856,"lng":69.2034,"address":"...","name":"Chilonzor"}]
@@ -64,6 +70,8 @@ CREATE INDEX listing_status_idx ON ListingEntity(status, validTo);
 -- Talabaga ko'rsatiladigan ro'yxat doim tur bo'yicha filtrlanadi (Ijara / Ish / Xizmat
 -- alohida bo'limlar) — shuning uchun status bilan birga indekslanadi.
 CREATE INDEX listing_kind_idx ON ListingEntity(kind, status, updatedAt);
+-- "Universitetim" ekrani: shu OTMga bog'langan topshiriq/ijara e'lonlari.
+CREATE INDEX listing_university_idx ON ListingEntity(universityId, kind, status);
 
 selectAll:
 SELECT * FROM ListingEntity ORDER BY updatedAt DESC;
@@ -97,7 +105,7 @@ INSERT OR REPLACE INTO ListingEntity(
     kind, detailsJson,
     title, description, imagesJson,
     priceUnit, price, priceMax, currency, isNegotiable, finalPrice,
-    contactPhone,
+    contactPhone, universityId,
     branchesJson,
     validFrom, validTo, attributesJson, optionGroupsJson,
     status, rejectionReason, viewsCount, createdAt, updatedAt
@@ -106,7 +114,7 @@ INSERT OR REPLACE INTO ListingEntity(
     ?, ?,
     ?, ?, ?,
     ?, ?, ?, ?, ?, ?,
-    ?,
+    ?, ?,
     ?,
     ?, ?, ?, ?,
     ?, ?, ?, ?, ?
@@ -117,6 +125,10 @@ UPDATE ListingEntity SET status = ?, updatedAt = ? WHERE id = ?;
 
 deleteById:
 DELETE FROM ListingEntity WHERE id = ?;
+
+-- Turdagi e'lonlar soni — namuna ma'lumot (seed) faqat jadval bo'sh bo'lganda yoziladi.
+countByKind:
+SELECT count(*) FROM ListingEntity WHERE kind = ?;
 
 clear:
 DELETE FROM ListingEntity;

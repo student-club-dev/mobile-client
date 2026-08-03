@@ -22,7 +22,7 @@ sealed interface GoogleSignInResult {
  * - Android: `androidx.credentials` (Credential Manager) + Google ID; Web (server) client ID kerak.
  * - iOS: GoogleSignIn SDK (hozircha ulanmagan — [GoogleSignInResult.Unavailable]).
  *
- * Token backendга yuboriladi, u yerда tekshirilib sessiya ochiladi.
+ * Token backendga yuboriladi, u yerda tekshirilib sessiya ochiladi.
  */
 expect class GoogleSignIn {
     /** Google tanlash oynasini ochadi va ID token'ni (yoki xatoni) qaytaradi. */

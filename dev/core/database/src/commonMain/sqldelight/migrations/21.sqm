@@ -1,0 +1,7 @@
+-- v21 -> v22 — talaba ro'yxatlaridagi profil rasmi.
+--
+-- Bosh harf o'rniga hamma joyda haqiqiy rasm ko'rsatiladi. Local seed'da rasm yo'q, ya'ni
+-- ustun NULL bo'lib qoladi va avatarda bosh harf chiziladi — bu normal. Ro'yxat backendga
+-- (`GET /v1/students`) ulanganda esa qo'shimcha o'zgarishsiz rasm paydo bo'ladi.
+
+ALTER TABLE StudentEntity ADD COLUMN avatarUrl TEXT;

@@ -11,7 +11,7 @@ import kotlinx.coroutines.flow.Flow
 /**
  * Autentifikatsiya biznes-amallari — ViewModel faqat shu use-case'larni chaqiradi.
  *
- * Validatsiya shu yerda, bitta joyда: ekran ham, kelajakdagi boshqa chaqiruvchi ham bir xil
+ * Validatsiya shu yerda, bitta joyda: ekran ham, kelajakdagi boshqa chaqiruvchi ham bir xil
  * qoidaga bo'ysunadi. Backend qoidalari (`RegisterDto.password.minLength = 8`) bilan mos.
  */
 private const val MIN_PASSWORD_LENGTH = 8
@@ -44,6 +44,19 @@ class RegisterUseCase(private val repository: AuthRepository) {
         }
         return repository.register(identifier, password)
     }
+}
+
+/**
+ * Ro'yxatni yakunlaydi — SMS kod tasdiqlangandan KEYIN sessiyani haqiqatan ochadi.
+ * Shu chaqiruvgacha foydalanuvchi ilovaga kirgan hisoblanmaydi.
+ */
+class CompleteRegistrationUseCase(private val repository: AuthRepository) {
+    suspend operator fun invoke(): Resource<User> = repository.completeRegistration()
+}
+
+/** Tasdiqlanmagan ro'yxatni bekor qiladi (kod ekranidan orqaga qaytilganda). */
+class CancelRegistrationUseCase(private val repository: AuthRepository) {
+    suspend operator fun invoke() = repository.cancelPendingRegistration()
 }
 
 /** Tizimdan chiqish — refresh token bekor qilinadi, local kesh tozalanadi. */

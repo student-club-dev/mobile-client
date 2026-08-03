@@ -42,7 +42,7 @@ class StudentRepositoryImpl(
                         q.clear()
                         res.data.forEach { s ->
                             q.upsert(
-                                s.id, s.firstName, s.lastName, s.initial, s.universityId, s.universityMonogram,
+                                s.id, s.firstName, s.lastName, s.initial, s.avatarUrl, s.universityId, s.universityMonogram,
                                 s.course.toLong(), s.faculty, s.friendStatus, s.interests.joinDb(),
                                 s.friendsCount.toLong(), s.adsCount.toLong(), s.rating,
                             )

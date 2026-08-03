@@ -1,23 +1,40 @@
 package uz.studentclub.app
 
+import android.Manifest
+import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.fragment.app.FragmentActivity
-import dev.shared.StudentApp
+import dev.core.common.push.PushRoute
+import dev.shared.App
+import uz.studentclub.app.push.PushNotifications
 
 /**
- * Yagona Activity — to'g'ridan-to'g'ri talaba login oqimi + StudentShell'ni ochadi.
+ * Yagona Activity — to'g'ridan-to'g'ri login oqimi + StudentShell'ni ochadi.
  * Rol tanlash yo'q (bu faqat talaba ilovasi; biznes tomoni alohida ElonUz ilovasida).
- * Logout'da Activity qayta ishga tushadi va login ekraniga qaytadi.
  *
- * FragmentActivity — biometrik BiometricPrompt shuni talab qiladi (F1).
+ * Chiqish Activity'ni QAYTA ISHGA TUSHIRMAYDI — navigatsiya grafining o'zida kirish
+ * ekraniga qaytiladi (qarang: `AuthNavHost` HOME marshruti).
  */
 class MainActivity : FragmentActivity() {
+
+    /**
+     * Bildirishnoma ruxsati (Android 13+). Launcher **shart-sharoitsiz**, konstruksiya
+     * paytida ro'yxatdan o'tishi kerak — `onCreate` ichida shartli ro'yxatdan o'tkazish
+     * holat tiklanganda `IllegalStateException` beradi. Natija kerak emas: rad etilsa
+     * ilova o'zgarishsiz ishlayveradi.
+     */
+    private val notificationPermission =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         // Tizim splash'i (Android 12+ SplashScreen API) — statik StudentClub logotipi.
         // `super.onCreate()`dan OLDIN chaqirilishi shart. Ushlab turmaymiz: ilk Compose
@@ -41,6 +58,40 @@ class MainActivity : FragmentActivity() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             window.isNavigationBarContrastEnforced = false
         }
-        setContent { StudentApp(onExit = ::recreate) }
+        // Push bosilib ochilgan bo'lsa — qaysi suhbat kerakligini eslab qo'yamiz.
+        routeFromPush(intent)
+        requestNotificationPermission()
+        setContent { App() }
+    }
+
+    /**
+     * Ilova allaqachon ochiq bo'lganda push bosilsa shu chaqiriladi (`launchMode=singleTop`).
+     * `intent` ni ham yangilaymiz, aks holda keyingi `getIntent()` eskisini qaytarardi.
+     */
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        routeFromPush(intent)
+    }
+
+    /**
+     * `data.conversationId` — fonda kelgan bildirishnoma bosilganda tizim uni intent
+     * "extra"si qilib beradi; old planda esa uni [PushNotifications] o'zi qo'yadi.
+     * Suhbatni `StudentShell` ochadi (UI tayyor bo'lgach `PushRoute` ni o'qiydi).
+     */
+    private fun routeFromPush(intent: Intent?) {
+        PushRoute.set(intent?.getStringExtra(PushNotifications.EXTRA_CONVERSATION_ID))
+    }
+
+    /**
+     * Android 13+ da bildirishnoma ko'rsatish uchun ish vaqti ruxsati kerak.
+     * Rad etilsa ilova to'liq ishlayveradi — faqat push ko'rinmaydi, shuning uchun
+     * natijani kuzatmaymiz va tushuntiruvchi dialog ham chizmaymiz.
+     */
+    private fun requestNotificationPermission() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+        val granted = ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) ==
+            PackageManager.PERMISSION_GRANTED
+        if (!granted) notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
     }
 }

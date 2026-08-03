@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    `FileProvider` faqat shu yerda sanab o'tilgan papkalarga ruxsat beradi.
+
+    Faqat bitta papka ochilgan (`cacheDir/sc_capture`): kamera yozadigan joy. Butun keshni
+    ochish kerak emas — u yerda boshqa modullarning fayllari ham bor va ularni tashqi
+    ilovaga ko'rsatishning hech qanday sababi yo'q.
+
+    Nom `VideoCapture.android.kt` dagi `CAPTURE_DIR` bilan bir xil bo'lishi SHART.
+-->
+<paths>
+    <cache-path
+        name="sc_capture"
+        path="sc_capture/" />
+</paths>

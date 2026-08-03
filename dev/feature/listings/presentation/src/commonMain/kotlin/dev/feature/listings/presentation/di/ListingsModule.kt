@@ -3,6 +3,7 @@ package dev.feature.listings.presentation.di
 import dev.core.network.createPublicHttpClient
 import dev.feature.listings.data.remote.ListingRemoteDataSource
 import dev.feature.listings.data.remote.LocalListingRemoteDataSource
+import dev.feature.listings.data.remote.ApiGeoRepository
 import dev.feature.listings.data.remote.NominatimGeoRepository
 import dev.feature.listings.data.repository.ListingRepositoryImpl
 import dev.feature.listings.domain.repository.GeoRepository
@@ -43,7 +44,20 @@ fun listingsModule(useRemoteApi: Boolean) = module {
 
     // Teskari geokodlash — OpenStreetMap Nominatim (tekin). Ilovaning umumiy klienti EMAS:
     // unda Firebase Bearer tokeni bor, uni begona serverga yuborib bo'lmaydi.
-    single<GeoRepository> { NominatimGeoRepository(createPublicHttpClient()) }
+    /**
+     * Geokodlash — **o'z backendimiz** (`/v1/geo/geocode`, `/v1/geo/reverse-geocode`).
+     *
+     * Nominatim zaxira sifatida qoladi: ikkala endpoint ham `503` qaytarishi mumkin
+     * (provayder kaliti sozlanmagan deployment), o'shanda manzil tanlash butunlay
+     * ishlamay qolmasin. Batafsil — `ApiGeoRepository` izohida.
+     */
+    single<GeoRepository> {
+        ApiGeoRepository(
+            geo = get(),
+            connectivity = get(),
+            fallback = NominatimGeoRepository(createPublicHttpClient()),
+        )
+    }
 
     factory { CreateBranchFromPointUseCase(get()) }
     factory { SearchPlacesUseCase(get()) }

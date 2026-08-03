@@ -18,6 +18,10 @@ androidx-splashscreen = "1.2.0"
 coroutines = "1.9.0"
 serialization = "1.7.3"
 datetime = "0.6.1"
+# Fayl bilan ishlash (`kotlinx.io.files`) — video keshdagi fayl sifatida yuboriladi.
+# Versiya Ktor 3.0.3 tranzitiv olib keladigan bilan bir xil: ikkitasi ajralsa,
+# `SystemFileSystem` ikki marta klasspathda bo'lib qolardi.
+kotlinxIo = "0.5.4"
 
 # Networking
 ktor = "3.0.3"
@@ -32,8 +36,22 @@ sqldelight = "2.0.2"
 # Logging / Image
 napier = "2.7.1"
 coil = "3.0.4"
+# Media3/ExoPlayer — `media/VideoPlayer` ning Android tomoni.
+# 1.5.x compileSdk 35 va AGP 8.7 bilan mos keladigan oxirgi barqaror qator;
+# undan yuqorisi compileSdk 36 talab qiladi, shuning uchun ko'tarilmaydi.
+media3 = "1.5.1"
 # Chucker — Debug HTTP inspektori (bildirishnoma + alohida ekran)
 chucker = "4.0.0"
+# WebRTC (Android target) — 1:1 audio/video qo'ng'iroq media qatlami.
+#
+# Google'ning `org.webrtc:google-webrtc` nashri 2019 dan beri yangilanmagan va Maven'dan
+# olib tashlangan; `io.github.webrtc-sdk:android` — o'sha `org.webrtc` API'sining faol
+# saqlanadigan qurilmasi (LiveKit ham shuni ishlatadi). Paket nomi bir xil bo'lgani uchun
+# kod Google nashri bilan ham mos keladi.
+#
+# 125.x qatori ataylab: 137+ compileSdk 36 va yangi NDK talab qiladi, loyihada esa
+# compileSdk 35 / AGP 8.7 (media3 ham shu sababdan 1.5.x da qolgan).
+webrtc = "125.6422.07"
 
 # Firebase / Auth (Google + Phone)
 googleServices = "4.4.2"
@@ -57,6 +75,7 @@ kotlinx-coroutines-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-cor
 kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "serialization" }
 kotlinx-datetime = { group = "org.jetbrains.kotlinx", name = "kotlinx-datetime", version.ref = "datetime" }
+kotlinx-io-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-io-core", version.ref = "kotlinxIo" }
 
 # Ktor
 ktor-client-core = { group = "io.ktor", name = "ktor-client-core", version.ref = "ktor" }
@@ -64,6 +83,8 @@ ktor-client-contentNegotiation = { group = "io.ktor", name = "ktor-client-conten
 ktor-serialization-json = { group = "io.ktor", name = "ktor-serialization-kotlinx-json", version.ref = "ktor" }
 ktor-client-logging = { group = "io.ktor", name = "ktor-client-logging", version.ref = "ktor" }
 ktor-client-auth = { group = "io.ktor", name = "ktor-client-auth", version.ref = "ktor" }
+# Chat real-time — Socket.IO (Engine.IO v4) protokoli shu WebSocket transporti ustida yuradi.
+ktor-client-websockets = { group = "io.ktor", name = "ktor-client-websockets", version.ref = "ktor" }
 ktor-client-okhttp = { group = "io.ktor", name = "ktor-client-okhttp", version.ref = "ktor" }
 ktor-client-darwin = { group = "io.ktor", name = "ktor-client-darwin", version.ref = "ktor" }
 
@@ -101,6 +122,8 @@ androidx-core-splashscreen = { group = "androidx.core", name = "core-splashscree
 # Firebase / Auth (Android target)
 firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.ref = "firebaseBom" }
 firebase-auth = { group = "com.google.firebase", name = "firebase-auth" }
+# Oflayn push (chat.md §10) — qurilma tokeni `POST /v1/devices` ga yoziladi.
+firebase-messaging = { group = "com.google.firebase", name = "firebase-messaging" }
 androidx-credentials = { group = "androidx.credentials", name = "credentials", version.ref = "credentials" }
 androidx-credentials-playServicesAuth = { group = "androidx.credentials", name = "credentials-play-services-auth", version.ref = "credentials" }
 googleid = { group = "com.google.android.libraries.identity.googleid", name = "googleid", version.ref = "googleid" }
@@ -122,6 +145,23 @@ chucker = { group = "com.github.chuckerteam.chucker", name = "library", version.
 chucker-noop = { group = "com.github.chuckerteam.chucker", name = "library-no-op", version.ref = "chucker" }
 coil-compose = { group = "io.coil-kt.coil3", name = "coil-compose", version.ref = "coil" }
 coil-network-ktor = { group = "io.coil-kt.coil3", name = "coil-network-ktor3", version.ref = "coil" }
+
+# Media3 (Android target) — chat videosi/GIF va e'lon videolari uchun.
+# `media3-exoplayer` pleyerning o'zi, `media3-ui` esa tayyor `PlayerView` boshqaruv paneli:
+# o'zimiz boshqaruv chizmaslik uchun ikkalasi ham kerak. `media3-datasource` (Bearer
+# sarlavhali `DefaultHttpDataSource`) exoplayer orqali tranzitiv keladi.
+androidx-media3-exoplayer = { group = "androidx.media3", name = "media3-exoplayer", version.ref = "media3" }
+androidx-media3-ui = { group = "androidx.media3", name = "media3-ui", version.ref = "media3" }
+# `media3-transformer` — yuborishdan OLDIN videoni siqish (Telegramdagidek). Telefon 4K/60
+# da suratga oladi: 10 soniyalik lavha ~67 MB, ya'ni serverning 64 MB chegarasidan oshadi va
+# yuborilmaydi. Transformer uni 1080p H.264/AAC ga o'giradi — ~10 barobar yengil, sifati esa
+# ekranda ko'z ilg'amaydigan darajada. `media3-effect` — o'lchamni o'zgartirish (`Presentation`).
+androidx-media3-transformer = { group = "androidx.media3", name = "media3-transformer", version.ref = "media3" }
+androidx-media3-effect = { group = "androidx.media3", name = "media3-effect", version.ref = "media3" }
+
+# WebRTC (Android target) — `PeerConnectionFactory`, `PeerConnection`, kamera/mikrofon
+# manbalari va `SurfaceViewRenderer`. iOS tomonida `WebRTC.framework` kerak (2-bosqich).
+webrtc-android = { group = "io.github.webrtc-sdk", name = "android", version.ref = "webrtc" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

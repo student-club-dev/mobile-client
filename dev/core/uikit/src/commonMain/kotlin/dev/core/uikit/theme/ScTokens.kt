@@ -30,6 +30,9 @@ import kotlin.math.sin
  * O'lchamlar va gradient yordamchisi mavzuga bog'liq emas — ular oddiy `val`.
  */
 object Sc {
+    /** Joriy mavzu to'q (dark) mi — och/to'q uchun turli qiymat kerak bo'lganda. */
+    val IsDark: Boolean @Composable @ReadOnlyComposable get() = LocalScColors.current.dark
+
     // --- Brend -------------------------------------------------------------
     val Brand: Color @Composable @ReadOnlyComposable get() = LocalScColors.current.brand
     val BrandDark: Color @Composable @ReadOnlyComposable get() = LocalScColors.current.brandDark
@@ -61,6 +64,15 @@ object Sc {
 
     /** Suhbat ekrani foni — nuqtali pattern ostida. */
     val ChatBg: Color @Composable @ReadOnlyComposable get() = LocalScColors.current.chatBg
+
+    /** To'q yuza, ustidagi matn/ikona doim oq (toast, xarita yorlig'i, kamera katagi). */
+    val InkSurface: Color @Composable @ReadOnlyComposable get() = LocalScColors.current.inkSurface
+
+    /**
+     * Topbar gradientining o'rta rangi — panel USTIDAGI belgi uning fonidan "kesib
+     * olingandek" ko'rinishi kerak bo'lganda (masalan avatardagi "onlayn" nuqtasi halqasi).
+     */
+    val HeaderMid: Color @Composable @ReadOnlyComposable get() = LocalScColors.current.headerMid
 
     // --- Holat ranglari ----------------------------------------------------
     val Success: Color @Composable @ReadOnlyComposable get() = LocalScColors.current.success
@@ -102,11 +114,16 @@ object Sc {
     val HeaderPadding = 22.dp
 
     // --- Gradientlar -------------------------------------------------------
-    /** Topbar: `linear-gradient(150deg, #23C3F5 0%, #00ADEE 48%, #0091D8 100%)`. */
+    /**
+     * Topbar: `linear-gradient(150deg, #23C3F5 0%, #00ADEE 48%, #0091D8 100%)`.
+     *
+     * Ranglar brenddan ALOHIDA tokenlardan olinadi ([ScColors.headerTop] va h.k.) —
+     * qorong'i rejimda topbar to'q ko'k bo'ladi, ekranning qolgani bilan bir oilada.
+     */
     val headerBrush: Brush
         @Composable @ReadOnlyComposable
         get() = with(LocalScColors.current) {
-            angledGradient(150f, 0f to brandLight, 0.48f to brand, 1f to brandDark)
+            angledGradient(150f, 0f to headerTop, 0.48f to headerMid, 1f to headerBottom)
         }
 
     /** Tugma/FAB: `linear-gradient(135deg, #00ADEE, #0091D8)`. */

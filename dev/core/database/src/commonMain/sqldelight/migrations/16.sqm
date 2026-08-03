@@ -1,0 +1,48 @@
+-- v16 -> v17 — chat backendga ulandi (`/v1/conversations` + `/chat` WebSocket).
+--
+-- Eski jadvallar demo/seed suhbatlar uchun edi: suhbatda faqat `peerName`/`peerInitial`,
+-- xabarda esa `outgoing` bayrog'i va `time` matni bor edi. Yangi modelda suhbat ikkinchi
+-- tomonning to'liq qisqa profilini (`StudentSummary`) saqlaydi, xabar esa server bergan
+-- `seq` (tartib va kursor o'qi), `senderId` va yuborilish holatini.
+--
+-- Eski qatorlar KO'CHIRILMAYDI: ular local seed ma'lumot, backenddagi suhbatlarga
+-- mos kelmaydi (id'lari boshqa). Ilova birinchi ochilishda `GET /v1/conversations` dan
+-- haqiqiy ro'yxatni yuklaydi.
+
+DROP TABLE IF EXISTS ConversationEntity;
+DROP TABLE IF EXISTS MessageEntity;
+
+CREATE TABLE ConversationEntity (
+    id TEXT NOT NULL PRIMARY KEY,
+    type TEXT NOT NULL DEFAULT 'DIRECT',
+    lastMessageAt INTEGER,
+
+    otherId TEXT NOT NULL,
+    otherUsername TEXT,
+    otherFullName TEXT,
+    otherAvatarUrl TEXT,
+    otherOnline INTEGER NOT NULL DEFAULT 0,
+    otherLastSeenAt INTEGER,
+
+    lastMessageBody TEXT,
+    lastMessageSenderId TEXT,
+
+    unreadCount INTEGER NOT NULL DEFAULT 0,
+    lastReadSeq INTEGER NOT NULL DEFAULT 0,
+    otherReadSeq INTEGER NOT NULL DEFAULT 0,
+    archived INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE MessageEntity (
+    id TEXT NOT NULL PRIMARY KEY,
+    conversationId TEXT NOT NULL,
+    senderId TEXT NOT NULL,
+    seq INTEGER NOT NULL DEFAULT 0,
+    type TEXT NOT NULL DEFAULT 'TEXT',
+    body TEXT NOT NULL,
+    createdAt INTEGER NOT NULL,
+    clientMsgId TEXT,
+    status TEXT NOT NULL DEFAULT 'SENT'
+);
+
+CREATE INDEX message_conversation_idx ON MessageEntity(conversationId, seq);

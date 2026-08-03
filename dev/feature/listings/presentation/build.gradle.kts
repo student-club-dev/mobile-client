@@ -12,6 +12,8 @@ kotlin {
             implementation(projects.dev.feature.listings.data)
 
             implementation(projects.dev.core.domain)
+            // E'lon egasining universiteti (`Listing.universityId` odatiy qiymati) profildan.
+            implementation(projects.dev.feature.profile.domain)
             implementation(projects.dev.core.network)
             // Koin moduli `ListingRepositoryImpl(database, ...)` ni quradi.
             implementation(projects.dev.core.database)

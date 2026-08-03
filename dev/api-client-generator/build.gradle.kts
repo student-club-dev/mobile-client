@@ -23,6 +23,31 @@ val specFile = layout.projectDirectory.file("student-club.json")
 // Tayyorlangan spec build papkasiga tushadi (iym'dagi `v2-processed.json` ekvivalenti).
 val processedSpec = layout.buildDirectory.file("student-club-processed.json")
 
+/**
+ * Enum'lar ro'yxati — **server tomonda kengayishi kutilayotgan** va javobning issiq yo'lida
+ * turganlari. Ular Kotlin enum'i EMAS, oddiy `String` bo'lib generatsiya qilinadi (qadam 11).
+ *
+ * Sabab tarixiy va aniq: `MessageType` ga `CALL` qiymati qo'shilganda kotlinx.serialization
+ * eski klientlarda `SerializationException` tashladi va bu bitta pufakchani emas — suhbat
+ * tarixini, suhbatlar ro'yxatini va `message:new` handler'ini birdaniga yiqitdi.
+ *
+ * Bu yerga faqat **javobda** keladigan va kodda enum sifatida ishlatilmaydigan turlar
+ * kiritiladi (qiymat domenda `parseEnum` bilan o'qiladi). So'rov parametri sifatida
+ * ishlatiladigan enum'lar (`DeleteScopeDto`, `StudentSortDto`, …) tegilmaydi: ularni biz
+ * yozamiz, server emas, ya'ni noma'lum qiymat kelib qolishi mumkin emas.
+ */
+val lenientEnums = setOf(
+    "MessageTypeDto",
+    "MediaKindDto",
+    "MediaStatusDto",
+    "ConversationTypeDto",
+    "CallStatusDto",
+    "CallEndReasonDto",
+    "CallMediaDto",
+    "CallDirectionDto",
+    "CallPartyDto",
+)
+
 // Generatsiya qilingan kod SHU modulning `build/` papkasiga chiqadi, `:dev:api-client` esa uni
 // srcDir sifatida ulaydi (`builtBy` orqali).
 //
@@ -56,13 +81,30 @@ val apiServerUrl = "https://api.studentclub.uz/v1"
  *    uni kompilyatsiya qilolmaydi. Haqiqiy tip `format` → `example` → maydon nomi bo'yicha tiklanadi.
  * 5. **Butun sonlar `integer` ga o'tkaziladi** — NestJS hamma sonni `number` deb yozadi, natijada
  *    `sortOrder`/`viewsCount` kabi maydonlar `Double` bo'lib qolardi (kasrlilarda `format` bor).
- * 6. **operationId'lar qisqartiriladi** — `BusinessController_getMy` → `getMy`. Tag ichida nom
- *    takrorlansa, to'liq (prefiksli) nom saqlanadi.
+ * 6. **operationId'lar qisqartiriladi** — `BusinessController_getMy` → `getMy`. Qisqa nom
+ *    spec bo'ylab takrorlansa (masalan `SearchController_search` va
+ *    `StudentSearchController_search` — ikkalasi ham `search`), kontroller nomi bilan
+ *    ajratiladi: `studentSearch`. Kontroller nomining o'zi qisqa nom bilan tugasa u
+ *    yakka holda ishlatiladi (`studentSearchSearch` emas, `studentSearch`), shuning uchun
+ *    `SearchController_search` **`search`** bo'lib qoladi — spec kengayganda mavjud
+ *    metodlar nomi o'zgarmaydi.
  * 7. **Tag nomlari ASCII'ga keltiriladi va guruhlanadi** — `Auth — Business OTP` va qo'shnilari
  *    bitta `AuthBusinessApi` klassiga yig'iladi (aks holda 8 ta mayda API klassi chiqadi).
  * 8. **`$ref` yonidagi `nullable` saqlanadi** — OpenAPI 3.0 da `$ref` bilan yonma-yon turgan
  *    kalitlar e'tiborsiz qoladi, shuning uchun `{"nullable": true, "$ref": X}` `allOf` ichiga
  *    o'raladi (aks holda `UserProfileDto.gender` null bo'lolmay, javob parse bo'lmasdi).
+ * 9. **`multipart/form-data` maydonlaridagi `enum` olib tashlanadi** — generator enum uchun
+ *    `formData { append(key, value) }` ning `Any` variantini tanlaydi, u esa Ktor 3 da
+ *    `@InternalAPI` va kompilyatsiyani yiqitadi (`POST /media/chat-upload` dagi `kind`).
+ * 10. **`nullable` maydonlar `required` dan chiqariladi** — aks holda generator ularga
+ *    `@Required` qo'yadi va backend bitta kalitni tushirib qoldirsa butun javob pars
+ *    bo'lmaydi (masalan `MessageDto.deletedAt` yo'q bo'lsa — butun suhbat tarixi).
+ * 11. **Kengayadigan enum'lar oddiy `string` ga o'giriladi** ([lenientEnums]) — kotlinx
+ *    noma'lum enum qiymatida `SerializationException` tashlaydi va u BITTA maydonni emas,
+ *    **butun javobni** yiqitadi. `MessageType` ga `CALL` qo'shilishi aynan shu tarzda
+ *    tarqatilgan klientlarning chat ekranini o'ldirdi (`handoff/09-CALLS-PREREQUISITES.md` §1).
+ *    Domen tomonda qiymat baribir `parseEnum(raw, default)` bilan o'qiladi, ya'ni noma'lum
+ *    qiymat faqat o'sha bitta xabarni "noma'lum tur" qiladi.
  */
 val cleanSwagger = tasks.register("cleanSwagger") {
     group = "openapi"
@@ -71,7 +113,9 @@ val cleanSwagger = tasks.register("cleanSwagger") {
     val input = specFile.asFile
     val output = processedSpec.get().asFile
     val serverUrl = apiServerUrl
+    val lenient = lenientEnums
     inputs.file(input)
+    inputs.property("lenientEnums", lenient.sorted().joinToString(","))
     outputs.file(output)
 
     doLast {
@@ -90,6 +134,10 @@ val cleanSwagger = tasks.register("cleanSwagger") {
                 c.startsWith("AuthStudent") -> "AuthStudent"
                 c.startsWith("AuthBusiness") -> "AuthBusiness"
                 c == "Profiles" -> "Profile"
+                // "Catalog (student feed)" / "Discounts (student feed)" — qavs ichidagi izoh
+                // klass nomiga qo'shilmasin: `CatalogApi`, `DiscountsApi`.
+                c.startsWith("Catalog") -> "Catalog"
+                c.startsWith("Discounts") -> "Discounts"
                 else -> c
             }
         }
@@ -99,6 +147,17 @@ val cleanSwagger = tasks.register("cleanSwagger") {
         // tipsiz `object` deb yozadi).
         val booleanProps = setOf("multiple", "requiresCustomName")
 
+        // Kasrli maydonlar: koordinatalar/reyting misolsiz kelsa ham `Double` bo'lishi shart —
+        // `Int` bo'lsa `41.352` deserializatsiyada yiqiladi.
+        val doubleProps = setOf("lat", "lng", "minLat", "maxLat", "minLng", "maxLng", "rating")
+
+        // Butun sonli, ammo misolsiz (va shu sabab "string" deb topiladigan) maydonlar.
+        val integerProps = setOf("totalLimit")
+
+        /** Misol kasrmi (`41.352`, `4.6`) — shunda maydon `Double` bo'lishi kerak. */
+        fun isFractional(example: Any?): Boolean =
+            example is Number && example.toDouble() % 1.0 != 0.0
+
         fun retype(node: MutableMap<String, Any?>, propName: String?) {
             val format = node["format"] as? String
             val example = node["example"]
@@ -106,6 +165,14 @@ val cleanSwagger = tasks.register("cleanSwagger") {
                 format == "int32" || format == "int64" -> node["type"] = "integer"
                 format == "double" || format == "float" -> node["type"] = "number"
                 propName != null && propName in booleanProps -> node["type"] = "boolean"
+                propName != null && propName in integerProps -> {
+                    node["type"] = "integer"
+                    node["format"] = "int32"
+                }
+                propName in doubleProps || isFractional(example) -> {
+                    node["type"] = "number"
+                    node["format"] = "double"
+                }
                 example is Number -> {
                     node["type"] = "integer"
                     node["format"] = "int32"
@@ -138,13 +205,18 @@ val cleanSwagger = tasks.register("cleanSwagger") {
                         retype(map, propName)
                     }
 
-                    // (5) `number` → `integer`. Kasrli maydonlarda doim `format: double` bor,
-                    // shuning uchun formatsiz `number` — har doim butun son.
+                    // (5) `number` → `integer`. NestJS hamma sonni formatsiz `number` deb yozadi,
+                    // shuning uchun butun/kasr farqi faqat maydon nomi va `example` dan bilinadi:
+                    // `lat: 41.352` — Double, `viewsCount: 412` — Int.
                     if (map["type"] == "number") {
                         val format = map["format"] as? String
                         if (format == null) {
-                            map["type"] = "integer"
-                            map["format"] = "int32"
+                            if (propName in doubleProps || isFractional(map["example"])) {
+                                map["format"] = "double" // tip `number` bo'lib qoladi → Double
+                            } else {
+                                map["type"] = "integer"
+                                map["format"] = "int32"
+                            }
                         } else if (format == "int32" || format == "int64") {
                             map["type"] = "integer"
                         }
@@ -187,6 +259,39 @@ val cleanSwagger = tasks.register("cleanSwagger") {
         }
         val ambiguous = shortNames.groupingBy { it }.eachCount().filterValues { it > 1 }.keys
 
+        /**
+         * Takrorlangan qisqa nomni kontroller nomi bilan ajratadi.
+         *
+         * Kontroller nomi qisqa nom bilan TUGASA u yakka holda yetarli
+         * (`StudentSearchController_search` → `studentSearch`, `studentSearchSearch` emas).
+         * Shu qoida tufayli `SearchController_search` uchun nomzod — oddiy `search`, ya'ni
+         * spec'ga yangi `…Search` kontrolleri qo'shilganda MAVJUD metod nomi o'zgarmaydi.
+         */
+        fun disambiguate(rawId: String, short: String): String {
+            val prefix = rawId.substringBefore('_').removeSuffix("Controller")
+            val merged = if (prefix.lowercase().endsWith(short.lowercase())) {
+                prefix
+            } else {
+                prefix + short.replaceFirstChar(Char::uppercaseChar)
+            }
+            return merged.replaceFirstChar(Char::lowercaseChar)
+        }
+
+        // Nomzodlar hali ham to'qnashsa (masalan ikkita bir xil kontroller nomi) — to'liq
+        // prefiksli shaklga qaytamiz, aks holda generator ikkita bir xil metod chiqarardi.
+        val candidates = mutableListOf<String>()
+        paths.values.forEach { pathItem ->
+            @Suppress("UNCHECKED_CAST")
+            (pathItem as MutableMap<String, Any?>).forEach { (method, op) ->
+                if (method !in methods) return@forEach
+                @Suppress("UNCHECKED_CAST")
+                val rawId = (op as MutableMap<String, Any?>)["operationId"]?.toString().orEmpty()
+                val short = rawId.substringAfter('_', rawId)
+                candidates.add(if (short in ambiguous) disambiguate(rawId, short) else short)
+            }
+        }
+        val stillAmbiguous = candidates.groupingBy { it }.eachCount().filterValues { it > 1 }.keys
+
         val rewrittenPaths = linkedMapOf<String, Any?>()
         paths.forEach { (path, pathItem) ->
             @Suppress("UNCHECKED_CAST")
@@ -205,8 +310,14 @@ val cleanSwagger = tasks.register("cleanSwagger") {
                 val rawId = operation["operationId"]?.toString().orEmpty()
                 val short = rawId.substringAfter('_', rawId)
                 operation["operationId"] = if (short in ambiguous) {
-                    val prefix = rawId.substringBefore('_').removeSuffix("Controller")
-                    prefix.replaceFirstChar(Char::lowercaseChar) + short.replaceFirstChar(Char::uppercaseChar)
+                    val candidate = disambiguate(rawId, short)
+                    if (candidate in stillAmbiguous) {
+                        val prefix = rawId.substringBefore('_').removeSuffix("Controller")
+                        prefix.replaceFirstChar(Char::lowercaseChar) +
+                            short.replaceFirstChar(Char::uppercaseChar)
+                    } else {
+                        candidate
+                    }
                 } else {
                     short
                 }
@@ -237,6 +348,23 @@ val cleanSwagger = tasks.register("cleanSwagger") {
                         )
                     if (hasBody) json["schema"] = payload else resp.remove("content")
                 }
+
+                // (9) `multipart/form-data` maydonlaridan `enum` olib tashlanadi.
+                // Enum bo'lsa generator nested enum klass chiqaradi va `formData { }` ichida
+                // `append(key, value)` ning `Any` variantini tanlaydi — u Ktor 3 da
+                // `@InternalAPI`, ya'ni kompilyatsiya XATOSI (`POST /media/chat-upload`
+                // dagi `kind` aynan shunday). Oddiy `string` da `String` overload'i tanlanadi.
+                // Qiymatlar yo'qolmaydi: chaqiruvchi enum'ning `value` ini uzatadi.
+                @Suppress("UNCHECKED_CAST")
+                val formSchema = ((operation["requestBody"] as? Map<String, Any?>)
+                    ?.get("content") as? Map<String, Any?>)
+                    ?.get("multipart/form-data") as? Map<String, Any?>
+                @Suppress("UNCHECKED_CAST")
+                val formProps = (formSchema?.get("schema") as? Map<String, Any?>)
+                    ?.get("properties") as? Map<String, Any?>
+                formProps?.values?.forEach { prop ->
+                    (prop as? MutableMap<String, Any?>)?.remove("enum")
+                }
             }
             // (3) `/v1` prefiksi bazaviy manzilga ko'chadi
             rewrittenPaths[path.removePrefix("/v1")] = item
@@ -246,6 +374,58 @@ val cleanSwagger = tasks.register("cleanSwagger") {
         // (4)(5) barcha sxemalarni tiplash — komponentlar va inline sxemalar birgalikda
         fixTypes(root["components"], null)
         fixTypes(root["paths"], null)
+
+        // (10) `nullable` maydonlar `required` ro'yxatidan chiqariladi.
+        //
+        // Spec'da ular "kalit DOIM bor, qiymati null bo'lishi mumkin" degani, va generator
+        // shuni `@Required` bilan ifodalaydi — kotlinx.serialization esa kalit yo'q bo'lsa
+        // `MissingFieldException` tashlaydi. Natijada backend bitta yangi maydonni javobdan
+        // tushirib qoldirsa (yoki eski versiya deploy bo'lsa) BUTUN suhbat tarixi pars
+        // bo'lmay, ekran bo'sh qolardi. Klient uchun to'g'ri xatti-harakat — yo'q kalitni
+        // `null` deb olish; qiymat baribir nullable, ya'ni chaqiruvchi kodda hech narsa
+        // o'zgarmaydi.
+        fun relaxRequired(node: Any?) {
+            when (node) {
+                is MutableMap<*, *> -> {
+                    @Suppress("UNCHECKED_CAST")
+                    val map = node as MutableMap<String, Any?>
+                    @Suppress("UNCHECKED_CAST")
+                    val props = map["properties"] as? Map<String, Any?>
+                    @Suppress("UNCHECKED_CAST")
+                    val required = map["required"] as? MutableList<Any?>
+                    if (props != null && required != null) {
+                        required.removeAll { name ->
+                            (props[name?.toString()] as? Map<*, *>)?.get("nullable") == true
+                        }
+                        if (required.isEmpty()) map.remove("required")
+                    }
+                    map.values.forEach { relaxRequired(it) }
+                }
+                is List<*> -> node.forEach { relaxRequired(it) }
+            }
+        }
+        relaxRequired(root["components"])
+        relaxRequired(root["paths"])
+
+        // (11) Kengayadigan enum'lar → oddiy `string`.
+        //
+        // Sxemaning O'ZI o'zgartiriladi, unga `$ref` qilgan maydonlar emas: shunda barcha
+        // ishlatilish joyi (javob, kesh, `replyTo.type`) bir vaqtda bardoshli bo'ladi.
+        // Qiymatlar ro'yxati `description` ga ko'chiriladi — spec hujjat sifatida o'qiladi.
+        @Suppress("UNCHECKED_CAST")
+        val schemas = (root["components"] as? MutableMap<String, Any?>)
+            ?.get("schemas") as? MutableMap<String, Any?>
+        lenient.forEach { name ->
+            @Suppress("UNCHECKED_CAST")
+            val schema = schemas?.get(name) as? MutableMap<String, Any?> ?: return@forEach
+            val values = (schema.remove("enum") as? List<*>)?.joinToString(" · ") ?: return@forEach
+            schema["type"] = "string"
+            val doc = (schema["description"] as? String)?.plus("\n\n") ?: ""
+            schema["description"] = doc +
+                "Qiymatlar: $values. Ataylab `enum` EMAS — server ro'yxatni kengaytirsa " +
+                "noma'lum qiymat butun javobni pars qilinmaydigan qilib qo'ymasligi kerak."
+            logger.lifecycle("cleanSwagger: $name → string (kengayadigan enum)")
+        }
 
         // Xom spec'da `servers` bo'sh — generator BASE_URL konstantasi uchun manzil kutadi.
         root["servers"] = listOf(mapOf("url" to serverUrl, "description" to "Dev"))

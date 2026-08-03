@@ -1,0 +1,12 @@
+-- v19 -> v20 — chat ichidagi suhbatdosh profili (Telegram uslubidagi ekran).
+--
+-- Bu maydonlar serverdan ALLAQACHON kelardi (`GET /v1/conversations` javobidagi
+-- `StudentSummaryDto`), lekin keshda saqlanmay tashlab yuborilardi. Endi profil ekrani
+-- oflayn ham to'liq ochiladi va ro'yxat yangilanishini kutmaydi.
+--
+-- `otherUniversityId` — ERKIN satr (`emis-142`): serverda universitetlar katalogi yo'q,
+-- nom local `UniversityEntity` dan shu id bo'yicha topiladi.
+
+ALTER TABLE ConversationEntity ADD COLUMN otherUniversityId TEXT;
+ALTER TABLE ConversationEntity ADD COLUMN otherGender TEXT;
+ALTER TABLE ConversationEntity ADD COLUMN otherCourseYear TEXT;

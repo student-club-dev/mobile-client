@@ -1,0 +1,263 @@
+# Push bildirishnomalar — mobil tomon sozlamasi
+
+**Holat: backend tayyor va production'da ishlayapti.** Qolgani — mobil tomon.
+
+`02-API-CHANGES.md` §1 dagi «push provayderi faqat log yozadigan stub» degan qator **eskirgan**.
+Real FCM provayderi yozildi, testlandi va 2026-07-31 da production'ga chiqarildi.
+
+---
+
+## 1. Firebase loyihasi — majburiy qiymat
+
+| | |
+|---|---|
+| **Project ID** | **`studentclub-191b0`** |
+| Konsol | <https://console.firebase.google.com> |
+| Tarif | Spark (bepul) — FCM uchun cheklov yo'q |
+
+⛔ **Bu aynan shu loyiha bo'lishi shart.** `google-services.json` yoki `GoogleService-Info.plist`
+ichidagi `project_id` boshqa qiymat bo'lsa, ilova olgan token boshqa loyihaga tegishli bo'ladi va
+backend uni yuborganda FCM `SENDER_ID_MISMATCH` qaytaradi. Backend bunday tokenni **o'lik deb
+hisoblab bazadan o'chirib yuboradi** — ya'ni xato jimgina yo'qoladi va foydalanuvchi hech qachon
+push olmaydi, hech qayerda xato ko'rinmaydi. Bu eng qimmat turdagi nosozlik.
+
+Tekshirish: yuklab olgan fayldagi `project_id` ni ko'zingiz bilan solishtiring.
+
+## 2. Nima qilish kerak — qat'iy ro'yxat
+
+Firebase **faqat Android (va web) uchun** kerak. iOS Apple'ning APNs xizmatiga to'g'ridan-to'g'ri
+boradi — §2.2 ga qarang.
+
+### 2.1 Android
+
+1. Firebase Console → **⚙️ Project settings → General → Add app → Android**
+2. **Package name** — Android `applicationId` bilan **belgi-ma-belgi** bir xil bo'lishi shart
+   (`build.gradle.kts` dagi qiymat). Xato yozilsa token umuman berilmaydi
+3. `google-services.json` ni yuklab olib `app/` papkasiga qo'ying
+4. `com.google.gms.google-services` plagini va Firebase Messaging bog'liqligini ulang
+5. Android 13+ da **`POST_NOTIFICATIONS` ruxsati ish vaqtida so'raladi** — busiz bildirishnoma
+   ko'rsatilmaydi, garchi token olinsa ham
+
+### 2.2 iOS — **Firebase orqali emas** (2026-08-02 da o'zgardi)
+
+⚠️ Bu bo'lim to'liq qayta yozildi. Ilgari bu yerda Firebase'ga iOS ilovasini qo'shish va `.p8` ni
+Firebase konsoliga yuklash yozilgan edi — **endi bunday qilinmaydi**. Backend iPhone'larga
+Apple'ning APNs xizmatiga **to'g'ridan-to'g'ri** yuboradi. Sabab va batafsil spetsifikatsiya:
+`docs/api/mobile_questions/PUSH_APNS_BACKEND.md` va uning javobi `PUSH_APNS_RESPONSE.md`.
+
+Ilova tomonida:
+
+1. Xcode loyihasida **Firebase kerak emas** — `FirebaseAuth` / `FirebaseFirestore` bog'liqliklari
+   (eski auth'dan qolgan) olib tashlanishi mumkin
+2. Xcode → *Signing & Capabilities* → **Push Notifications** va **Background Modes → Remote
+   notifications** yoqilgan bo'lsin
+3. `didRegisterForRemoteNotificationsWithDeviceToken` bergan **xom APNs tokenini** hex qatorga
+   aylantirib `POST /v1/devices` ga `platform: "IOS"` bilan yuboring — ilova buni allaqachon
+   shunday qiladi (`iOSApp.swift`)
+
+⛔ Token **64 ta kichik hex belgi** bo'lishi shart. Boshqa formatda backend **422
+`INVALID_DEVICE_TOKEN`** qaytaradi — bu iOS build'i xato token (masalan FCM tokeni) yuborayotganini
+darhol ko'rsatadi.
+
+Kalit (`.p8`) **serverda** turadi, Firebase'da emas. Uni backendga uzatish — DevOps ishi
+(`APNS_KEY_P8`, `APNS_KEY_ID`, `APNS_TEAM_ID`, `APNS_TOPIC`, `APNS_ENV`).
+
+⚠️ **Muhit muhim:** Xcode'dan o'rnatilgan debug build **sandbox** tokenini oladi, TestFlight/App
+Store build'i esa **production** tokenini. Ikkalasi aralashmaydi. Backend birinchi yuborishda
+ikkala xostni sinab ko'radi va qaysi biri ishlaganini eslab qoladi, shuning uchun ikkala build ham
+ishlaydi — lekin test qilayotganda qaysi build'ni ishlatayotganingizni bilib turing.
+
+`.p8` faylini **bir marta** yuklab olish mumkin. Yo'qotsangiz yangisini yasaysiz.
+
+### 2.3 Tokenni backendga ro'yxatdan o'tkazish
+
+FCM token olingach uni backendga yuborasiz. Batafsil — quyida §3.
+
+---
+
+## 3. Endpointlar
+
+### `POST /v1/devices` — tokenni ro'yxatdan o'tkazish
+
+Faqat **talaba** hisobi (`StudentGuard`). `Authorization: Bearer <access_token>` majburiy.
+
+```jsonc
+// So'rov
+{
+  "token": "fcm-token-string",
+  "platform": "ANDROID"        // "IOS" | "ANDROID" | "WEB"
+}
+```
+
+```jsonc
+// Javob — 200
+{ "success": true, "status": 200, "code": null, "message": "OK", "result": null, "error": null }
+```
+
+| Kod | Sabab |
+|---|---|
+| `401 UNAUTHORIZED` / `TOKEN_EXPIRED` | Token yo'q yoki eskirgan |
+| `403 FORBIDDEN` | Talaba hisobi emas |
+| `422 VALIDATION_ERROR` | `token` bo'sh, yoki `platform` uchlikdan tashqarida |
+
+**Qachon chaqirish kerak — uchala holat ham majburiy:**
+
+1. **Har kirishdan (login) keyin** — token foydalanuvchiga bog'lanadi
+2. **`onNewToken` chaqirilganda** — FCM tokenni istalgan vaqtda qayta berishi mumkin (ilova
+   qayta o'rnatildi, ma'lumot tozalandi, qurilma tiklandi). Bu hodisani tinglamasangiz token
+   eskiradi va push to'xtaydi
+3. **Ilova har ishga tushganda** — arzon idempotent chaqiruv, tokenning tirikligini kafolatlaydi
+
+### `DELETE /v1/devices/{token}` — tokenni o'chirish
+
+**Chiqishda (logout) chaqirilishi shart.** Aks holda qurilma egasi almashsa yoki foydalanuvchi
+chiqib ketsa ham unga push kelaveradi — bu maxfiylik nuqsoni, chunki xabar matni bildirishnomada
+ko'rinadi.
+
+```
+DELETE /v1/devices/fcm-token-string
+→ 200, result: null
+```
+
+### O'lik tokenlar — backend o'zi tozalaydi
+
+FCM `UNREGISTERED`, `INVALID_ARGUMENT` yoki `SENDER_ID_MISMATCH` qaytarsa, backend tokenni
+**avtomatik o'chiradi**. Vaqtinchalik nosozlikda (tarmoq, 500) token saqlanadi — aks holda bitta
+uzilish tirik foydalanuvchilarni yo'qotardi.
+
+Ya'ni siz eski tokenlarni qo'lda tozalashingiz shart emas.
+
+---
+
+## 4. Push payload — nima keladi
+
+```jsonc
+{
+  "notification": {
+    "title": "Aziz Karimov",     // yuboruvchining ko'rinadigan ismi (2026-08-03 dan)
+    "body":  "<xabar turiga qarab matn>"
+  },
+  "data": {
+    "conversationId": "clx…",
+    "messageType": "TEXT",       // TEXT | IMAGE | GIF | VIDEO | VOICE | FILE | STICKER | SYSTEM
+    "albumId": "clx…",           // faqat albom bo'lsa
+    "senderId": "clx…",
+    "senderName": "Aziz Karimov",
+    "senderAvatarUrl": "https://…"   // ixtiyoriy — bo'lmasa maydon umuman yuborilmaydi
+  },
+  "android": { "priority": "high", "notification": { "sound": "default" } }
+}
+```
+
+**Sarlavha — yuboruvchining ismi** (Telegram/WhatsApp naqshi). Ilgari doim `Yangi xabar` edi;
+2026-08-03 dan backend `GET /v1/students/{id}` va suhbat ro'yxati ko'rsatadigan **o'sha** ismni
+qo'yadi (to'liq ism → bo'lmasa `username`), ya'ni bildirishnomadagi va chatdagi odam bir xil
+ataladi. Javobsiz qo'ng'iroq (`CALL`) push'i ham shu yo'ldan o'tadi — u ham ismli keladi.
+
+| Holat | `title` | `data.senderName` |
+|---|---|---|
+| Ism ham, username ham yo'q / bo'sh / hisob o'chirilgan | `Yangi xabar` | yuborilmaydi |
+| `SYSTEM` xabar | `StudentClub` | yuborilmaydi |
+| Albom (10 rasm → 1 push) | yuboruvchining ismi | yuboriladi |
+
+- `senderId` — **doim** keladi (xabarning o'zidan olinadi, profil satriga bog'liq emas)
+- `senderName` / `senderAvatarUrl` — qiymat yo'q bo'lsa maydon **umuman qo'shilmaydi**
+  (`null` ham, `"null"` ham, bo'sh satr ham emas)
+- Ism **64 belgiga kesiladi** — 4 KB dan oshgan payload'ni FCM `INVALID_ARGUMENT` bilan rad etadi
+  va bu backend uchun «token o'ldi» degani bo'lardi
+- `senderAvatarUrl` — **absolut** URL, prefiks qo'shish shart emas; profildagi joriy avatar
+
+`senderId` / `senderAvatarUrl` ilovada hozircha ishlatilmaydi — ular bildirishnomada avatar va
+Telegramdek `MessagingStyle` uchun keyingi qadam.
+
+`data` qiymatlari **doim `string`** — FCM boshqa turni qabul qilmaydi. `conversationId` ni deep
+link uchun ishlating: bosilganda to'g'ridan-to'g'ri o'sha suhbat ochilsin.
+
+### iOS — o'sha ma'no, APNs formatida
+
+iPhone FCM'dan emas, Apple'dan oladi, shuning uchun tuzilishi boshqacha. `data` bo'limi yo'q —
+maxsus maydonlar **ildizda**, `aps` yonida turadi:
+
+```jsonc
+{
+  "aps": {
+    "alert": { "title": "Aziz Karimov", "body": "<xabar turiga qarab matn>" },
+    "sound": "default",
+    "badge": 3,                      // o'qilmagan xabarlarning umumiy soni
+    "thread-id": "clx…",             // = conversationId, bildirishnomalarni guruhlaydi
+    "mutable-content": 1
+  },
+  "conversationId": "clx…",
+  "messageType": "TEXT",
+  "albumId": "clx…",                 // faqat albom bo'lsa
+  "senderId": "clx…",
+  "senderName": "Aziz Karimov",
+  "senderAvatarUrl": "https://…"     // ixtiyoriy
+}
+```
+
+| FCM | APNs |
+|---|---|
+| `notification.title` | `aps.alert.title` |
+| `notification.body` | `aps.alert.body` (§4 dagi **o'sha** matnlar jadvali) |
+| `data.conversationId` | ildizdagi `conversationId` (`userInfo["conversationId"]`) |
+| `data.messageType` | ildizdagi `messageType` |
+| `data.albumId` | ildizdagi `albumId` |
+| `data.senderId` / `senderName` / `senderAvatarUrl` | ildizda o'sha nomlar bilan |
+
+`aps.badge` — ilova belgisidagi raqam. iOS uni o'zi hisoblamaydi, faqat server aytadi; qiymat
+`GET /v1/conversations/unread-count` bergan son bilan bir xil.
+
+### `body` matnlari — xabar turiga qarab
+
+| Tur | Push matni |
+|---|---|
+| `TEXT` | xabar matni (120 belgigacha) |
+| `IMAGE` | `📷 Rasm` + izoh bo'lsa qo'shiladi |
+| `GIF` | `🎞 GIF` |
+| `VIDEO` | `🎥 Video` + izoh |
+| `VOICE` | `🎤 Ovozli xabar` |
+| `FILE` | `📎 <fayl nomi>` |
+| `STICKER` | `<emoji> Stiker` |
+
+## 5. Push **qachon** yuboriladi — bu muhim
+
+Backend push'ni **faqat quyidagi shartlar bajarilganda** yuboradi:
+
+1. **Qabul qiluvchining ochiq WebSocket ulanishi yo'q.** Ilova ochiq bo'lsa xabar `message:new`
+   hodisasi orqali keladi va push **yuborilmaydi** — ikki marta bildirishnoma chiqmasligi uchun
+2. **Albom bo'lsa — faqat bittasi.** 10 ta rasm yuborilsa 10 ta emas, **1 ta** push ketadi
+
+⚠️ Shundan kelib chiqadigan talab: **`message:new` hodisasini push'siz ham to'liq qayta ishlashingiz
+kerak.** Ilova ochiq bo'lganda bildirishnomani (agar boshqa ekranda bo'lsa) **o'zingiz**
+ko'rsatasiz — backend buni qilmaydi.
+
+---
+
+## 6. Tekshirish tartibi
+
+1. Ilovaga kiring → `POST /v1/devices` **200** qaytarganini tasdiqlang
+2. Ilovani **butunlay yoping** (fon emas — WebSocket uzilishi kerak)
+3. Boshqa hisobdan xabar yuboring
+4. Bildirishnoma kelishi kerak
+
+Kelmasa, tartib bo'yicha tekshiring:
+
+| Belgi | Sabab |
+|---|---|
+| `POST /v1/devices` 401 | Access token eskirgan — avval `refresh` |
+| Android ishlaydi, iOS yo'q | Serverda `APNS_*` sozlanmagan, yoki `APNS_TOPIC` bundle id'ga mos emas (§2.2) |
+| Ikkalasi ham yo'q | `project_id` mos emas, yoki token ro'yxatdan o'tmagan |
+| iOS: `POST /v1/devices` 422 `INVALID_DEVICE_TOKEN` | Ilova APNs tokenini emas, boshqa narsa yuboryapti (§2.2) |
+| iOS simulyatorda hech nima | Simulyatorda APNs tokeni umuman berilmaydi — haqiqiy qurilma kerak |
+| Ilova ochiq — push yo'q | **Bu to'g'ri xatti-harakat** (§5) |
+| Bildirishnoma ko'rinmaydi, lekin token bor (Android 13+) | `POST_NOTIFICATIONS` ruxsati so'ralmagan |
+
+## 7. Qo'ng'iroq push'i (B qism) — hali emas
+
+Yopiq iPhone'da jiringlash uchun **VoIP push (PushKit)** kerak, uni FCM **yubora olmaydi** — u
+APNs'ga to'g'ridan-to'g'ri, `apns-push-type: voip` sarlavhasi bilan ketishi shart. Bu alohida
+adapter va qo'ng'iroq bosqichida yoziladi. Unda **VoIP Services sertifikati** kerak bo'ladi —
+hozirgi `.p8` kaliti bunga yaramaydi.
+
+Ya'ni: oddiy xabar push'i **bugun ishlaydi**, qo'ng'iroq push'i esa B qismi bilan birga keladi.

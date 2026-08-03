@@ -51,7 +51,7 @@ private val adTypes = listOf(
 )
 
 /**
- * Ikona ro'yxatда emas, chizish paytida tanlanadi: ikonalar endi resurslardan
+ * Ikona ro'yxatda emas, chizish paytida tanlanadi: ikonalar endi resurslardan
  * o'qiladi va faqat kompozitsiya ichida mavjud bo'ladi.
  */
 private val AdTypeInfo.icon: ImageVector

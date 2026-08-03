@@ -1,0 +1,42 @@
+-- v26 -> v27 — sitata bilan javob, tarixni tozalash va suhbatni o'chirish
+-- (`CHAT_SELECTION_AND_HISTORY_RESPONSE.md`, backend tayyor).
+--
+-- ## 1. Sitata surati (`MessageDto.replyTo`)
+--
+-- Javob xabari nishonning **suratini** olib yuradi: nishon keyin o'chirilsa ham matni va
+-- belgilangan bo'lagi joyida qoladi (server ham aynan shunday saqlaydi). Shuning uchun
+-- nishonni `replyToId` bo'yicha keshdan qidirib chizmaymiz — qidirsak, tarixi hali
+-- yuklanmagan yoki tozalangan xabarda sitata bo'sh bo'lib qolardi.
+--
+-- `replyToOriginalDeleted = 1` bo'lsa sitata ko'rinaveradi, lekin unga **sakrab bo'lmaydi**
+-- (`replyToId` ham `NULL` bo'lishi mumkin — xabar bazadan butunlay tozalangan).
+--
+-- ## 2. `clearedBeforeSeq` — tarix suv belgisi
+--
+-- `DELETE /v1/conversations/{id}/history` dan keyin server `seq <= clearedBeforeSeq` bo'lgan
+-- xabarlarni **boshqa qaytarmaydi** (`before`, `after`, `around` — hammasiga taalluqli), shu
+-- sabab ular keshdan ham o'chiriladi. `seq` qayta sanalmaydi: tozalashdan keyingi xabarlar
+-- o'sishda davom etadi va kursorlar teshikka tushmaydi.
+--
+-- ## 3. `hidden` — suhbat ro'yxatdan olib tashlangan
+--
+-- ⚠️ Suhbat qatori O'CHIRILMAYDI. Yangi xabar kelsa u AYNAN o'sha `conversationId` bilan
+-- qaytadi (server yangisini yaratmaydi va `POST /v1/conversations` ham o'shani beradi) —
+-- qatorni o'chirsak tarix ikkiga bo'linib ketardi. Bayroq `touchConversation` da o'zi
+-- nolga tushadi.
+--
+-- Migratsiya FAQAT QO'SHADI: yangi ustunlar nullable yoki `DEFAULT 0`, ya'ni eski qatorlar
+-- «sitatasiz, tozalanmagan, ko'rinadigan» holatda qoladi.
+
+ALTER TABLE MessageEntity ADD COLUMN replyToId TEXT;
+ALTER TABLE MessageEntity ADD COLUMN replyToSeq INTEGER;
+ALTER TABLE MessageEntity ADD COLUMN replyToSenderId TEXT;
+ALTER TABLE MessageEntity ADD COLUMN replyToSenderName TEXT;
+ALTER TABLE MessageEntity ADD COLUMN replyToType TEXT;
+ALTER TABLE MessageEntity ADD COLUMN replyToPreview TEXT;
+ALTER TABLE MessageEntity ADD COLUMN replyToQuoteText TEXT;
+ALTER TABLE MessageEntity ADD COLUMN replyToQuoteOffset INTEGER;
+ALTER TABLE MessageEntity ADD COLUMN replyToOriginalDeleted INTEGER;
+
+ALTER TABLE ConversationEntity ADD COLUMN clearedBeforeSeq INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE ConversationEntity ADD COLUMN hidden INTEGER NOT NULL DEFAULT 0;

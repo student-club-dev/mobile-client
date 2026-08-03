@@ -22,6 +22,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -214,8 +215,14 @@ fun ScHeaderSubtitle(text: String, modifier: Modifier = Modifier) {
 }
 
 /**
- * Topbar'dagi aylana tugma: oq fon, chegarasiz, yumshoq soya, ikonasi `brandDark`.
- * Orqaga qaytish uchun hamisha `‹` ([ScIcons.ChevronLeft]) ishlatiladi — X emas.
+ * Topbar'dagi aylana tugma. Orqaga qaytish uchun hamisha `‹` ([ScIcons.ChevronLeft])
+ * ishlatiladi — X emas.
+ *
+ * Rangi MAVZUGA bog'liq ([scGlassButtonColors]): yorug'da oq fon + `brandDark` ikona
+ * (maketdagidek), to'q rejimda esa shaffof oq fon + OQ ikona. To'q rejimda eski qiymatlar
+ * qolib ketsa, gradient topbar to'qlashgani holda uning ustidagi tugmalar yorqin oq
+ * doiralar, ichidagi belgilar esa och ko'k bo'lib "yorug' rejimdan qolib ketgandek"
+ * ko'rinardi.
  */
 @Composable
 fun ScCircleButton(
@@ -224,8 +231,8 @@ fun ScCircleButton(
     modifier: Modifier = Modifier,
     size: Dp = 42.dp,
     iconSize: Dp = 20.dp,
-    background: Color = Color.White,
-    tint: Color = Sc.BrandDark,
+    background: Color = scGlassButtonColors().first,
+    tint: Color = scGlassButtonColors().second,
     contentDescription: String? = null,
     badge: Boolean = false,
     badgeColor: Color = Sc.Danger,
@@ -247,11 +254,22 @@ fun ScCircleButton(
                     .padding(top = 7.dp, end = 8.dp)
                     .size(8.dp)
                     .background(badgeColor, RoundedCornerShape(percent = 50))
-                    .border(1.5.dp, Color.White, RoundedCornerShape(percent = 50)),
+                    .border(1.5.dp, background, RoundedCornerShape(percent = 50)),
             )
         }
     }
 }
+
+/**
+ * Gradient topbar ustidagi tugmaning foni va ikona rangi — `fon to ikona`.
+ *
+ * Yagona joyda, chunki bir xil qoida uchta joyda kerak: [ScCircleButton], bosh ekranning
+ * o'z aylana tugmasi va profil sarlavhasidagi tugma.
+ */
+@Composable
+@ReadOnlyComposable
+fun scGlassButtonColors(): Pair<Color, Color> =
+    if (Sc.IsDark) Color.White.copy(alpha = 0.18f) to Color.White else Color.White to Sc.BrandDark
 
 // ---------------------------------------------------------------------------
 // Bo'lim sarlavhasi

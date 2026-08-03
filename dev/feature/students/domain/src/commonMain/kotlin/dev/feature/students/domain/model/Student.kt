@@ -12,6 +12,8 @@ data class Student(
     val firstName: String,
     val lastName: String,
     val initial: String,         // "D"
+    /** Profil rasmi. `null` bo'lsa avatarda bosh harf ko'rinadi. */
+    val avatarUrl: String? = null,
     val universityId: String,
     val universityMonogram: String, // "TATU"
     val course: Int,             // 1..4 (Mag = 5)

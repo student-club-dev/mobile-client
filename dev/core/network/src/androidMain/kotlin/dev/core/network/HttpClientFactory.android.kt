@@ -16,11 +16,17 @@ object OkHttpInterceptors {
     val interceptors: MutableList<Interceptor> = mutableListOf()
 }
 
-actual fun platformHttpClient(config: HttpClientConfig<*>.() -> Unit): HttpClient =
+actual fun platformHttpClient(
+    debugInterceptors: Boolean,
+    config: HttpClientConfig<*>.() -> Unit,
+): HttpClient =
     HttpClient(OkHttp) {
         config()
         engine {
             // Ro'yxatdagi barcha interceptor'lar (Chucker va h.k.) OkHttp'ga qo'shiladi.
-            OkHttpInterceptors.interceptors.forEach { addInterceptor(it) }
+            // WebSocket klienti ularsiz quriladi — qarang `platformHttpClient` izohi.
+            if (debugInterceptors) {
+                OkHttpInterceptors.interceptors.forEach { addInterceptor(it) }
+            }
         }
     }
