@@ -29,6 +29,8 @@ data class AuthFlowState(
     // Aloqa
     val phone: String = "",
     val password: String = "",
+    /** Parolni tiklashdagi "parolni takrorlang" maydoni — faqat shu oqimda ishlatiladi. */
+    val passwordConfirm: String = "",
     val passwordVisible: Boolean = false,
     val rememberMe: Boolean = true,
     // SMS kod
@@ -64,11 +66,21 @@ data class AuthFlowState(
     val phoneE164: String get() = phone.toUzPhoneE164().orEmpty()
 
     /**
-     * Parolni tiklashning 1-qadami to'ldirilganmi — raqam va yangi parol.
-     * Kod so'rashdan OLDIN tekshiriladi: `password/reset` uchalasini (raqam, kod, parol)
-     * bitta so'rovda kutadi, shuning uchun parolni oldindan olib qo'yamiz.
+     * Parolni tiklashning 1-qadami — faqat RAQAM. Parol bu ekranda so'ralmaydi: u kod
+     * tasdiqlangandan keyingi alohida ekranda kiritiladi.
      */
-    val resetReady: Boolean get() = phoneValid && password.length >= MIN_PASSWORD_LENGTH
+    val forgotReady: Boolean get() = phoneValid
+
+    /** Yangi parol ekrani to'ldirilganmi — uzunlik va takror mos kelishi. */
+    val newPasswordReady: Boolean
+        get() = password.length >= MIN_PASSWORD_LENGTH && password == passwordConfirm
+
+    /**
+     * Takror parol xatosi — foydalanuvchi ikkinchi maydonga yozishni boshlagandagina
+     * ko'rsatiladi (bo'sh maydon hali "mos kelmadi" degani emas).
+     */
+    val passwordMismatch: Boolean
+        get() = passwordConfirm.isNotEmpty() && password != passwordConfirm
 }
 
 /** Backend qoidasi: `RegisterDto.password.minLength = 8`. */

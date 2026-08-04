@@ -38,6 +38,7 @@ import dev.feature.chat.domain.model.StickerRef
 import dev.feature.chat.domain.model.UnreadCount
 import dev.feature.chat.domain.model.UploadState
 import dev.feature.chat.domain.repository.ChatRepository
+import dev.feature.chat.domain.repository.OutgoingVideoStored
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -142,6 +143,8 @@ class ChatRepositoryImpl(
 
     override fun observeTyping(conversationId: String): Flow<Boolean> =
         typingIds.map { conversationId in it }
+
+    override fun observeTypingIds(): Flow<Set<String>> = typingIds
 
     override fun observeRealtimeConnected(): Flow<Boolean> = socket.connected
 
@@ -703,7 +706,11 @@ class ChatRepositoryImpl(
      *   emas — Telegramdagidek o'z kadri bilan turadi;
      * - izoh (caption) qo'llab-quvvatlanadi.
      */
-    override suspend fun sendVideo(conversationId: String, video: OutgoingVideo): Resource<Unit> {
+    override suspend fun sendVideo(
+        conversationId: String,
+        video: OutgoingVideo,
+        onStored: OutgoingVideoStored?,
+    ): Resource<Unit> {
         // ⚠️ Dumaloq video xabarda izoh **umuman yo'q** — server matnni qabul qilmaydi
         // (`handoff/09-CALLS-REST.md` emas, `chat-upload` tavsifi: «carries no caption»).
         // Shuning uchun u bu yerda jimgina tashlanadi, xato sifatida emas: UI'da izoh
@@ -754,7 +761,7 @@ class ChatRepositoryImpl(
         // ⚠️ Aynan chaqiruvchining `Job` i — uni bekor qilish faqat shu videoni to'xtatadi,
         // ViewModel'ning qolgan ishlariga tegmaydi.
         return withSendJob(localId) {
-            uploadAndDeliverVideo(conversationId, video, caption, clientMsgId, localId)
+            uploadAndDeliverVideo(conversationId, video, caption, clientMsgId, localId, onStored)
         }
     }
 
@@ -835,6 +842,7 @@ class ChatRepositoryImpl(
         caption: String?,
         clientMsgId: String,
         localId: String,
+        onStored: OutgoingVideoStored? = null,
     ): Resource<Unit> {
         // Siqishga ajratilgan ulush: siqilmaydigan videoda `0f`, ya'ni halqa darrov
         // yuklashdan boshlanadi va yarmidan sakrab ketmaydi.
@@ -874,6 +882,13 @@ class ChatRepositoryImpl(
             is Resource.Error -> return fail(localId, upload.message, upload.error)
             Resource.Loading -> return Resource.Success(Unit)
         }
+
+        // Fayl HALI o'chirilmagan, `mediaId` esa endi ma'lum — telefon xotirasiga ko'chirib
+        // qolish uchun yagona lahza shu. Usiz o'z videongizni qayta ko'rish uni serverdan
+        // qaytadan yuklab olishni talab qilardi, holbuki u shu daqiqada qurilmada yotibdi.
+        //
+        // Xatosi yutiladi: saqlanmasa ham video serverda bor va yuborish muvaffaqiyatli.
+        runCatching { onStored?.invoke(attachment.id, (ready ?: video).path) }
 
         // Serverda baytlar bor — keshdagi nusxa endi keraksiz. `mediaId` bir martalik, ya'ni
         // qayta urinish ham faylni qaytadan yuklamaydi.

@@ -21,7 +21,9 @@ kotlin {
             api(compose.material3)
             api(compose.ui)
             api(compose.components.resources)
-            implementation(compose.materialIconsExtended)
+            // DIQQAT: `compose.materialIconsExtended` ataylab qo'shilmagan — u ~12 000 ta
+            // ikonka klassini dex'ga olib kiradi (~25 MB). Loyihada barcha ikonkalar
+            // `AppIcons`/`ScIcons` (o'z `ImageVector`larimiz) orqali beriladi.
             // Foydalanuvchi avatarlari (`ScAvatar`) — serverdagi rasm havolasi bo'yicha.
             implementation(libs.coil.compose)
             // Tanlangan video keshdagi **fayl** bo'lib yuriladi (`media/MediaFiles`) —

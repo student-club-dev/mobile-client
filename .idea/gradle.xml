@@ -81,10 +81,6 @@
             <option value="$PROJECT_DIR$/dev/feature/stories/data" />
             <option value="$PROJECT_DIR$/dev/feature/stories/domain" />
             <option value="$PROJECT_DIR$/dev/feature/stories/presentation" />
-            <option value="$PROJECT_DIR$/dev/feature/students" />
-            <option value="$PROJECT_DIR$/dev/feature/students/data" />
-            <option value="$PROJECT_DIR$/dev/feature/students/domain" />
-            <option value="$PROJECT_DIR$/dev/feature/students/presentation" />
             <option value="$PROJECT_DIR$/dev/feature/university" />
             <option value="$PROJECT_DIR$/dev/feature/university/data" />
             <option value="$PROJECT_DIR$/dev/feature/university/domain" />

@@ -350,6 +350,9 @@ fun StudentShell(onLoggedOut: () -> Unit) {
                     onBack = { nav.popSafe() },
                     openStudentId = entry.arguments?.getString("studentId"),
                     openConversationId = entry.arguments?.getString("conversationId"),
+                    // Yangi suhbat faqat BOG'LANGAN odam bilan boshlanadi — "Do'stlar"
+                    // ro'yxatidagi «Xabar» tugmasi uni o'zi ochadi.
+                    onNewChat = { nav.navigateSafe(CONNECTIONS) },
                 )
             }
             composable(

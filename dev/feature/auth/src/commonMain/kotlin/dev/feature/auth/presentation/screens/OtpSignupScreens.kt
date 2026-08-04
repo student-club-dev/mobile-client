@@ -331,7 +331,7 @@ fun ForgotPasswordScreen(
             ScreenTitle("Parolni tiklash", size = 23)
             Spacer(Modifier.height(8.dp))
             Text(
-                "Raqamingiz va yangi parolni kiriting — so‘ng SMS orqali 6 xonali kod yuboramiz.",
+                "Telefon raqamingizni kiriting — SMS orqali 6 xonali kod yuboramiz. Yangi parolni kod tasdiqlangandan keyin belgilaysiz.",
                 style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.sp, color = palette.inkMuted, textAlign = androidx.compose.ui.text.style.TextAlign.Center, lineHeight = 19.sp),
                 modifier = Modifier.padding(horizontal = 6.dp),
             )
@@ -351,28 +351,8 @@ fun ForgotPasswordScreen(
             textLetterSpacing = 0.5f,
         )
 
-        Spacer(Modifier.height(13.dp))
-        FieldLabel("Yangi parol")
-        Spacer(Modifier.height(7.dp))
-        GlassTextField(
-            value = state.password,
-            onValueChange = vm::onPasswordChange,
-            placeholder = "••••••••",
-            leading = AppIcons.Lock,
-            trailing = {
-                Icon(
-                    if (state.passwordVisible) AppIcons.EyeOff else AppIcons.Eye,
-                    null, tint = palette.inkFaint,
-                    modifier = Modifier.size(18.dp).clickableNoRipple { vm.togglePasswordVisible() },
-                )
-            },
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-            visualTransformation = if (state.passwordVisible) VisualTransformation.None
-            else PasswordVisualTransformation(),
-        )
-
         Spacer(Modifier.height(18.dp))
-        PrimaryButton("Kod yuborish", onSend, enabled = state.resetReady && !state.isLoading)
+        PrimaryButton("Kod yuborish", onSend, enabled = state.forgotReady && !state.isLoading)
 
         state.info?.let {
             Spacer(Modifier.height(12.dp))
@@ -389,6 +369,108 @@ fun ForgotPasswordScreen(
             Spacer(Modifier.width(7.dp))
             Text("Kirishga qaytish", style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = palette.primary))
         }
+    }
+}
+
+// ===========================================================================
+// 1j — YANGI PAROL (kod tasdiqlangandan keyin)
+// ===========================================================================
+
+/**
+ * Parolni tiklashning oxirgi qadami — yangi parol shu yerda so'raladi.
+ *
+ * Raqam va SMS kod allaqachon holatda: [onSave] `password/reset` ga uchalasini birga
+ * yuboradi. Kod noto'g'ri bo'lsa xato shu ekranda ko'rinadi va foydalanuvchi orqaga
+ * qaytib kodni tuzatishi mumkin.
+ */
+@Composable
+fun NewPasswordScreen(
+    state: AuthFlowState,
+    vm: AuthFlowViewModel,
+    onBack: () -> Unit,
+    onSave: () -> Unit,
+    palette: AppPalette = appPalette,
+) {
+    AppScreenScaffold(scroll = true) {
+        BackButton(onBack)
+        Spacer(Modifier.height(30.dp))
+        Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+            Box(
+                Modifier.size(84.dp)
+                    .background(palette.primary.copy(alpha = 0.14f), RoundedCornerShape(26.dp)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Box(
+                    Modifier.size(56.dp).background(palette.primaryBrush, RoundedCornerShape(18.dp)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(AppIcons.ShieldCheck, null, tint = Color.White, modifier = Modifier.size(28.dp))
+                }
+            }
+            Spacer(Modifier.height(20.dp))
+            ScreenTitle("Yangi parol", size = 23)
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "Raqamingiz tasdiqlandi. Endi yangi parolni o‘ylab toping — kamida 8 belgi.",
+                style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.sp, color = palette.inkMuted, textAlign = androidx.compose.ui.text.style.TextAlign.Center, lineHeight = 19.sp),
+                modifier = Modifier.padding(horizontal = 6.dp),
+            )
+        }
+
+        Spacer(Modifier.height(26.dp))
+        FieldLabel("Yangi parol")
+        Spacer(Modifier.height(7.dp))
+        GlassTextField(
+            value = state.password,
+            onValueChange = vm::onPasswordChange,
+            placeholder = "••••••••",
+            leading = AppIcons.Lock,
+            focused = true,
+            trailing = {
+                Icon(
+                    if (state.passwordVisible) AppIcons.EyeOff else AppIcons.Eye,
+                    null, tint = palette.inkFaint,
+                    modifier = Modifier.size(18.dp).clickableNoRipple { vm.togglePasswordVisible() },
+                )
+            },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+            visualTransformation = if (state.passwordVisible) VisualTransformation.None
+            else PasswordVisualTransformation(),
+        )
+
+        Spacer(Modifier.height(13.dp))
+        FieldLabel("Parolni takrorlang")
+        Spacer(Modifier.height(7.dp))
+        GlassTextField(
+            value = state.passwordConfirm,
+            onValueChange = vm::onPasswordConfirmChange,
+            placeholder = "••••••••",
+            leading = AppIcons.Lock,
+            trailing = {
+                Icon(
+                    if (state.passwordVisible) AppIcons.EyeOff else AppIcons.Eye,
+                    null, tint = palette.inkFaint,
+                    modifier = Modifier.size(18.dp).clickableNoRipple { vm.togglePasswordVisible() },
+                )
+            },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+            visualTransformation = if (state.passwordVisible) VisualTransformation.None
+            else PasswordVisualTransformation(),
+        )
+
+        // Mos kelmagani darhol ko'rinadi — tugmani bosib ko'rishni kutmasdan.
+        if (state.passwordMismatch) ErrorText("Parollar mos kelmadi.")
+
+        Spacer(Modifier.height(18.dp))
+        PrimaryButton(
+            "Parolni saqlash", onSave,
+            enabled = state.newPasswordReady && !state.isLoading,
+            trailingIcon = AppIcons.Check,
+        )
+
+        ErrorText(state.error)
+
+        Spacer(Modifier.height(20.dp))
     }
 }
 

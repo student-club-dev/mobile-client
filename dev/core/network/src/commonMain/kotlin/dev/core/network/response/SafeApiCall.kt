@@ -3,6 +3,7 @@ package dev.core.network.response
 import dev.core.common.Resource
 import dev.core.common.errorOf
 import dev.core.common.error.AppException
+import dev.core.common.error.AppMessageBus
 import dev.core.common.error.toAppException
 import dev.core.common.network.NetworkConnectivity
 import io.ktor.client.plugins.ClientRequestException
@@ -43,21 +44,33 @@ private suspend fun <T> runSafely(
     block: suspend () -> T,
 ): Resource<T> {
     // Internet yo'q bo'lsa — so'rov qilmasdan aniq xato.
-    if (connectivity?.isOnline() == false) return errorOf(AppException.NoInternet())
+    if (connectivity?.isOnline() == false) return failure(AppException.NoInternet())
     return try {
         Resource.Success(block())
     } catch (e: CancellationException) {
         throw e // korutina bekori — uzatiladi
     } catch (e: AppException) {
-        errorOf(e) // checker allaqachon typed tashlagan
+        failure(e) // checker allaqachon typed tashlagan
     } catch (e: ClientRequestException) {
-        errorOf(e.toAppExceptionWithFields()) // 4xx — 422 maydon xatolari bilan
+        failure(e.toAppExceptionWithFields()) // 4xx — 422 maydon xatolari bilan
     } catch (e: ServerResponseException) {
-        errorOf(AppException.Server(e.response.status.value, e)) // 5xx
+        failure(AppException.Server(e.response.status.value, e)) // 5xx
     } catch (e: Throwable) {
         // Tarmoq/timeout/parse — matn va joriy internet holatiga qarab.
-        errorOf(e.toAppException(connectivity?.isOnline() ?: true))
+        failure(e.toAppException(connectivity?.isOnline() ?: true))
     }
+}
+
+/**
+ * Xatoni [Resource.Error] ga aylantiradi VA [AppMessageBus] ga yuboradi.
+ *
+ * Bu — butun ilovadagi yagona nuqta: har qanday API javobidagi xato shu yerdan o'tadi,
+ * demak ildizdagi toast hech qanday ekran uni ko'rsatishini kutmaydi. Ekran o'z inline
+ * xatosini ko'rsatishda davom etadi — ular bir-birini almashtirmaydi.
+ */
+private fun failure(e: AppException): Resource.Error {
+    AppMessageBus.error(e)
+    return errorOf(e)
 }
 
 /**

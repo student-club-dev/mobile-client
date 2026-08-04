@@ -14,6 +14,15 @@ import dev.feature.chat.domain.model.UploadState
 import kotlinx.coroutines.flow.Flow
 
 /**
+ * Yuborilgan video serverga tushdi va `mediaId` oldi, keshdagi fayli esa **hali joyida**.
+ *
+ * Shu daqiqada chaqiruvchi uni telefon xotirasiga ko'chirib qoladi. Domen qatlami
+ * saqlashning O'ZI bilan shug'ullanmaydi (u platformaga bog'liq), faqat to'g'ri lahzani
+ * beradi.
+ */
+typealias OutgoingVideoStored = suspend (mediaId: String, localPath: String) -> Unit
+
+/**
  * **Chat** — 1:1 yozishma (handoff: `03-WEBSOCKET.md`).
  *
  * Real vaqt — WebSocket (`/chat`, Socket.IO); REST esa tarix, ro'yxat va WS ishlamay
@@ -39,6 +48,14 @@ interface ChatRepository {
 
     /** Suhbatdosh "yozmoqda" holati (WS `typing`; ~5 soniyadan keyin o'zi so'nadi). */
     fun observeTyping(conversationId: String): Flow<Boolean>
+
+    /**
+     * Ayni paytda kimdir yozayotgan BARCHA suhbatlar.
+     *
+     * Suhbatlar ro'yxati uchun: har bir qator uchun alohida oqim ochish o'rniga bitta
+     * to'plam kuzatiladi — WS hodisasi baribir hammasiga bitta manbadan keladi.
+     */
+    fun observeTypingIds(): Flow<Set<String>>
 
     /** WebSocket ulangannmi — sarlavhadagi holat va zaxira yo'lni tanlash uchun. */
     fun observeRealtimeConnected(): Flow<Boolean>
@@ -157,8 +174,17 @@ interface ChatRepository {
      *
      * Fayl keshdan **oqim bilan** yuklanadi va yuborish tugagach (yiqilsa ham) o'chiriladi —
      * qarang [OutgoingVideo].
+     *
+     * [onStored] — yuklash tugab, `mediaId` ma'lum bo'lgan, lekin keshdagi fayl hali
+     * O'CHIRILMAGAN daqiqada chaqiriladi. Aynan shu yerda chaqiruvchi videoni telefon
+     * xotirasiga ko'chirib qoladi: usiz o'z videongizni qayta ko'rish uchun uni serverdan
+     * qaytadan yuklab olish kerak bo'lardi — fayl allaqachon qurilmada bo'lsa ham.
      */
-    suspend fun sendVideo(conversationId: String, video: OutgoingVideo): Resource<Unit>
+    suspend fun sendVideo(
+        conversationId: String,
+        video: OutgoingVideo,
+        onStored: OutgoingVideoStored? = null,
+    ): Resource<Unit>
 
     /**
      * Ketayotgan yuborishni to'xtatadi — siqish ham, yuklash ham uziladi.

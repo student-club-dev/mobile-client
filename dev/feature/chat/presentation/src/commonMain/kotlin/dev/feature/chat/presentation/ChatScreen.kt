@@ -5,7 +5,6 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.awaitLongPressOrCancellation
@@ -32,21 +31,17 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -80,16 +75,16 @@ import dev.core.uikit.components.AppIcons
 import dev.core.uikit.components.ScAvatar
 import dev.core.uikit.components.ScCircleButton
 import dev.core.uikit.components.ScHeader
-import dev.core.uikit.components.ScHeaderTitle
-import dev.core.uikit.components.ScIconTile
 import dev.core.uikit.components.ScIcons
 import dev.core.uikit.components.ScShimmerBox
 import dev.core.uikit.components.ScShimmerLine
+import dev.core.uikit.components.ScSwipeBackState
 import dev.core.uikit.components.ScText
-import dev.core.uikit.components.ScUploadRing
 import dev.core.uikit.components.StatusBarAppearance
-import dev.core.uikit.components.scCard
+import dev.core.uikit.components.rememberScSwipeBackState
 import dev.core.uikit.components.scStyle
+import dev.core.uikit.components.scSwipeBack
+import dev.core.uikit.components.scSwipeBackUnder
 import dev.core.uikit.media.PickedVideo
 import dev.core.uikit.media.deleteMediaFile
 import dev.core.uikit.media.ownsFile
@@ -98,17 +93,14 @@ import dev.core.uikit.media.rememberMultiMediaPicker
 import dev.core.uikit.media.ScVideoPlayer
 import dev.core.uikit.media.rememberAudioPlayer
 import dev.core.uikit.media.rememberAudioRecorder
-import dev.core.uikit.media.VideoPreparer
 import dev.feature.connections.presentation.StudentProfileSheet
 import dev.core.uikit.media.rememberVideoCapture
 import dev.core.uikit.media.rememberVideoNotePreparer
 import dev.core.uikit.media.rememberVideoPreparer
-import dev.core.uikit.media.videoNeedsPreparing
 import dev.core.uikit.media.rememberFilePicker
 import dev.core.uikit.theme.Sc
 import dev.feature.chat.domain.model.ConversationItem
 import dev.feature.chat.domain.model.GifItem
-import dev.feature.chat.domain.model.Message
 import dev.feature.chat.domain.model.MessageCall
 import dev.feature.chat.domain.model.MessageStatus
 import dev.feature.chat.domain.model.MessageType
@@ -117,7 +109,7 @@ import dev.feature.chat.domain.model.OutgoingVideo
 import dev.feature.chat.domain.model.Sticker
 import dev.feature.chat.domain.model.StickerSearchItem
 import dev.feature.chat.presentation.gif.ChatMediaPanel
-import dev.feature.clubs.domain.model.Club
+import dev.feature.chat.presentation.list.MessagesScreen
 import dev.feature.calls.domain.model.CallMedia
 import dev.feature.calls.domain.model.CallStatus
 import dev.feature.calls.domain.repository.CallController
@@ -151,11 +143,19 @@ fun ChatScreen(
      * o'zi bila olmaydi va pastki panelni yashirish uchun shu xabar kerak.
      */
     onThreadOpenChange: (Boolean) -> Unit = {},
+    /**
+     * «Yangi suhbat» tugmasi (FAB). Suhbat faqat BOG'LANGAN odam bilan boshlanadi,
+     * shuning uchun u «Do'stlar» ekraniga olib boradi. `null` — tugma chizilmaydi.
+     */
+    onNewChat: (() -> Unit)? = null,
     vm: ChatViewModel = koinViewModel(),
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
     val clubs by vm.clubs.collectAsStateWithLifecycle()
     val folder by vm.folder.collectAsStateWithLifecycle()
+    val query by vm.query.collectAsStateWithLifecycle()
+    val myProfile by vm.myProfile.collectAsStateWithLifecycle()
+    val typing by vm.typingConversations.collectAsStateWithLifecycle()
 
     val threadOpen = state.selected != null
     LaunchedEffect(threadOpen) { onThreadOpenChange(threadOpen) }
@@ -196,30 +196,55 @@ fun ChatScreen(
         if (direct) onBack?.invoke()
     }
 
+    /**
+     * Suhbatni o'ngga surib yopish holati — ekran darajasida, chunki uni **ikki qavat**
+     * o'qiydi: surilayotgan suhbat va uning tagidan chiqadigan ro'yxat.
+     */
+    val swipeBack = rememberScSwipeBackState()
+
+    /**
+     * Suhbat tagida ro'yxat chizilsinmi.
+     *
+     * Faqat surish paytida: ro'yxat doim chizib turilsa, u butunlay berkilgan holda ham
+     * har kadrda qayta chizilardi (ortiqcha chizish). Ekran KONKRET suhbat bilan ochilgan
+     * bo'lsa (`direct`) esa umuman chizilmaydi — u yerda ortga qaytish ro'yxatga emas,
+     * kelingan ekranga olib boradi va tagida ro'yxat turgani yolg'on bo'lardi.
+     */
+    val revealList = state.selected != null && !direct && swipeBack.revealing
+
     Box(Modifier.fillMaxSize()) {
         if (state.selected == null && openingDirect) {
             // Suhbat ochilguncha (va chiqish animatsiyasi davomida) — yozishmaning skeleti.
             OpeningThread(onBack)
-        } else if (state.selected == null) {
-            ConversationList(
+        } else if (state.selected == null || revealList) {
+            MessagesScreen(
+                modifier = Modifier.scSwipeBackUnder(swipeBack),
                 conversations = state.conversations,
                 archivedConversations = state.archivedConversations,
                 clubs = clubs,
                 folder = folder,
                 onFolder = vm::selectFolder,
+                query = query,
+                onQuery = vm::onQuery,
+                typing = typing,
+                myProfile = myProfile,
                 onToggleJoin = vm::toggleJoin,
                 onClubSoon = { vm.showMessage("Klub suhbati tez orada ochiladi") },
                 onBack = onBack,
+                onNewChat = onNewChat,
                 onOpen = vm::open,
                 onArchive = { vm.setArchived(it.id, true) },
                 onUnarchive = { vm.setArchived(it.id, false) },
                 onBlock = { vm.block(it.other.id) },
                 onReport = { c, reason, note -> vm.reportStudent(c.other.id, reason, note) },
             )
-        } else {
+        }
+
+        state.selected?.let { selected ->
             ChatThread(
-                conversation = state.selected!!,
+                conversation = selected,
                 state = state,
+                swipeBack = swipeBack,
                 onBack = closeThread,
                 onDraft = vm::onDraft,
                 onSend = vm::send,
@@ -243,6 +268,8 @@ fun ChatScreen(
                 onSendVoice = vm::sendVoice,
                 // Sarlavha har kompozitsiyada qayta o'qiladi — token yangilangach ham to'g'ri.
                 mediaHeaders = vm.mediaHeaders(),
+                onVideoOpened = vm::ensureVideoSaved,
+                onNeedPoster = vm::ensureVideoPoster,
                 onSoon = vm::showMessage,
             )
         }
@@ -316,409 +343,6 @@ private fun OpeningThread(onBack: (() -> Unit)?) {
     }
 }
 
-/**
- * Ro'yxatdagi qisqa ko'rinish.
- *
- * Media xabarda tana **bo'sh** (server `body` ni faqat matn va izoh uchun to'ldiradi),
- * shuning uchun ko'rinish turdan quriladi. Turi keshda saqlanadi (`lastMessageType`).
- */
-private fun Message?.preview(): String = when {
-    this == null -> "Xabar yozing…"
-    deleted -> "Xabar o'chirildi"
-    type == MessageType.IMAGE -> "📷 Rasm"
-    type == MessageType.GIF -> "GIF"
-    type == MessageType.VIDEO -> "🎬 Video"
-    type == MessageType.VIDEO_NOTE -> "⭕️ Video xabar"
-    type == MessageType.VOICE -> "🎤 Ovozli xabar"
-    type == MessageType.FILE -> "📎 Fayl"
-    type == MessageType.STICKER -> "${sticker?.emoji.orEmpty()} Stiker".trim()
-    // Qo'ng'iroq — push matni bilan **bir xil** shakl (`handoff/09-CALLS-REST.md` §4).
-    // `call` keshdan kelmasa (suhbatlar ro'yxatining qisqa qatorida u yo'q) turdan
-    // umumiy matn quriladi.
-    type == MessageType.CALL -> call?.let { "📞 ${callPreview(it)}" } ?: "📞 Qo'ng'iroq"
-    body.isBlank() -> "Xabar yozing…"
-    else -> body
-}
-
-/** Suhbat avatarlari navbat bilan uch tint ranggida. */
-private val avatarVisuals: List<Pair<Color, Color>>
-    @Composable @ReadOnlyComposable get() = listOf(
-        Sc.TintViolet to Sc.Violet,
-        Sc.TintBlue to Sc.Brand,
-        Sc.TintGreenDeep to Sc.Success,
-    )
-
-// ---------------------------------------------------------------------------
-// Suhbatlar ro'yxati
-// ---------------------------------------------------------------------------
-
-@Composable
-private fun ConversationList(
-    conversations: List<ConversationItem>,
-    archivedConversations: List<ConversationItem>,
-    clubs: List<Club>,
-    folder: ChatFolder,
-    onFolder: (ChatFolder) -> Unit,
-    onToggleJoin: (Club) -> Unit,
-    onClubSoon: () -> Unit,
-    onBack: (() -> Unit)?,
-    onOpen: (ConversationItem) -> Unit,
-    onArchive: (ConversationItem) -> Unit,
-    onUnarchive: (ConversationItem) -> Unit,
-    onBlock: (ConversationItem) -> Unit,
-    onReport: (ConversationItem, ReportReason, String?) -> Unit,
-) {
-    var showArchived by remember { mutableStateOf(false) }
-    var actionFor by remember { mutableStateOf<ConversationItem?>(null) }
-    var blockFor by remember { mutableStateOf<ConversationItem?>(null) }
-    var reportFor by remember { mutableStateOf<ConversationItem?>(null) }
-    val list = if (showArchived) archivedConversations else conversations
-
-    Column(Modifier.fillMaxSize().background(Sc.Bg)) {
-        ScHeader {
-            Row(
-                Modifier.fillMaxWidth().padding(top = 18.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                if (showArchived || onBack != null) {
-                    ScCircleButton(
-                        ScIcons.ChevronLeft,
-                        { if (showArchived) showArchived = false else onBack?.invoke() },
-                        contentDescription = "Orqaga",
-                    )
-                }
-                ScHeaderTitle(if (showArchived) "Arxiv" else "Xabarlar", size = 26f, modifier = Modifier.weight(1f))
-                if (!showArchived && archivedConversations.isNotEmpty()) {
-                    ScCircleButton(ScIcons.Archive, { showArchived = true }, contentDescription = "Arxiv")
-                }
-            }
-        }
-
-        // Papkalar — arxivda ko'rinmaydi: arxiv o'zi alohida ro'yxat va uning ichida
-        // "Klublar" degan tanlov ma'nosiz bo'lardi (klub suhbati arxivlanmaydi).
-        if (!showArchived) {
-            FolderTabs(
-                folder = folder,
-                onFolder = onFolder,
-                unread = conversations.sumOf { it.unreadCount },
-                clubCount = clubs.size,
-            )
-        }
-
-        // Tab rejimida pastda navigatsiya paneli turadi — oxirgi qator berkilmasin.
-        val listPadding = PaddingValues(
-            start = Sc.ScreenPadding, end = Sc.ScreenPadding,
-            top = 20.dp, bottom = if (onBack == null) 110.dp else 24.dp,
-        )
-
-        if (!showArchived && folder == ChatFolder.CLUBS) {
-            ClubList(clubs, listPadding, onToggleJoin, onClubSoon, Modifier.fillMaxWidth().weight(1f))
-        } else if (list.isEmpty()) {
-            Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
-                ScText(
-                    if (showArchived) "Arxiv bo'sh" else "Suhbatlar yo'q.\n\"Do'stlar\" bo'limidan yozishni boshlang.",
-                    14f, FontWeight.Medium, Sc.Muted, lineHeight = 21f,
-                )
-            }
-        } else {
-            LazyColumn(
-                Modifier.fillMaxWidth().weight(1f),
-                contentPadding = listPadding,
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                itemsIndexed(list, key = { _, c -> c.id }) { index, c ->
-                    ConversationRow(c, index, onClick = { onOpen(c) }, onLongPress = { actionFor = c })
-                }
-            }
-        }
-    }
-
-    val action = actionFor
-    if (action != null) {
-        AlertDialog(
-            onDismissRequest = { actionFor = null },
-            title = { Text(action.other.displayName, style = scStyle(17f, FontWeight.ExtraBold)) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    ActionRow(
-                        if (action.archived) ScIcons.ChevronRight else ScIcons.Archive,
-                        if (action.archived) "Arxivdan chiqarish" else "Arxivlash",
-                    ) {
-                        if (action.archived) onUnarchive(action) else onArchive(action)
-                        actionFor = null
-                    }
-                    ActionRow(ScIcons.Users, "Bloklash", danger = true) {
-                        blockFor = action
-                        actionFor = null
-                    }
-                    ActionRow(ScIcons.Bell, "Shikoyat qilish", danger = true) {
-                        reportFor = action
-                        actionFor = null
-                    }
-                }
-            },
-            confirmButton = {},
-            dismissButton = {
-                TextButton(onClick = { actionFor = null }) {
-                    Text("Bekor", style = scStyle(14f, FontWeight.Bold, Sc.InkSoft))
-                }
-            },
-        )
-    }
-
-    val blockTarget = blockFor
-    if (blockTarget != null) {
-        ConfirmDialog(
-            title = "Bloklash",
-            // Suhbatni o'chirish endpointi yo'q — blok esa bog'lanishni server tomonda uzadi.
-            message = "${blockTarget.other.displayName} bloklanadi: bog'lanish o'chadi va " +
-                "ikkalangiz bir-biringizga yozolmaysiz.",
-            confirmLabel = "Bloklash",
-            onConfirm = { onBlock(blockTarget); blockFor = null },
-            onDismiss = { blockFor = null },
-        )
-    }
-
-    val reportTarget = reportFor
-    if (reportTarget != null) {
-        ReportDialog(
-            title = "Shikoyat: ${reportTarget.other.displayName}",
-            onSend = { reason, note -> onReport(reportTarget, reason, note); reportFor = null },
-            onDismiss = { reportFor = null },
-        )
-    }
-}
-
-/** Klub kartalari dizaynda navbat bilan ko'k / binafsha / yashil bo'ladi. */
-@Composable
-private fun clubVisual(index: Int): Triple<Color, Color, ImageVector> = when (index.mod(3)) {
-    0 -> Triple(Sc.TintBlue, Sc.Brand, ScIcons.Laptop)
-    1 -> Triple(Sc.TintViolet, Sc.Violet, ScIcons.MessageLines)
-    else -> Triple(Sc.TintGreen, Sc.Success, ScIcons.Medal)
-}
-
-/**
- * Papkalar qatori — Telegramdagi kabi: "Shaxsiy" va "Klublar", bittasi tanlangan.
- *
- * Qator [ChatFolder.entries] bo'yicha quriladi, ya'ni "Guruhlar" qo'shilganda bu yerda
- * hech narsa o'zgarmaydi. Chiziqlar teng ulushda: ikki-uch papkada ular butun kenglikni
- * to'ldiradi va gorizontal sudralish kerak bo'lmaydi.
- */
-@Composable
-private fun FolderTabs(
-    folder: ChatFolder,
-    onFolder: (ChatFolder) -> Unit,
-    unread: Int,
-    clubCount: Int,
-) {
-    Row(
-        Modifier.fillMaxWidth().padding(horizontal = Sc.ScreenPadding).padding(top = 16.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        ChatFolder.entries.forEach { entry ->
-            FolderChip(
-                label = entry.label,
-                active = folder == entry,
-                modifier = Modifier.weight(1f),
-                // Belgicha faqat o'qilmagan suhbatlar sonida ma'noli; klublarda esa
-                // hozircha xabar yo'q, shuning uchun u yerda oddiy klublar soni.
-                badge = when (entry) {
-                    ChatFolder.PERSONAL -> unread
-                    ChatFolder.CLUBS -> clubCount
-                },
-                badgeAccent = entry == ChatFolder.PERSONAL,
-            ) { onFolder(entry) }
-        }
-    }
-}
-
-@Composable
-private fun FolderChip(
-    label: String,
-    active: Boolean,
-    modifier: Modifier = Modifier,
-    badge: Int = 0,
-    /** `true` — o'qilmagan (qizil/oq) belgicha; `false` — shunchaki son (kulrang). */
-    badgeAccent: Boolean = true,
-    onClick: () -> Unit,
-) {
-    Row(
-        modifier.clip(RoundedCornerShape(999.dp))
-            .background(if (active) Sc.Brand else Sc.Chip)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 10.dp, vertical = 9.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(5.dp, Alignment.CenterHorizontally),
-    ) {
-        ScText(label, 12.5f, FontWeight.Bold, if (active) Color.White else Sc.ChipInk, maxLines = 1)
-        if (badge > 0) {
-            val background = when {
-                active -> Color.White
-                badgeAccent -> Sc.Danger
-                else -> Sc.MutedLight
-            }
-            Box(
-                Modifier.size(17.dp).background(background, RoundedCornerShape(percent = 50)),
-                contentAlignment = Alignment.Center,
-            ) { ScText("$badge", 9.5f, FontWeight.ExtraBold, if (active) Sc.Brand else Color.White) }
-        }
-    }
-}
-
-/**
- * "Klublar" papkasi — klublar xuddi suhbatlar kabi qator bo'lib turadi.
- *
- * Alohida klublar ekrani YO'Q: qo'shilish/chiqish shu qatorning o'zida, chunki klub —
- * jamoaviy suhbat va uning joyi xabarlar ichida. Qatorning o'zi bosilganda esa klub suhbati
- * ochilishi kerak — u backendda hali yo'q, shuning uchun hozircha ogohlantirish chiqadi.
- */
-@Composable
-private fun ClubList(
-    clubs: List<Club>,
-    contentPadding: PaddingValues,
-    onToggleJoin: (Club) -> Unit,
-    onOpen: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    if (clubs.isEmpty()) {
-        Box(modifier, contentAlignment = Alignment.Center) {
-            ScText(
-                "Klublar yo'q.\nUlar tez orada qo'shiladi.",
-                14f, FontWeight.Medium, Sc.Muted,
-                Modifier.padding(horizontal = Sc.ScreenPadding),
-                lineHeight = 21f,
-            )
-        }
-        return
-    }
-
-    LazyColumn(
-        modifier,
-        contentPadding = contentPadding,
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        // A'zo bo'lganlar tepada — Telegramda ham o'zing turgan suhbat birinchi.
-        items(clubs.sortedByDescending { it.joined }, key = { it.id }) { club ->
-            ClubRow(club, onClick = onOpen, onToggleJoin = { onToggleJoin(club) })
-        }
-    }
-}
-
-@Composable
-private fun ClubRow(club: Club, onClick: () -> Unit, onToggleJoin: () -> Unit) {
-    val (tint, accent, icon) = clubVisual((club.id - 1).toInt())
-    Row(
-        Modifier.fillMaxWidth()
-            .scCard(radius = 22.dp, elevation = 6.dp, onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(13.dp),
-    ) {
-        // Rasmi bo'lsa — o'zi, bo'lmasa klub belgisi: bosh harf odam ismidek ko'rinardi.
-        if (club.imageUrl.isNullOrBlank()) {
-            ScIconTile(tint, size = 50.dp, radius = 18.dp) {
-                Icon(icon, null, tint = accent, modifier = Modifier.size(24.dp))
-            }
-        } else {
-            ScAvatar(
-                name = club.name,
-                size = 50.dp,
-                avatarUrl = club.imageUrl,
-                background = tint,
-                initialColor = accent,
-            )
-        }
-        Column(Modifier.weight(1f)) {
-            ScText(club.name, 15.5f, FontWeight.ExtraBold, Sc.Ink, maxLines = 1)
-            Spacer(Modifier.height(2.dp))
-            ScText(
-                club.description.ifBlank { "${club.membersCount} a'zo" },
-                13.5f, FontWeight.Medium, Sc.Muted, maxLines = 1,
-            )
-            Spacer(Modifier.height(3.dp))
-            ScText("${club.membersCount} a'zo", 12f, FontWeight.Bold, accent, maxLines = 1)
-        }
-        JoinButton(club.joined, accent, onToggleJoin)
-    }
-}
-
-/** Qo'shilish / chiqish — avval klublar ekranida edi, endi shu qatorning o'zida. */
-@Composable
-private fun JoinButton(joined: Boolean, accent: Color, onClick: () -> Unit) {
-    Box(
-        Modifier.clip(RoundedCornerShape(12.dp))
-            .background(if (joined) Sc.Chip else accent)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 9.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        ScText(
-            if (joined) "A'zosiz" else "Qo'shilish",
-            12f, FontWeight.ExtraBold,
-            if (joined) Sc.ChipInk else Color.White,
-            maxLines = 1,
-        )
-    }
-}
-
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
-private fun ConversationRow(
-    c: ConversationItem,
-    index: Int,
-    onClick: () -> Unit,
-    onLongPress: () -> Unit,
-) {
-    val (tint, accent) = avatarVisuals[index.mod(avatarVisuals.size)]
-    Row(
-        Modifier.fillMaxWidth()
-            .scCard(radius = 22.dp, elevation = 6.dp)
-            .combinedClickable(onClick = onClick, onLongClick = onLongPress)
-            .padding(horizontal = 16.dp, vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(13.dp),
-    ) {
-        Box {
-            ScAvatar(
-                name = c.other.displayName,
-                size = 50.dp,
-                avatarUrl = c.other.avatarUrl,
-                background = tint,
-                initialColor = accent,
-            )
-            // Onlayn holati SHU ro'yxatda haqiqiy (Redis'dan) — qidiruvdagidan farqli.
-            if (c.other.online) {
-                Box(
-                    Modifier.align(Alignment.BottomEnd)
-                        .padding(1.dp)
-                        .size(13.dp)
-                        .background(Sc.Card, RoundedCornerShape(percent = 50))
-                        .padding(2.5.dp)
-                        .background(Sc.Success, RoundedCornerShape(percent = 50)),
-                )
-            }
-        }
-        Column(Modifier.weight(1f)) {
-            ScText(c.other.displayName, 15.5f, FontWeight.ExtraBold, Sc.Ink, maxLines = 1)
-            Spacer(Modifier.height(2.dp))
-            ScText(
-                c.lastMessage.preview(),
-                13.5f, FontWeight.Medium, Sc.Muted, maxLines = 1,
-            )
-        }
-        Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(5.dp)) {
-            ScText(ChatFormat.listStamp(c.conversation.lastMessageAt), 12f, FontWeight.SemiBold, Sc.MutedLight, maxLines = 1)
-            if (c.unreadCount > 0) {
-                Box(
-                    Modifier.size(19.dp).background(Sc.Brand, RoundedCornerShape(percent = 50)),
-                    contentAlignment = Alignment.Center,
-                ) { ScText("${c.unreadCount}", 10.5f, FontWeight.ExtraBold, Color.White) }
-            }
-        }
-    }
-}
-
 // ---------------------------------------------------------------------------
 // Suhbat (Telegram uslubi)
 // ---------------------------------------------------------------------------
@@ -727,6 +351,8 @@ private fun ConversationRow(
 private fun ChatThread(
     conversation: ConversationItem,
     state: ChatUiState,
+    /** O'ngga surib yopish — holat ekran darajasida, tagidagi ro'yxat ham shunga qaraydi. */
+    swipeBack: ScSwipeBackState,
     onBack: () -> Unit,
     onDraft: (String) -> Unit,
     onSend: () -> Unit,
@@ -751,6 +377,17 @@ private fun ChatThread(
     onSendVoice: (ByteArray, String) -> Unit,
     /** Media so'rovlari uchun `Authorization` sarlavhasi — pleyerlar tokensiz `404` oladi. */
     mediaHeaders: Map<String, String>,
+    /**
+     * Video ochildi — uni telefonning «StudentClub/Video» papkasiga **bir marta** yozish
+     * uchun. Ikkinchi ochilishda yuklab olish bo'lmaydi.
+     */
+    onVideoOpened: (mediaId: String?, url: String?) -> Unit,
+    /**
+     * Video pufagi ekranga chiqdi — birinchi kadrini («yuzini») tayyorlash uchun. Server
+     * `?variant=thumb` da video uchun rasm bermaydi, shuning uchun kadr telefonda
+     * ajratiladi.
+     */
+    onNeedPoster: (mediaId: String?, url: String?) -> Unit,
     /** Hali tayyor bo'lmagan amal bosilganda ko'rsatiladigan bir martalik xabar. */
     onSoon: (String) -> Unit,
 ) {
@@ -1032,7 +669,16 @@ private fun ChatThread(
     }
     LaunchedEffect(atTop) { if (atTop) onLoadOlder() }
 
-    Column(Modifier.fillMaxSize().background(Sc.ChatBg).imePadding()) {
+    Column(
+        Modifier.fillMaxSize()
+            // Istalgan joydan o'ngga surish — orqaga (iOS/Telegramdagidek). Tanlash rejimida
+            // u avval belgilashni bekor qiladi: "orqaga" har doim BITTA qadam orqaga
+            // bo'lishi kerak, aks holda tasodifan belgilangan xabarlar bilan birga butun
+            // suhbat ham yopilib ketardi.
+            .scSwipeBack(swipeBack) { if (selectionMode) selectedIds = emptySet() else onBack() }
+            .background(Sc.ChatBg)
+            .imePadding(),
+    ) {
         // Tanlash rejimida sarlavha butunlay almashadi (Telegram'dagidek): ism va holat
         // o'rniga tanlanganlar soni va amallar chiqadi.
         if (selectionMode) {
@@ -1137,6 +783,7 @@ private fun ChatThread(
                                         if (selectionMode) toggleSelection(m) else viewer = m.images to imageIndex
                                     },
                                     onCancelUpload = onCancelUpload,
+                                    onNeedPoster = onNeedPoster,
                                     onOpenAttachment = { message ->
                                         val media = message.attachment
                                         when {
@@ -1257,6 +904,9 @@ private fun ChatThread(
     }
 
     videoViewer?.let { video ->
+        // Ochilishi bilan telefonga yoziladi (fonda, ko'rishni kutdirmasdan). Ikkinchi
+        // ochilishda `url` allaqachon local nusxa bo'ladi va yuklash umuman bo'lmaydi.
+        LaunchedEffect(video.mediaId) { onVideoOpened(video.mediaId, video.url) }
         Dialog(
             onDismissRequest = { videoViewer = null },
             properties = DialogProperties(usePlatformDefaultWidth = false),
@@ -1336,6 +986,7 @@ private fun ChatThread(
             // Videoning havolasi himoyalangan (`/v1/media/{id}/raw`) — pleyerga sarlavha
             // berilmasa `404` olardi va ekran qop-qora bo'lib qolardi.
             mediaHeaders = mediaHeaders,
+            onVideoOpened = onVideoOpened,
             onDismiss = { viewer = null },
         )
     }
@@ -1911,6 +1562,8 @@ private fun MessageBubble(
     onCancelUpload: (String) -> Unit,
     /** Fayl yoki video bosildi — chaqiruvchi uni ochadi (yuklab olish / pleyer). */
     onOpenAttachment: (ChatMessageUi) -> Unit,
+    /** Video pufagi ekranga chiqdi — birinchi kadrini tayyorlash uchun. */
+    onNeedPoster: (mediaId: String?, url: String?) -> Unit,
     onToggleVoice: (ChatMessageUi) -> Unit,
     /** Hozir eshitilayotgan ovozli xabar id'si — bir vaqtda faqat bittasi ijro etiladi. */
     playingVoiceId: String?,
@@ -1931,6 +1584,7 @@ private fun MessageBubble(
                 onOpen = onOpenImage,
                 onCancelUpload = onCancelUpload,
                 onTap = onTap,
+                onNeedPoster = onNeedPoster,
             )
         // Fayl hali ketmoqda — biriktirma serverning javobi bilan keladi, ya'ni quyidagi
         // shoxobchalarning hech biri hozircha ishlamaydi.
@@ -1947,9 +1601,17 @@ private fun MessageBubble(
             )
         // Dumaloq video xabar — o'z pufagi yo'q, aylana bo'lib chiziladi.
         message.type == MessageType.VIDEO_NOTE && message.attachment != null ->
-            VideoNoteBubble(message, onOpen = { onOpenAttachment(message) })
+            VideoNoteBubble(
+                message,
+                onOpen = { onOpenAttachment(message) },
+                onNeedPoster = onNeedPoster,
+            )
         message.type == MessageType.VIDEO && message.attachment != null ->
-            VideoBubble(message, onOpen = { onOpenAttachment(message) })
+            VideoBubble(
+                message,
+                onOpen = { onOpenAttachment(message) },
+                onNeedPoster = onNeedPoster,
+            )
         message.sticker != null -> StickerBubble(message, onTap = onTap)
         else -> TextBubble(message, onTap = onTap)
     }
@@ -2022,7 +1684,7 @@ private fun callTitle(call: MessageCall): String = when {
 }
 
 /** Suhbatlar ro'yxatidagi qisqa ko'rinish — [callTitle] bilan bir xil qoida. */
-private fun callPreview(call: MessageCall): String = callTitle(call)
+internal fun callPreview(call: MessageCall): String = callTitle(call)
 
 @Composable
 private fun TextBubble(message: ChatMessageUi, onTap: () -> Unit) {
@@ -2163,7 +1825,7 @@ private fun Composer(
 // ---------------------------------------------------------------------------
 
 @Composable
-private fun ActionRow(
+internal fun ActionRow(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     label: String,
     danger: Boolean = false,
@@ -2182,7 +1844,7 @@ private fun ActionRow(
 }
 
 @Composable
-private fun ConfirmDialog(
+internal fun ConfirmDialog(
     title: String,
     message: String,
     confirmLabel: String,
@@ -2208,7 +1870,7 @@ private fun ConfirmDialog(
 
 /** Shikoyat dialogi — sabab (majburiy) + ixtiyoriy izoh (≤1000 belgi). */
 @Composable
-private fun ReportDialog(
+internal fun ReportDialog(
     title: String,
     onSend: (ReportReason, String?) -> Unit,
     onDismiss: () -> Unit,

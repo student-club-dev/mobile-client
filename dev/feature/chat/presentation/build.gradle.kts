@@ -11,8 +11,11 @@ kotlin { sourceSets { commonMain.dependencies {
     implementation(projects.dev.feature.calls.presentation)
     // Suhbatdosh profili — UMUMIY varaq (story lentasidan ham shu ochiladi).
     implementation(projects.dev.feature.connections.presentation)
-    // O'sha profildagi «Postlar» bo'limi — suhbatdoshning faol lavhalari.
+    // O'sha profildagi «Postlar» bo'limi — suhbatdoshning faol lavhalari. Shu moduldan
+    // suhbatlar ro'yxati tepasidagi story lentasi ham keladi (`StoriesRow`).
     implementation(projects.dev.feature.stories.presentation)
+    // Lentadagi «Lavham» katakchasi uchun O'Z ismim va rasmim (`ObserveProfileUseCase`).
+    implementation(projects.dev.feature.profile.domain)
     // Suhbatdosh profilidagi universitet nomi: backend faqat `universityId` beradi
     // (katalogi yo'q), nomni local katalogdan topamiz.
     implementation(projects.dev.feature.university.domain)

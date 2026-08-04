@@ -60,17 +60,79 @@ android {
             keyAlias = "androiddebugkey"
             keyPassword = "android"
         }
+
+        /**
+         * Release kaliti — `local.properties` dan (repoga tushmaydi):
+         *   RELEASE_STORE_FILE=/Users/.../studentclub-release.jks
+         *   RELEASE_STORE_PASSWORD=...
+         *   RELEASE_KEY_ALIAS=...
+         *   RELEASE_KEY_PASSWORD=...
+         *
+         * Kalit sozlanmagan bo'lsa release build DEBUG kaliti bilan imzolanadi — shunda
+         * `Build → Build APK(s)` release variantda ham darhol o'rnatiladigan APK beradi.
+         * Play Store debug sertifikatini QABUL QILMAYDI, ya'ni sozlashni unutib qolib
+         * ketish xavfi yo'q: yuklashda aniq xato chiqadi.
+         */
+        create("release") {
+            val storePath = secret("RELEASE_STORE_FILE")
+            if (storePath.isNotBlank() && file(storePath).exists()) {
+                storeFile = file(storePath)
+                storePassword = secret("RELEASE_STORE_PASSWORD")
+                keyAlias = secret("RELEASE_KEY_ALIAS")
+                keyPassword = secret("RELEASE_KEY_PASSWORD")
+            } else {
+                logger.lifecycle(
+                    "⚠️  RELEASE_STORE_FILE sozlanmagan — release build debug kaliti bilan " +
+                        "imzolanadi (sinov uchun yaroqli, Play Store uchun emas)."
+                )
+                storeFile = file("debug.keystore")
+                storePassword = "android"
+                keyAlias = "androiddebugkey"
+                keyPassword = "android"
+            }
+        }
     }
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("release")
+            // R8 — o'lchamning eng katta leveri: ishlatilmagan kod olib tashlanadi va
+            // qolgani qisqartiriladi. Qoidalar `proguard-rules.pro` da (reflection/JNI
+            // ishlatadigan joylar: WebRTC, serialization, enum'lar).
+            isMinifyEnabled = true
+            // Kod qisqargandan keyin unga bog'lanmagan resurslarni ham olib tashlaydi.
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
         }
     }
+    /**
+     * ABI bo'yicha bo'lish — o'lchamning ikkinchi katta leveri.
+     *
+     * WebRTC (`libjingle_peerconnection_so.so`) har bir ABI uchun 6–12 MB joy oladi va
+     * yagona ("universal") APK'da to'rttasi ham yotadi (~40 MB). Qurilmaga esa faqat
+     * BITTASI kerak.
+     *
+     * Play Store'ga **AAB** yuborilsa bu avtomatik bo'ladi va bu blok umuman ta'sir
+     * qilmaydi (`bundleRelease` o'zi ABI/til/DPI bo'yicha bo'ladi). Bu yerdagi sozlama —
+     * APK'ni to'g'ridan-to'g'ri tarqatish uchun (Telegram, sayt va h.k.).
+     *
+     * `isUniversalApk = true` — hammasi bir joyda turgan zaxira nusxa ham chiqadi:
+     * ABI'si noma'lum qurilmaga shuni berish mumkin.
+     */
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            // Haqiqiy qurilmalar: arm64 — deyarli hammasi, armeabi-v7a — eski 32-bitliklar.
+            // x86_64 — emulyator (release'ni emulyatorda sinash uchun kerak).
+            include("arm64-v8a", "armeabi-v7a", "x86_64")
+            isUniversalApk = true
+        }
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -115,6 +177,7 @@ dependencies {
     implementation(compose.foundation)
     implementation(compose.material3)
     implementation(compose.ui)
-    implementation(compose.uiTooling)
-    implementation(compose.preview)
+    // Tooling/Preview faqat Android Studio uchun — release'da kerak emas (bir necha MB dex).
+    debugImplementation(compose.uiTooling)
+    debugImplementation(compose.preview)
 }

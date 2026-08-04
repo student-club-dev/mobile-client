@@ -3,6 +3,7 @@ package dev.feature.auth.presentation.flow
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.core.common.Resource
+import dev.core.common.error.AppMessageBus
 import dev.core.domain.model.User
 import dev.core.domain.usecase.CancelRegistrationUseCase
 import dev.core.domain.usecase.CompleteRegistrationUseCase
@@ -43,8 +44,11 @@ sealed interface AuthEvent {
     /** Ro'yxat yakunlandi (raqam tasdiqlandi yoki o'tkazib yuborildi) — muvaffaqiyat ekraniga. */
     data object Registered : AuthEvent
 
-    /** Parolni tiklash kodi yuborildi — kod + yangi parol ekraniga. */
+    /** Parolni tiklash kodi yuborildi — kod kiritish ekraniga. */
     data object ResetCodeSent : AuthEvent
+
+    /** Kod to'liq kiritildi — endi yangi parol ekraniga. */
+    data object ResetCodeEntered : AuthEvent
 
     /** Parol yangilandi — kirish ekraniga qaytamiz. */
     data object PasswordReset : AuthEvent
@@ -64,8 +68,8 @@ sealed interface AuthEvent {
  * - **ro'yxat** — telefon (yoki email) + parol; hisob darhol ochiladi, so'ng SMS kod bilan
  *   raqam tasdiqlanadi (`otp/request` + `otp/verify` — ikkalasi ham **sessiya** talab qiladi,
  *   shuning uchun ular ro'yxatdan KEYIN keladi va o'tkazib yuborilishi mumkin);
- * - **parolni tiklash** — raqamga SMS kod (`password/forgot`) → kod + yangi parol
- *   (`password/reset`).
+ * - **parolni tiklash** — raqamga SMS kod (`password/forgot`) → kodni kiritish → yangi parol
+ *   (`password/reset` uchalasini bitta so'rovda oladi).
  *
  * Token yangilash bu yerda emas — u tarmoq qatlamida avtomatik (`createHttpClient`).
  */
@@ -126,6 +130,9 @@ class AuthFlowViewModel(
     }
 
     fun onPasswordChange(v: String) = _state.update { it.copy(password = v, error = null) }
+    fun onPasswordConfirmChange(v: String) =
+        _state.update { it.copy(passwordConfirm = v, error = null) }
+
     fun togglePasswordVisible() = _state.update { it.copy(passwordVisible = !it.passwordVisible) }
     fun toggleRememberMe() = _state.update { it.copy(rememberMe = !it.rememberMe) }
     fun onOtpChange(v: String) = _state.update {
@@ -337,32 +344,34 @@ class AuthFlowViewModel(
     // ------------------------------------------------------------------
 
     /**
-     * 1-qadam — raqam va YANGI PAROL kiritilgach SMS kod so'raladi.
+     * 1-qadam — FAQAT raqam kiritiladi va SMS kod so'raladi.
      *
-     * Parol shu qadamda olinadi va holatda saqlanadi: `password/reset` raqam + kod + yangi
-     * parolni bitta so'rovda kutadi, u esa kod tasdiqlangan zahoti yuboriladi.
+     * Parol bu qadamda so'ralmaydi: foydalanuvchi avval raqamiga egaligini isbotlaydi
+     * (kod), yangi parolni esa undan keyingi ekranda kiritadi. Kirish ekranida yozilgan
+     * eski parol qolib ketmasligi uchun maydonlar tozalanadi.
      */
-    fun requestPasswordReset() {
+    fun requestPasswordReset(navigateToCode: Boolean = true) {
         val s = _state.value
         if (s.isLoading) return
         if (!s.phoneValid) {
             _state.update { it.copy(error = "To‘liq 9 xonali raqam kiriting.") }
             return
         }
-        if (s.password.length < MIN_PASSWORD_LENGTH) {
-            _state.update { it.copy(error = "Parol kamida $MIN_PASSWORD_LENGTH belgidan iborat bo‘lsin.") }
-            return
-        }
         _state.update { it.copy(isLoading = true, error = null, info = null) }
         viewModelScope.launch {
             when (val result = forgotPasswordUseCase(s.phoneE164)) {
                 is Resource.Success -> {
-                    // Parol TOZALANMAYDI — u keyingi qadamda kod bilan birga yuboriladi.
                     _state.update {
-                        it.copy(isLoading = false, otp = "", otpPurpose = OtpPurpose.RESET_PASSWORD)
+                        it.copy(
+                            isLoading = false,
+                            otp = "",
+                            password = "",
+                            passwordConfirm = "",
+                            otpPurpose = OtpPurpose.RESET_PASSWORD,
+                        )
                     }
                     startResendTimer(DEFAULT_RESEND_SECONDS)
-                    _events.send(AuthEvent.ResetCodeSent)
+                    if (navigateToCode) _events.send(AuthEvent.ResetCodeSent)
                 }
                 is Resource.Error -> _state.update { it.copy(isLoading = false, error = result.message) }
                 Resource.Loading -> Unit
@@ -370,17 +379,42 @@ class AuthFlowViewModel(
         }
     }
 
-    /** 2-qadam — kod tasdiqlanadi va parol shu yerda o'rnatiladi (`password/reset`). */
+    /**
+     * 2-qadam — kod kiritildi, yangi parol ekraniga o'tamiz.
+     *
+     * Backendda kodni ALOHIDA tekshiradigan endpoint yo'q: `password/reset` raqam + kod +
+     * yangi parolni bitta so'rovda kutadi. Shuning uchun bu qadam tarmoqqa bormaydi —
+     * kod holatda saqlanib turadi va parol bilan birga [resetPassword] da yuboriladi.
+     * Kod noto'g'ri bo'lsa xato o'sha yerda chiqadi va foydalanuvchi orqaga qaytib
+     * kodni tuzatishi mumkin.
+     */
+    fun confirmResetCode() {
+        val s = _state.value
+        if (s.isLoading || !s.otpValid) return
+        _state.update { it.copy(error = null) }
+        viewModelScope.launch { _events.send(AuthEvent.ResetCodeEntered) }
+    }
+
+    /** 3-qadam — yangi parol o'rnatiladi (`password/reset`: raqam + kod + parol). */
     fun resetPassword() {
         val s = _state.value
         if (s.isLoading) return
+        if (s.password.length < MIN_PASSWORD_LENGTH) {
+            _state.update { it.copy(error = "Parol kamida $MIN_PASSWORD_LENGTH belgidan iborat bo‘lsin.") }
+            return
+        }
+        if (s.password != s.passwordConfirm) {
+            _state.update { it.copy(error = "Parollar mos kelmadi.") }
+            return
+        }
         _state.update { it.copy(isLoading = true, error = null) }
         viewModelScope.launch {
             when (val result = resetPasswordUseCase(s.phoneE164, s.otp, s.password)) {
                 is Resource.Success -> {
                     _state.update {
-                        it.copy(isLoading = false, otp = "", password = "")
+                        it.copy(isLoading = false, otp = "", password = "", passwordConfirm = "")
                     }
+                    AppMessageBus.success("Parol yangilandi. Endi yangi parol bilan kiring.")
                     _events.send(AuthEvent.PasswordReset)
                 }
                 is Resource.Error -> _state.update { it.copy(isLoading = false, error = result.message) }
@@ -397,7 +431,8 @@ class AuthFlowViewModel(
         val s = _state.value
         if (s.isLoading || s.resendSeconds > 0) return
         when (s.otpPurpose) {
-            OtpPurpose.RESET_PASSWORD -> requestPasswordReset()
+            // Foydalanuvchi allaqachon kod ekranida — qayta navigatsiya qilinmaydi.
+            OtpPurpose.RESET_PASSWORD -> requestPasswordReset(navigateToCode = false)
             OtpPurpose.VERIFY_PHONE -> {
                 _state.update { it.copy(isLoading = true, error = null) }
                 viewModelScope.launch { requestPhoneOtp(navigateToOtp = false) }

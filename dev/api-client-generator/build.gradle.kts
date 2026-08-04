@@ -76,6 +76,10 @@ val apiServerUrl = "https://api.studentclub.uz/v1"
  * 2. **Xato javoblarining tanasi olib tashlanadi** — aks holda har bir 401/404 uchun keraksiz
  *    inline model generatsiya qilinadi. Xatolarni konvert plagini + `AppException` hal qiladi.
  * 3. **`/v1` prefiksi yo'llardan olib tashlanadi** — u bazaviy manzilda (`servers`) turadi.
+ * 3a. **Eski geo yo'llari tashlanadi** (`/v1/regions`, `/v1/districts`) — serverda admin panel
+ *    uchun qolgan, ilova esa `/v1/geo/…` kontrakt yo'llarini ishlatadi. Spec'da tursa
+ *    `getRegions`/`getDistricts` takrorlanib, generator KERAKLI metodlarni ham
+ *    `geoRegionsGetRegions` deb qayta nomlaydi.
  * 4. **Tipsiz nullable maydonlar tiplanadi.** NestJS `string | null` ni `{"type":"object",
  *    "nullable":true}` deb yozadi; generator undan `kotlin.Any?` chiqaradi va kotlinx.serialization
  *    uni kompilyatsiya qilolmaydi. Haqiqiy tip `format` → `example` → maydon nomi bo'yicha tiklanadi.
@@ -251,6 +255,19 @@ val cleanSwagger = tasks.register("cleanSwagger") {
         @Suppress("UNCHECKED_CAST")
         val paths = root["paths"] as MutableMap<String, Any?>
         val methods = setOf("get", "post", "put", "patch", "delete", "head", "options")
+
+        // Eski geo yo'llari — serverda admin panel uchun qolgan, ilova ularni ISHLATMAYDI
+        // (kontrakt yo'llari `/v1/geo/*`). Ular spec'da tursa `getRegions`/`getDistricts`
+        // ikki martadan takrorlanadi va generator to'qnashuvni yo'l nomi bilan hal qiladi:
+        // `geoRegionsGetRegions` / `regionsGetRegions`. Ya'ni bu ikki o'lik yo'l KERAKLI
+        // metodlarning nomini buzadi. Spec faylining o'ziga tegmaymiz — u backend yuborgan
+        // holida qoladi, tashlab yuborish shu yerda bo'ladi.
+        val droppedPaths = listOf("/v1/regions", "/v1/districts")
+        droppedPaths.forEach { dead ->
+            if (paths.remove(dead) != null) {
+                logger.lifecycle("cleanSwagger: $dead tashlandi (eski geo yo'li, /v1/geo/* ishlatiladi)")
+            }
+        }
 
         // OpenAPI operationId'lari BUTUN spec bo'yicha noyob bo'lishi shart, shuning uchun
         // qisqartirishdan oldin takrorlanadiganlarini global ro'yxatdan topamiz.

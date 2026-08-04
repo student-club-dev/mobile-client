@@ -5,6 +5,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.core.common.Resource
 import dev.core.common.auth.TokenStore
+import dev.core.uikit.media.cacheRemoteToStudentClubFolder
+import dev.core.uikit.media.chatVideoFileName
+import dev.core.uikit.media.saveToStudentClubFolder
+import dev.core.uikit.media.videoPosterUrl
 import dev.feature.chat.domain.model.ConversationItem
 import dev.feature.chat.domain.model.EmojiText
 import dev.feature.chat.domain.model.FluentEmoji
@@ -23,6 +27,7 @@ import dev.feature.clubs.domain.model.Club
 import dev.feature.clubs.domain.repository.ClubRepository
 import dev.feature.connections.domain.model.ReportReason
 import dev.feature.connections.domain.repository.ConnectionsRepository
+import dev.feature.profile.domain.usecase.ObserveProfileUseCase
 import dev.feature.university.domain.repository.UniversityRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
@@ -36,6 +41,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -94,6 +100,11 @@ data class ChatMediaItem(
      * «Tayyorlanmoqda…», ham «yuborilmadi» deb turardi — ikkita qarama-qarshi yorliq.
      */
     val failed: Boolean = false,
+    /**
+     * Server `mediaId` si — video telefondagi papkaga shu nom bilan yoziladi
+     * (`chat_<mediaId>.mp4`). Rasmda ishlatilmaydi.
+     */
+    val mediaId: String? = null,
 ) {
     val loading: Boolean get() = url == null
 }
@@ -106,8 +117,14 @@ data class ChatMediaItem(
  */
 @Immutable
 data class ChatAttachmentUi(
-    /** Serverdagi medianing to'liq havolasi — **token bilan** so'raladi. */
+    /**
+     * O'ynatiladigan havola. Odatda serverdagi to'liq havola (**token bilan** so'raladi),
+     * lekin video telefondagi «StudentClub/Video» papkasiga tushgan bo'lsa — o'sha local
+     * nusxa (`content://` yoki `file://`).
+     */
     val url: String,
+    /** Server `mediaId` si — video papkadagi fayl nomi shu bo'yicha quriladi. */
+    val mediaId: String? = null,
     val thumbUrl: String? = null,
     /** `FILE` da asl nom; bo'lmasa umumiy "Fayl". */
     val fileName: String? = null,
@@ -211,6 +228,17 @@ enum class ChatFolder(val label: String) {
     PERSONAL("Shaxsiy"),
     CLUBS("Klublar"),
 }
+
+/**
+ * Story lentasi uchun kerak bo'ladigan O'ZIM haqidagi minimal ma'lumot.
+ *
+ * Butun `UserProfile` emas: lentaga faqat shu ikkitasi kerak va ortiqcha maydonlar
+ * o'zgarganda (masalan kurs yoki universitet) ro'yxat qayta chizilib turardi.
+ */
+data class ChatMyProfile(
+    val name: String = "Talaba",
+    val avatarUrl: String? = null,
+)
 
 data class ChatUiState(
     val conversations: List<ConversationItem> = emptyList(),
@@ -326,6 +354,7 @@ class ChatViewModel(
     private val connectionsRepository: ConnectionsRepository,
     universityRepository: UniversityRepository,
     private val clubRepository: ClubRepository,
+    observeProfileUseCase: ObserveProfileUseCase,
     private val tokenStore: TokenStore,
 ) : ViewModel() {
 
@@ -344,12 +373,56 @@ class ChatViewModel(
         .catch { emit(emptyList()) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    /**
+     * Ayni paytda kimdir yozayotgan suhbatlar — ro'yxatdagi «yozmoqda…» uchun.
+     *
+     * Bitta to'plam: hodisa WS'dan baribir bitta manbadan keladi va har qator uchun
+     * alohida oqim ochish shunchaki qatlamni ko'paytirardi. Ochilgan suhbatdagi
+     * indikator esa [state] dan (`peerTyping`) olinadi — u yerda boshqa savol.
+     */
+    val typingConversations: StateFlow<Set<String>> = chatRepository.observeTypingIds()
+        .catch { emit(emptySet()) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptySet())
+
     /** Klubga qo'shilish / undan chiqish (hozircha local). */
     fun toggleJoin(club: Club) {
         viewModelScope.launch {
             clubRepository.setJoined(club.id, !club.joined)
             showMessage(if (club.joined) "Klubdan chiqdingiz" else "Klubga qo'shildingiz")
         }
+    }
+
+    /**
+     * O'zimning ismim va rasmim — suhbatlar ro'yxati tepasidagi story lentasi uchun
+     * («Lavham» katakchasi ularni tashqaridan kutadi, qarang `StoriesRow`).
+     *
+     * Profil keshdan o'qiladi (uni bosh ekran allaqachon serverdan tortib qo'yadi), shuning
+     * uchun bu yerda `refresh` chaqirilmaydi: chat ekrani profil uchun so'rov yubormaydi.
+     */
+    val myProfile: StateFlow<ChatMyProfile> = observeProfileUseCase()
+        .map { profile ->
+            ChatMyProfile(
+                name = profile?.displayName?.takeIf { it.isNotBlank() } ?: "Talaba",
+                avatarUrl = profile?.avatarUrl?.takeIf { it.isNotBlank() },
+            )
+        }
+        .catch { emit(ChatMyProfile()) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), ChatMyProfile())
+
+    private val _query = MutableStateFlow("")
+
+    /**
+     * Ro'yxat qidiruvi — Telegramdagi «Chatlarni qidirish» maydoni.
+     *
+     * Server so'rovi YO'Q: butun suhbatlar ro'yxati allaqachon local keshda va u odatda
+     * o'nlab qatordan iborat — filtrlash shu yerda, xarf yozilishi bilan bo'ladi.
+     * [folder] kabi ViewModel'da: suhbat ochilib yopilganda ro'yxat kompozitsiyadan chiqadi
+     * va `remember` yozilgan matnni unutardi.
+     */
+    val query: StateFlow<String> = _query.asStateFlow()
+
+    fun onQuery(value: String) {
+        _query.value = value
     }
 
     private val _folder = MutableStateFlow(ChatFolder.PERSONAL)
@@ -387,6 +460,20 @@ class ChatViewModel(
         val hasMoreHistory: Boolean = true,
         val message: String? = null,
         val unreadTotal: Int = 0,
+        /**
+         * Telefondagi «StudentClub/Video» papkasidagi videolar — `fayl nomi → havola`.
+         *
+         * Bir marta ochilgan video shu yerga tushadi va keyingi ko'rishlarda pleyerga
+         * TARMOQ havolasi emas, shu local nusxa beriladi (qarang [ensureVideoSaved]).
+         */
+        val localVideos: Map<String, String> = emptyMap(),
+        /**
+         * Videoning birinchi kadri — `mediaId → poster fayli`.
+         *
+         * Server `?variant=thumb` da video uchun rasm bermaydi, shuning uchun kadr
+         * telefonda ajratiladi (qarang [ensureVideoPoster]).
+         */
+        val videoPosters: Map<String, String> = emptyMap(),
     )
 
     /** "Yozmoqda" ni to'xtatuvchi taymer — 3 soniya jimlikdan keyin `typing:stop`. */
@@ -407,7 +494,90 @@ class ChatViewModel(
                 .catch { /* katalog bo'lmasa profil universitetsiz ko'rinadi */ }
                 .collect { list -> universityNames.value = list.associate { it.id to it.name } }
         }
+        // Telefondagi videolar ro'yxati — ilova ochilishida bir marta.
+        viewModelScope.launch { refreshLocalVideos() }
     }
+
+    // ---------------------------------------------------------------------------
+    // Videolarni telefonda saqlash
+    // ---------------------------------------------------------------------------
+
+    /** Papkani qayta o'qiydi — yangi video saqlangandan keyin chaqiriladi. */
+    private suspend fun refreshLocalVideos() {
+        val urls = localVideoUrls()
+        extra.update { it.copy(localVideos = urls) }
+    }
+
+    /**
+     * Video ochilganda uni telefonga **bir marta** yozadi.
+     *
+     * Chaqiruv har ochilishda bo'ladi, lekin yuklab olish faqat birinchisida: papkada fayl
+     * bo'lsa [cacheRemoteToStudentClubFolder] tarmoqqa umuman chiqmaydi. Ya'ni ikkinchi
+     * ko'rish trafik sarflamaydi — talab shu.
+     *
+     * ⚠️ Yuklash **fonda** ketadi va ekranni kutdirmaydi: pleyer shu payt tarmoq havolasidan
+     * o'ynayveradi, papkadagi nusxa esa KEYINGI ochilish uchun tayyorlanadi. Aks holda
+     * foydalanuvchi videoni ko'rish uchun uning to'liq yuklanishini kutishi kerak bo'lardi.
+     *
+     * Xato jimgina yutiladi: saqlanmasa ham video baribir serverdan ochiladi.
+     */
+    fun ensureVideoSaved(mediaId: String?, url: String?) {
+        if (mediaId.isNullOrBlank() || url.isNullOrBlank()) return
+        // Allaqachon papkada — hech narsa qilmaymiz (holatda ham shu havola turibdi).
+        if (extra.value.localVideos.containsKey(chatVideoFileName(mediaId))) return
+        // `file://` — bu allaqachon local nusxa, uni o'ziga qayta yozishning ma'nosi yo'q.
+        if (url.startsWith("file://") || url.startsWith("content://")) return
+
+        viewModelScope.launch {
+            val saved = runCatching {
+                cacheRemoteToStudentClubFolder(
+                    url = url,
+                    headers = mediaHeaders(),
+                    fileName = chatVideoFileName(mediaId),
+                    isVideo = true,
+                )
+            }.getOrNull()
+            if (saved != null) refreshLocalVideos()
+        }
+    }
+
+    /**
+     * Video pufagida ko'rsatiladigan birinchi kadrni tayyorlaydi.
+     *
+     * Pufak ekranga chiqqanda chaqiriladi. Kadr **bir marta** ajratiladi va keshga
+     * yoziladi: bir xil video ro'yxatda necha marta uchrasa ham ish bir marta bo'ladi.
+     *
+     * Manba sifatida telefondagi nusxa afzal — o'shanda kadr darhol chiqadi. Nusxa hali
+     * yo'q bo'lsa tarmoq havolasi beriladi: platforma butun videoni emas, faqat kerakli
+     * baytlarni o'qiydi.
+     */
+    fun ensureVideoPoster(mediaId: String?, url: String?) {
+        if (mediaId.isNullOrBlank() || url.isNullOrBlank()) return
+        if (extra.value.videoPosters.containsKey(mediaId)) return
+        // Bir vaqtda ikki marta boshlanmasin: ro'yxat tez suriladi va bitta pufak
+        // qayta-qayta kompozitsiya qilinishi mumkin.
+        if (!posterJobs.add(mediaId)) return
+
+        viewModelScope.launch {
+            val local = extra.value.localVideos[chatVideoFileName(mediaId)]
+            val poster = runCatching {
+                videoPosterUrl(
+                    source = local ?: url,
+                    headers = mediaHeaders(),
+                    cacheKey = mediaId,
+                )
+            }.getOrNull()
+            if (poster != null) {
+                extra.update { it.copy(videoPosters = it.videoPosters + (mediaId to poster)) }
+            } else {
+                // Chiqmadi — keyingi urinishga yo'l ochiq qoldiramiz (tarmoq tiklanishi mumkin).
+                posterJobs.remove(mediaId)
+            }
+        }
+    }
+
+    /** Kadri ajratilayotgan videolar — takroriy ishni to'xtatadi. */
+    private val posterJobs = mutableSetOf<String>()
 
     // MUHIM: `messagesFlow` combine'ning majburiy a'zosi. `onStart` darhol bo'sh ro'yxat
     // beradi, aks holda birinchi snapshot kelmaguncha butun state emit qilinmay, bosilgan
@@ -449,6 +619,8 @@ class ChatViewModel(
                 otherDeliveredSeq = selected?.otherDeliveredSeq ?: 0,
                 localImages = rest.localImages,
                 uploads = rest.uploads,
+                localVideos = rest.extra.localVideos,
+                videoPosters = rest.extra.videoPosters,
             ),
             draft = rest.draft,
             peerTyping = rest.typing,
@@ -485,6 +657,8 @@ class ChatViewModel(
         otherDeliveredSeq: Int,
         localImages: Map<String, ByteArray>,
         uploads: Map<String, UploadState>,
+        localVideos: Map<String, String>,
+        videoPosters: Map<String, String>,
     ): List<ChatMessageUi> {
         val groups = groupAlbums()
         return groups.mapIndexed { index, group ->
@@ -522,10 +696,18 @@ class ChatViewModel(
                             messageId = m.id,
                             // Biriktirma URL'i himoyalangan (`/v1/media/{id}/raw`) — rasm
                             // yuklovchi tokenli klientdan foydalanadi (`createImageHttpClient`).
-                            url = m.attachment?.previewUrl?.takeIf { it.isNotBlank() },
+                            // Video: avval SERVER poster'i (`?variant=thumb`), u bo'lmasa
+                            // telefonda ajratilgan kadr. Ikkinchisi — zaxira, chunki
+                            // serverning tayyor rasmi arzonroq.
+                            url = m.attachment?.thumbUrl?.takeIf { it.isNotBlank() }
+                                ?: m.attachment?.id?.let { videoPosters[it] }
+                                ?: m.attachment?.previewUrl?.takeIf { it.isNotBlank() },
                             localBytes = localImages[m.id],
                             aspectRatio = m.attachment?.aspectRatio,
-                            fullUrl = m.attachment?.url?.takeIf { it.isNotBlank() },
+                            // Video telefonda bo'lsa TARMOQ havolasi umuman ishlatilmaydi —
+                            // pleyer local nusxani ochadi. Bo'lmasa eskicha serverdan.
+                            fullUrl = m.attachment?.localVideoUrl(localVideos)
+                                ?: m.attachment?.url?.takeIf { it.isNotBlank() },
                             uploadProgress = upload?.progress,
                             uploading = upload != null,
                             // GIF ham pleyerda ochiladi (u ovozsiz MP4), lekin katakda
@@ -538,6 +720,7 @@ class ChatViewModel(
                             },
                             processing = m.attachment?.processing == true,
                             failed = m.status == MessageStatus.FAILED,
+                            mediaId = m.attachment?.id,
                         )
                     }
                 } else {
@@ -548,8 +731,13 @@ class ChatViewModel(
                     ?.takeIf { head.type in ATTACHMENT_LIKE && !head.deleted }
                     ?.let { media ->
                         ChatAttachmentUi(
-                            url = media.url,
-                            thumbUrl = media.thumbUrl,
+                            // Video telefonda bo'lsa pleyerga LOCAL nusxa beriladi —
+                            // qayta ko'rish tarmoqqa chiqmaydi.
+                            url = media.localVideoUrl(localVideos) ?: media.url,
+                            mediaId = media.id,
+                            // Videoda server thumb'i rasm bermaydi — telefonda ajratilgan
+                            // kadr ustun turadi. Rasm/fayl uchun eskicha.
+                            thumbUrl = media.id?.let { videoPosters[it] } ?: media.thumbUrl,
                             fileName = media.fileName,
                             sizeBytes = media.sizeBytes,
                             durationMs = media.durationMs,
@@ -833,7 +1021,18 @@ class ChatViewModel(
         val id = selectedId.value ?: return
         stopTyping()
         viewModelScope.launch {
-            when (val res = chatRepository.sendVideo(id, video)) {
+            val res = chatRepository.sendVideo(id, video) { mediaId, localPath ->
+                // Yuborilgan video DARHOL telefon xotirasiga tushadi — fayl hali qurilmada
+                // turganida. Shuning uchun uni qayta ko'rish uchun serverdan yuklab olish
+                // KERAK EMAS: bir bayt ham sarflanmaydi.
+                saveToStudentClubFolder(
+                    sourcePath = localPath,
+                    fileName = chatVideoFileName(mediaId),
+                    isVideo = true,
+                )
+                refreshLocalVideos()
+            }
+            when (res) {
                 is Resource.Error -> extra.update { it.copy(message = res.message) }
                 else -> Unit
             }

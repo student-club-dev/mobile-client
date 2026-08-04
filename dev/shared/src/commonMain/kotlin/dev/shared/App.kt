@@ -27,6 +27,7 @@ import dev.core.di.IMAGE_CLIENT
 import dev.core.network.NetworkConfig
 import dev.core.network.media.MediaUrl
 import dev.core.network.media.apiOrigin
+import dev.core.uikit.components.ScToastHost
 import dev.core.uikit.theme.AppTheme
 import dev.feature.settings.domain.model.ThemeMode
 import dev.feature.settings.domain.repository.SettingsRepository
@@ -123,6 +124,10 @@ private fun AppScaffold(content: @Composable () -> Unit) {
             // o'z insetlarini o'zi qo'yadi. Kiruvchi qo'ng'iroq foydalanuvchi qaysi
             // ekranda turganidan qat'i nazar ko'rinishi kerak.
             CallHost()
+            // Xato/xabar toastlari — HAMMA narsadan ustida va insetdan tashqarida: ular
+            // status bar ostidan tushadi va foydalanuvchi qaysi ekranda bo'lishidan
+            // qat'i nazar ko'rinishi kerak (`AppMessageBus`).
+            ScToastHost()
         }
     }
 }

@@ -3,6 +3,11 @@ package dev.feature.stories.presentation
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.rememberScrollableState
+import androidx.compose.foundation.gestures.scrollable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,25 +18,34 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.util.lerp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.core.uikit.components.AppIcons
 import dev.core.uikit.components.ScAvatar
@@ -51,6 +65,7 @@ import dev.feature.connections.domain.model.StudentSummary
 import dev.feature.stories.domain.model.StoryGroup
 import dev.feature.stories.domain.model.StoryLimits
 import org.koin.compose.viewmodel.koinViewModel
+import kotlin.math.roundToInt
 
 /**
  * Avatar diametri, halqa qalinligi va halqa bilan avatar orasidagi oraliq —
@@ -62,6 +77,35 @@ private val GAP = 3.dp
 
 /** Katakning to'liq eni — halqa + oraliq ikki tomondan. */
 private val CELL = AVATAR + (RING + GAP) * 2
+
+/** Kataklar orasidagi oraliq. */
+private val CELL_GAP = 12.dp
+
+/**
+ * Katakning to'liq o'lchami — lentani ushlab turgan panel avatar MARKAZI qayerda
+ * turishini shundan hisoblaydi ([StoriesRow] ning yig'ilishi, `MessagesHeader`).
+ */
+val StoriesCell: Dp get() = CELL
+
+/** Yig'ilgan to'plamdagi bitta doira (halqasi bilan) diametri. */
+val StoriesCollapsedCell: Dp get() = COLLAPSED_AVATAR + COLLAPSED_RING * 2
+
+/** Yig'ilgan to'plamdagi qo'shni doiralar markazlari orasidagi qadam. */
+val StoriesCollapsedStep: Dp get() = StoriesCollapsedCell - COLLAPSED_OVERLAP
+
+/**
+ * Yig'ilgan to'plam qancha joy egallaydi — sarlavha shuncha o'ngga suriladi.
+ *
+ * Kataklar soni O'ZGARGANDAgina qayta hisoblanadi (lavha qo'shilganda/tugaganda), ya'ni
+ * yig'ilish animatsiyasi davomida bu qiymat qimirlamaydi.
+ */
+@Composable
+fun storiesCollapsedWidth(vm: StoriesViewModel = koinViewModel()): Dp {
+    val state by vm.state.collectAsStateWithLifecycle()
+    // Birinchi katak — doim o'zimniki ("Lavham"), shuning uchun kamida bittasi bor.
+    val visible = (1 + state.groups.size).coerceAtMost(COLLAPSED_MAX)
+    return StoriesCollapsedCell + StoriesCollapsedStep * (visible - 1)
+}
 
 /**
  * Bosh ekrandagi story lentasi (`handoff/07-STORIES.md` §2).
@@ -80,6 +124,19 @@ fun StoriesRow(
     myAvatarUrl: String?,
     modifier: Modifier = Modifier,
     /**
+     * Lenta chetidagi bo'shliq. Xabarlar ekranida lenta topbar ICHIDA turadi va u yerda
+     * chekka topbarniki bilan bir xil bo'lishi kerak ([Sc.HeaderPadding]).
+     */
+    contentPadding: PaddingValues = PaddingValues(horizontal = Sc.ScreenPadding, vertical = 4.dp),
+    /**
+     * `true` — lenta KO'K gradient topbar ustida (Xabarlar ekrani): yozuvlar oq, halqalar
+     * ham oq bo'ladi. Sukut — odatiy fon ustida (bosh ekran), brend gradienti bilan.
+     *
+     * Rang tokenlari bilan hal qilib bo'lmaydi: `Sc.Ink` va brend ko'ki ikkalasi ham
+     * ko'k gradient ustida ko'rinmay qoladi, ya'ni bu fon emas — KONTEKST farqi.
+     */
+    onHeader: Boolean = false,
+    /**
      * Lavha muallifi ustiga bosildi — uning profili ochilsin.
      *
      * Profil varag'ini **chaqiruvchi** chizadi: undagi «Media / Fayllar / Havolalar»
@@ -87,6 +144,18 @@ fun StoriesRow(
      * allaqachon story'ga bog'langan — «Postlar» bo'limi uchun).
      */
     onOpenProfile: ((StudentSummary) -> Unit)? = null,
+    /**
+     * Yig'ilish darajasi: `0f` — to'liq lenta, `1f` — sarlavha yonidagi kichik to'plam.
+     * Kataklar shu oraliqda UZLUKSIZ kichrayib, bir-birining ustiga suriladi.
+     *
+     * ⚠️ Bu lambda ataylab `Float` emas: qiymat faqat o'lchash va chizish bosqichida
+     * o'qiladi, ya'ni surish davomida lenta qayta KOMPOZITSIYA qilinmaydi.
+     */
+    collapse: () -> Float = { 0f },
+    /** Yig'ilgan to'plamning chap cheti — lentaning o'z chap chetidan hisoblab. */
+    collapsedStart: Dp = 0.dp,
+    /** Yig'ilgan to'plam bosildi (lenta qayta ochilishi kerak). */
+    onCollapsedClick: (() -> Unit)? = null,
     vm: StoriesViewModel = koinViewModel(),
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
@@ -113,28 +182,35 @@ fun StoriesRow(
         }
     }
 
-    LazyRow(
-        modifier,
-        contentPadding = PaddingValues(horizontal = Sc.ScreenPadding, vertical = 4.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    StoryStrip(
+        collapse = collapse,
+        contentPadding = contentPadding,
+        collapsedStart = collapsedStart,
+        onCollapsedClick = onCollapsedClick,
+        modifier = modifier,
     ) {
-        item(key = "mine") {
-            MyStoryCell(
-                name = myName,
-                avatarUrl = myAvatarUrl,
-                publishing = state.publishing,
-                progress = state.publishProgress,
-                // Halqa lavhalarim soniga bo'linadi — nechta lavham bo'lsa, shuncha bo'lak.
-                storyCount = state.mine.size,
-                // Lavham bo'lsa — o'zimga ko'rinadi; bo'lmasa darhol qo'shish.
-                onClick = {
-                    if (state.hasMine) vm.openMine(myName, myAvatarUrl) else pickerChoice = true
-                },
-                onAdd = { pickerChoice = true },
+        MyStoryCell(
+            name = myName,
+            avatarUrl = myAvatarUrl,
+            publishing = state.publishing,
+            progress = state.publishProgress,
+            // Halqa lavhalarim soniga bo'linadi — nechta lavham bo'lsa, shuncha bo'lak.
+            storyCount = state.mine.size,
+            onHeader = onHeader,
+            collapse = collapse,
+            // Lavham bo'lsa — o'zimga ko'rinadi; bo'lmasa darhol qo'shish.
+            onClick = {
+                if (state.hasMine) vm.openMine(myName, myAvatarUrl) else pickerChoice = true
+            },
+            onAdd = { pickerChoice = true },
+        )
+        state.groups.forEach { group ->
+            StoryCell(
+                group = group,
+                onHeader = onHeader,
+                collapse = collapse,
+                onClick = { vm.open(group) },
             )
-        }
-        items(state.groups, key = { it.author.id }) { group ->
-            StoryCell(group = group, onClick = { vm.open(group) })
         }
     }
 
@@ -170,59 +246,153 @@ fun StoriesRow(
             },
         )
     }
-
 }
 
 /**
- * Lenta yig'ilganda (bosh ekran topbari siqilganda) uning o'rnini bosadigan **kichik
- * to'plam** — Telegramdagidek bir-birining ustiga chiqqan 3 tagacha avatar.
+ * Kataklarni ushlab turgan gorizontal tasma — va ularni sarlavha yonidagi to'plamga
+ * **uzluksiz** aylantiruvchi joy.
  *
- * Bosilganda ekran tepasiga qaytaradi ([onClick]), ya'ni to'liq lenta ko'rinadi. Lavha
- * umuman bo'lmasa (o'zimniki ham, boshqalarniki ham) hech nima chizilmaydi.
+ * Nega `LazyRow` emas: lazy ro'yxat o'z chegarasidan tashqarini QIRQADI, morfing esa
+ * kataklarni tasmadan tashqariga — sarlavha qatoriga olib chiqadi. Bu yerda esa qirqish
+ * faqat GORIZONTAL (surilgan kataklar chetdan chiqib ketmasin), vertikal bo'yicha esa
+ * ochiq: panel tasmani butunligicha yuqoriga surganda kataklar sarlavha ustida chiziladi.
+ * Lentadagi kataklar soni kichik (server faqat FAOL lavhalarni qaytaradi), shuning uchun
+ * hammasini birdan kompozitsiya qilish qimmat emas.
+ *
+ * Har bir katakning o'rni, o'lchami va shaffofligi FAQAT joylashtirish lambda'sida
+ * hisoblanadi (`placeWithLayer`) — ya'ni surish davomida qayta kompozitsiya bo'lmaydi.
  */
 @Composable
-fun StoriesCollapsed(
-    myName: String,
-    myAvatarUrl: String?,
-    onClick: () -> Unit,
+private fun StoryStrip(
+    collapse: () -> Float,
+    contentPadding: PaddingValues,
+    collapsedStart: Dp,
+    onCollapsedClick: (() -> Unit)?,
     modifier: Modifier = Modifier,
-    /**
-     * Halqa ranglari. Sukut — brend gradienti; gradient topbar ustida oq beriladi, aks
-     * holda ko'k halqa ko'k fonda ko'rinmay qoladi.
-     */
-    ringBrush: Brush = Brush.linearGradient(listOf(Sc.BrandLight, Sc.Brand)),
-    vm: StoriesViewModel = koinViewModel(),
+    content: @Composable () -> Unit,
 ) {
-    val state by vm.state.collectAsStateWithLifecycle()
-    // O'zimniki birinchi — to'plamda ham lentadagi tartib saqlanadi.
-    val mine = if (state.hasMine) listOf(myName to myAvatarUrl) else emptyList()
-    val avatars = (mine + state.groups.map { it.author.displayName to it.author.avatarUrl })
-        .take(COLLAPSED_MAX)
-    if (avatars.isEmpty()) return
+    var offset by remember { mutableFloatStateOf(0f) }
+    // Surish chegarasi O'LCHASHda ma'lum bo'ladi. Snapshot holati EMAS: uni faqat imo-ishora
+    // ishlovchisi o'qiydi, ya'ni o'zgarishi hech nimani qayta chizishi shart emas.
+    val maxOffset = remember { floatArrayOf(0f) }
+    // Yig'ilgan to'plam qaysi to'rtburchakda turadi (chap, tepa, o'ng, past). Tegish
+    // FAQAT shu yerda ushlanadi: tasma butun kenglikni egallaydi va yig'ilganda
+    // sarlavhaning ustiga chiqadi — cheklovsiz u orqaga va qidiruv tugmalarini
+    // to'sib qo'yardi.
+    val collapsedBounds = remember { floatArrayOf(0f, 0f, 0f, 0f) }
+    val scroll = rememberScrollableState { delta ->
+        val old = offset
+        offset = (old - delta).coerceIn(0f, maxOffset[0])
+        old - offset
+    }
 
-    Row(
-        modifier.clip(RoundedCornerShape(percent = 50)).clickable(onClick = onClick),
-        // Manfiy oraliq — doiralar bir-birining ustiga chiqadi.
-        horizontalArrangement = Arrangement.spacedBy(-COLLAPSED_OVERLAP),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        avatars.forEach { (name, url) ->
-            Box(
-                Modifier.size(COLLAPSED_AVATAR + COLLAPSED_RING * 2)
-                    .clip(CircleShape)
-                    .background(ringBrush),
-                contentAlignment = Alignment.Center,
-            ) {
-                ScAvatar(
-                    name = name,
-                    size = COLLAPSED_AVATAR,
-                    avatarUrl = url,
-                    background = Color.White.copy(alpha = 0.9f),
-                )
+    Layout(
+        content = content,
+        modifier = modifier
+            // Yig'ilgan to'plam bitta butun tugma bo'lib qoladi: alohida kataklarning
+            // bosilishi ham, tasmaning surilishi ham o'sha paytda ma'nosiz.
+            .pointerInput(onCollapsedClick) {
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                    if (collapse() < CollapsedTapThreshold) return@awaitEachGesture
+                    val (left, top, right, bottom) = collapsedBounds
+                    val point = down.position
+                    if (point.x < left || point.x > right || point.y < top || point.y > bottom) {
+                        return@awaitEachGesture
+                    }
+                    down.consume()
+                    while (true) {
+                        val event = awaitPointerEvent(PointerEventPass.Initial)
+                        event.changes.forEach { it.consume() }
+                        if (event.changes.none { it.pressed }) break
+                    }
+                    onCollapsedClick?.invoke()
+                }
+            }
+            .scrollable(scroll, Orientation.Horizontal)
+            .clipHorizontally(),
+    ) { measurables, constraints ->
+        val loose = Constraints(maxWidth = Constraints.Infinity, maxHeight = Constraints.Infinity)
+        val placeables = measurables.map { it.measure(loose) }
+        val padStart = contentPadding.calculateLeftPadding(layoutDirection).roundToPx()
+        val padEnd = contentPadding.calculateRightPadding(layoutDirection).roundToPx()
+        val padTop = contentPadding.calculateTopPadding().roundToPx()
+        val padBottom = contentPadding.calculateBottomPadding().roundToPx()
+        val gap = CELL_GAP.roundToPx()
+
+        val contentWidth = placeables.sumOf { it.width } +
+            gap * (placeables.size - 1).coerceAtLeast(0) + padStart + padEnd
+        val width = constraints.maxWidth
+        val height = padTop + padBottom + (placeables.maxOfOrNull { it.height } ?: 0)
+        maxOffset[0] = (contentWidth - width).coerceAtLeast(0).toFloat()
+
+        val ringCenter = (CELL / 2).toPx()
+        val collapsedCell = StoriesCollapsedCell.toPx()
+        val collapsedStartPx = collapsedStart.toPx()
+        val collapsedStep = StoriesCollapsedStep.toPx()
+        val collapsedScale = collapsedCell / CELL.toPx()
+
+        val stacked = placeables.size.coerceAtMost(COLLAPSED_MAX)
+        val stackWidth = collapsedCell + collapsedStep * (stacked - 1).coerceAtLeast(0)
+        collapsedBounds[0] = collapsedStartPx
+        collapsedBounds[1] = padTop + ringCenter - collapsedCell
+        collapsedBounds[2] = collapsedStartPx + stackWidth
+        collapsedBounds[3] = padTop + ringCenter + collapsedCell
+
+        layout(width, height) {
+            val f = collapse().coerceIn(0f, 1f)
+            var x = padStart - offset
+            placeables.forEachIndexed { index, placeable ->
+                // Kataklar ustma-ust tushganda ham halqa markazi qimirlamasin: shkala
+                // va siljish shu nuqtaga nisbatan hisoblanadi.
+                val restCenter = x + placeable.width / 2f
+                val targetCenter = collapsedStartPx + collapsedCell / 2f + index * collapsedStep
+                val center = lerp(restCenter, targetCenter, f)
+                // To'plamda faqat dastlabki bir nechtasi qoladi — qolganlari yo'qoladi
+                // (aks holda sarlavha yonida o'nlab doira yig'ilib qolardi).
+                val fade = if (index < COLLAPSED_MAX) 1f else (1f - f).coerceIn(0f, 1f)
+                val left = x
+                placeable.placeWithLayer(left.roundToInt(), padTop) {
+                    transformOrigin = TransformOrigin(
+                        pivotFractionX = 0.5f,
+                        pivotFractionY = ringCenter / placeable.height,
+                    )
+                    val scale = lerp(1f, collapsedScale, f)
+                    scaleX = scale
+                    scaleY = scale
+                    translationX = center - restCenter
+                    alpha = fade
+                }
+                x += placeable.width + gap
             }
         }
     }
 }
+
+/**
+ * Faqat GORIZONTAL qirqish.
+ *
+ * Odatiy `clipToBounds()` ikkala o'q bo'yicha qirqadi va yig'ilayotgan kataklarning
+ * sarlavha qatoriga chiqishini to'sib qo'yardi. Vertikal chegara ataylab juda keng
+ * olingan — amalda "yo'q" degani.
+ */
+private fun Modifier.clipHorizontally() = drawWithContent {
+    val scope = this
+    clipRect(
+        left = 0f,
+        top = -size.height * VerticalClipSlack,
+        right = size.width,
+        bottom = size.height * VerticalClipSlack,
+    ) {
+        scope.drawContent()
+    }
+}
+
+/** Shundan ortiq yig'ilganda tasma bitta tugma bo'lib qoladi. */
+private const val CollapsedTapThreshold = 0.6f
+
+/** Vertikal qirqishning "yo'qligi" — tasma balandligining shuncha barobari. */
+private const val VerticalClipSlack = 6f
 
 /**
  * Rasm yoki video — ikkalasi ham lavha bo'la oladi, lekin tizim tanlagichlari boshqa-boshqa
@@ -243,6 +413,14 @@ private fun StoryPickerChoice(onDismiss: () -> Unit, onPhoto: () -> Unit, onVide
 }
 
 /**
+ * Katak ostidagi yozuv va «+» belgisi yig'ilish boshlanishi bilan TEZ yo'qoladi: 26dp'lik
+ * doirachalar yonida ular o'qilmaydigan chizgiga aylanardi.
+ */
+private fun labelAlpha(collapse: Float): Float = (1f - collapse * LabelFadeSpeed).coerceIn(0f, 1f)
+
+private const val LabelFadeSpeed = 2.5f
+
+/**
  * «Lavham» katakchasi — Telegramdagi «Hikoyam».
  *
  * Avatarim **doim** ko'rinadi (kamera ikonkasi emas): lavha qo'ygan-qo'ymaganimdan qat'i
@@ -258,6 +436,10 @@ private fun MyStoryCell(
     progress: Float?,
     /** Faol lavhalarim soni — halqa shuncha bo'lakka bo'linadi. */
     storyCount: Int,
+    /** Ko'k topbar ustidami — qarang [StoriesRow]. */
+    onHeader: Boolean,
+    /** Yig'ilish darajasi — yozuv va «+» belgisining shaffofligi uchun. */
+    collapse: () -> Float,
     onClick: () -> Unit,
     onAdd: () -> Unit,
 ) {
@@ -269,7 +451,7 @@ private fun MyStoryCell(
             Box(Modifier.clip(CircleShape).clickable(enabled = !publishing, onClick = onClick)) {
                 // O'z lavhalarim doim "yorqin": ular menga ko'rilgan-ko'rilmagan emas —
                 // halqa bu yerda "lavham bor" degan ma'noni bildiradi.
-                StoryRing(segments = List(storyCount) { true }) {
+                StoryRing(segments = List(storyCount) { true }, onHeader = onHeader) {
                     Box(contentAlignment = Alignment.Center) {
                         ScAvatar(name = name, size = AVATAR, avatarUrl = avatarUrl)
                         // Foiz avatar USTIDA: yuklash davomida ham kimning lavhasi
@@ -281,8 +463,11 @@ private fun MyStoryCell(
                 }
             }
             Box(
-                Modifier.size(22.dp).clip(CircleShape).background(Sc.Brand)
-                    .border(2.5.dp, Sc.Bg, CircleShape)
+                Modifier.graphicsLayer { alpha = labelAlpha(collapse()) }
+                    .size(22.dp).clip(CircleShape).background(Sc.Brand)
+                    // Halqa fon rangida — topbar ustida esa oq, aks holda kulrang doira
+                    // ko'k gradientda "kir dog'" bo'lib ko'rinardi.
+                    .border(2.5.dp, if (onHeader) Color.White else Sc.Bg, CircleShape)
                     .clickable(enabled = !publishing, onClick = onAdd),
                 contentAlignment = Alignment.Center,
             ) {
@@ -308,11 +493,22 @@ private fun MyStoryCell(
             },
             11.5f,
             FontWeight.SemiBold,
-            if (hasMine) Sc.Ink else Sc.Muted,
-            Modifier.width(CELL),
+            storyLabelColor(active = hasMine, onHeader = onHeader),
+            Modifier.width(CELL).graphicsLayer { alpha = labelAlpha(collapse()) },
             maxLines = 1,
         )
     }
+}
+
+/**
+ * Katak ostidagi yozuv rangi: faol (lavhasi bor / ko'rilmagan) — to'q, aks holda xira.
+ * Ko'k topbar ustida ikkalasi ham oq, farqi shaffoflikda.
+ */
+@Composable
+private fun storyLabelColor(active: Boolean, onHeader: Boolean): Color = when {
+    onHeader -> if (active) Color.White else Color.White.copy(alpha = 0.7f)
+    active -> Sc.Ink
+    else -> Sc.Muted
 }
 
 /**
@@ -322,14 +518,19 @@ private fun MyStoryCell(
  * (§2). Ko'rib bo'lingan guruhda halqa xira chiziq bo'lib qoladi.
  */
 @Composable
-private fun StoryCell(group: StoryGroup, onClick: () -> Unit) {
+private fun StoryCell(
+    group: StoryGroup,
+    onHeader: Boolean,
+    collapse: () -> Float,
+    onClick: () -> Unit,
+) {
     Column(
         Modifier.clip(RoundedCornerShape(14.dp)).clickable(onClick = onClick),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         // Har lavha uchun bitta bo'lak: ko'rilmagani yorqin, ko'rilgani xira — Telegram
         // va Instagramdagi kabi, ya'ni "yana nechtasi qolgani" bir qarashda ko'rinadi.
-        StoryRing(segments = group.stories.map { !it.seen }) {
+        StoryRing(segments = group.stories.map { !it.seen }, onHeader = onHeader) {
             ScAvatar(
                 name = group.author.displayName,
                 size = AVATAR,
@@ -341,8 +542,10 @@ private fun StoryCell(group: StoryGroup, onClick: () -> Unit) {
             group.author.displayName,
             11.5f,
             FontWeight.SemiBold,
-            if (group.hasUnseen) Sc.Ink else Sc.Muted,
-            Modifier.width(CELL).padding(horizontal = 2.dp),
+            storyLabelColor(active = group.hasUnseen, onHeader = onHeader),
+            Modifier.width(CELL)
+                .padding(horizontal = 2.dp)
+                .graphicsLayer { alpha = labelAlpha(collapse()) },
             maxLines = 1,
         )
     }
@@ -362,9 +565,13 @@ private fun StoryCell(group: StoryGroup, onClick: () -> Unit) {
  * Halqa bilan avatar orasida oraliq bor ([GAP]) — halqa avatarga «yopishib» qolmaydi.
  */
 @Composable
-private fun StoryRing(segments: List<Boolean>, content: @Composable () -> Unit) {
-    val litBrush = Brush.linearGradient(listOf(Sc.BrandLight, Sc.Brand, Sc.Violet))
-    val dimBrush = SolidColor(Sc.Border)
+private fun StoryRing(segments: List<Boolean>, onHeader: Boolean, content: @Composable () -> Unit) {
+    // Ko'k gradient ustida brend gradienti yo'qoladi — u yerda halqa oq bo'ladi,
+    // ko'rilgani esa shaffof oq (fon ustidagi xira kulrang chiziqning o'rnida).
+    val litBrush =
+        if (onHeader) SolidColor(Color.White)
+        else Brush.linearGradient(listOf(Sc.BrandLight, Sc.Brand, Sc.Violet))
+    val dimBrush = SolidColor(if (onHeader) Color.White.copy(alpha = 0.38f) else Sc.Border)
     // Ro'yxat bo'sh — bitta xira halqa (hali lavha yo'q).
     val states = segments.ifEmpty { listOf(false) }
 
@@ -426,6 +633,60 @@ private val COLLAPSED_AVATAR = 26.dp
 private val COLLAPSED_RING = 1.5.dp
 private val COLLAPSED_OVERLAP = 10.dp
 private const val COLLAPSED_MAX = 3
+
+/**
+ * Lenta yig'ilganda (bosh ekran topbari siqilganda) uning o'rnini bosadigan **kichik
+ * to'plam** — Telegramdagidek bir-birining ustiga chiqqan 3 tagacha avatar.
+ *
+ * Bosilganda ekran tepasiga qaytaradi ([onClick]), ya'ni to'liq lenta ko'rinadi. Lavha
+ * umuman bo'lmasa (o'zimniki ham, boshqalarniki ham) hech nima chizilmaydi.
+ *
+ * ⚠️ Xabarlar ekranida bu ishlatilmaydi: u yerda lentaning O'ZI shu to'plamga aylanadi
+ * ([StoriesRow] `collapse`), ya'ni ikkita alohida ko'rinish o'rniga bitta uzluksiz harakat.
+ */
+@Composable
+fun StoriesCollapsed(
+    myName: String,
+    myAvatarUrl: String?,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    /**
+     * Halqa ranglari. Sukut — brend gradienti; gradient topbar ustida oq beriladi, aks
+     * holda ko'k halqa ko'k fonda ko'rinmay qoladi.
+     */
+    ringBrush: Brush = Brush.linearGradient(listOf(Sc.BrandLight, Sc.Brand)),
+    vm: StoriesViewModel = koinViewModel(),
+) {
+    val state by vm.state.collectAsStateWithLifecycle()
+    // O'zimniki birinchi — to'plamda ham lentadagi tartib saqlanadi.
+    val mine = if (state.hasMine) listOf(myName to myAvatarUrl) else emptyList()
+    val avatars = (mine + state.groups.map { it.author.displayName to it.author.avatarUrl })
+        .take(COLLAPSED_MAX)
+    if (avatars.isEmpty()) return
+
+    Row(
+        modifier.clip(RoundedCornerShape(percent = 50)).clickable(onClick = onClick),
+        // Manfiy oraliq — doiralar bir-birining ustiga chiqadi.
+        horizontalArrangement = Arrangement.spacedBy(-COLLAPSED_OVERLAP),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        avatars.forEach { (name, url) ->
+            Box(
+                Modifier.size(COLLAPSED_AVATAR + COLLAPSED_RING * 2)
+                    .clip(CircleShape)
+                    .background(ringBrush),
+                contentAlignment = Alignment.Center,
+            ) {
+                ScAvatar(
+                    name = name,
+                    size = COLLAPSED_AVATAR,
+                    avatarUrl = url,
+                    background = Color.White.copy(alpha = 0.9f),
+                )
+            }
+        }
+    }
+}
 
 /**
  * Tanlangan video lavha uchun juda uzunmi.

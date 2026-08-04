@@ -3,6 +3,7 @@ package dev.feature.chat.presentation
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -31,6 +32,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -40,6 +42,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.layout.ContentScale
@@ -57,6 +60,7 @@ import dev.core.uikit.components.ScUploadRing
 import dev.core.uikit.components.StatusBarAppearance
 import dev.core.uikit.components.scUploadPercent
 import dev.core.uikit.media.ScVideoPlayer
+import dev.core.uikit.media.rememberScVideoState
 import dev.core.uikit.media.toImageBitmapOrNull
 import kotlinx.coroutines.launch
 import dev.core.uikit.theme.Sc
@@ -139,9 +143,24 @@ internal fun ImageAlbumBubble(
      * uzun bosishni **o'ziga olib qo'yardi** va surish boshlanmasdi.
      */
     onTap: () -> Unit,
+    /**
+     * To'rda video katagi bor — uning birinchi kadrini tayyorlash uchun.
+     *
+     * ⚠️ Video xabar aynan SHU yerda chiziladi, [VideoBubble] da emas: `VIDEO` turi
+     * `MEDIA_GRID` ga kiradi va rasm bilan bitta mozaikadan o'tadi.
+     */
+    onNeedPoster: (mediaId: String?, url: String?) -> Unit = { _, _ -> },
 ) {
     val images = message.images
     if (images.isEmpty()) return
+
+    // Har bir video katagi uchun bir marta. `fullUrl` — videoning o'zi; `url` esa
+    // allaqachon poster bo'lishi mumkin va uni manba qilib berish aylanma bo'lardi.
+    LaunchedEffect(images) {
+        // Faqat serverda poster BO'LMAGAN videolar uchun: serverning tayyor rasmi bo'lsa
+        // kadr ajratish ortiqcha ish bo'lardi.
+        images.filter { it.video && it.url == null }.forEach { onNeedPoster(it.mediaId, it.fullUrl) }
+    }
 
     val align = if (message.outgoing) Alignment.CenterEnd else Alignment.CenterStart
     Box(Modifier.fillMaxWidth(), contentAlignment = align) {
@@ -278,7 +297,11 @@ private fun ImageCell(
                 // (`02-API-CHANGES.md` §media), ya'ni "to'liq" ham bir necha yuz KB.
                 // Coil dekodlashda katakning o'lchamiga qadar kichraytiradi — xotira
                 // katakning o'zicha qoladi. Havola bo'lmasa thumb'ga qaytamiz.
-                model = image.fullUrl ?: image.url,
+                //
+                // ⚠️ VIDEO bunga kirmaydi: unda `fullUrl` — videoning O'ZI (`.mp4`), Coil
+                // esa undan kadr chiqara olmaydi va katak bo'sh kulrang bo'lib qolardi.
+                // Videoda `url` allaqachon poster (telefonda ajratilgan birinchi kadr).
+                model = if (image.video) image.url else image.fullUrl ?: image.url,
                 contentDescription = "Rasm",
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),
@@ -474,6 +497,12 @@ internal fun MediaViewerDialog(
     title: String? = null,
     /** Sarlavha ostidagi qator — qachon yuborilgani. */
     subtitle: String? = null,
+    /** Video ostida ko'rsatiladigan izoh (xabar matni). */
+    caption: String? = null,
+    /**
+     * Ochilgan video — uni telefonga bir marta saqlash uchun. Rasmlarda chaqirilmaydi.
+     */
+    onVideoOpened: (mediaId: String?, url: String?) -> Unit = { _, _ -> },
     onDismiss: () -> Unit,
 ) {
     if (items.isEmpty()) return
@@ -482,6 +511,22 @@ internal fun MediaViewerDialog(
         pageCount = { items.size },
     )
     val scope = rememberCoroutineScope()
+
+    // Surib o'tilgan HAR bir video saqlanadi, faqat birinchisi emas: albomda beshta video
+    // bo'lsa foydalanuvchi hammasini ko'radi va hammasi telefonda qolishi kerak.
+    val current = items.getOrNull(pager.currentPage)
+    LaunchedEffect(current?.mediaId) {
+        if (current?.video == true) onVideoOpened(current.mediaId, current.fullUrl ?: current.url)
+    }
+
+    // Videoning o'z boshqaruvi (Telegramdagidek). Holat SAHIFA bo'yicha emas, ko'rgich
+    // bo'yicha bitta: bir vaqtda faqat bitta video o'ynaydi, ya'ni ikkitasi kerak emas.
+    val videoState = rememberScVideoState()
+    // Panel videoga bosilganda yashirinadi/ko'rinadi. Rasmda ma'nosi yo'q — u yerda
+    // bosish hech narsa qilmaydi.
+    var controlsVisible by remember { mutableStateOf(true) }
+    // Sahifa almashsa panel qaytadan ko'rinsin: yangi videoni boshqarish kerak bo'ladi.
+    LaunchedEffect(pager.currentPage) { controlsVisible = true }
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -499,9 +544,17 @@ internal fun MediaViewerDialog(
                         headers = mediaHeaders,
                         // Faqat ochiq sahifa o'ynaydi — qolganlari pauzada turadi.
                         autoPlay = pager.currentPage == page,
-                        showControls = true,
+                        // Tizimning tayyor paneli o'chirilgan — uning o'rniga
+                        // [VideoPlayerControls] chiziladi (Telegram ko'rinishi).
+                        showControls = false,
                         contentScaleFit = true,
-                        modifier = Modifier.fillMaxSize(),
+                        // Holat faqat OCHIQ sahifaga ulanadi: aks holda tasmadagi barcha
+                        // videolar bitta ko'chirgichni bir vaqtda yangilab yuborardi.
+                        state = if (pager.currentPage == page) videoState else null,
+                        modifier = Modifier.fillMaxSize()
+                            .pointerInput(Unit) {
+                                detectTapGestures { controlsVisible = !controlsVisible }
+                            },
                     )
                     url != null -> AsyncImage(
                         model = url,
@@ -580,6 +633,15 @@ internal fun MediaViewerDialog(
                 }
             }
 
+            // Videoning boshqaruv paneli — faqat ochiq sahifa video bo'lsa.
+            if (current?.video == true) {
+                VideoPlayerControls(
+                    state = videoState,
+                    visible = controlsVisible,
+                    caption = caption,
+                )
+            }
+
             // Pastdagi tasma — albomdagi qolgan medialar; bosilgani darhol ochiladi.
             if (items.size > 1) {
                 LazyRow(
@@ -615,11 +677,13 @@ internal fun ImageViewerDialog(
     images: List<ChatMediaItem>,
     startIndex: Int,
     mediaHeaders: Map<String, String> = emptyMap(),
+    onVideoOpened: (mediaId: String?, url: String?) -> Unit = { _, _ -> },
     onDismiss: () -> Unit,
 ) = MediaViewerDialog(
     items = images,
     startIndex = startIndex,
     mediaHeaders = mediaHeaders,
+    onVideoOpened = onVideoOpened,
     onDismiss = onDismiss,
 )
 
@@ -799,8 +863,15 @@ private fun Waveform(points: List<Int>, progress: Float) {
  * O'shanda ijro belgisi o'rniga "tayyorlanmoqda" ko'rsatiladi — bosilsa faqat xato chiqardi.
  */
 @Composable
-internal fun VideoBubble(message: ChatMessageUi, onOpen: () -> Unit) {
+internal fun VideoBubble(
+    message: ChatMessageUi,
+    onOpen: () -> Unit,
+    /** Pufak ekranga chiqdi — birinchi kadrni tayyorlash uchun. */
+    onNeedPoster: (mediaId: String?, url: String?) -> Unit = { _, _ -> },
+) {
     val video = message.attachment ?: return
+    // Kadr faqat KERAK bo'lganda ajratiladi: pufak ekranga chiqmasa ish ham boshlanmaydi.
+    LaunchedEffect(video.mediaId) { onNeedPoster(video.mediaId, video.url) }
     val align = if (message.outgoing) Alignment.CenterEnd else Alignment.CenterStart
     Box(Modifier.fillMaxWidth(), contentAlignment = align) {
         Box(
@@ -877,8 +948,14 @@ internal fun VideoBubble(message: ChatMessageUi, onOpen: () -> Unit) {
  * osilib qolgandek ko'rinardi.
  */
 @Composable
-internal fun VideoNoteBubble(message: ChatMessageUi, onOpen: () -> Unit) {
+internal fun VideoNoteBubble(
+    message: ChatMessageUi,
+    onOpen: () -> Unit,
+    /** Doira ekranga chiqdi — birinchi kadrini tayyorlash uchun. */
+    onNeedPoster: (mediaId: String?, url: String?) -> Unit = { _, _ -> },
+) {
     val video = message.attachment ?: return
+    LaunchedEffect(video.mediaId) { onNeedPoster(video.mediaId, video.url) }
     val align = if (message.outgoing) Alignment.CenterEnd else Alignment.CenterStart
     Box(Modifier.fillMaxWidth(), contentAlignment = align) {
         Box(
