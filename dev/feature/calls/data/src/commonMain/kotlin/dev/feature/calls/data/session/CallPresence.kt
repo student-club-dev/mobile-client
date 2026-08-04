@@ -12,6 +12,16 @@ package dev.feature.calls.data.session
 interface CallPresence {
 
     /**
+     * Kiruvchi qo'ng'iroq keldi — telefon jiringlay boshladi.
+     *
+     * Android'da bu **to'liq ekranli** bildirishnoma: ilova fonda bo'lsa ham (yoki ekran
+     * o'chiq bo'lsa ham) tizim qo'ng'irog'idek "Javob berish / Rad etish" oynasi chiqadi.
+     * Usiz kiruvchi qo'ng'iroq faqat ilova ochiq turganda ko'rinardi — ya'ni amalda
+     * ko'rinmasdi.
+     */
+    fun onIncomingCall(peerName: String, video: Boolean)
+
+    /**
      * Jonli qo'ng'iroq boshlandi. [peerName] bildirishnomada ko'rinadi.
      *
      * [video] — kamera ishlatiladimi. Android'da bu **muhim**: old plan xizmatining
@@ -25,6 +35,7 @@ interface CallPresence {
 
     /** Platforma ilmog'i kerak bo'lmagan joylar uchun (testlar, iOS 1-bosqichi). */
     companion object Noop : CallPresence {
+        override fun onIncomingCall(peerName: String, video: Boolean) = Unit
         override fun onCallStarted(peerName: String, video: Boolean) = Unit
         override fun onCallEnded() = Unit
     }

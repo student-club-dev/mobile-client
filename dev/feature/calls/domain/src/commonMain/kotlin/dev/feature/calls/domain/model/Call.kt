@@ -115,6 +115,19 @@ data class IceServers(
     val servers: List<IceServer> = emptyList(),
     val ttlSeconds: Int = DEFAULT_TTL_SECONDS,
 ) {
+    /**
+     * Ro'yxatda **haqiqiy TURN** bormi.
+     *
+     * ⚠️ Bu tekshiruvsiz `relayOnly` halokatli: `iceTransportPolicy = RELAY` da klient
+     * FAQAT relay nomzod yig'adi va TURN bo'lmasa nomzodlar umuman bo'lmaydi — qo'ng'iroq
+     * "Ulanmoqda" da turib, 30 soniyadan keyin `FAILED` bo'ladi. STUN (`stun:`) bu yerda
+     * hisobga olinmaydi: u srflx beradi, relay emas.
+     */
+    val hasTurn: Boolean
+        get() = servers.any { server ->
+            server.urls.any { it.startsWith("turn:") || it.startsWith("turns:") }
+        }
+
     companion object {
         const val DEFAULT_TTL_SECONDS = 3600
 

@@ -1,7 +1,6 @@
 package dev.feature.calls.data.engine
 
 import android.content.Context
-import android.media.AudioManager
 import dev.feature.calls.domain.model.CallMedia
 import dev.feature.calls.domain.model.CallStats
 import dev.feature.calls.domain.model.CandidateType
@@ -69,8 +68,20 @@ internal class WebRtcCallEngine(
     private var frontCamera = true
     private var closed = false
 
-    private val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-    private var previousAudioMode = AudioManager.MODE_NORMAL
+    /**
+     * Remote tavsif qo'yilgunicha kelgan nomzodlar.
+     *
+     * `addIceCandidate` remote tavsifsiz **jimgina yiqiladi**, nomzod esa qaytib kelmaydi.
+     * `call:accepted` va `call:ice` alohida oqimlarda yig'ilgani uchun nomzodning oldinroq
+     * kelishi kamdan-kam emas — aksincha, odatiy hol. Aynan shu qo'ng'iroqni "Ulanmoqda"
+     * da qotirib qo'yardi.
+     */
+    private val pendingCandidates = mutableListOf<IceCandidate>()
+    private var remoteDescriptionSet = false
+    private val candidateLock = Any()
+
+    /** Joriy konfiguratsiya — [relaxIceTransportPolicy] uni o'zgartirib qayta qo'yadi. */
+    private var configuration: PeerConnection.RTCConfiguration? = null
 
     // --- Qurish ---------------------------------------------------------------------------
 
@@ -99,7 +110,30 @@ internal class WebRtcCallEngine(
         setRemote(SessionDescription(SessionDescription.Type.ANSWER, remoteAnswerSdp))
 
     override suspend fun addRemoteCandidate(candidate: String, sdpMid: String, sdpMLineIndex: Int) {
-        peerConnection?.addIceCandidate(IceCandidate(sdpMid, sdpMLineIndex, candidate))
+        val ice = IceCandidate(sdpMid, sdpMLineIndex, candidate)
+        val connection = synchronized(candidateLock) {
+            if (!remoteDescriptionSet) {
+                pendingCandidates += ice
+                null
+            } else {
+                peerConnection
+            }
+        }
+        connection?.addIceCandidate(ice)
+    }
+
+    /** Navbatdagi nomzodlarni quyadi — remote tavsif qo'yilgan zahoti chaqiriladi. */
+    private fun flushPendingCandidates() {
+        val connection = peerConnection ?: return
+        val queued = synchronized(candidateLock) {
+            remoteDescriptionSet = true
+            val copy = pendingCandidates.toList()
+            pendingCandidates.clear()
+            copy
+        }
+        if (queued.isEmpty()) return
+        Napier.d("WebRTC: navbatdagi ${queued.size} ta nomzod quyildi", tag = LOG_TAG)
+        queued.forEach { runCatching { connection.addIceCandidate(it) } }
     }
 
     override suspend fun createRenegotiationOffer(iceRestart: Boolean): String? =
@@ -136,6 +170,7 @@ internal class WebRtcCallEngine(
         }
         val connection = factory.createPeerConnection(config, PeerObserver()) ?: return false
         peerConnection = connection
+        configuration = config
 
         // Ovoz doim bor — `VIDEO` qo'ng'iroqda ham suhbat ovozdan boshlanadi.
         val source = factory.createAudioSource(audioConstraints())
@@ -145,8 +180,6 @@ internal class WebRtcCallEngine(
         connection.addTrack(track, listOf(STREAM_ID))
 
         if (media == CallMedia.VIDEO) startCamera(connection)
-
-        enterCommunicationMode()
         true
     }.getOrElse {
         Napier.e("WebRTC: PeerConnection qurilmadi", it, tag = LOG_TAG)
@@ -221,21 +254,24 @@ internal class WebRtcCallEngine(
     }
 
     /**
-     * Karnay/quloqchin.
+     * ICE siyosatini `ALL` ga bo'shatadi — `setConfiguration` ni qayta qo'yish orqali.
      *
-     * Android 12+ da `setCommunicationDevice` rasmiy yo'l, undan eskisida esa
-     * `isSpeakerphoneOn`. Ikkalasi ham qo'llanadi: yangi API ba'zi qurilmalarda
-     * Bluetooth ulangan bo'lsa ishlamaydi va eski bayroq zaxira bo'lib qoladi.
+     * `PeerConnection` qayta qurilmaydi: mavjud nomzodlar va oqimlar joyida qoladi,
+     * libwebrtc esa endi host/srflx nomzodlarni ham yig'a boshlaydi
+     * (`continualGatheringPolicy = GATHER_CONTINUALLY` shuning uchun ham kerak).
      */
-    override fun setSpeakerEnabled(enabled: Boolean) = runCatching {
-        @Suppress("DEPRECATION")
-        audioManager.isSpeakerphoneOn = enabled
-    }.getOrElse { }
-
-    private fun enterCommunicationMode() = runCatching {
-        previousAudioMode = audioManager.mode
-        audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
-    }.getOrElse { }
+    override fun relaxIceTransportPolicy() {
+        val connection = peerConnection ?: return
+        val config = configuration ?: return
+        if (config.iceTransportsType == PeerConnection.IceTransportsType.ALL) return
+        runCatching {
+            config.iceTransportsType = PeerConnection.IceTransportsType.ALL
+            connection.setConfiguration(config)
+            Napier.d("WebRTC: ICE siyosati ALL ga bo'shatildi", tag = LOG_TAG)
+        }.onFailure {
+            Napier.w("WebRTC: ICE siyosati bo'shatilmadi", it, tag = LOG_TAG)
+        }
+    }
 
     // --- O'lchov --------------------------------------------------------------------------
 
@@ -324,11 +360,11 @@ internal class WebRtcCallEngine(
         runCatching { videoSource?.dispose() }
         runCatching { audioSource?.dispose() }
         runCatching { peerConnection?.dispose() }
-        runCatching {
-            @Suppress("DEPRECATION")
-            audioManager.isSpeakerphoneOn = false
-            audioManager.mode = previousAudioMode
+        synchronized(candidateLock) {
+            pendingCandidates.clear()
+            remoteDescriptionSet = false
         }
+        configuration = null
         capturer = null
         surfaceHelper = null
         videoSource = null
@@ -393,7 +429,10 @@ internal class WebRtcCallEngine(
             },
             description,
         )
-        return applied.await()
+        val ok = applied.await()
+        // Endi nomzodlarni qabul qilsa bo'ladi — kutib turganlari shu yerda quyiladi.
+        if (ok) flushPendingCandidates()
+        return ok
     }
 
     // --- PeerConnection kuzatuvchisi ---------------------------------------------------------

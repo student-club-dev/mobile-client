@@ -39,6 +39,8 @@ private class UnsupportedCallEngine : CallEngine {
 
     override suspend fun addRemoteCandidate(candidate: String, sdpMid: String, sdpMLineIndex: Int) = Unit
 
+    override fun relaxIceTransportPolicy() = Unit
+
     override suspend fun createRenegotiationOffer(iceRestart: Boolean): String? = null
 
     override suspend fun answerRenegotiation(remoteOfferSdp: String): String? = null
@@ -46,7 +48,6 @@ private class UnsupportedCallEngine : CallEngine {
     override fun setMicEnabled(enabled: Boolean) = Unit
     override fun setCameraEnabled(enabled: Boolean) = Unit
     override fun switchCamera() = Unit
-    override fun setSpeakerEnabled(enabled: Boolean) = Unit
 
     override suspend fun collectStats(): CallStats? = null
 

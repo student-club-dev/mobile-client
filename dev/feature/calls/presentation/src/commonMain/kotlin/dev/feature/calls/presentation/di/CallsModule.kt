@@ -77,6 +77,7 @@ fun callsModule() = module {
             repository = get(),
             accessToken = { get<TokenStore>().tokens()?.accessToken },
             presence = get(),
+            audio = get(),
             scope = get(named(WS_SCOPE)),
         )
     }

@@ -52,8 +52,23 @@ interface CallEngine {
      * Nomzod hech qachon o'zgartirilmaydi — server ham shunday qiladi (yagona chetlashish:
      * `relayOnly` qo'ng'iroqda `typ relay` bo'lmagan nomzodni **tashlab yuborish**, qayta
      * yozish emas).
+     *
+     * ⚠️ Nomzod remote tavsifdan **oldin** kelishi odatiy hol: `call:accepted` va `call:ice`
+     * alohida oqimlarda yig'iladi, ya'ni tartib kafolatlanmagan. Amalga oshirish uni
+     * navbatga olishi va remote tavsif qo'yilgach quyishi SHART — aks holda nomzod
+     * yo'qoladi va qo'ng'iroq "ulanmoqda" da qotib qoladi.
      */
     suspend fun addRemoteCandidate(candidate: String, sdpMid: String, sdpMLineIndex: Int)
+
+    /**
+     * ICE siyosatini `RELAY` dan `ALL` ga bo'shatadi.
+     *
+     * Chiquvchi qo'ng'iroq ENG QAT'IY variantdan boshlanadi (faqat TURN), chunki
+     * `relayOnly` ning haqiqiy qiymati `call:invite` ack'igacha noma'lum. Ack `false`
+     * desa — juftlik avval gaplashgan — siyosat bo'shatiladi va host/srflx nomzodlar
+     * ham yig'iladi: bir tarmoqdagi ikki telefon TURN'siz, sezilarli tez ulanadi.
+     */
+    fun relaxIceTransportPolicy()
 
     /** Qayta muzokara: yangi offer quradi (kamera yoqilganda, ICE restart'da). */
     suspend fun createRenegotiationOffer(iceRestart: Boolean = false): String?
@@ -64,7 +79,11 @@ interface CallEngine {
     fun setMicEnabled(enabled: Boolean)
     fun setCameraEnabled(enabled: Boolean)
     fun switchCamera()
-    fun setSpeakerEnabled(enabled: Boolean)
+
+    // ⚠️ Karnay/quloqchin bu yerda EMAS — u [dev.feature.calls.data.session.CallAudio] da.
+    // Audio rejimi, fokus va marshrutning egasi bitta bo'lishi shart: ikki joydan
+    // boshqarilganda jiringlash `MODE_IN_COMMUNICATION` ni bosib ketardi va qo'ng'iroq
+    // ovozsiz qolardi.
 
     /**
      * Qo'ng'iroq o'lchovlari — `POST /v1/calls/{id}/stats` uchun.
