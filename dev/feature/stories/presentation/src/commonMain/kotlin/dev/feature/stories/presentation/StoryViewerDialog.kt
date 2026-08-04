@@ -80,9 +80,16 @@ internal fun StoryViewerDialog(
 ) {
     val group = state.group ?: return
     val story = state.story ?: return
-    var paused by remember { mutableStateOf(false) }
+    /** Barmoq ekranda ushlab turilibdi ([StoryTapZone]). */
+    var held by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
+    // Lavha almashsa ro'yxat yopiladi — u aynan shu postniki.
+    var viewersOpen by remember(story.id) { mutableStateOf(false) }
     val isVideo = story.kind == StoryKind.VIDEO
+
+    // Ustiga oyna chiqqanda lavha o'zi keyingisiga o'tib ketmasin: o'chirishni tasdiqlash
+    // ham, ko'rganlar ro'yxati ham ushlab turish bilan bir xil — vaqt to'xtaydi.
+    val paused = held || confirmDelete || viewersOpen
 
     /**
      * Tepadagi chiziqning to'lish ulushi (`0f..1f`) — **rasm uchun**.
@@ -171,12 +178,12 @@ internal fun StoryViewerDialog(
             Row(Modifier.fillMaxSize()) {
                 StoryTapZone(
                     Modifier.weight(1f),
-                    onHold = { paused = it },
+                    onHold = { held = it },
                     onTap = onPrevious,
                 )
                 StoryTapZone(
                     Modifier.weight(1f),
-                    onHold = { paused = it },
+                    onHold = { held = it },
                     onTap = onNext,
                 )
             }
@@ -221,12 +228,16 @@ internal fun StoryViewerDialog(
                         Column(Modifier.weight(1f)) {
                             ScText(group.author.displayName, 13.5f, FontWeight.Bold, Color.White, maxLines = 1)
                             // O'z lavhamda ko'rishlar soni bor; boshqalarnikida u ATAYLAB `null`.
+                            //
+                            // Bosilsa — kim ko'rgani ([StoryViewersSheet]). Ro'yxat arxivdagi
+                            // post uchun ham ochiladi: son muzlagan bo'lsa ham qatorlar joyida.
                             story.viewsCount?.let {
                                 ScText(
                                     "$it marta ko'rilgan",
                                     11f,
                                     FontWeight.Medium,
                                     Color.White.copy(alpha = 0.75f),
+                                    Modifier.clickable { viewersOpen = true },
                                 )
                             }
                         }
@@ -266,11 +277,15 @@ internal fun StoryViewerDialog(
                 }
             }
 
+            // Kim ko'rgani — o'z postimda, ko'rishlar soni bosilganda. Tegish zonalarining
+            // ustida turadi, ya'ni ro'yxat ochiqda ekranga tegish lavhani surmaydi.
+            if (viewersOpen) {
+                StoryViewersSheet(storyId = story.id, onClose = { viewersOpen = false })
+            }
+
             if (confirmDelete) {
-                // Pauza: dialog ochiq turganda lavha o'zi keyingisiga o'tib ketmasin.
-                paused = true
                 DeleteConfirm(
-                    onCancel = { confirmDelete = false; paused = false },
+                    onCancel = { confirmDelete = false },
                     onConfirm = { confirmDelete = false; onDelete(story.id) },
                 )
             }

@@ -7,6 +7,7 @@ import dev.feature.stories.data.repository.StoryRepositoryImpl
 import dev.feature.stories.domain.repository.StoryRepository
 import dev.feature.stories.presentation.MyPostsViewModel
 import dev.feature.stories.presentation.StoriesViewModel
+import dev.feature.stories.presentation.StoryViewersViewModel
 import dev.feature.stories.presentation.StudentPostsViewModel
 import io.ktor.client.HttpClient
 import org.koin.core.module.dsl.viewModelOf
@@ -34,6 +35,8 @@ fun storiesModule() = module {
     }
 
     viewModelOf(::StoriesViewModel)
+    // Lavha ko'ruvchisidagi «kim ko'rgan» ro'yxati — arxivdagi post uchun ham.
+    viewModelOf(::StoryViewersViewModel)
     // Profildagi «Postlar» / «Arxivlangan postlar» bo'limi — lentadan alohida holat.
     viewModelOf(::MyPostsViewModel)
     // Boshqa talaba profilidagi «Postlar» bo'limi.

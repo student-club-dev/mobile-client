@@ -41,6 +41,7 @@ import dev.feature.chat.domain.repository.ChatRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -628,7 +629,9 @@ class ChatRepositoryImpl(
         // sekinlashadi va serverning yuklash kvotasi (daqiqasiga 20 fayl) tezroq tugaydi.
         var failure: Resource.Error? = null
         for (item in pending) {
-            val result = uploadAndDeliver(conversationId, item, albumId)
+            // Videodagi bilan bir xil sabab ([withSendJob]): chatdan chiqib ketish
+            // yarim ketgan albomni to'xtatmasin.
+            val result = withSendJob(item.localId) { uploadAndDeliver(conversationId, item, albumId) }
             if (result is Resource.Error) failure = result
         }
         // Bittasi yiqilsa ham qolganlari yuborilgan — xatoni qaytaramiz, lekin xabarlar
@@ -774,14 +777,48 @@ class ChatRepositoryImpl(
         uploads.update { it - messageId }
     }
 
-    /** Blokni [sendJobs] da ro'yxatga olib bajaradi — tugagach yozuv o'chadi. */
+    /**
+     * Blokni **repozitoriy qamrovida** bajaradi va [sendJobs] da ro'yxatga oladi.
+     *
+     * ⚠️ Ataylab chaqiruvchining korutini emas. Ilgari yuborish `viewModelScope` da
+     * ketardi: chatdan chiqib ketish yoki ekranning aylanishi yarim yo'ldagi videoni
+     * o'ldirar, foydalanuvchi esa buni faqat qaytib kelganda ko'rardi. Repozitoriy Koin'da
+     * `single`, ya'ni uning qamrovi ilova bilan tengdosh.
+     *
+     * Chaqiruvchi baribir natijani kutadi ([await]) — lekin uning bekor bo'lishi faqat
+     * **kutishni** to'xtatadi, ishning o'zini emas. Yuborishni atayin to'xtatish uchun
+     * [cancelSend] bor va u aynan shu yerda ro'yxatga olingan korutinni bekor qiladi.
+     */
     private suspend fun <T> withSendJob(localId: String, block: suspend () -> T): T {
-        currentCoroutineContext()[Job]?.let { job -> sendJobs.update { it + (localId to job) } }
-        return try {
-            block()
-        } finally {
-            sendJobs.update { it - localId }
-        }
+        val work = scope.async { block() }
+        sendJobs.update { it + (localId to work) }
+        // Ro'yxat ishning o'zi tugaganda tozalanadi: `finally` da tozalash kutish bekor
+        // bo'lganda hali ketayotgan yuborishni ro'yxatdan o'chirib, uni bekor qilib
+        // bo'lmaydigan holga keltirardi.
+        work.invokeOnCompletion { sendJobs.update { jobs -> jobs - localId } }
+        return work.await()
+    }
+
+    /**
+     * Halqaning siqishga ajratilgan qismi — **davomiylikka qarab**.
+     *
+     * Ilgari bu qotirilgan `0.5f` edi va uzun lavhada halqa yarmida daqiqalab qotib
+     * turardi: uch daqiqalik videoni qayta kodlash bir necha daqiqa, uni yuklash esa
+     * o'n soniya — ya'ni ish 90% siqishda, halqa esa 50% deb ko'rsatardi.
+     *
+     * Bu ham **baho**, aniq o'lchov emas (kodek ham, tarmoq ham oldindan noma'lum), lekin
+     * u ishning haqiqiy nisbatiga qarab o'zgaradi: qisqa lavhada yuklash, uzunida siqish
+     * ustun bo'ladi.
+     */
+    private fun prepareShare(video: OutgoingVideo): Float {
+        val seconds = video.durationMs?.takeIf { it > 0 }?.let { it / MS_IN_SECOND } ?: return DEFAULT_PREPARE_SHARE
+        val encodeSeconds = seconds * ENCODE_SECONDS_PER_SECOND
+        // Siqilgan fayl manbadan katta bo'lmaydi va maqsadli hajmdan ham oshmaydi.
+        val uploadBytes = minOf(video.sizeBytes, COMPRESSED_TARGET_BYTES)
+        val uploadSeconds = uploadBytes / UPLOAD_BYTES_PER_SECOND
+        val total = encodeSeconds + uploadSeconds
+        if (total <= 0f) return DEFAULT_PREPARE_SHARE
+        return (encodeSeconds / total).coerceIn(MIN_PREPARE_SHARE, MAX_PREPARE_SHARE)
     }
 
     /**
@@ -801,7 +838,7 @@ class ChatRepositoryImpl(
     ): Resource<Unit> {
         // Siqishga ajratilgan ulush: siqilmaydigan videoda `0f`, ya'ni halqa darrov
         // yuklashdan boshlanadi va yarmidan sakrab ketmaydi.
-        val prepareShare = if (video.needsPreparing && video.prepare != null) PREPARE_SHARE else 0f
+        val prepareShare = if (video.needsPreparing && video.prepare != null) prepareShare(video) else 0f
         var ready: OutgoingVideo? = null
 
         val upload = tracked(localId, video.fileName, video.sizeBytes) { onProgress ->
@@ -1519,14 +1556,34 @@ class ChatRepositoryImpl(
         const val PROGRESS_STEP = 0.01f
 
         /**
-         * Halqaning siqishga ajratilgan qismi.
+         * Siqish tezligi: bir soniyalik video shuncha soniyada qayta kodlanadi.
          *
-         * Yarmi ataylab: mobil qurilmada siqish odatda yuklashdan tez emas (4K lavhani
-         * qayta kodlash o'nlab soniya), ya'ni ikkalasiga teng ulush berish halqani eng
-         * silliq to'ldiradi. Aniq nisbatni oldindan bilib bo'lmaydi — u qurilmaning
-         * kodegiga ham, tarmoq tezligiga ham bog'liq.
+         * O'rta qurilmada 720p apparat kodegi taxminan shu atrofda. Aniq son yo'q — u
+         * kodekka ham, manba o'lchamiga ham bog'liq; bu yerda kerak bo'lgani **nisbat**,
+         * mutlaq vaqt emas.
          */
-        const val PREPARE_SHARE = 0.5f
+        const val ENCODE_SECONDS_PER_SECOND = 0.5f
+
+        /** Mobil internetning ehtiyotkor bahosi — sekundiga 1 MB. */
+        const val UPLOAD_BYTES_PER_SECOND = 1024f * 1024f
+
+        /** Siqilgan videoning kutilayotgan hajmi (`VideoCompressor.TARGET_BYTES` bilan bir xil). */
+        const val COMPRESSED_TARGET_BYTES = 12L * 1024 * 1024
+
+        /**
+         * Siqish ulushining chegaralari.
+         *
+         * Ikkala chetda ham halqa "o'lik" ko'rinmasin: 0.8 dan yuqorisi yuklashni bir
+         * lahzaga siqib qo'yadi, 0.2 dan pasti esa siqish paytida halqani qotib turgandek
+         * ko'rsatadi.
+         */
+        const val MIN_PREPARE_SHARE = 0.2f
+        const val MAX_PREPARE_SHARE = 0.8f
+
+        /** Davomiylik noma'lum bo'lsa — eski xulq (teng ulush). */
+        const val DEFAULT_PREPARE_SHARE = 0.5f
+
+        const val MS_IN_SECOND = 1000f
 
         /** Server chegarasi: bitta so'rovda 100 tagacha id (`422 TOO_MANY_IDS`). */
         const val MAX_DELETE_IDS = 100

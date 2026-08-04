@@ -50,7 +50,8 @@ fun MyPostsSection(
             EmptyPosts(
                 title = if (archived) "Arxiv bo'sh" else "Hozircha post yo'q",
                 subtitle = if (archived) {
-                    "24 soati tugagan postlar shu yerga tushadi va faqat sizga ko'rinadi"
+                    "24 soati tugagan postlar shu yerga tushadi va faqat sizga ko'rinadi. " +
+                        "Rasm va videolar bir yil saqlanadi"
                 } else {
                     "Bosh ekrandagi «Sizning lavhangiz» katakchasidan post qo'shing"
                 },
@@ -83,6 +84,17 @@ fun MyPostsSection(
                     maxLines = 1,
                 )
             }
+        }
+
+        // Saqlash muddati — «arxivim qayoqqa ketdi?» degan savol tug'ilishidan oldin
+        // javob bo'lsin (`STORY_ARCHIVE_BACKEND.md` §3: server 365 kun saqlaydi).
+        if (archived && stories.isNotEmpty()) {
+            ScText(
+                "Rasm va videolar bir yil saqlanadi — keyin postning faqat yozuvi qoladi",
+                11.5f,
+                FontWeight.Medium,
+                Sc.MutedLight,
+            )
         }
 
         state.message?.let { ScText(it, 12.5f, FontWeight.SemiBold, Sc.Danger) }

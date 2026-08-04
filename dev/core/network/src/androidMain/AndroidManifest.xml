@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!--
+        Yuklash old plan xizmati uchun (`MediaUploadService`). Android 14+ da umumiy
+        `FOREGROUND_SERVICE` yetmaydi — har bir tur uchun alohida ruxsat kerak.
+        E'lon ataylab SHU MODULDA: yuklash kodi ham shu yerda va uni ishlatadigan har bir
+        ilovadan manifestga qo'l bilan qator qo'shishni talab qilish oson unutiladigan
+        qadam bo'lardi.
+    -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+
+    <application>
+
+        <!-- Media yuklash davomida jarayonni tirik ushlaydi (qarang `UploadKeepAlive`). -->
+        <service
+            android:name="dev.core.network.media.MediaUploadService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+
+        <!-- Ilova kontekstini erta ushlab qolish uchun — xizmat `Context` siz ochilmaydi. -->
+        <provider
+            android:name="dev.core.network.media.UploadContextProvider"
+            android:authorities="${applicationId}.scuploadcontext"
+            android:exported="false"
+            android:initOrder="1000" />
+    </application>
+</manifest>

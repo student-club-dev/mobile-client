@@ -6,6 +6,7 @@ import dev.core.network.generated.model.MediaUploadResponseDto
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.plugins.HttpTimeoutConfig
+import io.ktor.client.plugins.ResponseException
 import io.ktor.client.plugins.onUpload
 import io.ktor.client.plugins.timeout
 import io.ktor.client.request.HttpRequestBuilder
@@ -23,6 +24,13 @@ import io.ktor.http.Headers
 import io.ktor.http.HttpHeaders
 import io.ktor.http.contentType
 import io.ktor.http.content.ByteArrayContent
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withLock
 import kotlinx.io.buffered
 import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
@@ -207,10 +215,10 @@ class MediaUploader(
         onProgress: UploadProgress? = null,
         /** Sessiya id'si tug'ilganda chaqiriladi — bekor qilish va davom ettirish uchun. */
         onSession: ((String) -> Unit)? = null,
-    ): AttachmentDto {
+    ): AttachmentDto = UploadKeepAlive.holding {
         // Katta fayl BIR MARTALIK so'rov bilan ketmaydi: tarmoq uzilsa u noldan boshlanardi.
         if (sizeBytes >= RESUMABLE_ABOVE_BYTES) {
-            return resumableUpload(
+            return@holding resumableUpload(
                 path = path,
                 sizeBytes = sizeBytes,
                 fileName = fileName,
@@ -221,7 +229,7 @@ class MediaUploader(
                 onSession = onSession,
             )
         }
-        return client.post(config.baseUrl + CHAT_PATH) {
+        client.post(config.baseUrl + CHAT_PATH) {
             uploadTimeouts()
             trackUpload(onProgress)
             setBody(
@@ -262,10 +270,14 @@ class MediaUploader(
      * [resumeUploadId] berilsa yangi sessiya ochilmaydi — mavjudining holati o'qiladi.
      * Sessiya kamida 24 soat yashaydi.
      *
-     * ⚠️ Bo'laklar **ketma-ket** yuboriladi. Server ularni parallel ham qabul qiladi, lekin
-     * faylni bir marta oqim bilan o'qish (bir necha MB bufer) parallel o'qishdan ancha
-     * arzon: parallelda har oqim o'z buferini oladi va arzon telefonda bu xotirani
-     * bo'g'adi.
+     * **Bo'laklar parallel ketadi** — server buni ochiq ruxsat etadi («any order and in
+     * parallel»). Mobil tarmoqda bitta TCP oqimi kanalni to'ldirmaydi: kechikish katta,
+     * oyna kichik, ya'ni bitta so'rov navbat bilan ketganda tezlik nominal tezlikning
+     * yarmiga ham chiqmaydi. Bir vaqtda uchtasi ketsa kanal to'ladi.
+     *
+     * ⚠️ Xotira **cheklangan**: keyingi bo'lak faqat navbatda joy bo'shagach o'qiladi
+     * ([partsInFlight]), ya'ni xotirada eng ko'pi bilan `IN_FLIGHT_BUDGET_BYTES` turadi.
+     * Faylning o'zi baribir bitta oqim bilan, ketma-ket o'qiladi.
      */
     suspend fun resumableUpload(
         path: String,
@@ -277,7 +289,7 @@ class MediaUploader(
         onProgress: UploadProgress? = null,
         resumeUploadId: String? = null,
         onSession: ((String) -> Unit)? = null,
-    ): AttachmentDto {
+    ): AttachmentDto = UploadKeepAlive.holding {
         val session = resumeUploadId?.let { uploadStatus(it) }
             ?: initUpload(kind, conversationId, quality, fileName, sizeBytes)
         onSession?.invoke(session.uploadId)
@@ -286,25 +298,55 @@ class MediaUploader(
         val totalParts = ((sizeBytes + chunkSize - 1) / chunkSize).toInt()
         val alreadyReceived = session.received.toSet()
 
+        // Jarayon **tugagan bo'laklar** bo'yicha sanaladi, ya'ni u parallel yuborishda ham
+        // faqat oldinga yuradi. Hisobni bitta muteks himoya qiladi: `onProgress` ni ikki
+        // korutin bir vaqtda chaqirsa ko'rsatkich sakrab ketardi.
+        val progressLock = Mutex()
         var sent = alreadyReceived.size.toLong() * chunkSize
-        // Faylni BIR MARTA oqim bilan o'qiymiz: allaqachon serverda bo'lgan bo'lak
-        // baytlari o'qiladi va tashlab yuboriladi (`skip` ham xuddi shuni qiladi, lekin
-        // manba turiga bog'liq).
-        SystemFileSystem.source(Path(path)).buffered().use { source ->
-            for (index in 0 until totalParts) {
-                val remaining = sizeBytes - index.toLong() * chunkSize
-                val length = minOf(chunkSize.toLong(), remaining).toInt()
-                if (length <= 0) break
-                val chunk = source.readByteArray(length)
-                if (index in alreadyReceived) continue
 
-                uploadPart(session.uploadId, index, chunk)
-                sent += length
-                onProgress?.invoke((sent.toFloat() / sizeBytes).coerceIn(0f, MAX_REPORTED))
+        coroutineScope {
+            val slots = Semaphore(partsInFlight(chunkSize))
+            SystemFileSystem.source(Path(path)).buffered().use { source ->
+                for (index in 0 until totalParts) {
+                    val remaining = sizeBytes - index.toLong() * chunkSize
+                    val length = minOf(chunkSize.toLong(), remaining).toInt()
+                    if (length <= 0) break
+                    // Allaqachon serverda bo'lgan bo'lak baytlari ham o'qiladi va tashlab
+                    // yuboriladi (`skip` ham xuddi shuni qiladi, lekin manba turiga bog'liq).
+                    if (index in alreadyReceived) {
+                        source.readByteArray(length)
+                        continue
+                    }
+                    // ⚠️ Ruxsat baytlarni o'qishdan OLDIN olinadi: aks holda sikl butun
+                    // faylni xotiraga o'qib, navbatda kutib turardi.
+                    slots.acquire()
+                    val chunk = source.readByteArray(length)
+                    launch {
+                        try {
+                            uploadPart(session.uploadId, index, chunk)
+                            progressLock.withLock {
+                                sent += length
+                                onProgress?.invoke((sent.toFloat() / sizeBytes).coerceIn(0f, MAX_REPORTED))
+                            }
+                        } finally {
+                            slots.release()
+                        }
+                    }
+                }
             }
         }
-        return completeUpload(session.uploadId)
+        completeUpload(session.uploadId)
     }
+
+    /**
+     * Bir vaqtda ketadigan bo'laklar soni.
+     *
+     * Chegara **baytlarda**, sonda emas: server bo'lak hajmini o'zi tanlaydi va u kattaroq
+     * bo'lsa parallelizm o'z-o'zidan kamayadi. Arzon telefonda uchta 8 MB lik bufer
+     * `OutOfMemoryError` degani.
+     */
+    private fun partsInFlight(chunkSize: Int): Int =
+        (IN_FLIGHT_BUDGET_BYTES / chunkSize).coerceIn(1, MAX_PARTS_IN_FLIGHT)
 
     /** Sessiya ochadi — `POST /v1/media/upload/init`. */
     private suspend fun initUpload(
@@ -337,10 +379,29 @@ class MediaUploader(
      * baytlar qayerga tushishini yo'ldagi `index` hal qiladi.
      */
     private suspend fun uploadPart(uploadId: String, index: Int, bytes: ByteArray) {
-        client.put(config.baseUrl + uploadPath(uploadId) + "/part/$index") {
-            uploadTimeouts()
-            contentType(ContentType.Application.OctetStream)
-            setBody(ByteArrayContent(bytes, ContentType.Application.OctetStream))
+        // Bo'lak — yagona **idempotent** so'rovimiz: bir xil indeks o'zini qayta yozadi,
+        // ya'ni javob kelmay qolganda ham ko'r-ko'rona takrorlash xavfsiz. Shu sabab
+        // qayta urinish aynan shu yerda: butun klientga `HttpRequestRetry` qo'yish xabar
+        // yuborishni ham takrorlab, ikki nusxa xabar tug'dirishi mumkin edi.
+        var attempt = 0
+        while (true) {
+            try {
+                client.put(config.baseUrl + uploadPath(uploadId) + "/part/$index") {
+                    uploadTimeouts()
+                    contentType(ContentType.Application.OctetStream)
+                    setBody(ByteArrayContent(bytes, ContentType.Application.OctetStream))
+                }
+                return
+            } catch (cancelled: CancellationException) {
+                // Foydalanuvchi bekor qildi yoki ekran yopildi — qayta urinish mumkin emas.
+                throw cancelled
+            } catch (error: Throwable) {
+                attempt++
+                // Serverning "yo'q" javobi (kvota, ruxsat, sessiya eskirgan) takrorlashdan
+                // o'zgarmaydi — faqat tarmoq uzilishi takrorlashga arziydi.
+                if (attempt > PART_RETRIES || error is ResponseException) throw error
+                delay(RETRY_BACKOFF_MS * attempt)
+            }
         }
     }
 
@@ -458,6 +519,24 @@ class MediaUploader(
 
         /** Server juda kichik `chunkSize` bersa ham bo'lak shundan kichik bo'lmaydi. */
         const val MIN_CHUNK_BYTES = 256 * 1024
+
+        /**
+         * Bir vaqtda "havoda" turadigan baytlar — parallel bo'laklar shu byudjetdan
+         * bo'linadi ([partsInFlight]).
+         */
+        const val IN_FLIGHT_BUDGET_BYTES = 12 * 1024 * 1024
+
+        /**
+         * Undan ortig'i foyda bermaydi: mobil kanal to'lgandan keyin qo'shimcha oqim
+         * faqat kechikish va xotira qo'shadi.
+         */
+        const val MAX_PARTS_IN_FLIGHT = 3
+
+        /** Bitta bo'lakni necha marta qayta yuborish (tarmoq uzilishida). */
+        const val PART_RETRIES = 2
+
+        /** Qayta urinishlar orasidagi kutish — urinish raqamiga ko'paytiriladi. */
+        const val RETRY_BACKOFF_MS = 1_000L
 
         const val MAX_REPORTED = 0.99f
 
