@@ -69,8 +69,8 @@ import dev.core.uikit.theme.Sc
 import dev.core.domain.model.DiscountOffer
 import dev.feature.listings.domain.model.Listing
 import dev.feature.listings.domain.model.formatSum
-import dev.feature.students.domain.model.FriendStatus
-import dev.feature.students.domain.model.Student
+import dev.feature.connections.domain.model.ConnectionView
+import dev.feature.connections.domain.model.SearchedStudent
 import dev.feature.university.domain.model.University
 import org.koin.compose.viewmodel.koinViewModel
 import androidx.compose.runtime.ReadOnlyComposable
@@ -151,8 +151,8 @@ fun MyUniversityScreen(
                                 contentPadding = PaddingValues(horizontal = Sc.ScreenPadding),
                                 horizontalArrangement = Arrangement.spacedBy(13.dp),
                             ) {
-                                itemsIndexed(state.mates, key = { _, s -> s.id }) { index, s ->
-                                    MateCard(s, index) { vm.toggleFriend(s) }
+                                itemsIndexed(state.mates, key = { _, s -> s.student.id }) { index, s ->
+                                    MateCard(s, index) { vm.connect(s) }
                                 }
                             }
                         }
@@ -178,7 +178,7 @@ fun MyUniversityScreen(
         if (showStudents) {
             StudentsOverlay(
                 students = state.mates,
-                onFriend = { vm.toggleFriend(it) },
+                onConnect = { vm.connect(it) },
                 onClose = { showStudents = false },
             )
         }
@@ -302,14 +302,15 @@ private fun EmptyUniversity(loading: Boolean, modifier: Modifier = Modifier) {
 // ---------------------------------------------------------------------------
 
 @Composable
-private fun MateCard(student: Student, index: Int, onFriend: () -> Unit) {
+private fun MateCard(item: SearchedStudent, index: Int, onConnect: () -> Unit) {
     val (tint, accent) = tilePalette[index.mod(tilePalette.size)]
+    val student = item.student
     Column(
         Modifier.width(150.dp).scCard(radius = 26.dp).padding(horizontal = 16.dp, vertical = 18.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         ScAvatar(
-            name = student.firstName,
+            name = student.displayName,
             size = 62.dp,
             avatarUrl = student.avatarUrl,
             background = tint,
@@ -317,32 +318,36 @@ private fun MateCard(student: Student, index: Int, onFriend: () -> Unit) {
             shape = RoundedCornerShape(24.dp),
         )
         Spacer(Modifier.height(12.dp))
-        ScText(student.firstName, 16f, FontWeight.ExtraBold, Sc.Ink, maxLines = 1)
+        ScText(student.displayName, 16f, FontWeight.ExtraBold, Sc.Ink, maxLines = 1)
         Spacer(Modifier.height(3.dp))
-        ScText("${student.faculty} · ${courseText(student.course)}", 12.5f, FontWeight.SemiBold, Sc.Muted, maxLines = 1)
+        ScText(courseText(student.courseYear), 12.5f, FontWeight.SemiBold, Sc.Muted, maxLines = 1)
         Spacer(Modifier.height(14.dp))
-        FriendButton(student, onFriend)
+        ConnectButton(item.connectionStatus, onConnect)
     }
 }
 
+/**
+ * Bog'lanish tugmasi. Faqat [ConnectionView.NONE] holatida bosiladi — qolgan holatlar
+ * (kutilyapti, bog'langan, u so'rov yuborgan) "Do'stlar" ekranida boshqariladi.
+ */
 @Composable
-private fun FriendButton(student: Student, onFriend: () -> Unit) {
-    val pending = student.friendStatus != FriendStatus.NONE
-    val label = when (student.friendStatus) {
-        FriendStatus.FRIENDS -> "Do'st"
-        FriendStatus.PENDING -> "Kutilmoqda"
-        FriendStatus.NONE -> "+ Do'st"
+private fun ConnectButton(status: ConnectionView, onConnect: () -> Unit) {
+    val label = when (status) {
+        ConnectionView.NONE -> "+ Bog'lanish"
+        ConnectionView.PENDING_OUT -> "Yuborildi"
+        ConnectionView.PENDING_IN -> "So'rov bor"
+        ConnectionView.CONNECTED -> "Bog'langan"
     }
-    if (pending) {
-        ScSoftButton(
-            label, onFriend,
-            radius = 16.dp, verticalPadding = 10.dp, fontSize = 13.5f,
-            background = Sc.TintBlue, color = Sc.Brand,
+    if (status == ConnectionView.NONE) {
+        ScGradientButton(
+            label, onConnect,
+            radius = 16.dp, verticalPadding = 10.dp, fontSize = 13.5f, weight = FontWeight.Bold,
         )
     } else {
-        ScGradientButton(
-            label, onFriend,
-            radius = 16.dp, verticalPadding = 10.dp, fontSize = 13.5f, weight = FontWeight.Bold,
+        ScSoftButton(
+            label, {},
+            radius = 16.dp, verticalPadding = 10.dp, fontSize = 13.5f,
+            background = Sc.TintBlue, color = Sc.Brand,
         )
     }
 }
@@ -619,13 +624,20 @@ private fun UniversityPickRow(uni: University, index: Int, selected: Boolean, on
 // ---------------------------------------------------------------------------
 
 @Composable
-private fun StudentsOverlay(students: List<Student>, onFriend: (Student) -> Unit, onClose: () -> Unit) {
+private fun StudentsOverlay(
+    students: List<SearchedStudent>,
+    onConnect: (SearchedStudent) -> Unit,
+    onClose: () -> Unit,
+) {
     var query by remember { mutableStateOf("") }
-    var course by remember { mutableStateOf<Int?>(null) }
+    // Kurs — serverdagi shakl (`"1".."4"`, `"MASTER"`); `null` — "Hammasi".
+    var course by remember { mutableStateOf<String?>(null) }
+    // Qidiruv/filtr shu sahifadagi ro'yxat ustida ishlaydi: butun bazani qidirish
+    // "Do'stlar" ekranida (`GET /v1/students?q=`), bu yerda esa universitetim ro'yxati.
     val filtered = remember(students, query, course) {
         students.filter {
-            (query.isBlank() || it.fullName.contains(query, ignoreCase = true) || it.faculty.contains(query, ignoreCase = true)) &&
-                (course == null || it.course == course)
+            (query.isBlank() || it.student.displayName.contains(query, ignoreCase = true)) &&
+                (course == null || it.student.courseYear == course)
         }
     }
 
@@ -648,7 +660,7 @@ private fun StudentsOverlay(students: List<Student>, onFriend: (Student) -> Unit
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 CoursePill("Hammasi", course == null) { course = null }
-                listOf(1, 2, 3, 4, 5).forEach { c ->
+                listOf("1", "2", "3", "4", "MASTER").forEach { c ->
                     CoursePill(courseText(c), course == c) { course = c }
                 }
             }
@@ -661,7 +673,9 @@ private fun StudentsOverlay(students: List<Student>, onFriend: (Student) -> Unit
             contentPadding = PaddingValues(start = Sc.ScreenPadding, end = Sc.ScreenPadding, bottom = 110.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            itemsIndexed(filtered, key = { _, s -> s.id }) { index, s -> DetailedStudentCard(s, index, onFriend) }
+            itemsIndexed(filtered, key = { _, s -> s.student.id }) { index, s ->
+                DetailedStudentCard(s, index, onConnect)
+            }
             if (filtered.isEmpty()) {
                 item {
                     Box(Modifier.fillMaxWidth().padding(top = 40.dp), contentAlignment = Alignment.Center) {
@@ -687,43 +701,41 @@ private fun CoursePill(label: String, selected: Boolean, onClick: () -> Unit) {
 }
 
 @Composable
-private fun DetailedStudentCard(student: Student, index: Int, onFriend: (Student) -> Unit) {
+private fun DetailedStudentCard(
+    item: SearchedStudent,
+    index: Int,
+    onConnect: (SearchedStudent) -> Unit,
+) {
     val (tint, accent) = tilePalette[index.mod(tilePalette.size)]
+    val student = item.student
     Column(Modifier.fillMaxWidth().scCard(radius = 22.dp).padding(15.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(13.dp)) {
             ScAvatar(
-                name = student.fullName,
+                name = student.displayName,
                 size = 52.dp,
                 avatarUrl = student.avatarUrl,
                 background = tint,
                 initialColor = accent,
             )
             Column(Modifier.weight(1f)) {
-                ScText(student.fullName, 15.5f, FontWeight.ExtraBold, Sc.Ink, maxLines = 1)
+                ScText(student.displayName, 15.5f, FontWeight.ExtraBold, Sc.Ink, maxLines = 1)
                 Spacer(Modifier.height(3.dp))
-                ScText("${student.faculty} · ${courseText(student.course)}", 12.5f, FontWeight.Medium, Sc.Muted, maxLines = 1)
-                Spacer(Modifier.height(5.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    ScText("⭐ ${student.rating}", 11.5f, FontWeight.Bold, Sc.MutedLight)
-                    ScText("👥 ${student.friendsCount} do'st", 11.5f, FontWeight.Medium, Sc.MutedLight)
-                    ScText(student.universityMonogram, 11.5f, FontWeight.Medium, Sc.MutedLight)
+                ScText(courseText(student.courseYear), 12.5f, FontWeight.Medium, Sc.Muted, maxLines = 1)
+                // Presence serverdan keladi va talabaning sozlamasiga bo'ysunadi —
+                // yashirilgan bo'lsa `online = false` va qator umuman chizilmaydi.
+                if (student.online) {
+                    Spacer(Modifier.height(5.dp))
+                    ScText("🟢 Onlayn", 11.5f, FontWeight.Bold, Sc.Success)
                 }
             }
-            Box(Modifier.width(96.dp)) { FriendButton(student) { onFriend(student) } }
+            Box(Modifier.width(96.dp)) {
+                ConnectButton(item.connectionStatus) { onConnect(item) }
+            }
         }
-        if (student.interests.isNotEmpty()) {
+        // Bio — 140 belgigacha oddiy matn (havola/telefon serverda rad etiladi).
+        student.bio?.takeIf { it.isNotBlank() }?.let { bio ->
             Spacer(Modifier.height(10.dp))
-            Row(
-                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                student.interests.take(5).forEach { interest ->
-                    Box(
-                        Modifier.clip(RoundedCornerShape(10.dp)).background(Sc.TintBlue)
-                            .padding(horizontal = 10.dp, vertical = 5.dp),
-                    ) { ScText(interest, 11f, FontWeight.Medium, Sc.Brand, maxLines = 1) }
-                }
-            }
+            ScText(bio, 12.5f, FontWeight.Medium, Sc.Muted, maxLines = 2, lineHeight = 18f)
         }
     }
 }
@@ -823,4 +835,16 @@ private fun OffersMapSection(
 
 private fun hexRgb(argb: Long): String = "#" + (argb and 0xFFFFFF).toString(16).padStart(6, '0').uppercase()
 
-private fun courseText(course: Int): String = if (course >= 5) "Magistr" else "$course-kurs"
+/**
+ * Kurs yorlig'i. Server `"1".."4"` yoki `"MASTER"` qaytaradi; eski profillarda
+ * `"ONE".."FOUR"` uchraydi. Ko'rsatilmagan bo'lsa (`null`/bo'sh) — "Talaba".
+ */
+private fun courseText(courseYear: String?): String = when (courseYear) {
+    "1", "ONE" -> "1-kurs"
+    "2", "TWO" -> "2-kurs"
+    "3", "THREE" -> "3-kurs"
+    "4", "FOUR" -> "4-kurs"
+    "MASTER" -> "Magistr"
+    null, "" -> "Talaba"
+    else -> courseYear
+}

@@ -356,7 +356,10 @@ private fun clothingSection(
 /** Ovqat bo'limining katalog guruhi kaliti. */
 private const val FOOD_GROUP = "FOOD"
 
-/** Kiyim biznes turining kaliti (local seed'dagi `listings.json` bilan bir xil). */
+/**
+ * Kiyim biznes turining kaliti. Katalog turlari serverdan keladi va kalit hali barqaror
+ * emas — shu sabab yuqorida nom bo'yicha zaxira moslik ham bor.
+ */
 private const val CLOTHING_TYPE = "kiyim"
 
 /** Home'da faqat bir nechta karta ko'rinadi — butun ro'yxatni tortishning hojati yo'q. */

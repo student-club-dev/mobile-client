@@ -3,7 +3,6 @@ package dev.core.di
 import dev.feature.auth.di.authFeatureModule
 import dev.feature.listings.presentation.di.listingsModule
 import dev.feature.jobs.presentation.di.jobsModule
-import dev.feature.students.presentation.di.studentsModule
 import dev.feature.notifications.presentation.di.notificationsModule
 import dev.feature.clubs.data.di.clubsModule
 import dev.feature.settings.presentation.di.settingsModule
@@ -35,7 +34,6 @@ fun appModules() = coreModules() +
     // E'lonlar — `/v1/student-listings*` allaqachon bor, shuning uchun o'z bayrog'i bilan.
     listingsModule(STUDENT_LISTINGS_REMOTE_ENABLED) +
     jobsModule(REMOTE_SYNC_ENABLED) +
-    studentsModule(REMOTE_SYNC_ENABLED) +
     notificationsModule() +
     clubsModule() +
     settingsModule() +

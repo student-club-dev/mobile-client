@@ -177,8 +177,15 @@ class AuthFlowViewModel(
         it.copy(query = v, results = filterUniversities(allUniversities.value, v))
     }
 
-    fun onUniversitySelected(university: University) = _state.update {
-        it.copy(universityId = university.id, selectedUniversity = university)
+    /**
+     * Tanlangan OTM local katalogga ham yoziladi. Profilda faqat `universityId` saqlanadi
+     * (`emis-245`) va serverda universitetlar katalogi yo'q — nomni Home, Chat, Profil va
+     * "Universitetim" ekranlari shu local jadvaldan topadi. Yozilmasa prof-emis ro'yxati
+     * tortilmagunicha universitet nomsiz ko'rinardi.
+     */
+    fun onUniversitySelected(university: University) {
+        _state.update { it.copy(universityId = university.id, selectedUniversity = university) }
+        viewModelScope.launch { universityRepository.addUniversity(university) }
     }
 
     /** Ro'yxat uzun (butun O'zbekiston) — ko'rsatishni 200 taga cheklaymiz. */

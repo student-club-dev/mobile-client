@@ -22,7 +22,6 @@ kotlin {
             // Ishlar feature'i — Home domendan Job o'qiydi, StudentShell JobsScreen'ni ochadi.
             api(projects.dev.feature.jobs.domain)
             implementation(projects.dev.feature.jobs.presentation)
-            api(projects.dev.feature.students.domain)
             // "Do'stlar" (Connections) ekrani — StudentShell uni ochadi.
             implementation(projects.dev.feature.connections.presentation)
             implementation(projects.dev.feature.notifications.domain)

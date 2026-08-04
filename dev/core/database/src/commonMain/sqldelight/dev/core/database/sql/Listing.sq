@@ -131,9 +131,13 @@ UPDATE ListingEntity SET status = ?, updatedAt = ? WHERE id = ?;
 deleteById:
 DELETE FROM ListingEntity WHERE id = ?;
 
--- Turdagi e'lonlar soni — namuna ma'lumot (seed) faqat jadval bo'sh bo'lganda yoziladi.
 countByKind:
 SELECT count(*) FROM ListingEntity WHERE kind = ?;
+
+-- Eski o'rnatmalarda qolgan namuna e'lonlar (`ownerId = 'seed-user'`) — `SeedPurge` bir
+-- marta tozalaydi. Haqiqiy e'lonning egasi doim sessiya uid'i, ya'ni bu shart ularga tegmaydi.
+deleteByOwner:
+DELETE FROM ListingEntity WHERE ownerId = ?;
 
 clear:
 DELETE FROM ListingEntity;
