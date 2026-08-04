@@ -1,0 +1,13 @@
+-- v29 -> v30 — e'lonning ko'rinish doirasi (`audience`).
+--
+-- `STUDENT_LISTINGS_BACKEND.md` §7.2.4: e'lon egasi uni kim ko'rishini tanlaydi —
+-- `ALL` (hammaga), `NEARBY_UNIVERSITIES` (o'z OTM va unga yaqinlari) yoki
+-- `MY_UNIVERSITY` (faqat o'z OTM: "yotoqxonamizga sherik" kabi yopiq e'lon).
+--
+-- Odatiy qiymat ataylab `ALL`: cheklov qo'ygan e'lon kamroq odamga yetadi va spec ham
+-- universitetni avvalo **tartiblash signali** deb belgilaydi, cheklov emas. Shu sabab
+-- eski qatorlar ham `ALL` bo'lib qoladi — hech bir mavjud e'lon jimgina yashirinmaydi.
+--
+-- Migratsiya FAQAT QO'SHADI: ko'chirish ham, o'chirish ham yo'q.
+
+ALTER TABLE ListingEntity ADD COLUMN audience TEXT NOT NULL DEFAULT 'ALL';

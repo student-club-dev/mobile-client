@@ -45,6 +45,11 @@ CREATE TABLE ListingEntity (
     -- filtrlaydi. NULL — universitetga bog'lanmagan e'lon (hammaga tegishli).
     universityId TEXT,
 
+    -- Ko'rinish doirasi (§7.2.4): 'ALL' | 'NEARBY_UNIVERSITIES' | 'MY_UNIVERSITY'.
+    -- `universityId` NULL bo'lsa faqat 'ALL' ma'noga ega — qolgan ikkitasi qaysi OTM
+    -- ekanini bilmaydi.
+    audience TEXT NOT NULL DEFAULT 'ALL',
+
     -- Manzillar. E'lon bir nechta joyda amal qilishi mumkin, har biri xaritadan
     -- tanlangani uchun koordinatasi bor (talabaga eng yaqinini ko'rsatish uchun).
     -- JSON: [{"id":"br1","lat":41.2856,"lng":69.2034,"address":"...","name":"Chilonzor"}]
@@ -105,7 +110,7 @@ INSERT OR REPLACE INTO ListingEntity(
     kind, detailsJson,
     title, description, imagesJson,
     priceUnit, price, priceMax, currency, isNegotiable, finalPrice,
-    contactPhone, universityId,
+    contactPhone, universityId, audience,
     branchesJson,
     validFrom, validTo, attributesJson, optionGroupsJson,
     status, rejectionReason, viewsCount, createdAt, updatedAt
@@ -114,7 +119,7 @@ INSERT OR REPLACE INTO ListingEntity(
     ?, ?,
     ?, ?, ?,
     ?, ?, ?, ?, ?, ?,
-    ?, ?,
+    ?, ?, ?,
     ?,
     ?, ?, ?, ?,
     ?, ?, ?, ?, ?

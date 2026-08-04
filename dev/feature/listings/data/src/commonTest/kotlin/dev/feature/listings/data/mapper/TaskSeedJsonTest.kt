@@ -56,6 +56,7 @@ class TaskSeedJsonTest {
         finalPrice = 150_000,
         contactPhone = null,
         universityId = universityId,
+        audience = "ALL",
         branchesJson = "[]",
         validFrom = 0,
         validTo = 4_102_444_800_000L,

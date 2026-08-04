@@ -88,14 +88,30 @@ private fun PostCell(
         // ⚠️ Videoda local fayl ISHLATILMAYDI: rasm yuklovchi videodan kadr ajratmaydi
         // (buning uchun alohida dekoder kerak), ya'ni katak bo'sh qolardi. Video posteri
         // baribir yengil — u serverdan keladi.
+        //
+        // Saqlash muddati o'tgan arxiv postida serverga umuman so'rov yuborilmaydi: fayl
+        // qaytarib olingan (`url` → 404) va yuklovchi buzilgan rasm belgisini chizardi.
+        // Telefonda nusxa qolgan bo'lsa u baribir ko'rsatiladi.
+        val purged = story.mediaPurged
         ScNetworkImage(
-            url = if (story.kind == StoryKind.VIDEO) {
-                story.thumbUrl ?: story.url
-            } else {
-                story.localUri ?: story.thumbUrl ?: story.url
+            url = when {
+                story.kind == StoryKind.VIDEO -> (story.thumbUrl ?: story.url).takeIf { !purged }
+                purged -> story.localUri
+                else -> story.localUri ?: story.thumbUrl ?: story.url
             },
             modifier = Modifier.fillMaxSize(),
             contentDescription = if (story.kind == StoryKind.VIDEO) "Video post" else "Post",
+            fallback = {
+                // Post o'chmaydi — sanasi va o'rni qoladi, faqat mediasi yo'q.
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Icon(
+                        AppIcons.ImageIcon,
+                        contentDescription = "Media saqlanmagan",
+                        tint = Sc.MutedLight,
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
+            },
         )
 
         // Pastdagi qorayish — oq matn har qanday rasmda o'qilsin.

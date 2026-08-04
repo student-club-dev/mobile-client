@@ -1,10 +1,13 @@
 package dev.feature.listings.data.mapper
 
+import dev.core.network.generated.model.CreateStudentListingDto
 import dev.core.network.generated.model.StudentListingDto
+import dev.core.network.generated.model.UpdateStudentListingDto
 import dev.feature.listings.domain.model.EmploymentType
 import dev.feature.listings.domain.model.ExperienceLevel
 import dev.feature.listings.domain.model.Listing
 import dev.feature.listings.domain.model.ListingBranch
+import dev.feature.listings.domain.model.ListingAudience
 import dev.feature.listings.domain.model.ListingDetails
 import dev.feature.listings.domain.model.ListingIds
 import dev.feature.listings.domain.model.ListingStatus
@@ -99,6 +102,25 @@ class StudentListingApiMapperTest {
         )
         assertNull(listing(discount).toCreateDto(submit = true))
         assertNull(listing(discount).toUpdateDto())
+    }
+
+    /**
+     * `STUDENT_LISTINGS_BACKEND.md` §7.2.4: `MY_UNIVERSITY` / `NEARBY_UNIVERSITIES`
+     * doirasi `universityId` dan hisoblanadi. Universitetsiz e'londa ular yuborilsa
+     * server e'lonni **hech kimga** ko'rsatolmaydi — shuning uchun `ALL` ga tushiriladi.
+     */
+    @Test
+    fun `universitetsiz e'lon doim ALL doirasida ketadi`() {
+        val closed = listing(ListingDetails.Rental())
+            .copy(audience = ListingAudience.MY_UNIVERSITY, universityId = null)
+        assertEquals(CreateStudentListingDto.Audience.ALL, closed.toCreateDto(submit = true)!!.audience)
+        assertEquals(UpdateStudentListingDto.Audience.ALL, closed.toUpdateDto()!!.audience)
+
+        val bound = closed.copy(universityId = "tatu")
+        assertEquals(
+            CreateStudentListingDto.Audience.MY_UNIVERSITY,
+            bound.toCreateDto(submit = true)!!.audience,
+        )
     }
 
     @Test

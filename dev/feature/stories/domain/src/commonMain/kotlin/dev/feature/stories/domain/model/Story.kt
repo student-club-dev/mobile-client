@@ -39,6 +39,15 @@ data class Story(
      * serverdan qayta yuklab olish shart emas. Boshqa odamning lavhasida doim `null`.
      */
     val localUri: String? = null,
+    /**
+     * **Faqat arxivda.** Fayl bir yillik saqlash muddatidan keyin o'chirilgan — [url]
+     * endi `404` beradi.
+     *
+     * Shu sabab bunday postga rasm yuklashga urinilmaydi: yuklovchi baribir yiqilib,
+     * ekranda "buzilgan rasm" belgisi qolardi. O'rniga bo'sh katak chiziladi — sana va
+     * izoh joyida qoladi, ya'ni post yo'qolmaydi, faqat mediasi yo'q.
+     */
+    val mediaPurged: Boolean = false,
 ) {
     /** Ekranda necha millisekund turishi. */
     val displayMs: Int get() = durationMs?.takeIf { it > 0 } ?: DEFAULT_IMAGE_MS

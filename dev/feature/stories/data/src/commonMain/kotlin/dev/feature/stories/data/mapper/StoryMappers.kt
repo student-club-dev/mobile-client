@@ -39,6 +39,8 @@ fun StoryDto.toDomain(origin: String): Story = Story(
     // ⚠️ Boshqa odamning story'sida server buni ATAYLAB `null` qiladi — ko'rishlar soni
     // orqali tanishlar doirasini o'lchab bo'lmasin (`handoff/07-STORIES.md` §3).
     viewsCount = viewsCount,
+    // Arxivda bir yildan keyin fayl qaytarib olinadi (`url` → 404). Faol lavhada doim `false`.
+    mediaPurged = archivedMediaPurged,
 )
 
 fun StoryKindDto.toDomain(): StoryKind = when (this) {

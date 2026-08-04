@@ -4,12 +4,14 @@ import dev.core.network.NetworkConfig
 import dev.core.network.createPublicHttpClient
 import dev.core.network.generated.api.StudentListingsApi
 import dev.core.network.media.apiOrigin
+import dev.feature.listings.data.remote.ApiGeoCatalogRepository
 import dev.feature.listings.data.remote.ApiGeoRepository
 import dev.feature.listings.data.remote.ApiListingRemoteDataSource
 import dev.feature.listings.data.remote.ListingRemoteDataSource
 import dev.feature.listings.data.remote.LocalListingRemoteDataSource
 import dev.feature.listings.data.remote.NominatimGeoRepository
 import dev.feature.listings.data.repository.ListingRepositoryImpl
+import dev.feature.listings.domain.repository.GeoCatalogRepository
 import dev.feature.listings.domain.repository.GeoRepository
 import dev.feature.listings.domain.repository.ListingRepository
 import dev.feature.listings.domain.usecase.CreateBranchFromPointUseCase
@@ -77,11 +79,18 @@ fun listingsModule(useRemoteApi: Boolean) = module {
      * Nominatim uchun ALOHIDA klient: umumiy klientda sessiya tokeni bor va uni begona
      * serverga yuborib bo'lmaydi.
      */
+    /**
+     * Viloyat / tuman / metro ma'lumotnomasi — kontrakt yo'llari
+     * (`/geo/regions`, `/geo/regions/{id}/districts`, `/geo/metro-stations`), keshi
+     * local bazada. Nominatim zaxirasi ham shundan o'qiydi.
+     */
+    single<GeoCatalogRepository> { ApiGeoCatalogRepository(geo = get(), db = get(), dispatchers = get()) }
+
     single<GeoRepository> {
         ApiGeoRepository(
             geo = get(),
             connectivity = get(),
-            fallback = NominatimGeoRepository(createPublicHttpClient()),
+            fallback = NominatimGeoRepository(createPublicHttpClient(), catalog = get()),
         )
     }
 

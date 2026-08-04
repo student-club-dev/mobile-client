@@ -7,6 +7,15 @@ data class ResolvedAddress(
     val address: String,
     val regionId: String? = null,
     val districtId: String? = null,
+    /**
+     * Eng yaqin metro bekati — **mo'ljal**, manzilning bir qismi emas.
+     *
+     * Faqat Toshkentda va faqat 3 km ichida to'ladi
+     * ([dev.feature.listings.domain.model.GeoCatalog.METRO_LANDMARK_RADIUS_METERS]);
+     * uzoqdagi bekat mo'ljal emas, adashtiruvchi ma'lumot. Boshqa hamma joyda `null` —
+     * bu xato emas, normal holat.
+     */
+    val nearestMetro: String? = null,
 )
 
 /** Qidiruv natijasi — xaritada topilgan joy. */

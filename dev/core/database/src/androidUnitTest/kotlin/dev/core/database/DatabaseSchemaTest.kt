@@ -183,7 +183,9 @@ class DatabaseSchemaTest {
         // `STUDENT_LISTINGS_BACKEND.md` §7.2.4): "Universitetimda" bo'limi shu ustundan,
         // 28.sqm — chat lentasidagi qo'ng'iroq yozuvi (`MessageEntity.call*`) va ovozli
         // xabar matni (`attachmentTranscript`) — `handoff/09-CALLS-REST.md` §4.
-        assertEquals(29L, StudentClubDatabase.Schema.version)
+        // 29.sqm — e'lonning ko'rinish doirasi (`ListingEntity.audience`,
+        // `STUDENT_LISTINGS_BACKEND.md` §7.2.4): eski qatorlar 'ALL' bo'lib qoladi.
+        assertEquals(30L, StudentClubDatabase.Schema.version)
     }
 
     @Test
@@ -831,6 +833,9 @@ class DatabaseSchemaTest {
         val migrated = db.listingQueries.selectById("l-1").executeAsOne()
         assertEquals("DISCOUNT", migrated.kind)
         assertEquals(55_000L, migrated.price)
+        // 29.sqm — mavjud e'lon 'ALL' bo'lib qoladi: migratsiya hech bir e'lonni jimgina
+        // universitet doirasiga qamab qo'ymasligi kerak.
+        assertEquals("ALL", migrated.audience)
         assertTrue(
             migrated.detailsJson.contains("\"businessType\":\"CAFE_RESTAURANT\""),
             "biznes turi detailsJson ga ko'chmadi: ${migrated.detailsJson}",
@@ -879,6 +884,7 @@ class DatabaseSchemaTest {
                 """"businessName":"Chaykhana Navruz","categoryKey":"PIZZA",""" +
                 """"isDiscounted":true,"discountType":"PERCENT","discountValue":20}""",
             universityId: String? = null,
+            audience: String = "ALL",
         ) = q.upsert(
             id = id,
             ownerId = "u1",
@@ -896,6 +902,7 @@ class DatabaseSchemaTest {
             finalPrice = 44_000,
             contactPhone = "+998901234567",
             universityId = universityId,
+            audience = audience,
             branchesJson = """[{"id":"br1","lat":41.2856,"lng":69.2034,"address":"Chilonzor 9-kvartal, 42-uy"}]""",
             validFrom = 0,
             validTo = validTo,

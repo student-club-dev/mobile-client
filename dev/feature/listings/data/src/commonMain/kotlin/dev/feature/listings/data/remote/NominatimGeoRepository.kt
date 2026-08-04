@@ -1,7 +1,10 @@
 package dev.feature.listings.data.remote
 
 import dev.core.common.Resource
+import dev.feature.listings.domain.model.District
 import dev.feature.listings.domain.model.GeoCatalog
+import dev.feature.listings.domain.model.Region
+import dev.feature.listings.domain.repository.GeoCatalogRepository
 import dev.feature.listings.domain.repository.GeoRepository
 import dev.feature.listings.domain.repository.PlaceSuggestion
 import dev.feature.listings.domain.repository.ResolvedAddress
@@ -26,9 +29,15 @@ import kotlinx.serialization.Serializable
  *
  * MUHIM: bu klient ilovaning umumiy Ktor klienti EMAS — u har so'rovga Firebase Bearer
  * tokenini qo'shadi va bazaviy manzili `api.studentclub.uz`. Nominatim'ga o'z klienti kerak.
+ *
+ * [catalog] — viloyat/tuman/metro ma'lumotnomasi. Nominatim faqat MATN beradi, id bermaydi;
+ * ilgari u ilovadagi statik ro'yxatga solishtirilardi, endi esa **serverdagi** ro'yxatga
+ * (keshdan o'qiladi, ya'ni bu yo'l ham oflaynda ishlaydi). Metro bekati ham shu ro'yxatdan
+ * hisoblanadi — shunda zaxira yo'l `nearestMetro` ni asosiy yo'l bilan bir xil beradi.
  */
 class NominatimGeoRepository(
     private val httpClient: HttpClient,
+    private val catalog: GeoCatalogRepository,
 ) : GeoRepository {
 
     override suspend fun search(query: String): Resource<List<PlaceSuggestion>> = try {
@@ -59,7 +68,18 @@ class NominatimGeoRepository(
             header("User-Agent", USER_AGENT)
         }.body()
 
-        Resource.Success(response.toResolved())
+        val regions = catalog.regions()
+        val regionId = matchRegion(response.address, regions)
+        val districts = regionId?.let { catalog.districts(it) }.orEmpty()
+        val metro = GeoCatalog.nearestStation(catalog.metroStations(), lat, lng)
+
+        Resource.Success(
+            response.toResolved(
+                regionId = regionId,
+                districtId = matchDistrict(response.address, districts),
+                nearestMetro = metro?.name,
+            ),
+        )
     } catch (e: Exception) {
         Resource.Error(e.message ?: "Manzilni aniqlab bo'lmadi", e)
     }
@@ -71,7 +91,7 @@ class NominatimGeoRepository(
 }
 
 @Serializable
-private data class NominatimResponse(
+internal data class NominatimResponse(
     @SerialName("display_name") val displayName: String? = null,
     val address: NominatimAddress? = null,
 )
@@ -101,7 +121,7 @@ private fun NominatimSearchResult.toSuggestion(): PlaceSuggestion? {
 }
 
 @Serializable
-private data class NominatimAddress(
+internal data class NominatimAddress(
     val road: String? = null,
     @SerialName("house_number") val houseNumber: String? = null,
     val neighbourhood: String? = null,
@@ -112,7 +132,11 @@ private data class NominatimAddress(
     val state: String? = null,
 )
 
-private fun NominatimResponse.toResolved(): ResolvedAddress {
+internal fun NominatimResponse.toResolved(
+    regionId: String?,
+    districtId: String?,
+    nearestMetro: String?,
+): ResolvedAddress {
     val a = address
 
     // Talabaga foydali qism: ko'cha + uy raqami. Nominatim uni bermasa — to'liq nom.
@@ -122,26 +146,26 @@ private fun NominatimResponse.toResolved(): ResolvedAddress {
 
     return ResolvedAddress(
         address = short.ifBlank { displayName.orEmpty() },
-        regionId = matchRegion(a),
-        districtId = matchDistrict(a, matchRegion(a)),
+        regionId = regionId,
+        districtId = districtId,
+        nearestMetro = nearestMetro,
     )
 }
 
 /**
- * Nominatim viloyat nomini ("Toshkent shahri", "Tashkent") [GeoCatalog] id'siga bog'laydi.
+ * Nominatim viloyat nomini ("Toshkent shahri", "Tashkent") ma'lumotnomadagi id'ga bog'laydi.
  * Topilmasa `null` — bu xato emas: koordinata baribir bor, viloyat faqat filtr uchun.
  */
-private fun matchRegion(address: NominatimAddress?): String? {
+internal fun matchRegion(address: NominatimAddress?, regions: List<Region>): String? {
     val candidates = listOfNotNull(address?.state, address?.city)
-    return GeoCatalog.regions().firstOrNull { region ->
+    return regions.firstOrNull { region ->
         candidates.any { it.normalize().contains(region.name.take(6).normalize()) }
     }?.id
 }
 
-private fun matchDistrict(address: NominatimAddress?, regionId: String?): String? {
-    if (regionId == null) return null
+internal fun matchDistrict(address: NominatimAddress?, districts: List<District>): String? {
     val candidates = listOfNotNull(address?.county, address?.suburb, address?.town, address?.city)
-    return GeoCatalog.districts(regionId).firstOrNull { district ->
+    return districts.firstOrNull { district ->
         candidates.any { it.normalize().contains(district.name.take(5).normalize()) }
     }?.id
 }

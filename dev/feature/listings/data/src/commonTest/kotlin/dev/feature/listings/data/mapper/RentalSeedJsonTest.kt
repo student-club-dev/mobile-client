@@ -61,6 +61,7 @@ class RentalSeedJsonTest {
         finalPrice = 1_200_000,
         contactPhone = null,
         universityId = null,
+        audience = "ALL",
         branchesJson = branches,
         validFrom = 0,
         validTo = 4_102_444_800_000L,

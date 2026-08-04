@@ -28,6 +28,7 @@ import dev.core.uikit.components.PhonePrefix
 import dev.core.uikit.components.PhoneVisualTransformation
 import dev.core.uikit.theme.AppPalette
 import dev.core.uikit.theme.appPalette
+import dev.feature.listings.domain.model.ListingAudience
 import dev.feature.listings.domain.model.ListingField
 import dev.feature.listings.domain.model.ListingValidator
 import dev.feature.listings.domain.model.PriceUnit
@@ -232,6 +233,32 @@ fun ValiditySection(state: PostListingUiState, vm: PostListingViewModel) {
         ) {
             durationOptions.forEach { days ->
                 SelectChip("$days kun", state.durationDays == days, { vm.onDuration(days) })
+            }
+        }
+    }
+}
+
+/**
+ * E'lonni kim ko'radi (`STUDENT_LISTINGS_BACKEND.md` §7.2.4).
+ *
+ * Profilda universitet ko'rsatilmagan bo'lsa bo'lim **umuman chizilmaydi**: "faqat
+ * universitetim" qaysi OTM ekanini bilmaydi va tanlangan e'lon hech kimga ko'rinmay
+ * qolardi. O'shanda e'lon jimgina "Hammaga" bo'lib ketaveradi — bu yo'qotish emas,
+ * chunki universitet spec bo'yicha ham avvalo tartiblash signali.
+ */
+@Composable
+fun AudienceSection(state: PostListingUiState, vm: PostListingViewModel) {
+    if (!state.hasUniversity) return
+    FormSection(
+        title = "Kim ko'radi",
+        subtitle = state.audience.hint,
+    ) {
+        Row(
+            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(7.dp),
+        ) {
+            ListingAudience.entries.forEach { option ->
+                SelectChip(option.label, state.audience == option, { vm.onAudience(option) })
             }
         }
     }

@@ -6,6 +6,7 @@ import dev.feature.listings.domain.model.DiscountType
 import dev.feature.listings.domain.model.EmploymentType
 import dev.feature.listings.domain.model.ExperienceLevel
 import dev.feature.listings.domain.model.Listing
+import dev.feature.listings.domain.model.ListingAudience
 import dev.feature.listings.domain.model.ListingBranch
 import dev.feature.listings.domain.model.ListingDetails
 import dev.feature.listings.domain.model.ListingRedemption
@@ -189,6 +190,9 @@ fun ListingEntity.toDomain(): Listing = Listing(
     isNegotiable = isNegotiable != 0L,
     contactPhone = contactPhone,
     universityId = universityId,
+    // Noma'lum qiymat kelsa `ALL`: e'lonni yashirib qo'ygandan ko'ra ko'rsatgan xavfsizroq,
+    // chunki `ALL` — spec'dagi odatiy qiymatning o'zi.
+    audience = audience.toEnum(ListingAudience.entries, ListingAudience.ALL),
     branches = branchesJson.decodeBranches(),
     validFrom = validFrom,
     validTo = validTo,
@@ -312,6 +316,7 @@ fun Listing.toEntity(): ListingEntity = ListingEntity(
     finalPrice = finalPrice,
     contactPhone = contactPhone,
     universityId = universityId,
+    audience = audience.name,
     branchesJson = json.encodeToString(
         branches.map { branch ->
             BranchJson(

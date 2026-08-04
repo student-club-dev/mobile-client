@@ -180,6 +180,7 @@ fun TaskForm(state: PostListingUiState, palette: AppPalette, vm: PostListingView
             )
 
             ContactSection(state, vm, "Bajaruvchi shu raqamga bog'lanadi")
+            AudienceSection(state, vm)
         }
     }
 }

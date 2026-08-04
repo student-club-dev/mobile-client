@@ -63,6 +63,14 @@ data class Listing(
     val universityId: String? = null,
 
     /**
+     * E'lonni kim ko'radi (§7.2.4). Odatiy — [ListingAudience.ALL].
+     *
+     * [universityId] `null` bo'lsa faqat `ALL` ma'noga ega: qolgan ikki qiymat qaysi OTM
+     * ekanini bilmaydi va e'lon hech kimga ko'rinmay qolardi.
+     */
+    val audience: ListingAudience = ListingAudience.ALL,
+
+    /**
      * Manzillar — e'lon shu joylarning **hammasida** amal qiladi. Chegirmada bu filiallar,
      * ijarada uyning joyi, ishda ish joyi. Har biri xaritadan tanlanadi, shuning uchun
      * koordinatasi bor (qo'lda kiritilmaydi).
@@ -157,6 +165,28 @@ data class NearestBranch(val branch: ListingBranch, val distanceMeters: Double?)
             if (km >= 10) "${km.toInt()} km" else "${(km * 10).toInt() / 10.0} km"
         }
     }
+}
+
+/**
+ * E'lonning ko'rinish doirasi (`STUDENT_LISTINGS_BACKEND.md` §7.2.4).
+ *
+ * Universitet avvalo **tartiblash signali**: [ALL] da ham o'sha OTM talabalari e'lonni
+ * ro'yxat boshida ko'radi. [MY_UNIVERSITY] va [NEARBY_UNIVERSITIES] esa haqiqiy cheklov —
+ * "yotoqxonamizga sherik" kabi e'lonlar uchun.
+ */
+enum class ListingAudience(val label: String, val hint: String) {
+    ALL(
+        "Hammaga",
+        "Har qanday talaba ko'radi; o'z universitetingiznikilarga ro'yxat boshida chiqadi",
+    ),
+    NEARBY_UNIVERSITIES(
+        "Yaqin universitetlar",
+        "Universitetingiz va unga yaqin OTM talabalari ko'radi",
+    ),
+    MY_UNIVERSITY(
+        "Faqat universitetim",
+        "Faqat o'z universitetingiz talabalari ko'radi",
+    ),
 }
 
 /** E'lon holati. Oqim: DRAFT → PENDING_REVIEW → ACTIVE ⇄ PAUSED. */

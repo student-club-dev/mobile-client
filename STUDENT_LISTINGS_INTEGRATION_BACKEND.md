@@ -148,11 +148,35 @@ Ya'ni bu Faza 2 ga qolsa ham bo'ladi.
 
 ---
 
-## 7. Faza 2 — kutilmoqda
+## 7. Faza 2 — holat
 
-§7 dagi ro'yxat o'zgarmadi: universitet (§7.2.4), `GET /listings/catalog` (§7.3),
-chat'da `listingId` (§7.5), sevimlilar, `POST /search/map`, `POST /suggest`.
-Ular chiqqanda ilova tomondan qo'shimcha ish kam: `audience` bayrog'ini yoqish va
-`universityRelation` ni ko'rsatish.
+### ✅ Bajarildi: `audience` (§7.2.4 ning klient qismi)
+
+`CreateStudentListingDto` / `UpdateStudentListingDto` / `StudentListingDto` da maydon
+paydo bo'lgani uchun ulandi:
+
+- e'lon formasida "Kim ko'radi" tanlovi — `Hammaga` · `Yaqin universitetlar` ·
+  `Faqat universitetim`; odatiy `ALL` (spec'dagidek);
+- profilda universitet ko'rsatilmagan bo'lsa tanlov **umuman ko'rsatilmaydi** va so'rovga
+  doim `ALL` ketadi. Sabab: `MY_UNIVERSITY` doirasi `universityId` dan hisoblanadi, usiz
+  e'lon hech kimga ko'rinmay qolardi. Tanlov keyin universitet olib tashlansa ham `ALL` ga
+  qaytadi;
+- qiymat local bazada ham saqlanadi (`ListingEntity.audience`, migratsiya 29 → eski
+  qatorlar `ALL`), ya'ni oflaynda yaratilgan qoralama ham doirani yo'qotmaydi.
+
+### ⛔️ Kutilmoqda — spec'da hali yo'q
+
+Tekshirdik (`swaggerstudent.json`, 2026-08-03):
+
+| Kerak | Spec'dagi holat |
+|---|---|
+| `universityRelation` (`SAME`/`NEAREST`/`OTHER`), `universityName` | `StudentListingDto` da **yo'q** |
+| `universityIds[]`, `onlyMyUniversity`, `includeNearbyUniversities` filtrlari | `GET /v1/student-listings` query'sida **yo'q** (`sort=RELEVANCE` bor, lekin uni hisoblaydigan signal yo'q) |
+| `GET /listings/catalog?kind=…` (§7.3) | **yo'q** — kataloglar hali ilovada hardcode |
+| `POST /v1/conversations` da `listingId` (§7.5) | `OpenDirectDto` da faqat `studentId` |
+| Sevimlilar (`/favorite/toggle`), `POST /search/map`, `POST /suggest` | faqat **chegirmalar** tomonida bor (`/v1/discounts/*`), talaba e'lonlarida yo'q |
+
+Bular chiqqanda ilova tomonidagi ish kam: `universityRelation` ni kartada ko'rsatish va
+filtr oynasiga "Faqat universitetim" tugmasini qo'shish.
 
 `apply` / `applicationsCount` (§10 Q4) — hozircha kerak emas, chat va telefon yetarli.

@@ -200,6 +200,10 @@ class CreateBranchFromPointUseCase(private val geoRepository: GeoRepository) {
             lng = lng,
             address = resolved?.address?.takeIf { it.isNotBlank() }
                 ?: "${lat.round5()}, ${lng.round5()}",
+            // Mo'ljal — eng yaqin metro bekati (Toshkent, 3 km ichida). Manzil satriga
+            // qo'shilmaydi: manzilni foydalanuvchi tahrirlaydi, mo'ljal esa serverdan
+            // kelgan fakt va uni tasodifiy o'chirib qo'yish kerak emas.
+            landmark = resolved?.nearestMetro?.let { "$it metrosi yaqinida" },
             regionId = resolved?.regionId,
             districtId = resolved?.districtId,
         )

@@ -28,6 +28,17 @@ class GeoMapperTest {
         // ⚠️ Taxmin YO'Q: id aynan serverdan kelgan holda qoladi.
         assertEquals("TOSHKENT_SHAHRI", resolved.regionId)
         assertEquals("CHILONZOR", resolved.districtId)
+        // `metro_stations` seed qilingandan keyin bu maydon haqiqiy qiymat qaytaradi
+        // (`DISCOUNTS_BUSINESS_API_RESPONSE.md` §2.3) — u endi mo'ljal bo'lib ishlatiladi.
+        assertEquals("Chilonzor", resolved.nearestMetro)
+    }
+
+    @Test
+    fun `bo'sh metro nomi mo'ljal bo'lmaydi`() {
+        // Server 3 km dan uzoq bekatni `null` qiladi; bo'sh satr ham xuddi shunday —
+        // aks holda e'lon ostida bo'm-bo'sh "mo'ljal" qatori paydo bo'lardi.
+        val resolved = ReverseGeocodeResponseDto(address = "Chorsu", nearestMetro = "  ").toResolved()
+        assertNull(resolved.nearestMetro)
     }
 
     @Test

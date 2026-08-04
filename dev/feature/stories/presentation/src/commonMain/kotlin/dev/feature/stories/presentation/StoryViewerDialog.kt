@@ -120,7 +120,19 @@ internal fun StoryViewerDialog(
     Dialog(onDismissRequest = onClose, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         StatusBarAppearance(darkIcons = false)
         Box(Modifier.fillMaxSize().background(Color.Black)) {
-            if (isVideo) {
+            if (story.mediaPurged && story.localUri == null) {
+                // Arxivda bir yillik saqlash muddati o'tgan — fayl serverda yo'q
+                // (`url` → 404). Pleyer/rasm yuklovchisiga bermaymiz: ekran jimgina qora
+                // qolib, foydalanuvchi sababini bilmasdi.
+                Box(Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
+                    ScText(
+                        "Bu lavhaning fayli saqlanmagan — arxivda faqat yozuvi qoldi.",
+                        14f,
+                        FontWeight.Medium,
+                        Color.White,
+                    )
+                }
+            } else if (isVideo) {
                 ScVideoPlayer(
                     // Telefondagi nusxa bo'lsa — o'sha: tarmoq ham, kutish ham yo'q.
                     url = story.displayUrl,

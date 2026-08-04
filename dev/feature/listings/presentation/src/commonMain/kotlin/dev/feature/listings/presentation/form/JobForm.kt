@@ -371,6 +371,7 @@ fun JobForm(state: PostListingUiState, palette: AppPalette, vm: PostListingViewM
             subtitle = "Xaritadan aniq manzilni belgilang",
         )
 
+        AudienceSection(state, vm)
         ValiditySection(state, vm)
     }
 }

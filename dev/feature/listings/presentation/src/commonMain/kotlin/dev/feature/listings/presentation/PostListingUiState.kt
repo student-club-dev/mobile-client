@@ -7,6 +7,7 @@ import dev.feature.listings.domain.model.ExperienceLevel
 import dev.feature.listings.domain.model.ListingCatalog
 import dev.feature.listings.domain.model.ListingError
 import dev.feature.listings.domain.model.ListingField
+import dev.feature.listings.domain.model.ListingAudience
 import dev.feature.listings.domain.model.ListingBranch
 import dev.feature.listings.domain.model.ListingKind
 import dev.feature.listings.domain.model.PayPeriod
@@ -76,6 +77,14 @@ data class PostListingUiState(
     val searching: Boolean = false,
 
     val durationDays: Int = 30,
+
+    /**
+     * E'lonni kim ko'radi (§7.2.4). Tanlov FAQAT foydalanuvchining universiteti ma'lum
+     * bo'lganda ko'rsatiladi ([hasUniversity]) — usiz "faqat universitetim" qaysi OTM
+     * ekanini bilmaydi va e'lon hech kimga ko'rinmay qolardi.
+     */
+    val audience: ListingAudience = ListingAudience.ALL,
+    val hasUniversity: Boolean = false,
 
     // --- Turga xos ---
     val discount: DiscountFormState = DiscountFormState(),

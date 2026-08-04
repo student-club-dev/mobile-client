@@ -333,6 +333,9 @@ class LocalDataSeeder(
         universityId = universityId,
         branchesJson = branchesJson,
         validFrom = 0,
+        // Namuna e'lonlari hammaga ko'rinadi: seed universitetlari (`tatu`/`nuu`) ular
+        // faqat tartiblash uchun, doirani cheklash uchun emas.
+        audience = "ALL",
         validTo = FAR_FUTURE,
         attributesJson = "{}",
         optionGroupsJson = "[]",

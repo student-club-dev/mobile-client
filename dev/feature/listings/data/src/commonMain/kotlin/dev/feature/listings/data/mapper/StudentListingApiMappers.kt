@@ -13,6 +13,7 @@ import dev.core.network.media.MediaUrl
 import dev.feature.listings.domain.model.EmploymentType
 import dev.feature.listings.domain.model.ExperienceLevel
 import dev.feature.listings.domain.model.Listing
+import dev.feature.listings.domain.model.ListingAudience
 import dev.feature.listings.domain.model.ListingBranch
 import dev.feature.listings.domain.model.ListingDetails
 import dev.feature.listings.domain.model.ListingKind
@@ -321,6 +322,7 @@ fun StudentListingDto.toDomain(apiOrigin: String): Listing {
         isNegotiable = isNegotiable,
         contactPhone = contactPhone,
         universityId = universityId,
+        audience = audience.value.toEnumOrNull(ListingAudience.entries) ?: ListingAudience.ALL,
         branches = branches.map { branch ->
             ListingBranch(
                 id = branch.id,
@@ -379,9 +381,12 @@ fun StudentListingPageDto.toDomain(apiOrigin: String): ListingPage = ListingPage
  * Yaratish so'rovi. [submit] `true` bo'lsa server to'liq validatsiya qiladi va e'lon
  * o'sha so'rovning o'zida faol bo'ladi; `false` — validatsiyasiz qoralama.
  *
- * `audience` **yuborilmaydi**: `MY_UNIVERSITY` / `NEARBY_UNIVERSITIES` Faza 2 gacha
- * amalda emas va ularni yuborish e'lonni egasi mo'ljallaganidan kengroq ko'rsatardi.
- * `ownerId` ham yuborilmaydi — server uni token'dan oladi.
+ * `ownerId` yuborilmaydi — server uni token'dan oladi.
+ *
+ * `audience` universitetsiz e'londa **doim `ALL`**: `MY_UNIVERSITY` /
+ * `NEARBY_UNIVERSITIES` qaysi OTM ekanini `universityId` dan oladi va usiz e'lon hech
+ * kimga ko'rinmay qolardi. Bu shart formada ham bor, lekin bu yerda ham qo'yilgan —
+ * qoralama universitet tanlanishidan oldin saqlanishi mumkin.
  *
  * Turi serverga mos kelmasa (chegirma) — `null`.
  */
@@ -401,6 +406,7 @@ fun Listing.toCreateDto(submit: Boolean): CreateStudentListingDto? {
         isNegotiable = isNegotiable,
         contactPhone = contactPhone,
         universityId = universityId,
+        audience = effectiveAudience().toCreateAudience(),
         branches = branches.map { it.toDto() },
         validFrom = validFrom.toIsoOrNull(),
         validTo = validTo.toIsoOrNull(),
@@ -423,6 +429,7 @@ fun Listing.toUpdateDto(): UpdateStudentListingDto? {
         isNegotiable = isNegotiable,
         contactPhone = contactPhone,
         universityId = universityId,
+        audience = effectiveAudience().toUpdateAudience(),
         branches = branches.map { it.toDto() },
         validFrom = validFrom.toIsoOrNull(),
         validTo = validTo.toIsoOrNull(),
@@ -430,6 +437,18 @@ fun Listing.toUpdateDto(): UpdateStudentListingDto? {
         optionGroups = optionGroups.map { it.toDto() },
     )
 }
+
+/**
+ * Universitetsiz e'lon uchun doim `ALL` — qarang [toCreateDto] izohi.
+ */
+private fun Listing.effectiveAudience(): ListingAudience =
+    if (universityId.isNullOrBlank()) ListingAudience.ALL else audience
+
+private fun ListingAudience.toCreateAudience(): CreateStudentListingDto.Audience =
+    CreateStudentListingDto.Audience.entries.first { it.value == name }
+
+private fun ListingAudience.toUpdateAudience(): UpdateStudentListingDto.Audience =
+    UpdateStudentListingDto.Audience.entries.first { it.value == name }
 
 /** `POST /{id}/status` faqat shu uchtasini qabul qiladi; qolgani serverning ishi. */
 fun ListingStatus.toStatusDto(): SetListingStatusDto? = when (this) {

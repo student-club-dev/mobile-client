@@ -16,6 +16,7 @@ import dev.feature.listings.domain.model.RedemptionMethod
 import dev.feature.listings.domain.model.formatSum
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /** Chegirma formulasi va publish shartlari — `DISCOUNTS_BUSINESS_API.md` §3.5 va §6.1. */
@@ -444,6 +445,32 @@ class ListingValidatorTest {
         assertEquals("Chilonzor", GeoCatalog.district("TOSHKENT_SHAHRI", "CHILONZOR")?.name)
         // Apostrof id'dan tushib qoladi: "Mirzo Ulug'bek" → MIRZO_ULUGBEK
         assertEquals("Mirzo Ulug'bek", GeoCatalog.district("TOSHKENT_SHAHRI", "MIRZO_ULUGBEK")?.name)
+    }
+
+    /**
+     * Mo'ljal chegarasi backend bilan bir xil bo'lishi shart
+     * (`DISCOUNTS_BUSINESS_API_RESPONSE.md` §2.3): 3 km dan uzoqdagi bekat mo'ljal emas.
+     * Bu zaxira (Nominatim) yo'lida hisoblanadi — ikki yo'l bir xil javob berishi kerak.
+     */
+    @Test
+    fun `eng yaqin metro faqat 3 km ichida mo'ljal bo'ladi`() {
+        val stations = listOf(
+            dev.feature.listings.domain.model.MetroStation(
+                id = "CHILONZOR", name = "Chilonzor", line = "CHILONZOR",
+                lat = 41.27436, lng = 69.20497,
+            ),
+            dev.feature.listings.domain.model.MetroStation(
+                id = "BUYUK_IPAK_YOLI", name = "Buyuk ipak yo'li", line = "OZBEKISTON",
+                lat = 41.32536, lng = 69.33507,
+            ),
+        )
+
+        // Chilonzor bekatining yonidagi nuqta — eng yaqini o'sha.
+        assertEquals("CHILONZOR", GeoCatalog.nearestStation(stations, 41.2755, 69.2060)?.id)
+        // Samarqand — Toshkentdagi hech bir bekat mo'ljal emas.
+        assertNull(GeoCatalog.nearestStation(stations, 39.6542, 66.9597))
+        // Ro'yxat bo'sh (metro yo'q shahar / ro'yxat hali yuklanmagan) — xato emas.
+        assertNull(GeoCatalog.nearestStation(emptyList(), 41.2755, 69.2060))
     }
 
     @Test
