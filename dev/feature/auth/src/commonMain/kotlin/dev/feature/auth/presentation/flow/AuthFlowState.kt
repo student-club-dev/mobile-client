@@ -1,5 +1,8 @@
 package dev.feature.auth.presentation.flow
 
+import dev.core.common.format.isUzPhoneComplete
+import dev.core.common.format.toUzPhoneDigits
+import dev.core.common.format.toUzPhoneE164
 import dev.feature.university.domain.model.University
 
 /**
@@ -50,15 +53,15 @@ data class AuthFlowState(
     val error: String? = null,
     val info: String? = null,
 ) {
-    val phoneDigits: String get() = phone.filter { it.isDigit() }.take(9)
-    val phoneValid: Boolean get() = phoneDigits.length == 9
+    val phoneDigits: String get() = phone.toUzPhoneDigits()
+    val phoneValid: Boolean get() = phone.isUzPhoneComplete()
     val otpValid: Boolean get() = otp.length == 6
 
     /** Kirish tugmasi faolmi — telefon + parol. */
     val loginReady: Boolean get() = password.isNotBlank() && phoneValid
 
     /** E.164 formatdagi raqam (`+998901234567`) yoki bo'sh matn. */
-    val phoneE164: String get() = if (phoneValid) "+998$phoneDigits" else ""
+    val phoneE164: String get() = phone.toUzPhoneE164().orEmpty()
 
     /**
      * Parolni tiklashning 1-qadami to'ldirilganmi — raqam va yangi parol.

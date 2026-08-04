@@ -42,8 +42,14 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.core.common.format.UZ_PHONE_CODE
+import dev.core.common.format.isUzPhoneComplete
+import dev.core.common.format.toUzPhoneDigits
+import dev.core.common.format.toUzPhoneE164
 import dev.core.uikit.components.AppIcons
 import dev.core.uikit.components.GlassTextField
+import dev.core.uikit.components.PhonePrefix
+import dev.core.uikit.components.PhoneVisualTransformation
 import dev.core.uikit.components.ScCircleButton
 import dev.core.uikit.components.ScGradientButton
 import dev.core.uikit.components.ScHeader
@@ -92,7 +98,8 @@ fun EditProfileScreen(onBack: () -> Unit, vm: ProfileViewModel = koinViewModel()
 
     var firstName by remember(profile) { mutableStateOf(profile?.firstName.orEmpty()) }
     var lastName by remember(profile) { mutableStateOf(profile?.lastName.orEmpty()) }
-    var phone by remember(profile) { mutableStateOf(profile?.phoneNumber.orEmpty()) }
+    // Maydonda faqat 9 xonali milliy raqam turadi — "+998" prefiksi maydondan tashqarida.
+    var phone by remember(profile) { mutableStateOf(profile?.phoneNumber.orEmpty().toUzPhoneDigits()) }
     var universityId by remember(profile) { mutableStateOf(profile?.universityId) }
     var courseYear by remember(profile) { mutableStateOf(profile?.courseYear) }
     var gender by remember(profile) { mutableStateOf(profile?.gender) }
@@ -211,10 +218,20 @@ fun EditProfileScreen(onBack: () -> Unit, vm: ProfileViewModel = koinViewModel()
 
             FieldLabel("Telefon")
             GlassTextField(
-                phone, { phone = it }, "+998 90 123 45 67",
-                leading = AppIcons.Phone,
+                phone, { phone = it.toUzPhoneDigits() }, "90 123 45 67",
+                leadingContent = { PhonePrefix() },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                visualTransformation = PhoneVisualTransformation(),
             )
+            // Chala raqam saqlanmaydi — shu yerda ogohlantiramiz.
+            if (phone.isNotEmpty() && !phone.isUzPhoneComplete()) {
+                ScText(
+                    "Raqamni to'liq kiriting: $UZ_PHONE_CODE 90 123 45 67",
+                    11.5f,
+                    FontWeight.Medium,
+                    Sc.Danger,
+                )
+            }
 
             // Tarjimayi hol — 140 belgi, havola/telefon TAQIQLANGAN.
             FieldLabel("Tarjimayi hol")
@@ -328,10 +345,17 @@ fun EditProfileScreen(onBack: () -> Unit, vm: ProfileViewModel = koinViewModel()
                         error = bioError
                         return@ScGradientButton
                     }
+                    // Chala raqam bilan saqlab bo'lmaydi: raqam yo to'liq, yo umuman yo'q.
+                    if (phone.isNotEmpty() && !phone.isUzPhoneComplete()) {
+                        saving = false
+                        error = "Telefon raqamini to'liq kiriting"
+                        return@ScGradientButton
+                    }
                     val updated = (profile ?: UserProfile()).copy(
                         firstName = firstName.trim().ifBlank { null },
                         lastName = lastName.trim().ifBlank { null },
-                        phoneNumber = phone.trim().ifBlank { null },
+                        // Saqlashda doim yagona ko'rinish: "+998901234567".
+                        phoneNumber = phone.toUzPhoneE164(),
                         universityId = universityId,
                         courseYear = courseYear,
                         gender = gender,

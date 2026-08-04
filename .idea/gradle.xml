@@ -40,6 +40,10 @@
             <option value="$PROJECT_DIR$/dev/feature/ads/domain" />
             <option value="$PROJECT_DIR$/dev/feature/ads/presentation" />
             <option value="$PROJECT_DIR$/dev/feature/auth" />
+            <option value="$PROJECT_DIR$/dev/feature/calls" />
+            <option value="$PROJECT_DIR$/dev/feature/calls/data" />
+            <option value="$PROJECT_DIR$/dev/feature/calls/domain" />
+            <option value="$PROJECT_DIR$/dev/feature/calls/presentation" />
             <option value="$PROJECT_DIR$/dev/feature/chat" />
             <option value="$PROJECT_DIR$/dev/feature/chat/data" />
             <option value="$PROJECT_DIR$/dev/feature/chat/domain" />

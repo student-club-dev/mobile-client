@@ -85,6 +85,7 @@ import dev.feature.connections.domain.model.ConnectionView
 import dev.feature.connections.domain.model.SearchedStudent
 import org.koin.compose.viewmodel.koinViewModel
 import androidx.compose.runtime.ReadOnlyComposable
+import dev.core.common.format.formatAmount
 
 /**
  * Dizayndagi `cubic-bezier(.4,0,.2,1)` — topbar kichrayishi shu egri bilan.
@@ -125,6 +126,8 @@ fun HomeScreen(
     onOpenUniversity: () -> Unit = {},
     /** Yon paneldagi "E'lonlar" — talaba e'lonlari tab'i (ijara, xizmat, ish). */
     onOpenListings: () -> Unit = {},
+    /** Yon paneldagi "Mening e'lonlarim" — foydalanuvchining O'Z e'lonlari, barcha statuslar. */
+    onOpenMyListings: () -> Unit = {},
     /** Yon paneldagi "Sozlamalar". Ekranda boshqa kirish nuqtasi yo'q (profil ichida). */
     onOpenSettings: () -> Unit = {},
     vm: HomeViewModel = koinViewModel(),
@@ -239,6 +242,7 @@ fun HomeScreen(
             onOpenStudents = onOpenStudents,
             onOpenStudentSearch = onOpenStudentSearch,
             onOpenStudentRequests = onOpenStudentRequests,
+            onOpenMyListings = onOpenMyListings,
             onOpenSettings = onOpenSettings,
         )
     }
@@ -642,12 +646,12 @@ private fun OfferPrice(offer: DiscountOffer) {
         horizontalArrangement = Arrangement.spacedBy(5.dp),
     ) {
         ScText(
-            "${offer.effectivePrice.spaced()} so'm", 15.5f, FontWeight.ExtraBold, Color.White,
+            "${offer.effectivePrice.formatAmount()} so'm", 15.5f, FontWeight.ExtraBold, Color.White,
             letterSpacing = -0.2f, maxLines = 1,
         )
         if (offer.isDiscount && offer.originalPrice > offer.finalPrice) {
             Text(
-                offer.originalPrice.spaced(),
+                offer.originalPrice.formatAmount(),
                 style = scStyle(11f, FontWeight.SemiBold, Color.White.copy(alpha = 0.7f))
                     .copy(textDecoration = TextDecoration.LineThrough),
                 maxLines = 1,
@@ -678,7 +682,6 @@ private fun DiscountOffer.typeLabel(): String {
 }
 
 /** "30 000" — uch xonadan bo'sh joy bilan. */
-private fun Long.spaced(): String = toString().reversed().chunked(3).joinToString(" ").reversed()
 
 /** Oq yorliq ustidagi matn — mavzudan qat'i nazar to'q (fon doim oq). */
 private val InkOnLight = Color(0xFF0F2A43)

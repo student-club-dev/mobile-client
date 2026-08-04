@@ -16,6 +16,10 @@ kotlin {
             implementation(libs.kotlinx.coroutines.core)
             api(libs.napier)
         }
+        // Telefon/summa qoliplari (`format/Formats.kt`) — butun ilova shularga tayanadi.
+        commonTest.dependencies {
+            implementation("org.jetbrains.kotlin:kotlin-test")
+        }
     }
 }
 

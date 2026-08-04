@@ -81,6 +81,8 @@ import dev.core.uikit.map.OffersMapOverlay
 import dev.core.uikit.map.markersCenter
 import kotlinx.coroutines.delay
 import org.koin.compose.viewmodel.koinViewModel
+import dev.core.common.format.formatAmountShort
+import dev.core.common.format.formatAmount
 
 /**
  * "Siz uchun" feed.
@@ -621,7 +623,7 @@ private fun MapOverlay(
             // ro'yxat shu orqali guruhni topadi.
             id = first.id,
             lat = first.lat, lng = first.lng,
-            label = if (group.size > 1) first.merchant else "${first.effectivePrice.priceShort()} so'm",
+            label = if (group.size > 1) first.merchant else "${first.effectivePrice.formatAmountShort()} so'm",
             colorHex = hexRgb(first.bannerAccent),
             highlight = group.any { it.isDiscount },
             count = group.size,
@@ -814,16 +816,6 @@ private fun MapChip(label: String, selected: Boolean, palette: AppPalette, onCli
 // ARGB Long -> "#RRGGBB"
 private fun hexRgb(argb: Long): String = "#" + (argb and 0xFFFFFF).toString(16).padStart(6, '0').uppercase()
 
-// 21000 -> "21k", 890000 -> "890k", 6500000 -> "6.5M"
-private fun Long.priceShort(): String = when {
-    this >= 1_000_000 -> {
-        val whole = this / 1_000_000
-        val frac = (this % 1_000_000) / 100_000
-        if (frac == 0L) "${whole}M" else "$whole.${frac}M"
-    }
-    this >= 1_000 -> "${this / 1_000}k"
-    else -> "$this"
-}
 
 // ---------------------------------------------------------------------------
 // Filter ekrani — barcha bo'limlarni to'liq filterlash
@@ -922,7 +914,7 @@ private fun FilterScreen(
             // Sxemadagi ma'lumot — serverda nechta e'lon bor va narxlar oralig'i qanday.
             val schemaInfo = listOfNotNull(
                 fs.schemaTotal?.let { "Serverda $it ta e'lon" },
-                fs.priceRange?.let { "${it.first.sum()} – ${it.last.sum()} so'm" },
+                fs.priceRange?.let { "${it.first.formatAmount()} – ${it.last.formatAmount()} so'm" },
             ).joinToString(" · ")
             if (schemaInfo.isNotBlank()) {
                 Spacer(Modifier.height(12.dp))
@@ -1145,8 +1137,8 @@ private fun OfferBanner(offer: DiscountOffer, accent: Color, saved: Boolean, onT
             }
             if (offer.originalPrice > 0) {
                 Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                    Text("${offer.finalPrice.sum()} so'm", style = TextStyle(fontFamily = AppFontFamily, fontSize = 16.sp, fontWeight = FontWeight.Black, color = Color.White))
-                    Text("${offer.originalPrice.sum()}", style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.5f.sp, color = Color.White.copy(alpha = 0.7f), textDecoration = TextDecoration.LineThrough))
+                    Text("${offer.finalPrice.formatAmount()} so'm", style = TextStyle(fontFamily = AppFontFamily, fontSize = 16.sp, fontWeight = FontWeight.Black, color = Color.White))
+                    Text("${offer.originalPrice.formatAmount()}", style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.5f.sp, color = Color.White.copy(alpha = 0.7f), textDecoration = TextDecoration.LineThrough))
                     Text("/ ${offer.priceUnit}", style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.sp, color = Color.White.copy(alpha = 0.7f)))
                 }
             }
@@ -1233,7 +1225,7 @@ private fun RegularOfferCard(
                 offer.location?.let { Text(it, style = TextStyle(fontFamily = AppFontFamily, fontSize = 10.5f.sp, color = palette.inkFaint), maxLines = 1) }
             }
             if (offer.originalPrice > 0) {
-                Text("${offer.originalPrice.sum()} so'm / ${offer.priceUnit}", style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.sp, fontWeight = FontWeight.Black, color = palette.ink))
+                Text("${offer.originalPrice.formatAmount()} so'm / ${offer.priceUnit}", style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.sp, fontWeight = FontWeight.Black, color = palette.ink))
             }
         }
         Icon(
@@ -1284,9 +1276,6 @@ private fun OfferTagRow(
         )
     }
 }
-
-// "55000" → "55 000"
-private fun Long.sum(): String = toString().reversed().chunked(3).joinToString(" ").reversed()
 
 /** Filtr chipiga server bergan sonni qo'shadi: "Pitsa" → "Pitsa · 54". Son yo'q bo'lsa — o'zi. */
 private fun String.withCount(count: Int?): String = if (count == null) this else "$this · $count"

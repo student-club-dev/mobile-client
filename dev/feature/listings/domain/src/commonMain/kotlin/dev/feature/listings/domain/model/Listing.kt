@@ -1,5 +1,6 @@
 package dev.feature.listings.domain.model
 
+import dev.core.common.format.formatAmount
 import kotlin.math.PI
 import kotlin.math.atan2
 import kotlin.math.cos
@@ -304,9 +305,8 @@ data class OptionGroup(
     val options: List<OptionItem> = emptyList(),
 )
 
-/** "55000" → "55 000". Narxni o'qish uchun (uch xonali guruhlar, ajratgich — probel). */
-fun Long.formatSum(): String {
-    val s = toString()
-    if (s.length <= 3) return s
-    return s.reversed().chunked(3).joinToString(" ").reversed()
-}
+/**
+ * "55000" → "55 000". Narxni o'qish uchun (uch xonali guruhlar, ajratgich — probel).
+ * Qolipning o'zi bitta joyda — `dev.core.common.format.formatAmount`.
+ */
+fun Long.formatSum(): String = formatAmount(toString())

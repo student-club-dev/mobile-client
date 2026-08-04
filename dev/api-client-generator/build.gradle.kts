@@ -224,11 +224,19 @@ val cleanSwagger = tasks.register("cleanSwagger") {
 
                     @Suppress("UNCHECKED_CAST")
                     val properties = map["properties"] as? MutableMap<String, Any?>
+
+                    // Query/path parametri — nomi tugunning O'ZIDA turadi (`{"name": "lat",
+                    // "in": "query", "schema": {...}}`), sxema esa ichkarida. Nomni uzatmasak
+                    // `lat`/`lng` doubleProps ga tushmay, formatsiz `number` (5) qoidasi
+                    // bo'yicha `Int` bo'lib chiqadi — koordinatali qidiruv butunlay buziladi.
+                    val parameterName = (map["name"] as? String)?.takeIf { map.containsKey("in") }
+
                     map.forEach { (key, value) ->
                         when {
                             // Maydon nomi tiplashda kerak (`multiple`, `requiresCustomName`).
                             key == "properties" && properties != null ->
                                 properties.forEach { (name, schema) -> fixTypes(schema, name) }
+                            key == "schema" && parameterName != null -> fixTypes(value, parameterName)
                             // Massiv elementi ota-maydon nomini meros oladi.
                             key == "items" -> fixTypes(value, propName)
                             else -> fixTypes(value, null)
@@ -371,6 +379,44 @@ val cleanSwagger = tasks.register("cleanSwagger") {
         }
         root["paths"] = rewrittenPaths
 
+        // (12) Polimorf `oneOf` → erkin JSON obyekt (`JsonObject`).
+        //
+        // Talaba e'lonining `details` maydoni to'rt turdan biri bo'ladi va ajratgichi —
+        // `kind` (`STUDENT_LISTINGS_BACKEND.md` §4). Generator `oneOf` uchun ishlatib
+        // bo'ladigan Kotlin kodi chiqara olmaydi, ustiga backend spec'da `TaskDetailsDto` va
+        // qo'shnilarini UMUMAN e'lon qilmagan — `$ref` lar bo'shliqqa qaraydi va generatsiya
+        // yiqiladi.
+        //
+        // Shuning uchun tugun erkin obyektga aylantiriladi va `typeMappings` orqali
+        // `JsonObject` bo'lib chiqadi: turga xos qism qo'lda — `StudentListingApiMappers.kt`
+        // da — o'qiladi, xuddi local bazadagi `detailsJson` ustuni kabi. Yutuq faqat
+        // texnik emas: noma'lum tur kelganda javob yiqilmaydi, `details` xom JSON bo'lib
+        // qoladi va domen uni o'zi hal qiladi.
+        var polymorphicNodes = 0
+        fun collapseOneOf(node: Any?) {
+            when (node) {
+                is MutableMap<*, *> -> {
+                    @Suppress("UNCHECKED_CAST")
+                    val map = node as MutableMap<String, Any?>
+                    if (map.containsKey("oneOf") || map.containsKey("anyOf")) {
+                        map.remove("oneOf")
+                        map.remove("anyOf")
+                        map.remove("discriminator")
+                        map.remove("properties")
+                        map["type"] = "object"
+                        polymorphicNodes++
+                    }
+                    map.values.forEach { collapseOneOf(it) }
+                }
+                is List<*> -> node.forEach { collapseOneOf(it) }
+            }
+        }
+        collapseOneOf(root["components"])
+        collapseOneOf(root["paths"])
+        if (polymorphicNodes > 0) {
+            logger.lifecycle("cleanSwagger: $polymorphicNodes ta polimorf tugun → JsonObject")
+        }
+
         // (4)(5) barcha sxemalarni tiplash — komponentlar va inline sxemalar birgalikda
         fixTypes(root["components"], null)
         fixTypes(root["paths"], null)
@@ -444,6 +490,10 @@ openApiGenerate {
     packageName.set("dev.core.network.generated")
     apiPackage.set("dev.core.network.generated.api")
     modelPackage.set("dev.core.network.generated.model")
+    // Erkin JSON obyekti (qadam 12 dan keladigan `details`) — `kotlin.Any` emas,
+    // `JsonObject`: `kotlin.Any` ni kotlinx.serialization umuman kompilyatsiya qilmaydi.
+    typeMappings.set(mapOf("AnyType" to "JsonObject", "object" to "JsonObject"))
+    importMappings.set(mapOf("JsonObject" to "kotlinx.serialization.json.JsonObject"))
     configOptions.set(
         mapOf(
             "dateLibrary" to "kotlinx-datetime",

@@ -14,6 +14,7 @@ import dev.feature.connections.domain.repository.ConnectionsRepository
 import dev.feature.listings.domain.model.Listing
 import dev.feature.listings.domain.model.ListingKind
 import dev.feature.listings.domain.usecase.ObserveListingsByKindUseCase
+import dev.feature.listings.domain.usecase.RefreshListingsUseCase
 import dev.core.domain.repository.DiscountRepository
 import dev.core.domain.repository.RegionRepository
 import dev.feature.notifications.domain.repository.NotificationRepository
@@ -100,6 +101,7 @@ class HomeViewModel(
     private val discountRepository: DiscountRepository,
     private val regionRepository: RegionRepository,
     observeListingsByKind: ObserveListingsByKindUseCase,
+    private val refreshListings: RefreshListingsUseCase,
     private val connectionsRepository: ConnectionsRepository,
     notificationRepository: NotificationRepository,
 ) : ViewModel() {
@@ -149,6 +151,12 @@ class HomeViewModel(
         // Kirishdan keyin ilova shu ekrandan boshlanadi — profilni masofaviy manbadan
         // keshga tortamiz, shunda sarlavhadagi universitet/kurs darrov ko'rinadi.
         viewModelScope.launch { refreshProfileUseCase() }
+
+        // E'lon bo'limlari keshdan kuzatiladi, lekin kesh o'zi to'lmaydi: usiz Home'dagi
+        // "Fanlardan yordam" va "Ijara" faqat foydalanuvchi E'lonlar ekranini ochgandan
+        // keyin jonlanardi. Xatosi yutiladi — Home'da e'lon bo'limi shunchaki bo'sh qoladi.
+        viewModelScope.launch { refreshListings(ListingKind.TASK) }
+        viewModelScope.launch { refreshListings(ListingKind.RENTAL) }
     }
 
     private val header = combine(

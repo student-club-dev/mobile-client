@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -42,6 +43,7 @@ import dev.core.uikit.components.ScHeaderSubtitle
 import dev.core.uikit.components.ScHeaderTitle
 import dev.core.uikit.components.ScIconTile
 import dev.core.uikit.components.ScIcons
+import dev.core.uikit.components.ScSoftButton
 import dev.core.uikit.components.ScText
 import dev.core.uikit.components.scCard
 import dev.core.uikit.components.scStyle
@@ -82,12 +84,13 @@ fun ListingsBrowseScreen(
     var showSearch by remember { mutableStateOf(false) }
 
     LaunchedEffect(initialKind) { vm.selectKind(initialKind) }
+    LaunchedEffect(userLocation) { vm.setUserLocation(userLocation?.lat, userLocation?.lng) }
 
-    // Eng yaqinlari yuqorida. Joylashuv noma'lum bo'lsa tartib o'zgarmaydi.
-    val sorted = remember(state.listings, userLocation) {
-        state.listings
-            .map { it to it.nearestBranch(userLocation?.lat, userLocation?.lng) }
-            .sortedBy { (_, nearest) -> nearest?.distanceMeters ?: Double.MAX_VALUE }
+    // Tartib SERVERDAN keladi (`sort` parametri) va bu yerda qayta saralanmaydi: local
+    // saralash "yangi e'lonlar" yoki "arzondan qimmatga" tanlovini jimgina bekor qilardi.
+    // Masofa faqat kartochkadagi yozuv uchun hisoblanadi.
+    val withDistance = remember(state.listings, userLocation) {
+        state.listings.map { it to it.nearestBranch(userLocation?.lat, userLocation?.lng) }
     }
 
     Box(modifier.fillMaxSize().background(Sc.Bg)) {
@@ -117,7 +120,7 @@ fun ListingsBrowseScreen(
                 ),
                 verticalArrangement = Arrangement.spacedBy(13.dp),
             ) {
-                items(sorted, key = { (listing, _) -> listing.id }) { (listing, nearest) ->
+                items(withDistance, key = { (listing, _) -> listing.id }) { (listing, nearest) ->
                     ListingCard(
                         listing = listing,
                         distanceLabel = nearest?.distanceLabel(),
@@ -126,8 +129,25 @@ fun ListingsBrowseScreen(
                         onClick = { onOpenListing(listing.id) },
                     )
                 }
-                if (state.listings.isEmpty()) {
-                    item { BrowseEmptyState(state) }
+                when {
+                    // Cheksiz skroll: oxirgi kartochka ko'ringanda keyingi sahifa so'raladi.
+                    // Kompozitsiyaning O'ZI so'rov sababi — alohida scroll listener kerak emas.
+                    // Xato bo'lsa avtomatik urinish TO'XTAYDI: aks holda uzilgan tarmoqda
+                    // ro'yxat oxiri cheksiz halqaga aylanardi.
+                    state.hasNext -> item(key = "more") {
+                        val failed = state.error
+                        if (failed == null) {
+                            LaunchedEffect(state.nextCursor) { vm.loadMore() }
+                            BrowseFooter(loading = true)
+                        } else {
+                            BrowseMoreError(failed) { vm.consumeError(); vm.loadMore() }
+                        }
+                    }
+                    state.loading -> item(key = "loading") { BrowseFooter(loading = true) }
+                    state.error != null -> item(key = "error") {
+                        BrowseErrorState(state.error!!, onRetry = vm::refresh)
+                    }
+                    state.listings.isEmpty() -> item(key = "empty") { BrowseEmptyState(state) }
                 }
             }
         }
@@ -215,10 +235,16 @@ private fun BrowseHeader(
     }
 }
 
-/** "12 ta e'lon" yoki filtrlanganda "124 tadan 12 tasi". */
+/**
+ * "12 ta faol e'lon" yoki sahifalanganda "137 tadan 20 tasi".
+ *
+ * `totalCount` kursorli rejimda serverdan kelmaydi (u `COUNT(*)` ni ataylab hisoblamaydi) —
+ * o'shanda u yuklanganlar soniga teng bo'ladi va matn ham shunga moslashadi.
+ */
 private fun countLabel(state: ListingsBrowseUiState): String = when {
+    !state.loaded -> "Yuklanmoqda…"
     state.totalCount == 0 -> "Hozircha e'lon yo'q"
-    state.listings.size == state.totalCount -> "${state.totalCount} ta faol e'lon"
+    state.listings.size >= state.totalCount -> "${state.listings.size} ta faol e'lon"
     else -> "${state.totalCount} tadan ${state.listings.size} tasi"
 }
 
@@ -340,6 +366,53 @@ private val searchSuggestions = listOf("kuryer", "IELTS", "referat")
 // ---------------------------------------------------------------------------
 // Bo'sh holat
 // ---------------------------------------------------------------------------
+
+/** Ro'yxat ostidagi "yuklanmoqda" qatori — birinchi yuklashda ham, keyingi sahifada ham. */
+@Composable
+private fun BrowseFooter(loading: Boolean) {
+    if (!loading) return
+    Box(Modifier.fillMaxWidth().padding(vertical = 26.dp), contentAlignment = Alignment.Center) {
+        CircularProgressIndicator(color = Sc.Brand, strokeWidth = 2.5.dp, modifier = Modifier.size(26.dp))
+    }
+}
+
+/** Keyingi sahifa kelmadi — bor ro'yxat joyida qoladi, oxirida qayta urinish tugmasi. */
+@Composable
+private fun BrowseMoreError(message: String, onRetry: () -> Unit) {
+    Column(
+        Modifier.fillMaxWidth().padding(vertical = 22.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        ScText(message, 13f, FontWeight.Medium, Sc.Muted, maxLines = 2)
+        Spacer(Modifier.height(10.dp))
+        ScSoftButton("Yana yuklash", onRetry, Modifier.width(190.dp))
+    }
+}
+
+/**
+ * Tarmoq xatosi. Kesh ham bo'sh bo'lgandagina ko'rinadi — aks holda repository keshdagi
+ * e'lonlarni qaytaradi va foydalanuvchi xato borligini umuman sezmaydi.
+ */
+@Composable
+private fun BrowseErrorState(message: String, onRetry: () -> Unit) {
+    Column(
+        Modifier.fillMaxWidth().padding(top = 60.dp, start = 20.dp, end = 20.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        ScIconTile(Sc.TintAmber, size = 96.dp, radius = 30.dp) {
+            Icon(ScIcons.Map, null, tint = Sc.Amber, modifier = Modifier.size(40.dp))
+        }
+        Spacer(Modifier.height(18.dp))
+        ScText("Yuklab bo'lmadi", 19f, FontWeight.ExtraBold, Sc.Ink)
+        Spacer(Modifier.height(6.dp))
+        Text(
+            message,
+            style = scStyle(14f, FontWeight.Medium, Sc.Muted, lineHeight = 21f).copy(textAlign = TextAlign.Center),
+        )
+        Spacer(Modifier.height(18.dp))
+        ScSoftButton("Qayta urinish", onRetry, Modifier.width(200.dp))
+    }
+}
 
 /**
  * Bo'sh holat. Ikki holat ajratiladi: bo'limda umuman e'lon yo'qmi yoki filtr hammasini

@@ -32,7 +32,8 @@ import org.koin.dsl.KoinAppDeclaration
 fun appModules() = coreModules() +
     authFeatureModule +
     profileModule() +
-    listingsModule(REMOTE_SYNC_ENABLED) +
+    // E'lonlar — `/v1/student-listings*` allaqachon bor, shuning uchun o'z bayrog'i bilan.
+    listingsModule(STUDENT_LISTINGS_REMOTE_ENABLED) +
     jobsModule(REMOTE_SYNC_ENABLED) +
     studentsModule(REMOTE_SYNC_ENABLED) +
     notificationsModule() +

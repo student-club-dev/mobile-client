@@ -25,6 +25,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import dev.core.common.format.toAmountDigits
+import dev.core.uikit.components.AmountVisualTransformation
 import dev.core.uikit.components.AppFontFamily
 import dev.core.uikit.components.GlassTextField
 import dev.core.uikit.media.rememberImagePicker
@@ -227,6 +229,7 @@ fun PriceAndDiscountSection(state: PostListingUiState, vm: PostListingViewModel)
             state.price, vm::onPrice, "Masalan: 50 000",
             height = 48,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            visualTransformation = AmountVisualTransformation(),
             trailing = { Suffix("so'm", palette) },
         )
 
@@ -234,10 +237,11 @@ fun PriceAndDiscountSection(state: PostListingUiState, vm: PostListingViewModel)
             MiniLabel("Hozirgi narx (chegirmali)", palette)
             GlassTextField(
                 state.discount.discountValue,
-                { value -> vm.updateDiscount { it.copy(discountValue = value.filter { c -> c.isDigit() }) } },
+                { value -> vm.updateDiscount { it.copy(discountValue = value.toAmountDigits()) } },
                 "Masalan: 35 000",
                 height = 48,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                visualTransformation = AmountVisualTransformation(),
                 trailing = { Suffix("so'm", palette) },
             )
 

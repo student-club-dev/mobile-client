@@ -74,6 +74,8 @@ import dev.feature.students.domain.model.Student
 import dev.feature.university.domain.model.University
 import org.koin.compose.viewmodel.koinViewModel
 import androidx.compose.runtime.ReadOnlyComposable
+import dev.core.common.format.formatAmountShort
+import dev.core.common.format.formatAmount
 
 /** Ro'yxatdagi plitkalar navbat bilan shu tint/accent juftlarini oladi. */
 private val tilePalette: List<Pair<Color, Color>>
@@ -462,7 +464,7 @@ private fun NearbyOfferCard(shop: DiscountOffer, onClick: () -> Unit) {
         Spacer(Modifier.height(12.dp))
         ScText(shop.title, 13f, FontWeight.Medium, Sc.InkSoft, maxLines = 1)
         Spacer(Modifier.height(6.dp))
-        ScText("${shop.effectivePrice.sum()} so'm / ${shop.priceUnit}", 16f, FontWeight.ExtraBold, Sc.Orange, maxLines = 1)
+        ScText("${shop.effectivePrice.formatAmount()} so'm / ${shop.priceUnit}", 16f, FontWeight.ExtraBold, Sc.Orange, maxLines = 1)
         Spacer(Modifier.height(10.dp))
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
             Icon(ScIcons.MapPin, null, tint = Sc.Pink, modifier = Modifier.size(14.dp))
@@ -759,10 +761,10 @@ private fun OfferDetailSheet(shop: DiscountOffer, onClose: () -> Unit) {
             ScText(shop.title, 13.5f, FontWeight.Medium, Sc.InkSoft, lineHeight = 20f)
             Spacer(Modifier.height(10.dp))
             Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                ScText("${shop.effectivePrice.sum()} so'm", 18f, FontWeight.ExtraBold, Sc.Orange)
+                ScText("${shop.effectivePrice.formatAmount()} so'm", 18f, FontWeight.ExtraBold, Sc.Orange)
                 if (shop.isDiscount && shop.originalPrice > shop.finalPrice) {
                     Text(
-                        shop.originalPrice.sum(),
+                        shop.originalPrice.formatAmount(),
                         style = scStyle(12.5f, FontWeight.Medium, Sc.MutedLight)
                             .copy(textDecoration = TextDecoration.LineThrough),
                     )
@@ -795,7 +797,7 @@ private fun OffersMapSection(
 ) {
     val located = shops.filter { it.hasLocation }
     val markers = located.map {
-        OfferMarker(it.id, it.lat, it.lng, "${it.effectivePrice.priceShort()} so'm", hexRgb(it.bannerAccent), highlight = true)
+        OfferMarker(it.id, it.lat, it.lng, "${it.effectivePrice.formatAmountShort()} so'm", hexRgb(it.bannerAccent), highlight = true)
     }
     val center = if (markers.isEmpty()) MapPoint(41.311081, 69.240562)
     else MapPoint(markers.map { it.lat }.average(), markers.map { it.lng }.average())
@@ -818,18 +820,6 @@ private fun OffersMapSection(
     }
 }
 
-// "300000" -> "300 000"
-private fun Long.sum(): String = toString().reversed().chunked(3).joinToString(" ").reversed()
-
-private fun Long.priceShort(): String = when {
-    this >= 1_000_000 -> {
-        val w = this / 1_000_000
-        val f = (this % 1_000_000) / 100_000
-        if (f == 0L) "${w}M" else "$w.${f}M"
-    }
-    this >= 1_000 -> "${this / 1_000}k"
-    else -> "$this"
-}
 
 private fun hexRgb(argb: Long): String = "#" + (argb and 0xFFFFFF).toString(16).padStart(6, '0').uppercase()
 

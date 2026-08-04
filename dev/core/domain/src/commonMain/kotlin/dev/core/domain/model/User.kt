@@ -1,5 +1,8 @@
 package dev.core.domain.model
 
+import dev.core.common.format.UZ_PHONE_CODE
+import dev.core.common.format.UZ_PHONE_DIGITS
+
 /**
  * Kirgan foydalanuvchining sessiya ma'lumoti (local kesh + backend).
  *
@@ -41,13 +44,15 @@ sealed interface AuthIdentifier {
             if (text.contains('@')) {
                 return if (text.substringAfter('@').contains('.')) Email(text.lowercase()) else null
             }
+            // Bu yerda qolip **qat'iy**: identifikator to'liq bo'lishi shart, shuning uchun
+            // `toUzPhoneDigits()` dagi kabi ortiqcha raqam kesilmaydi — butunlay rad etiladi.
             val digits = text.filter { it.isDigit() }
             val local = when {
-                digits.length == 9 -> digits
-                digits.length == 12 && digits.startsWith("998") -> digits.drop(3)
+                digits.length == UZ_PHONE_DIGITS -> digits
+                digits.length == UZ_PHONE_DIGITS + 3 && digits.startsWith("998") -> digits.drop(3)
                 else -> return null
             }
-            return Phone("+998$local")
+            return Phone("$UZ_PHONE_CODE$local")
         }
     }
 }
