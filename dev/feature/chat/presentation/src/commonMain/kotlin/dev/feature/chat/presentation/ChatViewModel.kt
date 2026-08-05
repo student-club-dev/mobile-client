@@ -119,7 +119,7 @@ data class ChatMediaItem(
 data class ChatAttachmentUi(
     /**
      * O'ynatiladigan havola. Odatda serverdagi to'liq havola (**token bilan** so'raladi),
-     * lekin video telefondagi «StudentClub/Video» papkasiga tushgan bo'lsa — o'sha local
+     * lekin video ilovaning shaxsiy media keshiga tushgan bo'lsa — o'sha local
      * nusxa (`content://` yoki `file://`).
      */
     val url: String,
@@ -252,6 +252,8 @@ data class ChatUiState(
     val realtime: Boolean = false,
     val loadingOlder: Boolean = false,
     val hasMoreHistory: Boolean = true,
+    /** Suhbatlar ro'yxati "tepadan tortish" bilan yangilanmoqda. */
+    val refreshing: Boolean = false,
     /** Bir martalik xabar (xato / tasdiq). */
     val message: String? = null,
     /**
@@ -460,8 +462,10 @@ class ChatViewModel(
         val hasMoreHistory: Boolean = true,
         val message: String? = null,
         val unreadTotal: Int = 0,
+        /** Suhbatlar ro'yxati "tepadan tortish" bilan yangilanmoqda. */
+        val refreshing: Boolean = false,
         /**
-         * Telefondagi «StudentClub/Video» papkasidagi videolar — `fayl nomi → havola`.
+         * Ilovaning shaxsiy media keshidagi videolar — `mantiqiy nom → havola`.
          *
          * Bir marta ochilgan video shu yerga tushadi va keyingi ko'rishlarda pleyerga
          * TARMOQ havolasi emas, shu local nusxa beriladi (qarang [ensureVideoSaved]).
@@ -496,6 +500,27 @@ class ChatViewModel(
         }
         // Telefondagi videolar ro'yxati — ilova ochilishida bir marta.
         viewModelScope.launch { refreshLocalVideos() }
+    }
+
+    /**
+     * "Tepadan tortib yangilash" — suhbatlar ro'yxati va o'qilmaganlar soni serverdan
+     * qayta o'qiladi.
+     *
+     * WS uzilib qolgan bo'lsa (uyqu rejimi, tarmoq almashishi) ro'yxat eskirib qoladi va
+     * bu — foydalanuvchi uchun yagona qo'lda tuzatish yo'li. Ulanish ham qayta urinadi.
+     */
+    fun refreshConversations() {
+        if (extra.value.refreshing) return
+        viewModelScope.launch {
+            extra.update { it.copy(refreshing = true) }
+            try {
+                chatRepository.connectRealtime()
+                chatRepository.refreshConversations()
+                refreshUnreadTotal()
+            } finally {
+                extra.update { it.copy(refreshing = false) }
+            }
+        }
     }
 
     // ---------------------------------------------------------------------------
@@ -629,6 +654,7 @@ class ChatViewModel(
             hasMoreHistory = rest.extra.hasMoreHistory,
             message = rest.extra.message,
             unreadTotal = rest.extra.unreadTotal,
+            refreshing = rest.extra.refreshing,
             universityNames = rest.universityNames,
         )
     }

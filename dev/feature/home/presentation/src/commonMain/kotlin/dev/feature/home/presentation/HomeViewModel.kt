@@ -90,6 +90,12 @@ data class HomeUiState(
      * qo'yilmaydi.
      */
     val loading: Boolean = false,
+    /**
+     * Foydalanuvchi ekranni pastga tortdi va yangilanish ketyapti — tepadagi aylanma
+     * indikator shu bayroq bilan turadi ([loading] dan farqli: bu skelet emas, kontent
+     * joyida qoladi).
+     */
+    val refreshing: Boolean = false,
 )
 
 class HomeViewModel(
@@ -118,6 +124,13 @@ class HomeViewModel(
 
     /** Birinchi chegirma `refresh()` i tugaguncha `true` — Home skeletini shu boshqaradi. */
     private val refreshing = MutableStateFlow(true)
+
+    /**
+     * "Tepadan tortib yangilash" ketyapti. [refreshing] dan ALOHIDA: u birinchi
+     * yuklanishning skeletini boshqaradi, bu esa foydalanuvchi o'zi so'ragan yangilanishning
+     * aylanma indikatorini — kontent joyida turgan holda.
+     */
+    private val pullRefreshing = MutableStateFlow(false)
 
     init {
         refreshStudents()
@@ -219,9 +232,14 @@ class HomeViewModel(
         )
     }
 
+    private val extras = combine(
+        notificationRepository.observeUnreadCount(),
+        pullRefreshing,
+    ) { unread, pulling -> unread to pulling }
+
     val state: StateFlow<HomeUiState> = combine(
-        header, content, notificationRepository.observeUnreadCount(), _universityStudents, _students,
-    ) { h, c, unread, universityStudents, students ->
+        header, content, extras, _universityStudents, _students,
+    ) { h, c, (unread, pulling), universityStudents, students ->
         HomeUiState(
             userName = h.name,
             avatarUrl = h.avatarUrl,
@@ -236,10 +254,43 @@ class HomeViewModel(
             },
             hasUnreadNotifications = unread > 0,
             loading = c.loading,
+            refreshing = pulling,
         )
     }
         .catch { emit(HomeUiState()) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HomeUiState())
+
+    /**
+     * Ekran pastga tortildi — bosh ekrandagi HAMMA manba qayta o'qiladi.
+     *
+     * Bo'limlar turli repozitoriylardan keladi va ularning har biri o'z keshini yangilaydi;
+     * oqimlar (`observe…`) natijani o'zi ekranga olib chiqadi, ya'ni bu yerda holatga
+     * qo'lda yozish kerak emas.
+     *
+     * Har bir chaqiruv `runCatching` bilan: bittasi yiqilsa qolganlari baribir yangilanadi,
+     * xato esa `safeApiCall` ichida allaqachon toast qilingan.
+     */
+    fun refresh() {
+        if (pullRefreshing.value) return
+        viewModelScope.launch {
+            pullRefreshing.value = true
+            try {
+                val universityId = observeProfileUseCase().first()?.universityId
+                runCatching { refreshProfileUseCase() }
+                runCatching { universityRepository.refresh() }
+                runCatching { discountRepository.refresh() }
+                runCatching { refreshListings(ListingKind.TASK) }
+                runCatching { refreshListings(ListingKind.RENTAL) }
+                runCatching { notificationRepository.refresh() }
+                loadUniversityStudents(universityId)
+                refreshStudents()
+            } finally {
+                pullRefreshing.value = false
+                // Birinchi yuklanish bayrog'i ham tushadi: skelet qolib ketmasin.
+                refreshing.value = false
+            }
+        }
+    }
 
     /** Universitet manzili (prof-emis `address`) — viloyatni aniqlash uchun. */
     private suspend fun addressOf(universityId: String?): String? {

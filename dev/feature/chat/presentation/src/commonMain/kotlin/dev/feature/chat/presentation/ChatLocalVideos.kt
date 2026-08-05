@@ -6,11 +6,11 @@ import dev.feature.chat.domain.model.Attachment
 import dev.feature.chat.domain.model.MediaKind
 
 /**
- * Telefondagi «StudentClub/Video» papkasi — `fayl nomi → havola`.
+ * Ilovaning shaxsiy media keshi — `mantiqiy nom → havola`.
  *
- * Papka **bitta marta** o'qiladi va butun suhbatga yetadi: har bir video uchun alohida
- * qidirish yuzlab MediaStore so'rovi degani bo'lardi. Papkani o'qib bo'lmasa (SD-karta
- * chiqarilgan, ruxsat yo'q) bo'sh xarita qaytadi va hammasi eskicha — tarmoqdan — ishlaydi.
+ * Kesh **bitta marta** o'qiladi va butun suhbatga yetadi: har bir video uchun alohida
+ * qidirish yuzlab fayl tizimi so'rovi degani bo'lardi. O'qib bo'lmasa bo'sh xarita
+ * qaytadi va hammasi eskicha — tarmoqdan — ishlaydi.
  */
 internal suspend fun localVideoUrls(): Map<String, String> =
     runCatching { studentClubMediaUrls() }.getOrDefault(emptyMap())

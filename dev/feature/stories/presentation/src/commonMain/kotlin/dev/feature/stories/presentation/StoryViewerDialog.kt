@@ -3,8 +3,11 @@ package dev.feature.stories.presentation
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChange
+import kotlin.math.abs
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -171,22 +174,18 @@ internal fun StoryViewerDialog(
                 )
             }
 
-            // Tegish zonalari — eng pastda, ustidagi tugmalar ularni to'sadi.
+            // Boshqaruv zonasi — eng pastda, ustidagi tugmalar uni to'sadi.
             //
-            // Telegram/Instagram boshqaruvi: chap yarmi — oldingi, o'ng yarmi — keyingi,
-            // **ushlab turish** esa pauza (rasmda chiziq to'xtaydi, videoda ijro ham).
-            Row(Modifier.fillMaxSize()) {
-                StoryTapZone(
-                    Modifier.weight(1f),
+            // Telegram/Instagram boshqaruvi bitta imo-ishora ishlovchisida:
+            // chap yarmiga tegish — oldingi, o'ng yarmiga — keyingi, **ushlab turish** —
+            // pauza, **yon tomonga surish** — oldingi/keyingi hikoya.
+            Box(
+                Modifier.fillMaxSize().storyGestures(
                     onHold = { held = it },
-                    onTap = onPrevious,
-                )
-                StoryTapZone(
-                    Modifier.weight(1f),
-                    onHold = { held = it },
-                    onTap = onNext,
-                )
-            }
+                    onPrevious = onPrevious,
+                    onNext = onNext,
+                ),
+            )
 
             // Tepadagi gradient — progress va ism har qanday rasmda o'qilsin.
             Box(
@@ -231,9 +230,11 @@ internal fun StoryViewerDialog(
                             //
                             // Bosilsa — kim ko'rgani ([StoryViewersSheet]). Ro'yxat arxivdagi
                             // post uchun ham ochiladi: son muzlagan bo'lsa ham qatorlar joyida.
-                            story.viewsCount?.let {
+                            story.viewsCount?.let { views ->
                                 ScText(
-                                    "$it marta ko'rilgan",
+                                    // Nol — "0 marta ko'rilgan" emas: son sifatida u
+                                    // ma'nosiz va sovuq ko'rinardi.
+                                    if (views == 0) "Hali hech kim ko'rmagan" else "$views marta ko'rilgan",
                                     11f,
                                     FontWeight.Medium,
                                     Color.White.copy(alpha = 0.75f),
@@ -326,28 +327,83 @@ private fun StoryProgress(count: Int, current: Int, progress: Float) {
 }
 
 /**
- * Ekranning yarmi — bosilsa o'tish, **ushlab turilsa pauza**.
+ * Hikoya ko'ruvchisining **yagona** imo-ishora ishlovchisi: tegish, ushlab turish va
+ * yon tomonga surish.
  *
- * `clickable` yaramaydi: u faqat bosib-qo'yib yuborishni biladi, "barmoq turgan vaqt"
- * haqida hech nima demaydi. `detectTapGestures` esa bosishning boshi va oxirini alohida
- * beradi — pauza aynan shu oraliqda.
+ * Nega bitta joyda: `detectTapGestures` birinchi `down` ni **iste'mol qiladi**, ya'ni
+ * uning yonidagi (yoki ustidagi) surish ishlovchisi hech qachon ishga tushmasdi — ilgari
+ * ekranda faqat tegish ishlar, surish esa hech narsa qilmasdi. Shuning uchun uchala
+ * harakat bitta `awaitEachGesture` sikli ichida ajratiladi:
+ *
+ * - barmoq qo'yildi → **pauza** (chiziq va video to'xtaydi);
+ * - gorizontal siljish `touchSlop` dan oshdi → bu **surish**, tegish bekor qilinadi;
+ * - barmoq ko'tarilganda: surilgan bo'lsa yo'nalish bo'yicha oldingi/keyingi, aks holda
+ *   qaysi yarmida bosilgani bo'yicha oldingi/keyingi.
+ *
+ * ⚠️ Vertikal siljish TEGILMAYDI — u iste'mol qilinmaydi, ya'ni kelajakda "pastga
+ * surib yopish" qo'shilsa shu yerga qo'shiladi, hozircha esa oddiy tegish deb hisoblanadi.
  */
-@Composable
-private fun StoryTapZone(modifier: Modifier, onHold: (Boolean) -> Unit, onTap: () -> Unit) {
-    Box(
-        modifier.fillMaxHeight().pointerInput(Unit) {
-            detectTapGestures(
-                onPress = {
-                    onHold(true)
-                    // Barmoq ko'tarilgunicha (yoki imo-ishora bekor bo'lgunicha) kutamiz.
-                    tryAwaitRelease()
+private fun Modifier.storyGestures(
+    onHold: (Boolean) -> Unit,
+    onPrevious: () -> Unit,
+    onNext: () -> Unit,
+): Modifier = pointerInput(onPrevious, onNext) {
+    val slop = viewConfiguration.touchSlop
+    // Chegara dp'da beriladi — zich ekranda ham, siyragida ham barmoq bir xil masofa yuradi.
+    val swipeThreshold = SwipeThreshold.toPx()
+    awaitEachGesture {
+        // ⚠️ `requireUnconsumed` — sukut bo'yicha `true`: ustidagi tugmalar (muallif,
+        // «O'chirish», yopish) bosishni allaqachon iste'mol qilgan bo'ladi va ular
+        // bosilganda hikoya SURILMASLIGI kerak.
+        val down = awaitFirstDown()
+        onHold(true)
+        var dragX = 0f
+        var swiping = false
+        var canceled = false
+        try {
+            while (true) {
+                val event = awaitPointerEvent()
+                val change = event.changes.firstOrNull { it.id == down.id }
+                if (change == null) {
+                    canceled = true
+                    break
+                }
+                if (!change.pressed) break
+                dragX += change.positionChange().x
+                if (!swiping && abs(dragX) > slop) {
+                    swiping = true
+                    // Surish boshlandi — endi bu tegish emas, pauza ham tugadi.
                     onHold(false)
-                },
-                onTap = { onTap() },
-            )
-        },
-    )
+                }
+                // Surish paytida hodisani o'zimiz iste'mol qilamiz: tagidagi
+                // (yoki ustidagi) elementlar uni ikkinchi marta talqin qilmasin.
+                if (swiping) change.consume()
+            }
+        } finally {
+            onHold(false)
+        }
+        if (canceled) return@awaitEachGesture
+        when {
+            // Surish: barmoq CHAPGA ketdi → keyingi hikoya (kontent chapga suriladi),
+            // O'NGGA ketdi → oldingi. Yo'nalish Telegram/Instagram bilan bir xil.
+            swiping && dragX <= -swipeThreshold -> onNext()
+            swiping && dragX >= swipeThreshold -> onPrevious()
+            // Sust surish — hech qayerga o'tilmaydi (tasodifiy tegishdan himoya).
+            swiping -> Unit
+            // Oddiy tegish: ekranning qaysi yarmi bosilgani hal qiladi.
+            down.position.x < size.width / 2f -> onPrevious()
+            else -> onNext()
+        }
+    }
 }
+
+/**
+ * Surish shu masofadan oshsa hikoya almashadi.
+ *
+ * `touchSlop` (~8dp) o'zi yetarli emas: u shunchaki "bu surish" degan chegara, undan
+ * biroz oshgan tasodifiy siljishda ham hikoya sakrab ketardi.
+ */
+private val SwipeThreshold = 24.dp
 
 @Composable
 private fun DeleteConfirm(onCancel: () -> Unit, onConfirm: () -> Unit) {

@@ -48,6 +48,8 @@ data class MyUniversityUiState(
     val printShops: List<DiscountOffer> = emptyList(),   // "printerxona"
     val foods: List<DiscountOffer> = emptyList(),        // "ovqat"
     val loading: Boolean = true,
+    /** Ekran pastga tortildi va yangilanish ketyapti — tepadagi aylanma indikator. */
+    val refreshing: Boolean = false,
 )
 
 /** Universitet tanlash BottomSheet holati (prof-emis.edu.uz ro'yxati). */
@@ -74,6 +76,9 @@ class MyUniversityViewModel(
      */
     private val _mates = MutableStateFlow<List<SearchedStudent>>(emptyList())
 
+    /** "Tepadan tortib yangilash" ketyaptimi. */
+    private val _refreshing = MutableStateFlow(false)
+
     init {
         viewModelScope.launch { universityRepository.refresh() }
         // "Fanlardan yordam" bo'limi keshdan o'qiladi — uni serverdagi e'lonlar bilan
@@ -88,13 +93,32 @@ class MyUniversityViewModel(
         }
     }
 
+    /**
+     * Ekran pastga tortildi — universitet katalogi, guruhdoshlar va "Fanlardan yordam"
+     * qayta o'qiladi. Xatolar yutiladi (ular `safeApiCall` da toast bo'lib chiqadi):
+     * bittasi yiqilsa qolganlari baribir yangilanadi.
+     */
+    fun refresh() {
+        if (_refreshing.value) return
+        viewModelScope.launch {
+            _refreshing.value = true
+            try {
+                runCatching { universityRepository.refresh() }
+                runCatching { refreshListings(ListingKind.TASK) }
+                loadMates(observeProfileUseCase().first()?.universityId)
+            } finally {
+                _refreshing.value = false
+            }
+        }
+    }
+
     val state: StateFlow<MyUniversityUiState> = combine(
-        observeProfileUseCase(),
+        combine(observeProfileUseCase(), _refreshing) { profile, refreshing -> profile to refreshing },
         universityRepository.observeUniversities(),
         _mates,
         discountRepository.observeAllOffers(),
         observeListingsByKind(ListingKind.TASK),
-    ) { profile, universities, mates, offers, taskListings ->
+    ) { (profile, refreshing), universities, mates, offers, taskListings ->
         val uni = universities.firstOrNull { it.id == profile?.universityId }
         // Katalogdagi printerxona turi — kalit backenddan keladi (`PRINTING`); ovqat esa
         // butun katalog guruhi bo'yicha (`FOOD` — fast-food, milliy taomlar, somsa).
@@ -110,6 +134,7 @@ class MyUniversityViewModel(
             printShops = printShops,
             foods = foods,
             loading = false,
+            refreshing = refreshing,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), MyUniversityUiState())
 

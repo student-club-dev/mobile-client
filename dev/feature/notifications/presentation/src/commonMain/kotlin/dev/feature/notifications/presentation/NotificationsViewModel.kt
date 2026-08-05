@@ -27,6 +27,11 @@ data class NotificationsUiState(
      * bermaydi, u baribir ro'yxatni o'qiy oladi.
      */
     val error: String? = null,
+    /**
+     * Serverdan o'qilyapti va ro'yxat allaqachon to'la — "tepadan tortish" indikatori
+     * shu bayroq bilan aylanadi ([loading] esa skelet uchun, bo'sh ro'yxatda).
+     */
+    val refreshing: Boolean = false,
 )
 
 class NotificationsViewModel(
@@ -46,6 +51,7 @@ class NotificationsViewModel(
                 unreadCount = unread,
                 loading = remoteState.loading && items.isEmpty(),
                 error = remoteState.error?.takeIf { items.isEmpty() },
+                refreshing = remoteState.loading && items.isNotEmpty(),
             )
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), NotificationsUiState(loading = true))
 

@@ -55,6 +55,7 @@ import dev.core.uikit.components.ScAvatar
 import dev.core.uikit.components.ScMonogramTile
 import dev.core.uikit.components.ScNotFoundTitle
 import dev.core.uikit.components.ScSectionHeader
+import dev.core.uikit.components.ScPullRefresh
 import dev.core.uikit.components.ScSheetHandle
 import dev.core.uikit.components.ScSoftButton
 import dev.core.uikit.components.ScText
@@ -110,57 +111,59 @@ fun MyUniversityScreen(
             ScHeader {
                 ScHeaderTitle("Mening universitetim", modifier = Modifier.padding(top = 20.dp))
             }
-            LazyColumn(
-                Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(top = 18.dp, bottom = 120.dp),
-                verticalArrangement = Arrangement.spacedBy(22.dp),
-            ) {
-                item {
-                    UniversitiesSelector(Modifier.padding(horizontal = Sc.ScreenPadding)) {
-                        vm.loadUniversities(); showPicker = true
-                    }
-                }
-
-                val uni = state.university
-                if (uni == null) {
+            ScPullRefresh(refreshing = state.refreshing, onRefresh = vm::refresh) {
+                LazyColumn(
+                    Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(top = 18.dp, bottom = 120.dp),
+                    verticalArrangement = Arrangement.spacedBy(22.dp),
+                ) {
                     item {
-                        EmptyUniversity(
-                            loading = state.loading,
-                            modifier = Modifier.padding(horizontal = Sc.ScreenPadding),
-                        )
+                        UniversitiesSelector(Modifier.padding(horizontal = Sc.ScreenPadding)) {
+                            vm.loadUniversities(); showPicker = true
+                        }
                     }
-                } else {
-                    item { UniversityCard(uni, state.mates.size, Modifier.padding(horizontal = Sc.ScreenPadding)) }
-                    // Talaba yo'q bo'lsa BUTUN bo'lim (sarlavha ham) tushib qoladi: bo'sh
-                    // plitka ekranni cho'zardi, foydalanuvchiga esa hech nima bermasdi.
-                    if (state.mates.isNotEmpty()) {
+
+                    val uni = state.university
+                    if (uni == null) {
                         item {
-                            ScSectionHeader(
-                                "Do'stlashish uchun talabalar",
-                                Modifier.padding(horizontal = Sc.ScreenPadding),
-                                action = "Barchasi",
-                                onAction = { showStudents = true },
+                            EmptyUniversity(
+                                loading = state.loading,
+                                modifier = Modifier.padding(horizontal = Sc.ScreenPadding),
                             )
                         }
-                        item {
-                            LazyRow(
-                                Modifier.fillMaxWidth(),
-                                contentPadding = PaddingValues(horizontal = Sc.ScreenPadding),
-                                horizontalArrangement = Arrangement.spacedBy(13.dp),
-                            ) {
-                                itemsIndexed(state.mates, key = { _, s -> s.student.id }) { index, s ->
-                                    MateCard(s, index) { vm.connect(s) }
+                    } else {
+                        item { UniversityCard(uni, state.mates.size, Modifier.padding(horizontal = Sc.ScreenPadding)) }
+                        // Talaba yo'q bo'lsa BUTUN bo'lim (sarlavha ham) tushib qoladi: bo'sh
+                        // plitka ekranni cho'zardi, foydalanuvchiga esa hech nima bermasdi.
+                        if (state.mates.isNotEmpty()) {
+                            item {
+                                ScSectionHeader(
+                                    "Do'stlashish uchun talabalar",
+                                    Modifier.padding(horizontal = Sc.ScreenPadding),
+                                    action = "Barchasi",
+                                    onAction = { showStudents = true },
+                                )
+                            }
+                            item {
+                                LazyRow(
+                                    Modifier.fillMaxWidth(),
+                                    contentPadding = PaddingValues(horizontal = Sc.ScreenPadding),
+                                    horizontalArrangement = Arrangement.spacedBy(13.dp),
+                                ) {
+                                    itemsIndexed(state.mates, key = { _, s -> s.student.id }) { index, s ->
+                                        MateCard(s, index) { vm.connect(s) }
+                                    }
                                 }
                             }
                         }
+                        // Universitetimga tegishli topshiriq e'lonlari — talabalardan keyin,
+                        // atrofdagi joylardan oldin (u ham "universitetim" haqidagi ma'lumot).
+                        tasksSection(state.tasks, onSeeAll = onOpenTasks, onOpen = onOpenListing)
                     }
-                    // Universitetimga tegishli topshiriq e'lonlari — talabalardan keyin,
-                    // atrofdagi joylardan oldin (u ham "universitetim" haqidagi ma'lumot).
-                    tasksSection(state.tasks, onSeeAll = onOpenTasks, onOpen = onOpenListing)
-                }
 
-                nearbySection("Ovqatlar", state.foods, onMap = { showFoodMap = true }) { selectedOffer = it }
-                nearbySection("Printerxonalar", state.printShops, onMap = { showPrintMap = true }) { selectedOffer = it }
+                    nearbySection("Ovqatlar", state.foods, onMap = { showFoodMap = true }) { selectedOffer = it }
+                    nearbySection("Printerxonalar", state.printShops, onMap = { showPrintMap = true }) { selectedOffer = it }
+                }
             }
         }
 

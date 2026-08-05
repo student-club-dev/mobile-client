@@ -76,7 +76,10 @@ internal fun MessagesSegments(
 
     Row(
         modifier.fillMaxWidth()
-            .scCard(radius = 15.dp, elevation = 6.dp)
+            // Kartochka TO'LIQ yumaloq (kapsula) — radius balandligining yarmidan katta
+            // bo'lsa Compose uni balandlikka qisqartiradi, ya'ni bu «CircleShape» bilan
+            // bir xil natija beradi va o'lchamga bog'liq emas.
+            .scCard(radius = PillRadius, elevation = 6.dp)
             .padding(SegmentInset)
             .drawBehind {
                 if (count == 0) return@drawBehind
@@ -87,7 +90,9 @@ internal fun MessagesSegments(
                     brush = activeFill,
                     topLeft = Offset(position * (width + gap), 0f),
                     size = Size(width, size.height),
-                    cornerRadius = CornerRadius(SegmentRadius.toPx()),
+                    // Faol bo'lim ham kapsula: kartochka bilan bir xil qavariqlikda
+                    // bo'lmasa ichkarida burchakli to'rtburchak bo'lib turib qolardi.
+                    cornerRadius = CornerRadius(size.height / 2f),
                 )
             },
         horizontalArrangement = Arrangement.spacedBy(SegmentGap),
@@ -114,7 +119,8 @@ internal fun MessagesSegments(
 private fun RowScope.Segment(segment: ChatSegment, active: () -> Float, onClick: () -> Unit) {
     Box(
         Modifier.weight(1f)
-            .clip(RoundedCornerShape(SegmentRadius))
+            // Bosish sohasi ham kapsula — to'lqinlanish (ripple) burchaklardan chiqmasin.
+            .clip(RoundedCornerShape(percent = 50))
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
@@ -178,5 +184,11 @@ private fun proximity(indicator: Float, index: Int): Float =
 private val SegmentInset = 4.dp
 private val SegmentGap = 4.dp
 
-/** Faol bo'lim gradientining radiusi (kartochkanikidan 4dp kichik). */
-private val SegmentRadius = 11.dp
+/**
+ * "To'liq yumaloq" radius.
+ *
+ * Compose burchak radiusini shaklning yarim o'lchamiga QISQARTIRADI, ya'ni bu qiymat
+ * balandlikdan katta bo'lgani uchun natija aynan kapsula bo'ladi — panel balandligi
+ * o'zgarsa ham shakl to'g'ri qoladi.
+ */
+private val PillRadius = 999.dp

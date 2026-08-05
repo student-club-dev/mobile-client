@@ -80,10 +80,33 @@ class ProfileViewModel(
     /** Profil rasmlari — tahrirlash ekrani uchun. */
     val photos: StateFlow<ProfilePhotosState> = _photos.asStateFlow()
 
+    /** "Tepadan tortib yangilash" ketyapti. */
+    private val _refreshing = MutableStateFlow(false)
+    val refreshing: StateFlow<Boolean> = _refreshing.asStateFlow()
+
     init {
         // Offline-first: ekran ochilishi bilan fon rejimida masofaviy manbadan
         // yangilaymiz. Xato bo'lsa keshdagi ma'lumot ko'rinaveradi.
         viewModelScope.launch { refreshProfileUseCase() }
+    }
+
+    /**
+     * Ekran pastga tortildi — profil ham, rasmlar to'plami ham serverdan qayta o'qiladi.
+     *
+     * Profil boshqa qurilmada tahrirlangan bo'lishi mumkin, rasmlar esa umuman
+     * keshlanmaydi — ikkalasi ham faqat shu yo'l bilan yangilanadi.
+     */
+    fun refresh() {
+        if (_refreshing.value) return
+        viewModelScope.launch {
+            _refreshing.value = true
+            try {
+                runCatching { refreshProfileUseCase() }
+                loadPhotos()
+            } finally {
+                _refreshing.value = false
+            }
+        }
     }
 
     val state: StateFlow<ProfileUiState> = combine(

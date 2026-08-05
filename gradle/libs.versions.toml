@@ -40,6 +40,10 @@ coil = "3.0.4"
 # 1.5.x compileSdk 35 va AGP 8.7 bilan mos keladigan oxirgi barqaror qator;
 # undan yuqorisi compileSdk 36 talab qiladi, shuning uchun ko'tarilmaydi.
 media3 = "1.5.1"
+# CameraX — ilova ICHIDAGI kamera ekrani (hikoya qo'yish). Tizim kamerasi ilovadan
+# chiqib ketadi va u yerga o'z boshqaruvimizni (galereya rasmchasi, rejim almashtirgich)
+# qo'shib bo'lmaydi. 1.4.x — compileSdk 35 / AGP 8.7 bilan mos qator.
+camerax = "1.4.1"
 # Chucker — Debug HTTP inspektori (bildirishnoma + alohida ekran)
 chucker = "4.0.0"
 # WebRTC (Android target) — 1:1 audio/video qo'ng'iroq media qatlami.
@@ -158,6 +162,11 @@ androidx-media3-ui = { group = "androidx.media3", name = "media3-ui", version.re
 # ekranda ko'z ilg'amaydigan darajada. `media3-effect` — o'lchamni o'zgartirish (`Presentation`).
 androidx-media3-transformer = { group = "androidx.media3", name = "media3-transformer", version.ref = "media3" }
 androidx-media3-effect = { group = "androidx.media3", name = "media3-effect", version.ref = "media3" }
+# CameraX — `camera-view` tayyor `PreviewView` va `LifecycleCameraController` ni beradi
+# (core/camera2/lifecycle tranzitiv keladi), `camera-video` esa video yozishni qo'shadi.
+androidx-camera-view = { group = "androidx.camera", name = "camera-view", version.ref = "camerax" }
+androidx-camera-camera2 = { group = "androidx.camera", name = "camera-camera2", version.ref = "camerax" }
+androidx-camera-video = { group = "androidx.camera", name = "camera-video", version.ref = "camerax" }
 
 # WebRTC (Android target) — `PeerConnectionFactory`, `PeerConnection`, kamera/mikrofon
 # manbalari va `SurfaceViewRenderer`. iOS tomonida `WebRTC.framework` kerak (2-bosqich).

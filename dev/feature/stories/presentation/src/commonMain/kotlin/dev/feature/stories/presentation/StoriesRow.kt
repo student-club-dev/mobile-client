@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -39,7 +40,6 @@ import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.Layout
@@ -56,11 +56,12 @@ import dev.core.uikit.components.ScUploadRing
 import dev.core.uikit.components.scUploadPercent
 import dev.core.uikit.media.PickedImage
 import dev.core.uikit.media.PickedVideo
-import dev.core.uikit.media.rememberImageCapture
-import dev.core.uikit.media.rememberImagePicker
-import dev.core.uikit.media.rememberVideoCapture
-import dev.core.uikit.media.rememberVideoPicker
 import dev.core.uikit.media.rememberVideoPreparer
+import dev.core.uikit.media.ScCameraScreen
+import dev.core.uikit.media.rememberLatestGalleryThumbnail
+import dev.core.uikit.media.rememberMultiMediaPicker
+import dev.core.uikit.components.StatusBarAppearance
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.window.Dialog
 import androidx.compose.runtime.setValue
@@ -110,6 +111,27 @@ fun storiesCollapsedWidth(vm: StoriesViewModel = koinViewModel()): Dp {
     val state by vm.state.collectAsStateWithLifecycle()
     // Birinchi katak — doim o'zimniki ("Hikoyam"), shuning uchun kamida bittasi bor.
     val visible = (1 + state.groups.size).coerceAtMost(COLLAPSED_MAX)
+    return StoriesCollapsedCell + StoriesCollapsedStep * (visible - 1)
+}
+
+/**
+ * [StoriesCollapsed] **haqiqatda** qancha joy egallaydi — sarlavha yonida shuncha o'rin
+ * ajratiladi.
+ *
+ * [storiesCollapsedWidth] dan farqi: u yig'iladigan LENTA uchun ("Hikoyam" katagi doim
+ * bor), bu esa alohida to'plam uchun — o'z hikoyam bo'lmasa u chizilmaydi. Hech nima
+ * chizilmasa `0.dp` qaytadi: bosh ekran topbarida avatar bilan ism orasida bo'sh joy
+ * qolib ketmasin.
+ */
+@Composable
+fun storiesCollapsedStackWidth(
+    includeMine: Boolean = true,
+    vm: StoriesViewModel = koinViewModel(),
+): Dp {
+    val state by vm.state.collectAsStateWithLifecycle()
+    val mine = if (includeMine && state.hasMine) 1 else 0
+    val visible = (mine + state.groups.size).coerceAtMost(COLLAPSED_MAX)
+    if (visible == 0) return 0.dp
     return StoriesCollapsedCell + StoriesCollapsedStep * (visible - 1)
 }
 
@@ -167,15 +189,14 @@ fun StoriesRow(
     val state by vm.state.collectAsStateWithLifecycle()
     val viewer by vm.viewer.collectAsStateWithLifecycle()
 
-    var pickerChoice by remember { mutableStateOf(false) }
+    /** Kamera ekrani ochiqmi — «+» bosilganda DARROV shu ochiladi (tanlov oynasisiz). */
+    var cameraOpen by remember { mutableStateOf(false) }
 
     // Kameradan kelgan surat galereyadan tanlanganidan farq qilmaydi ([PickedImage]) —
-    // shuning uchun ikkala tanlagich ham bitta ishlovchiga tushadi.
+    // shuning uchun ikkala manba ham bitta ishlovchiga tushadi.
     val onImagePicked: (PickedImage?) -> Unit = { picked ->
         if (picked != null) vm.publish(picked.bytes, picked.fileName, caption = null)
     }
-    val picker = rememberImagePicker(onImagePicked)
-    val camera = rememberImageCapture(onImagePicked)
 
     // Siqish nashrdan KEYIN, katakchadagi halqa ichida ketadi — tanlagandan keyin
     // foydalanuvchi hech narsa kutmaydi.
@@ -193,8 +214,18 @@ fun StoriesRow(
             else -> vm.publishVideo(picked, videoPreparer, caption = null)
         }
     }
-    val videoPicker = rememberVideoPicker(onVideoPicked)
-    val videoCamera = rememberVideoCapture(onVideoPicked)
+
+    /**
+     * Galereya — **rasm va video birga** (`PickMultipleVisualMedia(ImageAndVideo)`).
+     *
+     * Ilgari ular ikkita alohida band edi va foydalanuvchi tanlashdan OLDIN "rasmmi yoki
+     * video?" degan savolga javob berishi kerak edi. Hikoyaga bittasi ketadi, shuning
+     * uchun natijadan birinchisi olinadi.
+     */
+    val galleryPicker = rememberMultiMediaPicker(maxItems = GALLERY_PICK_LIMIT) { media ->
+        media.images.firstOrNull()?.let { onImagePicked(it) }
+            ?: media.videos.firstOrNull()?.let { onVideoPicked(it) }
+    }
 
     StoryStrip(
         collapse = collapse,
@@ -212,11 +243,11 @@ fun StoriesRow(
             storyCount = state.mine.size,
             onHeader = onHeader,
             collapse = collapse,
-            // Hikoyam bo'lsa — o'zimga ko'rinadi; bo'lmasa darhol qo'shish.
+            // Hikoyam bo'lsa — o'zimga ko'rinadi; bo'lmasa darhol kamera.
             onClick = {
-                if (state.hasMine) vm.openMine(myName, myAvatarUrl) else pickerChoice = true
+                if (state.hasMine) vm.openMine(myName, myAvatarUrl) else cameraOpen = true
             },
-            onAdd = { pickerChoice = true },
+            onAdd = { cameraOpen = true },
         )
         state.groups.forEach { group ->
             StoryCell(
@@ -234,13 +265,12 @@ fun StoriesRow(
         StoryMessageDialog(text = text, onDismiss = vm::messageShown)
     }
 
-    if (pickerChoice) {
-        StoryPickerChoice(
-            onDismiss = { pickerChoice = false },
-            onCapturePhoto = { pickerChoice = false; camera.pick() },
-            onCaptureVideo = { pickerChoice = false; videoCamera.pick() },
-            onPhoto = { pickerChoice = false; picker.pick() },
-            onVideo = { pickerChoice = false; videoPicker.pick() },
+    if (cameraOpen) {
+        StoryCameraDialog(
+            onPhoto = { picked -> cameraOpen = false; onImagePicked(picked) },
+            onVideo = { picked -> cameraOpen = false; onVideoPicked(picked) },
+            onOpenGallery = { cameraOpen = false; galleryPicker.pick() },
+            onClose = { cameraOpen = false },
         )
     }
 
@@ -411,49 +441,50 @@ private const val CollapsedTapThreshold = 0.6f
 private const val VerticalClipSlack = 6f
 
 /**
- * Manba tanlash — **kamera** ham, galereya ham.
+ * Hikoya kamerasi — **to'liq ekranli**, Telegramdagi kabi.
  *
- * To'rt band, chunki tizimda to'rtta alohida yo'l bor: kamera surat va video uchun boshqa-boshqa
- * chaqiruv talab qiladi (`TakePicture` / `CaptureVideo`), galereya esa rasm va video uchun
- * alohida filtr. Kamera bandlari **birinchi**: hikoya ko'pincha "hozir, shu yerda" olinadi.
+ * Ilgari bu yerda to'rt bandli tanlov oynasi turardi («Suratga olish», «Video yozish»,
+ * «Galereyadan rasm», «Galereyadan video»): foydalanuvchi hikoya qo'yishdan oldin har
+ * safar shu ro'yxatdan o'tishi kerak edi. Endi «+» darrov kamerani ochadi, galereya esa
+ * chap-pastdagi rasmchada — bir bosishda.
  *
- * Sarlavha yo'q: oyna «+» bosilgandan keyin chiqadi, ya'ni foydalanuvchi nima qilayotganini
- * allaqachon biladi va «Hikoya qo'shish» yozuvi faqat joy egallardi.
+ * `Dialog` ichida chiziladi: kamera ekranning butun yuzasini egallashi kerak, karkasning
+ * pastki panel va sarlavhasi esa uning ustida qolmasligi kerak.
  */
 @Composable
-private fun StoryPickerChoice(
-    onDismiss: () -> Unit,
-    onCapturePhoto: () -> Unit,
-    onCaptureVideo: () -> Unit,
-    onPhoto: () -> Unit,
-    onVideo: () -> Unit,
+private fun StoryCameraDialog(
+    onPhoto: (PickedImage?) -> Unit,
+    onVideo: (PickedVideo?) -> Unit,
+    onOpenGallery: () -> Unit,
+    onClose: () -> Unit,
 ) {
-    Dialog(onDismissRequest = onDismiss) {
-        Column(
-            Modifier.clip(RoundedCornerShape(22.dp)).background(Sc.Card).padding(vertical = 8.dp),
-        ) {
-            StoryPickerAction(AppIcons.Camera, "Suratga olish", onCapturePhoto)
-            StoryPickerAction(AppIcons.Video, "Video yozish", onCaptureVideo)
-            StoryPickerAction(AppIcons.ImageIcon, "Galereyadan rasm", onPhoto)
-            StoryPickerAction(AppIcons.Film, "Galereyadan video", onVideo)
+    // Galereyadagi eng oxirgi rasm — chap-pastdagi rasmcha uchun. Ruxsat bo'lmasa `null`
+    // qaytadi va o'rniga oddiy ikonka chiziladi.
+    val thumbnail = rememberLatestGalleryThumbnail()
+    Dialog(
+        onDismissRequest = onClose,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        StatusBarAppearance(darkIcons = false)
+        Box(Modifier.fillMaxSize()) {
+            ScCameraScreen(
+                onPhoto = onPhoto,
+                onVideo = onVideo,
+                onOpenGallery = onOpenGallery,
+                onClose = onClose,
+                galleryThumbnail = thumbnail,
+            )
         }
     }
 }
 
-/** Manba tanlash oynasidagi bitta band — ikonka va yozuv bitta bosiladigan qatorda. */
-@Composable
-private fun StoryPickerAction(icon: ImageVector, label: String, onClick: () -> Unit) {
-    Row(
-        Modifier.fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = 20.dp, vertical = 13.dp),
-        horizontalArrangement = Arrangement.spacedBy(14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Icon(icon, null, tint = Sc.Brand, modifier = Modifier.size(21.dp))
-        ScText(label, 15f, FontWeight.Bold, Sc.Ink, maxLines = 1)
-    }
-}
+/**
+ * Galereya tanlagichiga beriladigan chegara.
+ *
+ * Hikoyaga BITTA media ketadi, lekin Android tizim tanlagichi 1 ni qabul qilmaydi
+ * (kamida 2 bo'lishi kerak) — shuning uchun 2 beriladi va natijadan birinchisi olinadi.
+ */
+private const val GALLERY_PICK_LIMIT = 2
 
 /**
  * Katak ostidagi yozuv va «+» belgisi yig'ilish boshlanishi bilan TEZ yo'qoladi: 26dp'lik
@@ -707,11 +738,19 @@ fun StoriesCollapsed(
      * holda ko'k halqa ko'k fonda ko'rinmay qoladi.
      */
     ringBrush: Brush = Brush.linearGradient(listOf(Sc.BrandLight, Sc.Brand)),
+    /**
+     * O'z hikoyam to'plamga kirsinmi.
+     *
+     * Bosh ekran topbarida `false`: yonginasida allaqachon MENING avatarim turibdi va
+     * to'plamdagi birinchi doira aynan o'shaning nusxasi bo'lib ko'rinardi — sarlavhada
+     * bir xil harfli ikkita doira.
+     */
+    includeMine: Boolean = true,
     vm: StoriesViewModel = koinViewModel(),
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
     // O'zimniki birinchi — to'plamda ham lentadagi tartib saqlanadi.
-    val mine = if (state.hasMine) listOf(myName to myAvatarUrl) else emptyList()
+    val mine = if (includeMine && state.hasMine) listOf(myName to myAvatarUrl) else emptyList()
     val avatars = (mine + state.groups.map { it.author.displayName to it.author.avatarUrl })
         .take(COLLAPSED_MAX)
     if (avatars.isEmpty()) return

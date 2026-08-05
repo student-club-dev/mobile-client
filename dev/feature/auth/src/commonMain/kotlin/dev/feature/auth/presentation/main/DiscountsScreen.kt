@@ -74,6 +74,7 @@ import dev.core.uikit.components.ScShimmerCard
 import dev.core.uikit.components.ScShimmerList
 import dev.core.uikit.components.ScNetworkImage
 import dev.core.uikit.components.ScSearchOverlay
+import dev.core.uikit.components.ScPullRefresh
 import dev.core.uikit.theme.AppPalette
 import dev.core.uikit.theme.appPalette
 import dev.feature.listings.presentation.NearbyDiscountsSection
@@ -109,6 +110,7 @@ fun DiscountsScreen(
     val detail by vm.detail.collectAsStateWithLifecycle()
     val catalogOpen by vm.catalogOpen.collectAsStateWithLifecycle()
     val catalog by vm.catalogState.collectAsStateWithLifecycle()
+    val pullRefreshing by vm.pullRefreshing.collectAsStateWithLifecycle()
     var showFilter by remember { mutableStateOf(false) }
     var showMap by remember { mutableStateOf(false) }
     var showSearch by remember { mutableStateOf(false) }
@@ -124,6 +126,8 @@ fun DiscountsScreen(
                 onOpenType = vm::openType,
                 onOpenAll = vm::openAllOffers,
                 onOpenSearch = { showSearch = true },
+                refreshing = pullRefreshing,
+                onRefresh = vm::refresh,
             )
         } else {
             FeedContent(
@@ -134,6 +138,8 @@ fun DiscountsScreen(
                 onOpenFilter = { vm.openFilter(); showFilter = true },
                 onOpenMap = { showMap = true },
                 onOpenSearch = { showSearch = true },
+                refreshing = pullRefreshing,
+                onRefresh = vm::refresh,
             )
         }
         // Qidiruv — klaviatura ustidagi suzuvchi maydon (E'lonlar ekranidagi bilan bir xil).
@@ -201,6 +207,8 @@ private fun CatalogContent(
     onOpenType: (DiscountCategory) -> Unit,
     onOpenAll: () -> Unit,
     onOpenSearch: () -> Unit,
+    refreshing: Boolean,
+    onRefresh: () -> Unit,
 ) {
     Column(Modifier.fillMaxSize().background(Sc.Bg)) {
         ScHeader {
@@ -221,33 +229,36 @@ private fun CatalogContent(
             }
         }
 
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(2),
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 110.dp),
-            horizontalArrangement = Arrangement.spacedBy(11.dp),
-            verticalArrangement = Arrangement.spacedBy(11.dp),
-        ) {
-            // "Barchasi" — turlarsiz to'liq feed. Butun qatorni egallaydi.
-            item(span = { GridItemSpan(maxLineSpan) }) {
-                AllOffersCard(catalog.totalOffers, palette, onOpenAll)
-            }
+        // Tepadan tortish — katalog va e'lonlar serverdan qayta o'qiladi.
+        ScPullRefresh(refreshing = refreshing, onRefresh = onRefresh) {
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(2),
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 110.dp),
+                horizontalArrangement = Arrangement.spacedBy(11.dp),
+                verticalArrangement = Arrangement.spacedBy(11.dp),
+            ) {
+                // "Barchasi" — turlarsiz to'liq feed. Butun qatorni egallaydi.
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    AllOffersCard(catalog.totalOffers, palette, onOpenAll)
+                }
 
-            if (catalog.loading) {
-                items(6) { ScShimmerCard() }
-            }
+                if (catalog.loading) {
+                    items(6) { ScShimmerCard() }
+                }
 
-            items(catalog.sections, key = { it.key }) { section ->
-                CatalogSectionCard(section, palette) { onOpenSection(section) }
-            }
+                items(catalog.sections, key = { it.key }) { section ->
+                    CatalogSectionCard(section, palette) { onOpenSection(section) }
+                }
 
-            // Bo'limga bog'lanmagan turlar — o'z katagi bilan (aks holda ular yo'qolardi).
-            items(catalog.looseTypes, key = { it.id }) { type ->
-                CatalogTypeCard(type, palette) { onOpenType(type) }
-            }
+                // Bo'limga bog'lanmagan turlar — o'z katagi bilan (aks holda ular yo'qolardi).
+                items(catalog.looseTypes, key = { it.id }) { type ->
+                    CatalogTypeCard(type, palette) { onOpenType(type) }
+                }
 
-            // Katalog bo'sh bo'lsa plitka chizilmaydi — tepadagi "Barchasi" kartasi
-            // baribir turadi, ya'ni ekran bo'm-bo'sh qolmaydi.
+                // Katalog bo'sh bo'lsa plitka chizilmaydi — tepadagi "Barchasi" kartasi
+                // baribir turadi, ya'ni ekran bo'm-bo'sh qolmaydi.
+            }
         }
     }
 }
@@ -416,6 +427,8 @@ private fun FeedContent(
     onOpenFilter: () -> Unit,
     onOpenMap: () -> Unit,
     onOpenSearch: () -> Unit,
+    refreshing: Boolean,
+    onRefresh: () -> Unit,
 ) {
     Column(Modifier.fillMaxSize().background(Sc.Bg)) {
         ScHeader {
@@ -482,38 +495,41 @@ private fun FeedContent(
 
         Spacer(Modifier.height(12.dp))
 
-        LazyColumn(
-            Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 110.dp),
-            verticalArrangement = Arrangement.spacedBy(11.dp),
-        ) {
-            item { NearbyDiscountsSection() }
+        // Tepadan tortish — feed serverdan qayta o'qiladi (bo'lim ochiq bo'lsa to'liq).
+        ScPullRefresh(refreshing = refreshing, onRefresh = onRefresh) {
+            LazyColumn(
+                Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 110.dp),
+                verticalArrangement = Arrangement.spacedBy(11.dp),
+            ) {
+                item { NearbyDiscountsSection() }
 
-            items(state.offers, key = { it.id }) { offer ->
-                val saved = state.savedIds.contains(offer.id)
-                val openDetail = { vm.openOffer(offer.id) }
-                if (offer.isDiscount) DiscountOfferCard(offer, saved, palette, vm::toggleSaved, openDetail)
-                else RegularOfferCard(offer, saved, palette, vm::toggleSaved, openDetail)
-            }
+                items(state.offers, key = { it.id }) { offer ->
+                    val saved = state.savedIds.contains(offer.id)
+                    val openDetail = { vm.openOffer(offer.id) }
+                    if (offer.isDiscount) DiscountOfferCard(offer, saved, palette, vm::toggleSaved, openDetail)
+                    else RegularOfferCard(offer, saved, palette, vm::toggleSaved, openDetail)
+                }
 
-            if (state.offers.isEmpty()) {
-                item {
-                    // Yuklanayotganda — kartalarning skeleti; tugagach "topilmadi".
-                    if (state.loading) {
-                        Column(verticalArrangement = Arrangement.spacedBy(11.dp)) {
-                            repeat(3) { ScShimmerCard() }
+                if (state.offers.isEmpty()) {
+                    item {
+                        // Yuklanayotganda — kartalarning skeleti; tugagach "topilmadi".
+                        if (state.loading) {
+                            Column(verticalArrangement = Arrangement.spacedBy(11.dp)) {
+                                repeat(3) { ScShimmerCard() }
+                            }
+                        } else {
+                            ScEmptyState(
+                                Modifier.padding(top = 24.dp),
+                                title = ScNotFoundTitle,
+                                message = "Bu filtr bo'yicha e'lon topilmadi. Shartlarni yumshating.",
+                                icon = ScIcons.Search,
+                                tint = palette.glass,
+                                iconColor = palette.inkFaint,
+                                titleColor = palette.ink,
+                                messageColor = palette.inkFaint,
+                            )
                         }
-                    } else {
-                        ScEmptyState(
-                            Modifier.padding(top = 24.dp),
-                            title = ScNotFoundTitle,
-                            message = "Bu filtr bo'yicha e'lon topilmadi. Shartlarni yumshating.",
-                            icon = ScIcons.Search,
-                            tint = palette.glass,
-                            iconColor = palette.inkFaint,
-                            titleColor = palette.ink,
-                            messageColor = palette.inkFaint,
-                        )
                     }
                 }
             }

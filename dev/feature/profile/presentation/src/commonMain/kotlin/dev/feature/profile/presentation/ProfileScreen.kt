@@ -45,6 +45,7 @@ import dev.core.uikit.components.ScUploadRing
 import dev.core.uikit.components.rememberScCollapsingHeaderState
 import dev.core.uikit.components.scUploadPercent
 import dev.core.uikit.components.scCard
+import dev.core.uikit.components.ScPullRefresh
 import dev.core.uikit.media.rememberImagePicker
 import dev.core.uikit.theme.Sc
 import dev.feature.stories.presentation.MyPostsSection
@@ -83,6 +84,7 @@ fun ProfileScreen(
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
     val photos by vm.photos.collectAsStateWithLifecycle()
+    val refreshing by vm.refreshing.collectAsStateWithLifecycle()
     var tab by remember { mutableStateOf(ProfileTab.POSTS) }
 
     // Avatar profil rasmlari to'plamidan olinadi: yangi rasm qo'yilgach `avatarUrl` faqat
@@ -111,101 +113,107 @@ fun ProfileScreen(
             expandable = photoUrls.isNotEmpty(),
         )
 
-        Column(
-            Modifier.fillMaxSize()
-                .nestedScroll(header.nestedScrollConnection)
-                .verticalScroll(rememberScrollState()),
-        ) {
-            ScProfileHeader(
-                state = header,
-                name = state.name,
-                // Bu **mening** profilim — ilovani ochib turgan odamning o'zi.
-                status = when {
-                    photos.uploading && photos.progress != null ->
-                        "rasm yuklanmoqda ${scUploadPercent(photos.progress!!)}"
-                    photos.uploading -> "rasm saqlanmoqda…"
-                    else -> "onlayn"
-                },
-                photoUrls = photoUrls,
-                photoIndex = photoIndex,
-                onAvatarClick = {
-                    when {
-                        // Rasm umuman yo'q — bosish darrov tanlagichni ochadi.
-                        photoUrls.isEmpty() -> if (photos.canAdd) imagePicker.pick()
-                        !header.expanded -> header.expand()
-                        else -> Unit
-                    }
-                },
-                onStep = { forward ->
-                    if (photoUrls.size > 1) {
-                        photoIndex = (photoIndex + if (forward) 1 else photoUrls.size - 1) %
-                            photoUrls.size
-                    }
-                },
-                topBar = { ScGlassButton(ScIcons.ChevronLeft, "Orqaga", onBack) },
-                trailing = { ScGlassButton(AppIcons.Settings, "Sozlamalar", onOpenSettings) },
-                avatarOverlay = {
-                    // Foiz avatar ustida: eski rasm ko'rinib turadi, yangisi esa ketmoqda.
-                    if (photos.uploading) {
-                        ScUploadRing(photos.progress, size = 96.dp, stroke = 3.5.dp)
-                    }
-                },
-            )
-
+        // Tepadan tortish — profil va rasmlar to'plami serverdan qayta o'qiladi.
+        //
+        // ⚠️ O'ram yig'iluvchi sarlavhaning `nestedScroll` idan TASHQARIDA: ikkalasi bir
+        // xil hodisalarni ushlaydi va tortish sarlavhani yoyish bilan aralashib ketardi.
+        ScPullRefresh(refreshing = refreshing, onRefresh = vm::refresh) {
             Column(
-                Modifier.fillMaxWidth().padding(horizontal = Sc.ScreenPadding),
-                verticalArrangement = Arrangement.spacedBy(14.dp),
+                Modifier.fillMaxSize()
+                    .nestedScroll(header.nestedScrollConnection)
+                    .verticalScroll(rememberScrollState()),
             ) {
-                Spacer(Modifier.height(4.dp))
-
-                // --- Uchta amal tugmasi (maketdagidek) ---------------------------------
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-                    ActionTile(
-                        AppIcons.Camera,
+                ScProfileHeader(
+                    state = header,
+                    name = state.name,
+                    // Bu **mening** profilim — ilovani ochib turgan odamning o'zi.
+                    status = when {
+                        photos.uploading && photos.progress != null ->
+                            "rasm yuklanmoqda ${scUploadPercent(photos.progress!!)}"
+                        photos.uploading -> "rasm saqlanmoqda…"
+                        else -> "onlayn"
+                    },
+                    photoUrls = photoUrls,
+                    photoIndex = photoIndex,
+                    onAvatarClick = {
                         when {
-                            photos.uploading && photos.progress != null ->
-                                "Yuklanmoqda ${scUploadPercent(photos.progress!!)}"
-                            photos.uploading -> "Saqlanmoqda…"
-                            else -> "Rasm belgilash"
-                        },
-                        Modifier.weight(1f),
-                        enabled = photos.canAdd,
-                    ) { imagePicker.pick() }
-                    ActionTile(AppIcons.Pencil, "Tahrirlash", Modifier.weight(1f), onClick = onEditProfile)
-                    ActionTile(AppIcons.Settings, "Sozlamalar", Modifier.weight(1f), onClick = onOpenSettings)
-                }
-
-                photos.error?.let { ScText(it, 12.5f, FontWeight.SemiBold, Sc.Danger) }
-
-                // --- Ma'lumotlar --------------------------------------------------------
-                // Rasmiy nom emas, qisqasi: karta ustuni tor va uzun nom to'rt qatorga
-                // yoyilardi. To'liq nom "Universitetim" ekranida turadi.
-                val university = state.universities
-                    .firstOrNull { it.id == state.profile?.universityId }?.shortName
-                val phone = state.profile?.phoneNumber ?: state.contact.takeIf { it.isNotBlank() }
-                InfoCard {
-                    phone?.let { InfoRow(formatUzPhoneFull(it), "Mobil raqam") }
-                    state.profile?.bio?.takeIf { it.isNotBlank() }?.let { InfoRow(it, "Tarjimayi hol") }
-                    state.profile?.email?.takeIf { it.isNotBlank() }?.let { InfoRow(it, "Pochta") }
-                    university?.let { InfoRow(it, "Universitet") }
-                    state.courseLabel?.let { InfoRow(it, "Kurs") }
-                }
-
-                if (showMyBusiness) {
-                    MyBusinessCard(onOpenMyBusiness)
-                }
-
-                // --- Bo'limlar ----------------------------------------------------------
-                TabBar(selected = tab, onSelect = { tab = it })
-
-                MyPostsSection(
-                    archived = tab == ProfileTab.ARCHIVE,
-                    authorName = state.name,
-                    authorAvatarUrl = photoUrls.firstOrNull(),
+                            // Rasm umuman yo'q — bosish darrov tanlagichni ochadi.
+                            photoUrls.isEmpty() -> if (photos.canAdd) imagePicker.pick()
+                            !header.expanded -> header.expand()
+                            else -> Unit
+                        }
+                    },
+                    onStep = { forward ->
+                        if (photoUrls.size > 1) {
+                            photoIndex = (photoIndex + if (forward) 1 else photoUrls.size - 1) %
+                                photoUrls.size
+                        }
+                    },
+                    topBar = { ScGlassButton(ScIcons.ChevronLeft, "Orqaga", onBack) },
+                    trailing = { ScGlassButton(AppIcons.Settings, "Sozlamalar", onOpenSettings) },
+                    avatarOverlay = {
+                        // Foiz avatar ustida: eski rasm ko'rinib turadi, yangisi esa ketmoqda.
+                        if (photos.uploading) {
+                            ScUploadRing(photos.progress, size = 96.dp, stroke = 3.5.dp)
+                        }
+                    },
                 )
 
-                LogoutRow { vm.logout(onLoggedOut) }
-                Spacer(Modifier.height(24.dp).navigationBarsPadding())
+                Column(
+                    Modifier.fillMaxWidth().padding(horizontal = Sc.ScreenPadding),
+                    verticalArrangement = Arrangement.spacedBy(14.dp),
+                ) {
+                    Spacer(Modifier.height(4.dp))
+
+                    // --- Uchta amal tugmasi (maketdagidek) ---------------------------------
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+                        ActionTile(
+                            AppIcons.Camera,
+                            when {
+                                photos.uploading && photos.progress != null ->
+                                    "Yuklanmoqda ${scUploadPercent(photos.progress!!)}"
+                                photos.uploading -> "Saqlanmoqda…"
+                                else -> "Rasm belgilash"
+                            },
+                            Modifier.weight(1f),
+                            enabled = photos.canAdd,
+                        ) { imagePicker.pick() }
+                        ActionTile(AppIcons.Pencil, "Tahrirlash", Modifier.weight(1f), onClick = onEditProfile)
+                        ActionTile(AppIcons.Settings, "Sozlamalar", Modifier.weight(1f), onClick = onOpenSettings)
+                    }
+
+                    photos.error?.let { ScText(it, 12.5f, FontWeight.SemiBold, Sc.Danger) }
+
+                    // --- Ma'lumotlar --------------------------------------------------------
+                    // Rasmiy nom emas, qisqasi: karta ustuni tor va uzun nom to'rt qatorga
+                    // yoyilardi. To'liq nom "Universitetim" ekranida turadi.
+                    val university = state.universities
+                        .firstOrNull { it.id == state.profile?.universityId }?.shortName
+                    val phone = state.profile?.phoneNumber ?: state.contact.takeIf { it.isNotBlank() }
+                    InfoCard {
+                        phone?.let { InfoRow(formatUzPhoneFull(it), "Mobil raqam") }
+                        state.profile?.bio?.takeIf { it.isNotBlank() }?.let { InfoRow(it, "Tarjimayi hol") }
+                        state.profile?.email?.takeIf { it.isNotBlank() }?.let { InfoRow(it, "Pochta") }
+                        university?.let { InfoRow(it, "Universitet") }
+                        state.courseLabel?.let { InfoRow(it, "Kurs") }
+                    }
+
+                    if (showMyBusiness) {
+                        MyBusinessCard(onOpenMyBusiness)
+                    }
+
+                    // --- Bo'limlar ----------------------------------------------------------
+                    TabBar(selected = tab, onSelect = { tab = it })
+
+                    MyPostsSection(
+                        archived = tab == ProfileTab.ARCHIVE,
+                        authorName = state.name,
+                        authorAvatarUrl = photoUrls.firstOrNull(),
+                    )
+
+                    LogoutRow { vm.logout(onLoggedOut) }
+                    Spacer(Modifier.height(24.dp).navigationBarsPadding())
+                }
             }
         }
     }

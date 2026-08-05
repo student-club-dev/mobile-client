@@ -13,8 +13,17 @@ import kotlinx.coroutines.flow.callbackFlow
 /**
  * Android internet holati — `ConnectivityManager`.
  *
- * `NET_CAPABILITY_VALIDATED` — Wi-Fi'ga ulangan, lekin haqiqiy internet yo'q holatni ham
- * to'g'ri aniqlaydi (masalan captive portal). Context Koin `androidContext()` dan keladi.
+ * Context Koin `androidContext()` dan keladi.
+ *
+ * ⚠️ `NET_CAPABILITY_VALIDATED` **talab qilinmaydi**. Tizim uni tarmoqqa ulangandan keyin
+ * o'zining tekshiruv so'rovi qaytgach qo'yadi — bu bir necha soniya davom etadi va aynan
+ * shu oynaga ilovaning ilk so'rovlari tushardi. Natijada har ochilishda "Internet aloqasi
+ * yo'q" chiqib, hech qanday ma'lumot yuklanmasdi (mobil internetda deyarli har safar).
+ *
+ * Endi "tarmoq bor" degani INTERNET imkoniyati e'lon qilingan faol tarmoq bo'lishi. Tarmoq
+ * yolg'onchi bo'lsa (captive portal) so'rovning O'ZI yiqiladi va `toAppException` uni
+ * baribir [dev.core.common.error.AppException.NoInternet] ga aylantiradi — ya'ni to'g'ri
+ * xabar yo'qolmaydi, faqat endi u taxminga emas, haqiqiy urinishga asoslanadi.
  */
 actual class NetworkConnectivity(private val context: Context) {
 
@@ -25,18 +34,20 @@ actual class NetworkConnectivity(private val context: Context) {
      * `ACCESS_NETWORK_STATE` bo'lmasa `SecurityException` uchadi. Bu tekshiruv har API
      * so'rovi oldidan chaqiriladi — shuning uchun u hech qachon ilovani yiqitmasligi kerak:
      * holatni bilmasak, "online" deb hisoblab so'rovni o'tkazamiz (haqiqiy tarmoq xatosi
-     * keyin baribir typed [AppException] ga aylanadi).
+     * keyin baribir typed [dev.core.common.error.AppException] ga aylanadi).
      */
-    actual fun isOnline(): Boolean = try {
-        val manager = cm
-        val network = manager?.activeNetwork
-        val caps = network?.let(manager::getNetworkCapabilities)
-        caps != null &&
-            caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
-            caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
-    } catch (e: SecurityException) {
-        Napier.w("ACCESS_NETWORK_STATE ruxsati yo'q — internet holati noma'lum", e)
-        true
+    actual fun isOnline(): Boolean {
+        return try {
+            // Xizmat yoki imkoniyatlar o'qilmasa — bilmaymiz, so'rovni TO'SMAYMIZ.
+            val manager = cm ?: return true
+            // Faol tarmoqning umuman yo'qligi ISHONCHLI belgi (aviarejim, Wi-Fi o'chirilgan).
+            val network = manager.activeNetwork ?: return false
+            val caps = manager.getNetworkCapabilities(network) ?: return true
+            caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+        } catch (e: SecurityException) {
+            Napier.w("ACCESS_NETWORK_STATE ruxsati yo'q — internet holati noma'lum", e)
+            true
+        }
     }
 
     actual val online: Flow<Boolean> = callbackFlow {

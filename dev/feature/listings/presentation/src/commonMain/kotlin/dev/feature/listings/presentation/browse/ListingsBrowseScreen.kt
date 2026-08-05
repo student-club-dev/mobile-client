@@ -50,6 +50,7 @@ import dev.core.uikit.components.ScText
 import dev.core.uikit.components.scCard
 import dev.core.uikit.components.scStyle
 import dev.core.uikit.components.ScSearchOverlay
+import dev.core.uikit.components.ScPullRefresh
 import dev.core.uikit.map.OfferMarker
 import dev.core.uikit.map.OffersMapOverlay
 import dev.core.uikit.map.rememberUserLocation
@@ -114,45 +115,50 @@ fun ListingsBrowseScreen(
             }
             Spacer(Modifier.height(15.dp))
 
-            LazyColumn(
-                Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(
-                    start = Sc.ScreenPadding, end = Sc.ScreenPadding,
-                    bottom = if (onBack == null) 110.dp else 24.dp,
-                ),
-                verticalArrangement = Arrangement.spacedBy(13.dp),
-            ) {
-                items(withDistance, key = { (listing, _) -> listing.id }) { (listing, nearest) ->
-                    ListingCard(
-                        listing = listing,
-                        distanceLabel = nearest?.distanceLabel(),
-                        branchLabel = nearest?.branch?.display(),
-                        palette = palette,
-                        onClick = { onOpenListing(listing.id) },
-                    )
-                }
-                when {
-                    // Cheksiz skroll: oxirgi kartochka ko'ringanda keyingi sahifa so'raladi.
-                    // Kompozitsiyaning O'ZI so'rov sababi — alohida scroll listener kerak emas.
-                    // Xato bo'lsa avtomatik urinish TO'XTAYDI: aks holda uzilgan tarmoqda
-                    // ro'yxat oxiri cheksiz halqaga aylanardi.
-                    state.hasNext -> item(key = "more") {
-                        val failed = state.error
-                        if (failed == null) {
-                            LaunchedEffect(state.nextCursor) { vm.loadMore() }
-                            BrowseFooter(loading = true)
-                        } else {
-                            BrowseMoreError(failed) { vm.consumeError(); vm.loadMore() }
+            // Tepadan tortish — ro'yxatni birinchi sahifadan qayta o'qiydi.
+            // `state.refreshing` ATAYLAB `state.loading` dan alohida: birinchi yuklanish
+            // skeletni ko'rsatadi, bu esa foydalanuvchi o'zi so'ragan yangilanish.
+            ScPullRefresh(refreshing = state.refreshing, onRefresh = vm::refresh) {
+                LazyColumn(
+                    Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(
+                        start = Sc.ScreenPadding, end = Sc.ScreenPadding,
+                        bottom = if (onBack == null) 110.dp else 24.dp,
+                    ),
+                    verticalArrangement = Arrangement.spacedBy(13.dp),
+                ) {
+                    items(withDistance, key = { (listing, _) -> listing.id }) { (listing, nearest) ->
+                        ListingCard(
+                            listing = listing,
+                            distanceLabel = nearest?.distanceLabel(),
+                            branchLabel = nearest?.branch?.display(),
+                            palette = palette,
+                            onClick = { onOpenListing(listing.id) },
+                        )
+                    }
+                    when {
+                        // Cheksiz skroll: oxirgi kartochka ko'ringanda keyingi sahifa so'raladi.
+                        // Kompozitsiyaning O'ZI so'rov sababi — alohida scroll listener kerak emas.
+                        // Xato bo'lsa avtomatik urinish TO'XTAYDI: aks holda uzilgan tarmoqda
+                        // ro'yxat oxiri cheksiz halqaga aylanardi.
+                        state.hasNext -> item(key = "more") {
+                            val failed = state.error
+                            if (failed == null) {
+                                LaunchedEffect(state.nextCursor) { vm.loadMore() }
+                                BrowseFooter(loading = true)
+                            } else {
+                                BrowseMoreError(failed) { vm.consumeError(); vm.loadMore() }
+                            }
                         }
+                        state.loading -> item(key = "loading") { BrowseFooter(loading = true) }
+                        state.error != null -> item(key = "error") {
+                            BrowseErrorState(state.error!!, onRetry = vm::refresh)
+                        }
+                        // Bo'limda umuman e'lon bo'lmasa — hech nima chizilmaydi. Plitka faqat
+                        // filtr/qidiruv hammasini kesib tashlaganda chiqadi: u yerda foydalanuvchi
+                        // o'zi qilgan amalning javobini kutadi.
+                        state.isFilteredEmpty -> item(key = "empty") { BrowseNotFoundState(state.kind) }
                     }
-                    state.loading -> item(key = "loading") { BrowseFooter(loading = true) }
-                    state.error != null -> item(key = "error") {
-                        BrowseErrorState(state.error!!, onRetry = vm::refresh)
-                    }
-                    // Bo'limda umuman e'lon bo'lmasa — hech nima chizilmaydi. Plitka faqat
-                    // filtr/qidiruv hammasini kesib tashlaganda chiqadi: u yerda foydalanuvchi
-                    // o'zi qilgan amalning javobini kutadi.
-                    state.isFilteredEmpty -> item(key = "empty") { BrowseNotFoundState(state.kind) }
                 }
             }
         }
@@ -304,7 +310,7 @@ private fun RowScope.KindSegment(kind: ListingKind, selected: Boolean, onClick: 
 
 /**
  * Bo'lim belgisi (qo'llanma: Yordam=`ic_book`, Ijara=`ic_home_filled`,
- * Xizmat=`ic_tools`, Ish=`ic_briefcase`).
+ * Xizmat=`ic_service`, Ish=`ic_briefcase`).
  *
  * Faol segment gradient ustida turadi — belgi oq rangga bo'yaladi. Nofaolida esa
  * ko'p rangli ikonalar o'z ranglarida ([ScGlyph], ya'ni bo'yalmaydi), bir rangli

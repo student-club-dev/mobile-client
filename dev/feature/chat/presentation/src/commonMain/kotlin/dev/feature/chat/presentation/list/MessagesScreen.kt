@@ -63,6 +63,7 @@ import dev.core.uikit.components.ScSearchOverlay
 import dev.core.uikit.components.ScText
 import dev.core.uikit.components.scBrandShadow
 import dev.core.uikit.components.scStyle
+import dev.core.uikit.components.ScPullRefresh
 import dev.core.uikit.theme.Sc
 import dev.feature.chat.domain.model.ConversationItem
 import dev.feature.chat.presentation.ActionRow
@@ -107,6 +108,10 @@ internal fun MessagesScreen(
     onBack: (() -> Unit)?,
     /** Yangi suhbat — «Do'stlar» ro'yxatiga olib boradi. */
     onNewChat: (() -> Unit)?,
+    /** Suhbatlar ro'yxati serverdan qayta o'qilmoqda (tepadagi aylanma indikator). */
+    refreshing: Boolean,
+    /** Ekran pastga tortildi — ro'yxatni serverdan qayta o'qish. */
+    onRefresh: () -> Unit,
     onOpen: (ConversationItem) -> Unit,
     onArchive: (ConversationItem) -> Unit,
     onUnarchive: (ConversationItem) -> Unit,
@@ -300,66 +305,74 @@ internal fun MessagesScreen(
             )
             val notFound = "«${query.trim()}» bo'yicha hech nima topilmadi"
 
-            if (showArchived) {
-                ConversationsPage(
-                    items = foundArchived,
-                    state = archivedState,
-                    typing = typing,
-                    contentPadding = listPadding,
-                    empty = if (query.isBlank()) {
-                        "Arxivga ko'chirilgan suhbat yo'q."
-                    } else {
-                        notFound
-                    },
-                    emptyTitle = if (query.isBlank()) ScEmptyTitle else ScNotFoundTitle,
-                    onOpen = onOpen,
-                    onLongPress = { actionFor = it },
-                )
-            } else {
-                HorizontalPager(
-                    state = pager,
-                    modifier = Modifier.fillMaxWidth().weight(1f),
-                    beyondViewportPageCount = 1,
-                ) { page ->
-                    // Yengil parallaks: qo'shni sahifa barmoq ortidan sekinroq keladi.
-                    //
-                    // ⚠️ Siljish ICHKI qatlamda, tashqisi esa QIRQADI. Aks holda qo'shni
-                    // sahifa (u pagerda ekran chetidan tashqarida turadi) parallaks
-                    // hisobiga o'z uyasidan chiqib, joriy sahifaning ustiga tushardi —
-                    // "Shaxsiy" bilan "Klublar" bir ekranda aralashib ko'rinardi.
-                    Box(Modifier.fillMaxSize().clipToBounds()) {
-                        Box(
-                            Modifier.fillMaxSize().graphicsLayer {
-                                val distance =
-                                    (pager.currentPage - page) + pager.currentPageOffsetFraction
-                                translationX = distance * size.width * PageParallax
-                            },
-                        ) {
-                            when (ChatFolder.entries[page]) {
-                                ChatFolder.PERSONAL -> ConversationsPage(
-                                    items = foundChats,
-                                    state = conversationsState,
-                                    typing = typing,
-                                    contentPadding = listPadding,
-                                    empty = if (query.isNotBlank()) notFound else {
-                                        "\"Do'stlar\" bo'limidan yozishni boshlang."
-                                    },
-                                    emptyTitle = if (query.isNotBlank()) ScNotFoundTitle else ScEmptyTitle,
-                                    onOpen = onOpen,
-                                    onLongPress = { actionFor = it },
-                                )
+            // Tepadan tortish — suhbatlar ro'yxati va o'qilmaganlar soni serverdan qayta
+            // o'qiladi (WS uzilib qolgan bo'lsa yagona qo'lda tuzatish yo'li).
+            ScPullRefresh(
+                refreshing = refreshing,
+                onRefresh = onRefresh,
+                modifier = Modifier.weight(1f),
+            ) {
+                if (showArchived) {
+                    ConversationsPage(
+                        items = foundArchived,
+                        state = archivedState,
+                        typing = typing,
+                        contentPadding = listPadding,
+                        empty = if (query.isBlank()) {
+                            "Arxivga ko'chirilgan suhbat yo'q."
+                        } else {
+                            notFound
+                        },
+                        emptyTitle = if (query.isBlank()) ScEmptyTitle else ScNotFoundTitle,
+                        onOpen = onOpen,
+                        onLongPress = { actionFor = it },
+                    )
+                } else {
+                    HorizontalPager(
+                        state = pager,
+                        modifier = Modifier.fillMaxSize(),
+                        beyondViewportPageCount = 1,
+                    ) { page ->
+                        // Yengil parallaks: qo'shni sahifa barmoq ortidan sekinroq keladi.
+                        //
+                        // ⚠️ Siljish ICHKI qatlamda, tashqisi esa QIRQADI. Aks holda qo'shni
+                        // sahifa (u pagerda ekran chetidan tashqarida turadi) parallaks
+                        // hisobiga o'z uyasidan chiqib, joriy sahifaning ustiga tushardi —
+                        // "Shaxsiy" bilan "Klublar" bir ekranda aralashib ko'rinardi.
+                        Box(Modifier.fillMaxSize().clipToBounds()) {
+                            Box(
+                                Modifier.fillMaxSize().graphicsLayer {
+                                    val distance =
+                                        (pager.currentPage - page) + pager.currentPageOffsetFraction
+                                    translationX = distance * size.width * PageParallax
+                                },
+                            ) {
+                                when (ChatFolder.entries[page]) {
+                                    ChatFolder.PERSONAL -> ConversationsPage(
+                                        items = foundChats,
+                                        state = conversationsState,
+                                        typing = typing,
+                                        contentPadding = listPadding,
+                                        empty = if (query.isNotBlank()) notFound else {
+                                            "\"Do'stlar\" bo'limidan yozishni boshlang."
+                                        },
+                                        emptyTitle = if (query.isNotBlank()) ScNotFoundTitle else ScEmptyTitle,
+                                        onOpen = onOpen,
+                                        onLongPress = { actionFor = it },
+                                    )
 
-                                ChatFolder.CLUBS -> ClubsPage(
-                                    clubs = foundClubs,
-                                    state = clubsState,
-                                    contentPadding = listPadding,
-                                    empty = if (query.isNotBlank()) notFound else {
-                                        "Klublar tez orada qo'shiladi."
-                                    },
-                                    emptyTitle = if (query.isNotBlank()) ScNotFoundTitle else ScEmptyTitle,
-                                    onToggleJoin = onToggleJoin,
-                                    onOpen = onClubSoon,
-                                )
+                                    ChatFolder.CLUBS -> ClubsPage(
+                                        clubs = foundClubs,
+                                        state = clubsState,
+                                        contentPadding = listPadding,
+                                        empty = if (query.isNotBlank()) notFound else {
+                                            "Klublar tez orada qo'shiladi."
+                                        },
+                                        emptyTitle = if (query.isNotBlank()) ScNotFoundTitle else ScEmptyTitle,
+                                        onToggleJoin = onToggleJoin,
+                                        onOpen = onClubSoon,
+                                    )
+                                }
                             }
                         }
                     }

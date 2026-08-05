@@ -168,11 +168,31 @@ class StoriesViewModel(
         if (nextGroup == null) close() else open(nextGroup)
     }
 
-    /** Oldingi hikoya; guruh boshida bo'lsa hech narsa qilinmaydi (ekran yopilmaydi). */
+    /**
+     * Oldingi hikoya; guruh boshida bo'lsa — **oldingi guruh**ning oxirgi hikoyasi
+     * (Telegram/Instagram xulqi, [next] ning aksi). Lentaning eng boshida hech narsa
+     * qilinmaydi: ekran yopilmaydi.
+     */
     fun previous() {
         val current = _viewer.value
-        if (current.index <= 0) return
-        _viewer.value = current.copy(index = current.index - 1)
+        if (current.index > 0) {
+            _viewer.value = current.copy(index = current.index - 1)
+            markViewed()
+            return
+        }
+        val group = current.group ?: return
+        val groups = _state.value.groups
+        // ⚠️ [next] dagi kabi: guruh lentada bo'lmasligi mumkin (o'z hikoyalarim).
+        val index = groups.indexOfFirst { it.author.id == group.author.id }
+        val previousGroup = if (index <= 0) null else groups.getOrNull(index - 1)
+        if (previousGroup != null) {
+            // Oldingi guruh OXIRGI hikoyasidan ochiladi — orqaga qarab uzluksiz oqim.
+            _viewer.value = StoryViewerState(
+                group = previousGroup,
+                index = (previousGroup.stories.size - 1).coerceAtLeast(0),
+            )
+            markViewed()
+        }
     }
 
     /**

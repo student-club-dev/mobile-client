@@ -46,6 +46,7 @@ import dev.core.uikit.components.scCard
 import dev.core.uikit.components.scStyle
 import dev.core.uikit.components.ScShimmerList
 import dev.core.uikit.components.ScShimmerFooter
+import dev.core.uikit.components.ScPullRefresh
 import dev.core.uikit.theme.Sc
 import dev.feature.connections.domain.model.BlockedStudent
 import kotlinx.coroutines.delay
@@ -117,33 +118,38 @@ fun BlockedStudentsScreen(
                 // izoh bo'limning nimaligini allaqachon aytadi).
                 state.isEmpty -> Unit
 
-                else -> LazyColumn(
-                    Modifier.fillMaxWidth(),
-                    state = listState,
-                    contentPadding = PaddingValues(horizontal = Sc.ScreenPadding, vertical = 4.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    if (state.total > 0) {
-                        item(key = "total") {
-                            ScText(
-                                "${state.total} ta talaba", 12.5f, FontWeight.Bold, Sc.Muted,
-                                Modifier.padding(start = 4.dp, bottom = 2.dp), maxLines = 1,
+                // Tepadan tortish — ro'yxat birinchi sahifadan qayta o'qiladi.
+                // `refreshing` — ro'yxat allaqachon to'la bo'lgandagi yuklanish: bo'sh
+                // ro'yxatda skelet chiziladi va indikator ortiqcha bo'lardi.
+                else -> ScPullRefresh(refreshing = state.loading, onRefresh = vm::refresh) {
+                    LazyColumn(
+                        Modifier.fillMaxSize(),
+                        state = listState,
+                        contentPadding = PaddingValues(horizontal = Sc.ScreenPadding, vertical = 4.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        if (state.total > 0) {
+                            item(key = "total") {
+                                ScText(
+                                    "${state.total} ta talaba", 12.5f, FontWeight.Bold, Sc.Muted,
+                                    Modifier.padding(start = 4.dp, bottom = 2.dp), maxLines = 1,
+                                )
+                            }
+                        }
+                        items(state.items, key = { it.student.id }) { blocked ->
+                            BlockedRow(
+                                blocked = blocked,
+                                busy = blocked.student.id in state.busyIds,
+                                onUnblock = { unblockFor = blocked },
                             )
                         }
-                    }
-                    items(state.items, key = { it.student.id }) { blocked ->
-                        BlockedRow(
-                            blocked = blocked,
-                            busy = blocked.student.id in state.busyIds,
-                            onUnblock = { unblockFor = blocked },
-                        )
-                    }
-                    if (state.loadingMore) {
-                        item(key = "loading_more") {
-                            ScShimmerFooter()
+                        if (state.loadingMore) {
+                            item(key = "loading_more") {
+                                ScShimmerFooter()
+                            }
                         }
+                        item(key = "bottom_space") { Spacer(Modifier.height(24.dp)) }
                     }
-                    item(key = "bottom_space") { Spacer(Modifier.height(24.dp)) }
                 }
             }
         }

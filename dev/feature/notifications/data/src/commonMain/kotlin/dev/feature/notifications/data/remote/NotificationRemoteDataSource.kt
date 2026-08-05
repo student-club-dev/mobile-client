@@ -5,7 +5,7 @@ import dev.core.common.error.AppException
 import dev.core.common.error.toAppException
 import dev.core.common.errorOf
 import dev.core.common.network.NetworkConnectivity
-import dev.core.network.response.toAppException
+import dev.core.network.response.toAppExceptionWithFields
 import dev.feature.notifications.data.dto.MarkNotificationsReadDto
 import dev.feature.notifications.data.dto.NotificationPageDto
 import io.ktor.client.HttpClient
@@ -80,7 +80,10 @@ class KtorNotificationRemoteDataSource(
     } catch (e: CancellationException) {
         throw e
     } catch (e: ResponseException) {
-        errorOf(e.response.status.toAppException(e))
+        // ⚠️ Tana O'QILADI (`toAppExceptionWithFields`), faqat statusdan xato qurilmaydi:
+        // server nima deganini ekran inline ko'rsatishi kerak. Toast baribir chiqmaydi —
+        // u `safeCall` ichidagi `failure()` da yuboriladi, bu yerda esa u ishlatilmaydi.
+        errorOf(e.toAppExceptionWithFields())
     } catch (e: Throwable) {
         errorOf(e.toAppException(connectivity?.isOnline() ?: true))
     }

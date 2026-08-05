@@ -44,6 +44,7 @@ import dev.core.uikit.components.ScIcons
 import dev.core.uikit.components.ScShimmerList
 import dev.core.uikit.components.ScText
 import dev.core.uikit.components.scCard
+import dev.core.uikit.components.ScPullRefresh
 import dev.core.uikit.theme.Sc
 import dev.feature.notifications.domain.model.AppNotification
 import dev.feature.notifications.domain.model.NotificationTarget
@@ -136,23 +137,27 @@ private fun NotificationList(
     vm: NotificationsViewModel,
     onOpenTarget: (NotificationTarget) -> Unit,
 ) {
-    LazyColumn(
-        Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(
-            start = Sc.ScreenPadding,
-            end = Sc.ScreenPadding,
-            top = 20.dp,
-            // Suzuvchi tugma balandligi + havo: oxirgi karta uning ostida qolib ketmasin.
-            bottom = if (state.unreadCount > 0) 104.dp else 24.dp,
-        ),
-        verticalArrangement = Arrangement.spacedBy(13.dp),
-    ) {
-        items(state.items, key = { it.id }) { n ->
-            NotificationCard(n) {
-                vm.onOpened(n)
-                // `None` — hech qayerga olib bormaydigan bildirishnoma (masalan "Xush
-                // kelibsiz"): u ham bosiladi, faqat o'qilgan bo'ladi.
-                if (n.target != NotificationTarget.None) onOpenTarget(n.target)
+    // Tepadan tortish — ro'yxat serverdan qayta o'qiladi. Push kelmagan holatda ham
+    // (bildirishnoma ruxsati berilmagan bo'lsa) yangisini shu yo'l bilan ko'rish mumkin.
+    ScPullRefresh(refreshing = state.refreshing, onRefresh = vm::refresh) {
+        LazyColumn(
+            Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(
+                start = Sc.ScreenPadding,
+                end = Sc.ScreenPadding,
+                top = 20.dp,
+                // Suzuvchi tugma balandligi + havo: oxirgi karta uning ostida qolib ketmasin.
+                bottom = if (state.unreadCount > 0) 104.dp else 24.dp,
+            ),
+            verticalArrangement = Arrangement.spacedBy(13.dp),
+        ) {
+            items(state.items, key = { it.id }) { n ->
+                NotificationCard(n) {
+                    vm.onOpened(n)
+                    // `None` — hech qayerga olib bormaydigan bildirishnoma (masalan "Xush
+                    // kelibsiz"): u ham bosiladi, faqat o'qilgan bo'ladi.
+                    if (n.target != NotificationTarget.None) onOpenTarget(n.target)
+                }
             }
         }
     }

@@ -236,13 +236,13 @@ internal fun Modifier.sideNavEdgeDrag(nav: SideNavState): Modifier {
  */
 @Composable
 internal fun SideNavHandle(onClick: () -> Unit, modifier: Modifier = Modifier) {
-    val shape = RoundedCornerShape(17.dp)
+    val shape = RoundedCornerShape(12.dp)
     val chevron = ScIcons.ChevronRight
     Box(
         modifier
             .padding(start = 8.dp)
             .size(HandleSize)
-            .scSoftShadow(12.dp, shape)
+            .scSoftShadow(8.dp, shape)
             .clip(shape)
             .background(Sc.Chip.copy(alpha = HandleAlpha))
             .border(1.dp, Sc.Handle.copy(alpha = HandleAlpha), shape)
@@ -251,8 +251,8 @@ internal fun SideNavHandle(onClick: () -> Unit, modifier: Modifier = Modifier) {
     ) {
         // `Arrangement.spacedBy` manfiy oraliqni qabul qilmaydi, shuning uchun ikkala
         // chevron markazdan teng masofaga suriladi — natijada zich `»` chiqadi.
-        Icon(chevron, "Yon menyu", tint = Sc.ChipInk, modifier = Modifier.size(21.dp).offset(x = (-5).dp))
-        Icon(chevron, null, tint = Sc.ChipInk, modifier = Modifier.size(21.dp).offset(x = 5.dp))
+        Icon(chevron, "Yon menyu", tint = Sc.ChipInk, modifier = Modifier.size(14.dp).offset(x = (-3.5).dp))
+        Icon(chevron, null, tint = Sc.ChipInk, modifier = Modifier.size(14.dp).offset(x = 3.5.dp))
     }
 }
 
@@ -271,8 +271,15 @@ internal fun Modifier.sideNavHandleSeam(): Modifier = this
         layout(placeable.width, 0) { placeable.place(0, -placeable.height / 2) }
     }
 
-/** Tutqich kvadrat — eni va bo'yi teng. */
-private val HandleSize = 52.dp
+/**
+ * Tutqich kvadrat — eni va bo'yi teng.
+ *
+ * 52dp juda katta edi: u topbardagi avatar bilan bir xil o'lchamda bo'lib, sarlavhaning
+ * ustiga chiqib turardi va ekranning eng ko'zga tashlanadigan elementiga aylanib qolgandi.
+ * 34dp — barmoq uchun yetarli (tegish maydoni atrofidagi bo'sh joy bilan birga ~48dp) va
+ * ko'z uni boshqaruv elementi sifatida o'qiydi.
+ */
+private val HandleSize = 34.dp
 
 /** Fon shaffofligi: 0 — ko'rinmas, 1 — to'liq to'q. Tagidagi kontent sal sezilib tursin. */
 private const val HandleAlpha = 0.82f

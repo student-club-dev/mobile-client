@@ -52,6 +52,7 @@ import dev.core.uikit.components.ScText
 import dev.core.uikit.components.scCard
 import dev.core.uikit.components.scStyle
 import dev.core.uikit.components.ScShimmerList
+import dev.core.uikit.components.ScPullRefresh
 import dev.core.uikit.theme.Sc
 import dev.feature.connections.domain.model.ConnectionRequest
 import dev.feature.connections.domain.model.ConnectionView
@@ -124,31 +125,40 @@ fun ConnectionsScreen(
 
             Spacer(Modifier.height(14.dp))
 
-            when (state.tab) {
-                ConnectionsTab.SEARCH -> SearchSection(
-                    state = state,
-                    onQuery = vm::onQueryChange,
-                    onClear = vm::clearQuery,
-                    onConnect = vm::connect,
-                    onOpenChat = onOpenChat,
-                    onMenu = { menuFor = it },
-                    vm = vm,
-                    modifier = Modifier.weight(1f),
-                )
-                ConnectionsTab.REQUESTS -> RequestsSection(
-                    state = state,
-                    onSelect = vm::selectRequestsTab,
-                    onAccept = vm::accept,
-                    onDecline = vm::decline,
-                    onMenu = { menuFor = it },
-                    modifier = Modifier.weight(1f),
-                )
-                ConnectionsTab.CONNECTED -> ConnectedSection(
-                    state = state,
-                    onOpenChat = onOpenChat,
-                    onMenu = { menuFor = it },
-                    modifier = Modifier.weight(1f),
-                )
+            // Tepadan tortish — OCHIQ bo'lim serverdan qayta o'qiladi. Bog'lanish holati
+            // ikki tomonlama: suhbatdosh so'rovni boshqa qurilmada qabul qilgan bo'lishi
+            // mumkin va ekranga qaytmasdan buni bilishning boshqa yo'li yo'q edi.
+            ScPullRefresh(
+                refreshing = state.refreshing,
+                onRefresh = vm::refreshCurrentTab,
+                modifier = Modifier.weight(1f),
+            ) {
+                when (state.tab) {
+                    ConnectionsTab.SEARCH -> SearchSection(
+                        state = state,
+                        onQuery = vm::onQueryChange,
+                        onClear = vm::clearQuery,
+                        onConnect = vm::connect,
+                        onOpenChat = onOpenChat,
+                        onMenu = { menuFor = it },
+                        vm = vm,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                    ConnectionsTab.REQUESTS -> RequestsSection(
+                        state = state,
+                        onSelect = vm::selectRequestsTab,
+                        onAccept = vm::accept,
+                        onDecline = vm::decline,
+                        onMenu = { menuFor = it },
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                    ConnectionsTab.CONNECTED -> ConnectedSection(
+                        state = state,
+                        onOpenChat = onOpenChat,
+                        onMenu = { menuFor = it },
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
             }
         }
 

@@ -232,6 +232,8 @@ fun ChatScreen(
                 onClubSoon = { vm.showMessage("Klub suhbati tez orada ochiladi") },
                 onBack = onBack,
                 onNewChat = onNewChat,
+                refreshing = state.refreshing,
+                onRefresh = vm::refreshConversations,
                 onOpen = vm::open,
                 onArchive = { vm.setArchived(it.id, true) },
                 onUnarchive = { vm.setArchived(it.id, false) },
@@ -378,7 +380,7 @@ private fun ChatThread(
     /** Media so'rovlari uchun `Authorization` sarlavhasi — pleyerlar tokensiz `404` oladi. */
     mediaHeaders: Map<String, String>,
     /**
-     * Video ochildi — uni telefonning «StudentClub/Video» papkasiga **bir marta** yozish
+     * Video ochildi — uni ilovaning shaxsiy media keshiga **bir marta** yozish
      * uchun. Ikkinchi ochilishda yuklab olish bo'lmaydi.
      */
     onVideoOpened: (mediaId: String?, url: String?) -> Unit,

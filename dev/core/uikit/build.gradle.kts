@@ -43,6 +43,13 @@ kotlin {
             // Video siqish (`media/VideoCompressor`) — yuborishdan oldin 1080p H.264 ga.
             implementation(libs.androidx.media3.transformer)
             implementation(libs.androidx.media3.effect)
+            // Ilova ichidagi kamera ekrani (`media/CameraScreen`) — hikoya qo'yishda.
+            // `camera-view` `PreviewView` + `LifecycleCameraController` ni beradi,
+            // `camera-camera2` — haqiqiy qurilma implementatsiyasi, `camera-video` —
+            // yozish (`Recorder`).
+            implementation(libs.androidx.camera.view)
+            implementation(libs.androidx.camera.camera2)
+            implementation(libs.androidx.camera.video)
             // `LocalLifecycleOwner` — ekran fonga ketganda videoni to'xtatish uchun.
             // Compose'dan tranzitiv kelishiga tayanmaymiz: bu API lifecycle 2.8+ da,
             // `androidx.lifecycle.compose` paketiga ko'chgan.

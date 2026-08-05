@@ -28,6 +28,7 @@ import dev.core.network.NetworkConfig
 import dev.core.network.media.MediaUrl
 import dev.core.network.media.apiOrigin
 import dev.core.uikit.components.ScToastHost
+import dev.core.uikit.media.purgeLegacyGalleryMedia
 import dev.core.uikit.theme.AppTheme
 import dev.feature.settings.domain.model.ThemeMode
 import dev.feature.settings.domain.repository.SettingsRepository
@@ -90,6 +91,10 @@ private fun AppScaffold(content: @Composable () -> Unit) {
         runCatching { seedPurge.purgeOnce() }
         seeder.seedIfEmpty()
         runCatching { universityRepository.ensureRemoteUniversities() }
+        // Eski versiyalar galereyaga yozib qo'ygan `story_…` / `chat_…` nusxalari — bir
+        // marta o'chiriladi. Endi media ilovaning shaxsiy papkasida turadi va galereyada
+        // umuman ko'rinmaydi (`StudentClubFolder`).
+        runCatching { purgeLegacyGalleryMedia() }
     }
 
     // Foydalanuvchi tanlagan mavzu (Sozlamalar). SYSTEM bo'lsa qurilma rejimiga ergashadi.

@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -131,7 +132,9 @@ fun EditProfileScreen(onBack: () -> Unit, vm: ProfileViewModel = koinViewModel()
         vm.addPhoto(picked.bytes, picked.fileName)
     }
 
-    Column(Modifier.fillMaxSize().background(Sc.Bg).verticalScroll(rememberScrollState())) {
+    // Klaviatura ochilganda ustun uning ustiga ko'tariladi — pastdagi maydonlar va
+    // "Saqlash" tugmasi klaviatura ostida qolib ketmasin.
+    Column(Modifier.fillMaxSize().background(Sc.Bg).imePadding().verticalScroll(rememberScrollState())) {
         ScHeader(horizontalPadding = 18.dp) {
             Row(
                 Modifier.fillMaxWidth().padding(top = 18.dp),
