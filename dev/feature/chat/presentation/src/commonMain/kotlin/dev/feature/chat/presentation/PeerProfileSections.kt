@@ -11,6 +11,7 @@ import dev.feature.chat.domain.model.MessageType
 import dev.feature.chat.domain.repository.ChatRepository
 import dev.feature.connections.presentation.ProfileSection
 import dev.feature.stories.presentation.StudentPostsSection
+import dev.feature.stories.presentation.StudentPostsViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -27,7 +28,7 @@ import org.koin.compose.viewmodel.koinViewModel
  *
  * ⚠️ Media/fayl/havolalar **mavjud suhbatdan** o'qiladi va suhbat **yaratilmaydi**: profil
  * ko'rish uchun `POST /v1/conversations` yuborilsa, hech qachon yozishmagan odam bilan
- * bo'sh suhbat paydo bo'lardi. Suhbat bo'lmasa bo'limlar bo'sh ko'rinadi.
+ * bo'sh suhbat paydo bo'lardi. Suhbat bo'lmasa bo'limlar umuman ko'rinmaydi.
  */
 @Composable
 fun rememberPeerProfileSections(
@@ -35,43 +36,62 @@ fun rememberPeerProfileSections(
     /** Fayl qatori bosildi — yuklab olish hali yo'q, chaqiruvchi xabar ko'rsatadi. */
     onOpenFile: (ChatFileUi) -> Unit = {},
     vm: PeerMediaViewModel = koinViewModel(),
+    postsVm: StudentPostsViewModel = koinViewModel(),
 ): List<ProfileSection> {
     val state by vm.state.collectAsStateWithLifecycle()
+    val postsState by postsVm.state.collectAsStateWithLifecycle()
     LaunchedEffect(studentId) { vm.load(studentId) }
 
-    return listOf(
-        ProfileSection("Postlar") { StudentPostsSection(studentId) },
-        ProfileSection("Media") {
-            if (state.media.isEmpty()) {
-                ChatEmptySection(if (state.loading) "Yuklanmoqda…" else "Bu suhbatda hali rasm yo'q")
-            } else {
-                ChatPhotoGrid(state.media, onOpen = { index -> vm.openViewer(index) })
-                // Ko'rgich bo'limning ICHIDA: profil varag'i dialog bo'lib ochilgan va
-                // ko'rgichni tashqarida chizsak u varaq ostida qolib ketardi.
-                state.viewerIndex?.let { index ->
-                    ImageViewerDialog(
-                        images = state.media,
-                        startIndex = index,
-                        onDismiss = vm::closeViewer,
-                    )
-                }
-            }
-        },
-        ProfileSection("Fayllar") {
-            if (state.files.isEmpty()) {
-                ChatEmptySection(if (state.loading) "Yuklanmoqda…" else "Bu suhbatda fayl yuborilmagan")
-            } else {
-                ChatFileList(state.files, onOpen = onOpenFile)
-            }
-        },
-        ProfileSection("Havolalar") {
-            if (state.links.isEmpty()) {
-                ChatEmptySection(if (state.loading) "Yuklanmoqda…" else "Bu suhbatda havola yuborilmagan")
-            } else {
-                ChatLinkList(state.links)
-            }
-        },
-    )
+    // Bo'sh bo'lim umuman qo'shilmaydi — ya'ni tabi ham chiqmaydi. Yuklanish paytida
+    // bo'lim turadi ("Yuklanmoqda…"): hali kelmagan ro'yxatni "yo'q" deb tashlab yuborsak,
+    // ma'lumot kelganda tablar sakrab qo'shilardi.
+    return buildList {
+        if (postsState.loading || postsState.group?.stories.orEmpty().isNotEmpty()) {
+            add(ProfileSection("Postlar") { StudentPostsSection(studentId, vm = postsVm) })
+        }
+        if (state.loading || state.media.isNotEmpty()) {
+            add(
+                ProfileSection("Media") {
+                    if (state.media.isEmpty()) {
+                        ChatSectionNote("Yuklanmoqda…")
+                    } else {
+                        ChatPhotoGrid(state.media, onOpen = { index -> vm.openViewer(index) })
+                        // Ko'rgich bo'limning ICHIDA: profil varag'i dialog bo'lib ochilgan va
+                        // ko'rgichni tashqarida chizsak u varaq ostida qolib ketardi.
+                        state.viewerIndex?.let { index ->
+                            ImageViewerDialog(
+                                images = state.media,
+                                startIndex = index,
+                                onDismiss = vm::closeViewer,
+                            )
+                        }
+                    }
+                },
+            )
+        }
+        if (state.loading || state.files.isNotEmpty()) {
+            add(
+                ProfileSection("Fayllar") {
+                    if (state.files.isEmpty()) {
+                        ChatSectionNote("Yuklanmoqda…")
+                    } else {
+                        ChatFileList(state.files, onOpen = onOpenFile)
+                    }
+                },
+            )
+        }
+        if (state.loading || state.links.isNotEmpty()) {
+            add(
+                ProfileSection("Havolalar") {
+                    if (state.links.isEmpty()) {
+                        ChatSectionNote("Yuklanmoqda…")
+                    } else {
+                        ChatLinkList(state.links)
+                    }
+                },
+            )
+        }
+    }
 }
 
 /** «Fayllar» bo'limidagi bitta qator — ro'yxatga xabarning o'zi kerak emas. */

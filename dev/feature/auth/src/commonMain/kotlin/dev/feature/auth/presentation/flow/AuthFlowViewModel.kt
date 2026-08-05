@@ -197,10 +197,10 @@ class AuthFlowViewModel(
 
     /** Ro'yxat uzun (butun O'zbekiston) — ko'rsatishni 200 taga cheklaymiz. */
     private fun filterUniversities(list: List<University>, query: String): List<University> =
+        // `matches` — rasmiy nom, qisqa nom, qisqartma va shahar bo'yicha: talaba "TATU"
+        // deb yozganda ham topilishi kerak.
         if (query.isBlank()) list.take(UNIVERSITY_RESULT_LIMIT)
-        else list.filter {
-            it.name.contains(query, ignoreCase = true) || it.city.contains(query, ignoreCase = true)
-        }.take(UNIVERSITY_RESULT_LIMIT)
+        else list.filter { it.matches(query) }.take(UNIVERSITY_RESULT_LIMIT)
 
     fun clearError() = _state.update { it.copy(error = null, info = null) }
 

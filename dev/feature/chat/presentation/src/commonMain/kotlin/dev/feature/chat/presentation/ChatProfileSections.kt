@@ -125,12 +125,20 @@ internal fun ChatFileList(files: List<ChatFileUi>, onOpen: (ChatFileUi) -> Unit)
     }
 }
 
+/**
+ * Profil varag'idagi bo'limning bir qatorlik izohi — hozircha faqat "Yuklanmoqda…" uchun.
+ *
+ * Bo'sh holat bu yerda chizilmaydi: ma'lumoti yo'q bo'lim ro'yxatga umuman qo'shilmaydi
+ * ([rememberPeerProfileSections]), ya'ni foydalanuvchi bo'sh tabga tusha olmaydi.
+ */
 @Composable
-internal fun ChatEmptySection(text: String) {
+internal fun ChatSectionNote(text: String) {
     Box(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(Sc.Card).padding(28.dp),
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(Sc.Card),
         contentAlignment = Alignment.Center,
-    ) { ScText(text, 13f, FontWeight.Medium, Sc.MutedLight) }
+    ) {
+        Box(Modifier.padding(28.dp)) { ScText(text, 13f, FontWeight.Medium, Sc.MutedLight) }
+    }
 }
 
 

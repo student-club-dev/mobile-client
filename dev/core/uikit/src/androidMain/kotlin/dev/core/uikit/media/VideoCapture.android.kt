@@ -68,7 +68,7 @@ actual fun rememberVideoCapture(onResult: (PickedVideo?) -> Unit): VideoPicker {
     return remember(launcher, permission, target) {
         VideoPicker {
             val open = open@{
-                val file = context.newCaptureFile()
+                val file = context.newCaptureFile("mp4")
                 val uri = context.captureUriOrNull(file)
                 if (uri == null) {
                     // FileProvider sozlanmagan — kamerani ochishning ma'nosi yo'q, u baribir
@@ -91,7 +91,8 @@ actual fun rememberVideoCapture(onResult: (PickedVideo?) -> Unit): VideoPicker {
     }
 }
 
-private fun Context.hasCameraPermission(): Boolean =
+/** Kamera ruxsati berilganmi — surat olish ([rememberImageCapture]) ham shunga tayanadi. */
+internal fun Context.hasCameraPermission(): Boolean =
     ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) ==
         PackageManager.PERMISSION_GRANTED
 
@@ -105,14 +106,15 @@ private class CaptureTarget {
 }
 
 /**
- * Kamera yozadigan fayl — ilovaning **o'z** keshida.
+ * Kamera yozadigan fayl — ilovaning **o'z** keshida. [extension] `mp4` (video) yoki `jpg`
+ * (surat).
  *
  * `MediaStore` emas: u videoni foydalanuvchining galereyasiga qo'shardi va tasodifan
  * bosilgan tugma o'sha yerda keraksiz lavha qoldirardi.
  */
-private fun Context.newCaptureFile(): File =
+internal fun Context.newCaptureFile(extension: String): File =
     File(cacheDir, CAPTURE_DIR).apply { mkdirs() }
-        .resolve("capture_${System.currentTimeMillis()}.mp4")
+        .resolve("capture_${System.currentTimeMillis()}.$extension")
 
 /**
  * Faylning kamera ilovasi yoza oladigan havolasi.
@@ -121,7 +123,7 @@ private fun Context.newCaptureFile(): File =
  * `FileUriExposedException` bilan tugaydi. Shuning uchun `FileProvider` — uning e'loni
  * `uikit` modulining manifestida, ya'ni ilova tomonda sozlash talab qilinmaydi.
  */
-private fun Context.captureUriOrNull(file: File): Uri? =
+internal fun Context.captureUriOrNull(file: File): Uri? =
     runCatching {
         FileProvider.getUriForFile(this, "$packageName.$FILE_PROVIDER_SUFFIX", file)
     }.getOrNull()

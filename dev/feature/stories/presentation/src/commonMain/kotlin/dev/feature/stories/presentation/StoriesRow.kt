@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -38,6 +39,7 @@ import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.Layout
@@ -52,7 +54,11 @@ import dev.core.uikit.components.ScAvatar
 import dev.core.uikit.components.ScText
 import dev.core.uikit.components.ScUploadRing
 import dev.core.uikit.components.scUploadPercent
+import dev.core.uikit.media.PickedImage
+import dev.core.uikit.media.PickedVideo
+import dev.core.uikit.media.rememberImageCapture
 import dev.core.uikit.media.rememberImagePicker
+import dev.core.uikit.media.rememberVideoCapture
 import dev.core.uikit.media.rememberVideoPicker
 import dev.core.uikit.media.rememberVideoPreparer
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -96,13 +102,13 @@ val StoriesCollapsedStep: Dp get() = StoriesCollapsedCell - COLLAPSED_OVERLAP
 /**
  * Yig'ilgan to'plam qancha joy egallaydi — sarlavha shuncha o'ngga suriladi.
  *
- * Kataklar soni O'ZGARGANDAgina qayta hisoblanadi (lavha qo'shilganda/tugaganda), ya'ni
+ * Kataklar soni O'ZGARGANDAgina qayta hisoblanadi (hikoya qo'shilganda/tugaganda), ya'ni
  * yig'ilish animatsiyasi davomida bu qiymat qimirlamaydi.
  */
 @Composable
 fun storiesCollapsedWidth(vm: StoriesViewModel = koinViewModel()): Dp {
     val state by vm.state.collectAsStateWithLifecycle()
-    // Birinchi katak — doim o'zimniki ("Lavham"), shuning uchun kamida bittasi bor.
+    // Birinchi katak — doim o'zimniki ("Hikoyam"), shuning uchun kamida bittasi bor.
     val visible = (1 + state.groups.size).coerceAtMost(COLLAPSED_MAX)
     return StoriesCollapsedCell + StoriesCollapsedStep * (visible - 1)
 }
@@ -110,7 +116,7 @@ fun storiesCollapsedWidth(vm: StoriesViewModel = koinViewModel()): Dp {
 /**
  * Bosh ekrandagi story lentasi (`handoff/07-STORIES.md` §2).
  *
- * Birinchi katak — **o'zimniki**: avatarim ko'rinadi, lavham bo'lsa halqa yonadi va bosish
+ * Birinchi katak — **o'zimniki**: avatarim ko'rinadi, hikoyam bo'lsa halqa yonadi va bosish
  * uni **ko'rsatadi**, pastdagi «+» esa doim yangisini qo'shadi. Qolganlari serverdagi
  * **tartibda** chiziladi: avval ko'rilmaganlar, ular ichida yangidan eskiga.
  * ⚠️ Qayta saralanmaydi — server allaqachon saralab beradi.
@@ -137,7 +143,7 @@ fun StoriesRow(
      */
     onHeader: Boolean = false,
     /**
-     * Lavha muallifi ustiga bosildi — uning profili ochilsin.
+     * Hikoya muallifi ustiga bosildi — uning profili ochilsin.
      *
      * Profil varag'ini **chaqiruvchi** chizadi: undagi «Media / Fayllar / Havolalar»
      * bo'limlari chat modulida yashaydi va story moduli chatga bog'lanolmaydi (chat
@@ -163,14 +169,20 @@ fun StoriesRow(
 
     var pickerChoice by remember { mutableStateOf(false) }
 
-    val picker = rememberImagePicker { picked ->
-        if (picked == null) return@rememberImagePicker
-        vm.publish(picked.bytes, picked.fileName, caption = null)
+    // Kameradan kelgan surat galereyadan tanlanganidan farq qilmaydi ([PickedImage]) —
+    // shuning uchun ikkala tanlagich ham bitta ishlovchiga tushadi.
+    val onImagePicked: (PickedImage?) -> Unit = { picked ->
+        if (picked != null) vm.publish(picked.bytes, picked.fileName, caption = null)
     }
+    val picker = rememberImagePicker(onImagePicked)
+    val camera = rememberImageCapture(onImagePicked)
+
     // Siqish nashrdan KEYIN, katakchadagi halqa ichida ketadi — tanlagandan keyin
     // foydalanuvchi hech narsa kutmaydi.
     val videoPreparer = rememberVideoPreparer()
-    val videoPicker = rememberVideoPicker { picked ->
+    // Kamerada yozilgan video ham xuddi shu yo'ldan o'tadi — davomiylik chegarasi
+    // ikkalasiga ham baravar tegishli.
+    val onVideoPicked: (PickedVideo?) -> Unit = { picked ->
         when {
             // `null` — foydalanuvchi bekor qildi (yoki fayl o'qilmadi). Xabar
             // ko'rsatilmaydi: bekor qilishga javoban chiqadigan oyna bezovta qilardi.
@@ -181,6 +193,8 @@ fun StoriesRow(
             else -> vm.publishVideo(picked, videoPreparer, caption = null)
         }
     }
+    val videoPicker = rememberVideoPicker(onVideoPicked)
+    val videoCamera = rememberVideoCapture(onVideoPicked)
 
     StoryStrip(
         collapse = collapse,
@@ -194,11 +208,11 @@ fun StoriesRow(
             avatarUrl = myAvatarUrl,
             publishing = state.publishing,
             progress = state.publishProgress,
-            // Halqa lavhalarim soniga bo'linadi — nechta lavham bo'lsa, shuncha bo'lak.
+            // Halqa hikoyalarim soniga bo'linadi — nechta hikoyam bo'lsa, shuncha bo'lak.
             storyCount = state.mine.size,
             onHeader = onHeader,
             collapse = collapse,
-            // Lavham bo'lsa — o'zimga ko'rinadi; bo'lmasa darhol qo'shish.
+            // Hikoyam bo'lsa — o'zimga ko'rinadi; bo'lmasa darhol qo'shish.
             onClick = {
                 if (state.hasMine) vm.openMine(myName, myAvatarUrl) else pickerChoice = true
             },
@@ -223,6 +237,8 @@ fun StoriesRow(
     if (pickerChoice) {
         StoryPickerChoice(
             onDismiss = { pickerChoice = false },
+            onCapturePhoto = { pickerChoice = false; camera.pick() },
+            onCaptureVideo = { pickerChoice = false; videoCamera.pick() },
             onPhoto = { pickerChoice = false; picker.pick() },
             onVideo = { pickerChoice = false; videoPicker.pick() },
         )
@@ -236,7 +252,7 @@ fun StoriesRow(
             onPrevious = vm::previous,
             onClose = vm::close,
             onDelete = vm::delete,
-            // O'z lavhamda profil ochilmaydi — u yerda ochadigan «boshqa odam» yo'q.
+            // O'z hikoyamda profil ochilmaydi — u yerda ochadigan «boshqa odam» yo'q.
             onOpenAuthor = { authorId ->
                 val author = viewer.group?.author
                 if (author != null && !vm.isMine(authorId)) {
@@ -256,7 +272,7 @@ fun StoriesRow(
  * kataklarni tasmadan tashqariga — sarlavha qatoriga olib chiqadi. Bu yerda esa qirqish
  * faqat GORIZONTAL (surilgan kataklar chetdan chiqib ketmasin), vertikal bo'yicha esa
  * ochiq: panel tasmani butunligicha yuqoriga surganda kataklar sarlavha ustida chiziladi.
- * Lentadagi kataklar soni kichik (server faqat FAOL lavhalarni qaytaradi), shuning uchun
+ * Lentadagi kataklar soni kichik (server faqat FAOL hikoyalarni qaytaradi), shuning uchun
  * hammasini birdan kompozitsiya qilish qimmat emas.
  *
  * Har bir katakning o'rni, o'lchami va shaffofligi FAQAT joylashtirish lambda'sida
@@ -395,20 +411,47 @@ private const val CollapsedTapThreshold = 0.6f
 private const val VerticalClipSlack = 6f
 
 /**
- * Rasm yoki video — ikkalasi ham lavha bo'la oladi, lekin tizim tanlagichlari boshqa-boshqa
- * (galereya rasm va video uchun alohida filtr talab qiladi).
+ * Manba tanlash — **kamera** ham, galereya ham.
+ *
+ * To'rt band, chunki tizimda to'rtta alohida yo'l bor: kamera surat va video uchun boshqa-boshqa
+ * chaqiruv talab qiladi (`TakePicture` / `CaptureVideo`), galereya esa rasm va video uchun
+ * alohida filtr. Kamera bandlari **birinchi**: hikoya ko'pincha "hozir, shu yerda" olinadi.
+ *
+ * Sarlavha yo'q: oyna «+» bosilgandan keyin chiqadi, ya'ni foydalanuvchi nima qilayotganini
+ * allaqachon biladi va «Hikoya qo'shish» yozuvi faqat joy egallardi.
  */
 @Composable
-private fun StoryPickerChoice(onDismiss: () -> Unit, onPhoto: () -> Unit, onVideo: () -> Unit) {
+private fun StoryPickerChoice(
+    onDismiss: () -> Unit,
+    onCapturePhoto: () -> Unit,
+    onCaptureVideo: () -> Unit,
+    onPhoto: () -> Unit,
+    onVideo: () -> Unit,
+) {
     Dialog(onDismissRequest = onDismiss) {
         Column(
-            Modifier.clip(RoundedCornerShape(20.dp)).background(Sc.Card).padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            Modifier.clip(RoundedCornerShape(22.dp)).background(Sc.Card).padding(vertical = 8.dp),
         ) {
-            ScText("Lavha qo'shish", 16f, FontWeight.ExtraBold, Sc.Ink)
-            ScText("Rasm", 15f, FontWeight.Bold, Sc.Brand, Modifier.clickable(onClick = onPhoto))
-            ScText("Video", 15f, FontWeight.Bold, Sc.Brand, Modifier.clickable(onClick = onVideo))
+            StoryPickerAction(AppIcons.Camera, "Suratga olish", onCapturePhoto)
+            StoryPickerAction(AppIcons.Video, "Video yozish", onCaptureVideo)
+            StoryPickerAction(AppIcons.ImageIcon, "Galereyadan rasm", onPhoto)
+            StoryPickerAction(AppIcons.Film, "Galereyadan video", onVideo)
         }
+    }
+}
+
+/** Manba tanlash oynasidagi bitta band — ikonka va yozuv bitta bosiladigan qatorda. */
+@Composable
+private fun StoryPickerAction(icon: ImageVector, label: String, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 20.dp, vertical = 13.dp),
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(icon, null, tint = Sc.Brand, modifier = Modifier.size(21.dp))
+        ScText(label, 15f, FontWeight.Bold, Sc.Ink, maxLines = 1)
     }
 }
 
@@ -421,10 +464,10 @@ private fun labelAlpha(collapse: Float): Float = (1f - collapse * LabelFadeSpeed
 private const val LabelFadeSpeed = 2.5f
 
 /**
- * «Lavham» katakchasi — Telegramdagi «Hikoyam».
+ * «Hikoyam» katakchasi — Telegram/Instagramdagi «Mening hikoyam» bilan bir xil.
  *
- * Avatarim **doim** ko'rinadi (kamera ikonkasi emas): lavha qo'ygan-qo'ymaganimdan qat'i
- * nazar bu men. Lavham bo'lsa halqa yonadi va bosish uni ko'rsatadi; pastdagi «+» esa
+ * Avatarim **doim** ko'rinadi (kamera ikonkasi emas): hikoya qo'ygan-qo'ymaganimdan qat'i
+ * nazar bu men. Hikoyam bo'lsa halqa yonadi va bosish uni ko'rsatadi; pastdagi «+» esa
  * har doim yangisini qo'shadi.
  */
 @Composable
@@ -432,9 +475,9 @@ private fun MyStoryCell(
     name: String,
     avatarUrl: String?,
     publishing: Boolean,
-    /** Yuklash foizi; `null` — hali/endi noma'lum (server lavhani yaratmoqda). */
+    /** Yuklash foizi; `null` — hali/endi noma'lum (server hikoyani yaratmoqda). */
     progress: Float?,
-    /** Faol lavhalarim soni — halqa shuncha bo'lakka bo'linadi. */
+    /** Faol hikoyalarim soni — halqa shuncha bo'lakka bo'linadi. */
     storyCount: Int,
     /** Ko'k topbar ustidami — qarang [StoriesRow]. */
     onHeader: Boolean,
@@ -449,12 +492,12 @@ private fun MyStoryCell(
             // Bosish halqaning O'ZIDA: «+» belgisi ustidan chizilgani uchun o'z bosishini
             // saqlab qoladi (keyin chizilgan element tegishni birinchi oladi).
             Box(Modifier.clip(CircleShape).clickable(enabled = !publishing, onClick = onClick)) {
-                // O'z lavhalarim doim "yorqin": ular menga ko'rilgan-ko'rilmagan emas —
-                // halqa bu yerda "lavham bor" degan ma'noni bildiradi.
+                // O'z hikoyalarim doim "yorqin": ular menga ko'rilgan-ko'rilmagan emas —
+                // halqa bu yerda "hikoyam bor" degan ma'noni bildiradi.
                 StoryRing(segments = List(storyCount) { true }, onHeader = onHeader) {
                     Box(contentAlignment = Alignment.Center) {
                         ScAvatar(name = name, size = AVATAR, avatarUrl = avatarUrl)
-                        // Foiz avatar USTIDA: yuklash davomida ham kimning lavhasi
+                        // Foiz avatar USTIDA: yuklash davomida ham kimning hikoyasi
                         // ketayotgani ko'rinib tursin.
                         if (publishing) {
                             ScUploadRing(progress, size = AVATAR, stroke = 2.5.dp)
@@ -479,7 +522,16 @@ private fun MyStoryCell(
                         modifier = Modifier.size(11.dp),
                     )
                 } else {
-                    ScText("+", 12f, FontWeight.ExtraBold, Color.White, maxLines = 1)
+                    // ⚠️ Matn EMAS, ikonka. «+» harf sifatida shrift qatoriga (baseline,
+                    // ascender/descender) tayanadi va doira ichida ko'zga tashlanadigan
+                    // darajada pastga surilib qolardi. Vektor esa o'z ramkasining aynan
+                    // markazida chizilgan.
+                    Icon(
+                        AppIcons.Plus,
+                        "Hikoya qo'shish",
+                        tint = Color.White,
+                        modifier = Modifier.size(13.dp),
+                    )
                 }
             }
         }
@@ -487,9 +539,9 @@ private fun MyStoryCell(
         ScText(
             when {
                 publishing && progress != null -> "Yuklanmoqda ${scUploadPercent(progress)}"
-                // Fayl ketib bo'lgan, server lavhani yaratmoqda — foiz o'rniga holat.
+                // Fayl ketib bo'lgan, server hikoyani yaratmoqda — foiz o'rniga holat.
                 publishing -> "Tayyorlanmoqda…"
-                else -> "Lavham"
+                else -> "Hikoyam"
             },
             11.5f,
             FontWeight.SemiBold,
@@ -501,7 +553,7 @@ private fun MyStoryCell(
 }
 
 /**
- * Katak ostidagi yozuv rangi: faol (lavhasi bor / ko'rilmagan) — to'q, aks holda xira.
+ * Katak ostidagi yozuv rangi: faol (hikoyasi bor / ko'rilmagan) — to'q, aks holda xira.
  * Ko'k topbar ustida ikkalasi ham oq, farqi shaffoflikda.
  */
 @Composable
@@ -528,7 +580,7 @@ private fun StoryCell(
         Modifier.clip(RoundedCornerShape(14.dp)).clickable(onClick = onClick),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        // Har lavha uchun bitta bo'lak: ko'rilmagani yorqin, ko'rilgani xira — Telegram
+        // Har hikoya uchun bitta bo'lak: ko'rilmagani yorqin, ko'rilgani xira — Telegram
         // va Instagramdagi kabi, ya'ni "yana nechtasi qolgani" bir qarashda ko'rinadi.
         StoryRing(segments = group.stories.map { !it.seen }, onHeader = onHeader) {
             ScAvatar(
@@ -552,10 +604,10 @@ private fun StoryCell(
 }
 
 /**
- * Avatar atrofidagi halqa — **lavhalar soniga bo'lingan** (Telegram/Instagramdagidek).
+ * Avatar atrofidagi halqa — **hikoyalar soniga bo'lingan** (Telegram/Instagramdagidek).
  *
- * [segments] — har lavha uchun bittadan bayroq: `true` — ko'rilmagan (brend gradienti),
- * `false` — ko'rilgan (xira chiziq). Ro'yxat bo'sh bo'lsa (lavha yo'q) butun halqa xira
+ * [segments] — har hikoya uchun bittadan bayroq: `true` — ko'rilmagan (brend gradienti),
+ * `false` — ko'rilgan (xira chiziq). Ro'yxat bo'sh bo'lsa (hikoya yo'q) butun halqa xira
  * bo'lib chiziladi.
  *
  * Nega bo'laklar `drawBehind` da chiziladi, `background(brush)` bilan emas: to'ldirilgan
@@ -572,7 +624,7 @@ private fun StoryRing(segments: List<Boolean>, onHeader: Boolean, content: @Comp
         if (onHeader) SolidColor(Color.White)
         else Brush.linearGradient(listOf(Sc.BrandLight, Sc.Brand, Sc.Violet))
     val dimBrush = SolidColor(if (onHeader) Color.White.copy(alpha = 0.38f) else Sc.Border)
-    // Ro'yxat bo'sh — bitta xira halqa (hali lavha yo'q).
+    // Ro'yxat bo'sh — bitta xira halqa (hali hikoya yo'q).
     val states = segments.ifEmpty { listOf(false) }
 
     Box(
@@ -596,7 +648,7 @@ private fun StoryRing(segments: List<Boolean>, onHeader: Boolean, content: @Comp
             }
 
             val step = FULL_CIRCLE / states.size
-            // Bo'laklar ko'payganda bo'shliq ham kichrayadi — aks holda 10 ta lavhada
+            // Bo'laklar ko'payganda bo'shliq ham kichrayadi — aks holda 10 ta hikoyada
             // halqadan ko'ra ko'proq bo'shliq qolardi.
             val gap = if (states.size > MANY_SEGMENTS) SMALL_GAP_DEGREES else GAP_DEGREES
             states.forEachIndexed { index, lit ->
@@ -638,7 +690,7 @@ private const val COLLAPSED_MAX = 3
  * Lenta yig'ilganda (bosh ekran topbari siqilganda) uning o'rnini bosadigan **kichik
  * to'plam** — Telegramdagidek bir-birining ustiga chiqqan 3 tagacha avatar.
  *
- * Bosilganda ekran tepasiga qaytaradi ([onClick]), ya'ni to'liq lenta ko'rinadi. Lavha
+ * Bosilganda ekran tepasiga qaytaradi ([onClick]), ya'ni to'liq lenta ko'rinadi. Hikoya
  * umuman bo'lmasa (o'zimniki ham, boshqalarniki ham) hech nima chizilmaydi.
  *
  * ⚠️ Xabarlar ekranida bu ishlatilmaydi: u yerda lentaning O'ZI shu to'plamga aylanadi
@@ -689,7 +741,7 @@ fun StoriesCollapsed(
 }
 
 /**
- * Tanlangan video lavha uchun juda uzunmi.
+ * Tanlangan video hikoya uchun juda uzunmi.
  *
  * Davomiylik aniqlanmagan bo'lsa (`null`) to'silmaydi: bu ba'zi kodeklarda bo'ladi va
  * o'shanda chegarani server tekshiradi — foydalanuvchini taxmin bilan to'xtatmaymiz.
@@ -723,4 +775,4 @@ private fun StoryMessageDialog(text: String, onDismiss: () -> Unit) {
 
 /** Chegara **mahsulot** qarori — `CHAT_MEDIA_PARITY_BACKEND.md` §2. */
 private const val STORY_TOO_LONG_MESSAGE =
-    "Lavha 1 daqiqadan uzun bo'lmasin. Videoni qisqartirib qayta tanlang."
+    "Hikoya 1 daqiqadan uzun bo'lmasin. Videoni qisqartirib qayta tanlang."

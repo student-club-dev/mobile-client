@@ -39,7 +39,7 @@ fun StoryDto.toDomain(origin: String): Story = Story(
     // ⚠️ Boshqa odamning story'sida server buni ATAYLAB `null` qiladi — ko'rishlar soni
     // orqali tanishlar doirasini o'lchab bo'lmasin (`handoff/07-STORIES.md` §3).
     viewsCount = viewsCount,
-    // Arxivda bir yildan keyin fayl qaytarib olinadi (`url` → 404). Faol lavhada doim `false`.
+    // Arxivda bir yildan keyin fayl qaytarib olinadi (`url` → 404). Faol hikoyada doim `false`.
     mediaPurged = archivedMediaPurged,
 )
 
@@ -60,7 +60,7 @@ fun StoryGroupDto.toDomain(origin: String): StoryGroup = StoryGroup(
     lastCreatedAt = lastCreatedAt,
 )
 
-/** Arxiv sahifasi — muddati o'tgan lavhalarim (`STORY_ARCHIVE_BACKEND.md`). */
+/** Arxiv sahifasi — muddati o'tgan hikoyalarim (`STORY_ARCHIVE_BACKEND.md`). */
 fun StoryArchivePageDto.toDomain(origin: String): StoryArchivePage = StoryArchivePage(
     items = items.map { it.toDomain(origin) },
     page = page,

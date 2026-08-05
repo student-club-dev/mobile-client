@@ -44,6 +44,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.core.uikit.components.ScCircleButton
+import dev.core.uikit.components.ScEmptyState
 import dev.core.uikit.components.ScGlyph
 import dev.core.uikit.components.ScGradientButton
 import dev.core.uikit.components.ScHeader
@@ -52,6 +53,7 @@ import dev.core.uikit.components.ScIconTile
 import dev.core.uikit.components.ScIcons
 import dev.core.uikit.components.ScAvatar
 import dev.core.uikit.components.ScMonogramTile
+import dev.core.uikit.components.ScNotFoundTitle
 import dev.core.uikit.components.ScSectionHeader
 import dev.core.uikit.components.ScSheetHandle
 import dev.core.uikit.components.ScSoftButton
@@ -129,22 +131,17 @@ fun MyUniversityScreen(
                     }
                 } else {
                     item { UniversityCard(uni, state.mates.size, Modifier.padding(horizontal = Sc.ScreenPadding)) }
-                    item {
-                        ScSectionHeader(
-                            "Do'stlashish uchun talabalar",
-                            Modifier.padding(horizontal = Sc.ScreenPadding),
-                            action = if (state.mates.isNotEmpty()) "Barchasi" else null,
-                            onAction = { showStudents = true },
-                        )
-                    }
-                    if (state.mates.isEmpty()) {
+                    // Talaba yo'q bo'lsa BUTUN bo'lim (sarlavha ham) tushib qoladi: bo'sh
+                    // plitka ekranni cho'zardi, foydalanuvchiga esa hech nima bermasdi.
+                    if (state.mates.isNotEmpty()) {
                         item {
-                            ScText(
-                                "Hozircha talaba yo'q.", 13f, FontWeight.Medium, Sc.Muted,
+                            ScSectionHeader(
+                                "Do'stlashish uchun talabalar",
                                 Modifier.padding(horizontal = Sc.ScreenPadding),
+                                action = "Barchasi",
+                                onAction = { showStudents = true },
                             )
                         }
-                    } else {
                         item {
                             LazyRow(
                                 Modifier.fillMaxWidth(),
@@ -234,18 +231,31 @@ private fun UniversityCard(uni: University, matesCount: Int, modifier: Modifier 
         Row(horizontalArrangement = Arrangement.spacedBy(15.dp)) {
             ScMonogramTile(uni.monogram, Sc.TintGreenDeep, Sc.Success, size = 78.dp, radius = 22.dp, fontSize = 20f)
             Column(Modifier.weight(1f)) {
-                ScText(uni.name, 17f, FontWeight.ExtraBold, Sc.Ink, lineHeight = 21f, letterSpacing = -0.2f)
-                if (uni.city.isNotBlank()) {
+                // Qisqa nom — huquqiy shtampsiz va taxallussiz (`UniversityNaming`). Uch
+                // qatordan oshsa kesiladi: kartochka balandligi ro'yxatdagi eng uzun nomga
+                // qarab sakramasligi kerak. To'liq rasmiy nom pastda turadi.
+                ScText(
+                    uni.shortName, 17f, FontWeight.ExtraBold, Sc.Ink,
+                    lineHeight = 21f, letterSpacing = -0.2f, maxLines = 3,
+                )
+                val place = listOfNotNull(uni.branch, uni.shortCity.ifBlank { null }).joinToString(" · ")
+                if (place.isNotBlank()) {
                     Spacer(Modifier.height(8.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         Icon(
                             ScIcons.MapPin, null, tint = Sc.Muted,
                             modifier = Modifier.padding(top = 1.dp).size(15.dp),
                         )
-                        ScText(uni.city, 12.5f, FontWeight.Medium, Sc.Muted, lineHeight = 18f)
+                        ScText(place, 12.5f, FontWeight.Medium, Sc.Muted, lineHeight = 18f, maxLines = 2)
                     }
                 }
             }
+        }
+        // To'liq rasmiy nom — hujjatlarda shu yoziladi, shuning uchun butun ilovada
+        // aynan SHU YERDA, bir joyda saqlanadi. Qisqa nomdan farqi bo'lmasa ko'rsatilmaydi.
+        if (uni.name.trim() != uni.shortName) {
+            Spacer(Modifier.height(14.dp))
+            ScText(uni.name, 11.5f, FontWeight.Medium, Sc.MutedLight, lineHeight = 16f, maxLines = 4)
         }
         Spacer(Modifier.height(16.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(11.dp)) {
@@ -361,31 +371,23 @@ private fun ConnectButton(status: ConnectionView, onConnect: () -> Unit) {
  * (`Listing.universityId`). Bir OTMdagi talaba bir xil fandan, bir xil o'qituvchining
  * topshirig'idan yordam so'raydi — shuning uchun bu ro'yxat universitet ekranida turadi.
  *
- * E'lon yo'q bo'lsa sarlavha baribir ko'rinadi va nima uchun bo'shligini aytadi: bo'lim
- * butunlay yashirilsa, foydalanuvchi bunday imkoniyat borligini umuman bilmay qolardi.
+ * E'lon yo'q bo'lsa bo'lim BUTUNLAY chizilmaydi — sarlavha ham, bo'sh holat ham. Ekranda
+ * faqat haqiqatan ma'lumoti bor bo'limlar qoladi.
  */
 private fun androidx.compose.foundation.lazy.LazyListScope.tasksSection(
     tasks: List<Listing>,
     onSeeAll: () -> Unit,
     onOpen: (String) -> Unit,
 ) {
+    if (tasks.isEmpty()) return
     item {
         ScSectionHeader(
             "📚 Fanlardan yordam",
             Modifier.padding(horizontal = Sc.ScreenPadding),
             subtitle = "Universitetimdagi topshiriq e'lonlari",
-            action = if (tasks.isNotEmpty()) "Barchasi" else null,
+            action = "Barchasi",
             onAction = onSeeAll,
         )
-    }
-    if (tasks.isEmpty()) {
-        item {
-            ScText(
-                "Hozircha topshiriq e'loni yo'q.", 13f, FontWeight.Medium, Sc.Muted,
-                Modifier.padding(horizontal = Sc.ScreenPadding),
-            )
-        }
-        return
     }
     items(tasks.take(5), key = { it.id }) { listing ->
         TaskCard(listing, Modifier.padding(horizontal = Sc.ScreenPadding)) { onOpen(listing.id) }
@@ -429,24 +431,25 @@ private fun androidx.compose.foundation.lazy.LazyListScope.nearbySection(
     onMap: () -> Unit,
     onOffer: (DiscountOffer) -> Unit,
 ) {
+    // Joy topilmasa sarlavha ham chizilmaydi — aks holda ekranda hech qayerga olib
+    // bormaydigan "Ovqatlar" yozuvi osilib qolardi.
+    if (offers.isEmpty()) return
     item {
         ScSectionHeader(
             title,
             Modifier.padding(horizontal = Sc.ScreenPadding),
-            action = if (offers.isNotEmpty()) "Xarita" else null,
+            action = "Xarita",
             actionIcon = ScIcons.Map,
             onAction = onMap,
         )
     }
-    if (offers.isNotEmpty()) {
-        item {
-            LazyRow(
-                Modifier.fillMaxWidth().padding(top = 14.dp),
-                contentPadding = PaddingValues(horizontal = Sc.ScreenPadding),
-                horizontalArrangement = Arrangement.spacedBy(13.dp),
-            ) {
-                items(offers, key = { it.id }) { NearbyOfferCard(it) { onOffer(it) } }
-            }
+    item {
+        LazyRow(
+            Modifier.fillMaxWidth().padding(top = 14.dp),
+            contentPadding = PaddingValues(horizontal = Sc.ScreenPadding),
+            horizontalArrangement = Arrangement.spacedBy(13.dp),
+        ) {
+            items(offers, key = { it.id }) { NearbyOfferCard(it) { onOffer(it) } }
         }
     }
 }
@@ -520,7 +523,12 @@ private fun UniversitySheet(
                         ScText("Ro'yxatni yuklab bo'lmadi.\nInternetni tekshiring.", 13f, FontWeight.Medium, Sc.Muted)
                     }
                     picker.results.isEmpty() -> CenterNote {
-                        ScText("Universitet topilmadi.", 13f, FontWeight.Medium, Sc.Muted)
+                        ScEmptyState(
+                            title = ScNotFoundTitle,
+                            message = "Bunday universitet ro'yxatda yo'q. Nomini boshqacha yozib ko'ring.",
+                            icon = ScIcons.Search,
+                            compact = true,
+                        )
                     }
                     else -> LazyColumn(
                         Modifier.fillMaxWidth(),
@@ -598,12 +606,14 @@ private fun UniversityPickRow(uni: University, index: Int, selected: Boolean, on
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(13.dp),
     ) {
-        ScMonogramTile(uni.monogram, tint, accent, size = 54.dp, radius = 16.dp, fontSize = 14f)
+        ScMonogramTile(uni.monogram, tint, accent, size = 54.dp, radius = 16.dp, fontSize = 16f)
         Column(Modifier.weight(1f)) {
-            ScText(uni.name, 14.5f, FontWeight.ExtraBold, Sc.Ink, lineHeight = 19f, maxLines = 2)
-            if (uni.city.isNotBlank()) {
+            ScText(uni.shortName, 14.5f, FontWeight.ExtraBold, Sc.Ink, lineHeight = 19f, maxLines = 2)
+            // Filial OLDINDA: ro'yxatda yonma-yon turgan «Samarqand davlat veterinariya …
+            // universiteti» qatorlarini faqat shu ajratadi.
+            if (uni.display.subtitle.isNotBlank()) {
                 Spacer(Modifier.height(4.dp))
-                ScText(uni.city, 12f, FontWeight.Medium, Sc.Muted, maxLines = 1)
+                ScText(uni.display.subtitle, 12f, FontWeight.Medium, Sc.Muted, maxLines = 1)
             }
         }
         // Radio — tanlanganda brend halqa + ichki nuqta.
@@ -678,9 +688,12 @@ private fun StudentsOverlay(
             }
             if (filtered.isEmpty()) {
                 item {
-                    Box(Modifier.fillMaxWidth().padding(top = 40.dp), contentAlignment = Alignment.Center) {
-                        ScText("Talaba topilmadi.", 13f, FontWeight.Medium, Sc.Muted)
-                    }
+                    ScEmptyState(
+                        Modifier.padding(top = 24.dp),
+                        title = ScNotFoundTitle,
+                        message = "Bu shartlarga mos talaba yo'q. Qidiruvni yoki filtrni o'zgartiring.",
+                        icon = ScIcons.Users,
+                    )
                 }
             }
         }

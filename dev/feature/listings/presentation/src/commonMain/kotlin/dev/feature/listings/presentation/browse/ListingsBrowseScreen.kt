@@ -37,7 +37,9 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.material3.Text
 import dev.core.uikit.components.ScCircleButton
+import dev.core.uikit.components.ScEmptyState
 import dev.core.uikit.components.ScGlyph
+import dev.core.uikit.components.ScNotFoundTitle
 import dev.core.uikit.components.ScHeader
 import dev.core.uikit.components.ScHeaderSubtitle
 import dev.core.uikit.components.ScHeaderTitle
@@ -147,7 +149,10 @@ fun ListingsBrowseScreen(
                     state.error != null -> item(key = "error") {
                         BrowseErrorState(state.error!!, onRetry = vm::refresh)
                     }
-                    state.listings.isEmpty() -> item(key = "empty") { BrowseEmptyState(state) }
+                    // Bo'limda umuman e'lon bo'lmasa — hech nima chizilmaydi. Plitka faqat
+                    // filtr/qidiruv hammasini kesib tashlaganda chiqadi: u yerda foydalanuvchi
+                    // o'zi qilgan amalning javobini kutadi.
+                    state.isFilteredEmpty -> item(key = "empty") { BrowseNotFoundState(state.kind) }
                 }
             }
         }
@@ -415,30 +420,21 @@ private fun BrowseErrorState(message: String, onRetry: () -> Unit) {
 }
 
 /**
- * Bo'sh holat. Ikki holat ajratiladi: bo'limda umuman e'lon yo'qmi yoki filtr hammasini
- * kesib tashladimi — foydalanuvchi nima qilishi kerakligi bu ikkisida boshqacha.
+ * «Topilmadi» — faqat filtr/qidiruv hammasini kesib tashlaganda.
+ *
+ * Bo'limda umuman e'lon bo'lmagan holat chizilmaydi: foydalanuvchi hech narsa so'ramagan
+ * bo'lsa, unga "hozircha bo'sh" plitkasini ko'rsatishning hojati yo'q — ro'yxat shunchaki
+ * bo'sh qoladi.
  */
 @Composable
-private fun BrowseEmptyState(state: ListingsBrowseUiState) {
-    val message = when {
-        state.isFilteredEmpty -> "Bu shartlarga mos e'lon topilmadi. Filtrni yumshating yoki qidiruvni o'zgartiring."
-        else -> emptySectionMessage(state.kind)
-    }
-    Column(
-        Modifier.fillMaxWidth().padding(top = 60.dp, start = 20.dp, end = 20.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        ScIconTile(state.kind.tint(), size = 96.dp, radius = 30.dp) {
-            KindGlyph(state.kind, onGradient = false, size = 46.dp)
-        }
-        Spacer(Modifier.height(18.dp))
-        ScText(if (state.isFilteredEmpty) "Natija yo'q" else "Hozircha bo'sh", 19f, FontWeight.ExtraBold, Sc.Ink)
-        Spacer(Modifier.height(6.dp))
-        Text(
-            message,
-            style = scStyle(14f, FontWeight.Medium, Sc.Muted, lineHeight = 21f).copy(textAlign = TextAlign.Center),
-        )
-    }
+private fun BrowseNotFoundState(kind: ListingKind) {
+    ScEmptyState(
+        Modifier.padding(top = 26.dp),
+        title = ScNotFoundTitle,
+        message = "Bu shartlarga mos e'lon topilmadi. Filtrni yumshating yoki qidiruvni o'zgartiring.",
+        tint = kind.tint(),
+        glyph = { KindGlyph(kind, onGradient = false, size = 46.dp) },
+    )
 }
 
 /** Bo'lim plitkasining tint foni. */
@@ -448,14 +444,6 @@ private fun ListingKind.tint(): Color = when (this) {
     ListingKind.RENTAL -> Sc.TintGreen
     ListingKind.SERVICE -> Sc.TintBlue
     ListingKind.JOB, ListingKind.DISCOUNT -> Sc.TintAmber
-}
-
-private fun emptySectionMessage(kind: ListingKind): String = when (kind) {
-    ListingKind.RENTAL -> "Hali ijara e'loni joylanmagan. Birinchi bo'lib siz joylashingiz mumkin."
-    ListingKind.SERVICE -> "Hali xizmat e'loni yo'q. O'z xizmatingizni joylab ko'ring."
-    ListingKind.JOB -> "Hali ish e'loni yo'q. Tez orada paydo bo'ladi."
-    ListingKind.DISCOUNT -> "Hali chegirma e'loni yo'q."
-    ListingKind.TASK -> "Hali topshiriq yo'q. Yordam kerak bo'lsa birinchi bo'lib so'rang."
 }
 
 // ---------------------------------------------------------------------------

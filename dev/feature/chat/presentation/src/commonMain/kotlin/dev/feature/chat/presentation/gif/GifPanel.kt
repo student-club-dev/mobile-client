@@ -36,7 +36,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
+import dev.core.uikit.components.ScEmptyStateBox
 import dev.core.uikit.components.ScIcons
+import dev.core.uikit.components.ScNotFoundTitle
 import dev.core.uikit.components.ScSoftButton
 import dev.core.uikit.components.ScText
 import dev.core.uikit.components.scStyle
@@ -271,7 +273,13 @@ internal fun MediaSearchErrorView(message: String, retriable: Boolean, onRetry: 
 
 @Composable
 internal fun MediaSearchCenterText(text: String) {
-    Box(Modifier.fillMaxSize().padding(horizontal = 28.dp), Alignment.Center) {
-        ScText(text, 13.5f, FontWeight.Medium, Sc.MutedLight)
-    }
+    // Panel klaviatura balandligida — shuning uchun `compact`, aks holda ikona bilan
+    // sarlavha panelga sig'masdi.
+    ScEmptyStateBox(
+        Modifier.fillMaxSize(),
+        title = ScNotFoundTitle,
+        message = text,
+        icon = ScIcons.Search,
+        compact = true,
+    )
 }

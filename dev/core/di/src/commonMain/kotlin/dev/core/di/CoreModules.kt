@@ -97,6 +97,19 @@ const val DISCOUNTS_REMOTE_ENABLED = true
  */
 const val STUDENT_LISTINGS_REMOTE_ENABLED = true
 
+/**
+ * Bildirishnomalar ro'yxati backenddan keladimi — `GET /v1/notifications` +
+ * `POST /v1/notifications/read` (`NOTIFICATIONS_BACKEND.md`).
+ *
+ * ⚠️ Bu endpoint spec'da (`student-club.json`) HALI YO'Q — klient tomoni tayyor, server
+ * kutilmoqda. Shuning uchun bayroq hozircha `false`: yoqilsa ekran har ochilganda 404
+ * oladi va "Ro'yxat yuklanmadi" holatida turardi. Endpoint joylangan kuni shu qiymatni
+ * `true` qilish kifoya — boshqa hech narsani o'zgartirish kerak emas.
+ *
+ * Push (`POST /v1/devices`) bunga BOG'LIQ EMAS: u allaqachon serverda va doim ishlaydi.
+ */
+const val NOTIFICATIONS_REMOTE_ENABLED = false
+
 /** Coil ishlatadigan rasm klientining Koin nomi. */
 const val IMAGE_CLIENT = "imageHttpClient"
 

@@ -41,7 +41,10 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.core.uikit.components.ScAvatar
 import dev.core.uikit.components.ScCircleButton
+import dev.core.uikit.components.ScEmptyState
+import dev.core.uikit.components.ScEmptyTitle
 import dev.core.uikit.components.ScHeader
+import dev.core.uikit.components.ScNotFoundTitle
 import dev.core.uikit.components.ScHeaderTitle
 import dev.core.uikit.components.ScIconTile
 import dev.core.uikit.components.ScIcons
@@ -271,10 +274,12 @@ private fun SearchSection(
             state.searched && state.results.isEmpty() -> Hint(
                 if (state.query.isNotBlank()) {
                     // Qidiruv `firstName` va `lastName` ni ALOHIDA tekshiradi — to'liq ism ishlamaydi.
-                    "Hech kim topilmadi.\nBitta so'z yozing — to'liq ism bo'yicha qidiruv ishlamaydi."
+                    "Bitta so'z yozing — to'liq ism bo'yicha qidiruv ishlamaydi."
                 } else {
-                    "Bu filtrlarga mos talaba yo'q"
+                    "Bu filtrlarga mos talaba yo'q."
                 },
+                icon = ScIcons.Search,
+                title = ScNotFoundTitle,
             )
             else -> LazyColumn(
                 Modifier.fillMaxWidth(),
@@ -384,9 +389,8 @@ private fun RequestsSection(
         }
         Spacer(Modifier.height(12.dp))
         val list = state.requests
-        if (list.isEmpty()) {
-            Hint(if (state.requestsTab == RequestsTab.INCOMING) "Kiruvchi so'rov yo'q" else "Chiquvchi so'rov yo'q")
-        } else {
+        // So'rov yo'q bo'lsa hech nima chizilmaydi — chiplarning ostida bo'sh joy qoladi.
+        if (list.isNotEmpty()) {
             LazyColumn(
                 Modifier.fillMaxWidth(),
                 contentPadding = PaddingValues(horizontal = Sc.ScreenPadding, vertical = 4.dp),
@@ -422,12 +426,9 @@ private fun ConnectedSection(
     modifier: Modifier = Modifier,
 ) {
     if (state.connections.isEmpty()) {
+        // Yuklanayotgan bo'lsa skelet; bo'sh bo'lsa umuman hech nima.
         if (state.loading) {
             ScShimmerList(rows = 6, modifier = modifier.padding(horizontal = Sc.ScreenPadding))
-        } else {
-            Box(modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
-                Hint("Hali bog'lanmagansiz.\n\"Qidiruv\" bo'limidan do'st toping.")
-            }
         }
         return
     }
@@ -576,10 +577,12 @@ private fun PillButton(
 }
 
 @Composable
-private fun Hint(text: String) {
-    Box(Modifier.fillMaxWidth().padding(horizontal = 32.dp, vertical = 28.dp), contentAlignment = Alignment.Center) {
-        ScText(text, 13.5f, FontWeight.Medium, Sc.Muted, lineHeight = 20f)
-    }
+private fun Hint(
+    text: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector? = null,
+    title: String = ScEmptyTitle,
+) {
+    ScEmptyState(title = title, message = text, icon = icon)
 }
 
 @Composable

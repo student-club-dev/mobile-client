@@ -24,9 +24,10 @@ fun CallHost() {
     val controller = koinInject<CallController>()
 
     // Kanal ilova ishga tushganda ochiladi. Kirmagan foydalanuvchida `tokenProvider`
-    // `null` qaytaradi va `SocketIoClient` ulanmaydi — sikl eksponensial kechikish bilan
-    // qayta urinadi (maksimum 30 s), ya'ni kirilgan zahoti kanal o'zi ko'tariladi.
-    // Shu sabab bu yerda auth holatini alohida kuzatish shart emas.
+    // `null` qaytaradi va `SocketIoClient` ulanmaydi: u tarmoqqa umuman chiqmasdan,
+    // faqat local `TokenStore` ni qisqa oraliqda tekshirib turadi (`NO_SESSION_POLL_MS`),
+    // ya'ni kirilgan zahoti kanal o'zi ko'tariladi. Shu sabab bu yerda auth holatini
+    // alohida kuzatish shart emas.
     LaunchedEffect(Unit) { controller.start() }
 
     val session by controller.session.collectAsStateWithLifecycle()

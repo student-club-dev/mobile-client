@@ -23,8 +23,8 @@ import kotlinx.coroutines.delay
 /**
  * Story repository'si — generatsiya qilingan [StoriesApi] ustida (`handoff/07-STORIES.md`).
  *
- * Kesh **yo'q**: lavha 24 soat yashaydi va istalgan payt muddati o'tishi mumkin, shu
- * jumladan foydalanuvchi uni ochib turganda. Eskirgan kesh bu yerda faqat "yo'q lavhani
+ * Kesh **yo'q**: hikoya 24 soat yashaydi va istalgan payt muddati o'tishi mumkin, shu
+ * jumladan foydalanuvchi uni ochib turganda. Eskirgan kesh bu yerda faqat "yo'q hikoyani
  * ko'rsatish" xatosiga olib kelardi.
  */
 class StoryRepositoryImpl(
@@ -45,7 +45,7 @@ class StoryRepositoryImpl(
         safeCall(connectivity) { api.storiesMine().body() }.map { dto -> dto.items.map { it.toDomain(apiOrigin) } }
 
     /**
-     * Arxiv — muddati o'tgan lavhalarim. Bu yerda ham kesh yo'q: ro'yxat faqat profilning
+     * Arxiv — muddati o'tgan hikoyalarim. Bu yerda ham kesh yo'q: ro'yxat faqat profilning
      * bitta bo'limida ko'rinadi va o'sha yerda bir marta o'qiladi.
      */
     override suspend fun archive(page: Int, size: Int): Resource<StoryArchivePage> =
@@ -125,7 +125,7 @@ class StoryRepositoryImpl(
 
     /**
      * Fon amali: xatosi **yutiladi**. Bu ko'rish hisoblagichi uchun signal va u
-     * foydalanuvchining lavhani ko'rishini hech qanday holatda to'smasligi kerak.
+     * foydalanuvchining hikoyani ko'rishini hech qanday holatda to'smasligi kerak.
      *
      * Chegara — daqiqasiga 120 so'rov (§4): tez surib ko'rish normal, lekin undan
      * oshsa 429 keladi va u ham jimgina yutiladi.

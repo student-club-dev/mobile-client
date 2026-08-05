@@ -394,7 +394,7 @@ class ChatViewModel(
 
     /**
      * O'zimning ismim va rasmim — suhbatlar ro'yxati tepasidagi story lentasi uchun
-     * («Lavham» katakchasi ularni tashqaridan kutadi, qarang `StoriesRow`).
+     * («Hikoyam» katakchasi ularni tashqaridan kutadi, qarang `StoriesRow`).
      *
      * Profil keshdan o'qiladi (uni bosh ekran allaqachon serverdan tortib qo'yadi), shuning
      * uchun bu yerda `refresh` chaqirilmaydi: chat ekrani profil uchun so'rov yubormaydi.

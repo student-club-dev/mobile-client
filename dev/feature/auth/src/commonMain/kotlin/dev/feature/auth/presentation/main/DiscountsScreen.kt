@@ -61,10 +61,12 @@ import dev.core.domain.model.DiscountOffer
 import dev.core.domain.model.DiscountTag
 import dev.core.uikit.components.AppFontFamily
 import dev.core.uikit.components.ScCircleButton
+import dev.core.uikit.components.ScEmptyState
 import dev.core.uikit.components.ScHeader
 import dev.core.uikit.components.ScHeaderSubtitle
 import dev.core.uikit.components.ScHeaderTitle
 import dev.core.uikit.components.ScIcons
+import dev.core.uikit.components.ScNotFoundTitle
 import dev.core.uikit.theme.Sc
 import dev.core.uikit.components.AppIcons
 import dev.core.uikit.components.GlassTextField
@@ -244,21 +246,8 @@ private fun CatalogContent(
                 CatalogTypeCard(type, palette) { onOpenType(type) }
             }
 
-            if (!catalog.loading && catalog.sections.isEmpty() && catalog.looseTypes.isEmpty()) {
-                item(span = { GridItemSpan(maxLineSpan) }) {
-                    Box(
-                        Modifier.fillMaxWidth().padding(top = 40.dp),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text(
-                            "Katalog hali yuklanmadi.",
-                            style = TextStyle(
-                                fontFamily = AppFontFamily, fontSize = 13.sp, color = palette.inkFaint,
-                            ),
-                        )
-                    }
-                }
-            }
+            // Katalog bo'sh bo'lsa plitka chizilmaydi — tepadagi "Barchasi" kartasi
+            // baribir turadi, ya'ni ekran bo'm-bo'sh qolmaydi.
         }
     }
 }
@@ -515,9 +504,16 @@ private fun FeedContent(
                             repeat(3) { ScShimmerCard() }
                         }
                     } else {
-                        Box(Modifier.fillMaxWidth().padding(top = 40.dp), contentAlignment = Alignment.Center) {
-                            Text("Bu filtr bo'yicha e'lon topilmadi.", style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.sp, color = palette.inkFaint))
-                        }
+                        ScEmptyState(
+                            Modifier.padding(top = 24.dp),
+                            title = ScNotFoundTitle,
+                            message = "Bu filtr bo'yicha e'lon topilmadi. Shartlarni yumshating.",
+                            icon = ScIcons.Search,
+                            tint = palette.glass,
+                            iconColor = palette.inkFaint,
+                            titleColor = palette.ink,
+                            messageColor = palette.inkFaint,
+                        )
                     }
                 }
             }

@@ -1,0 +1,27 @@
+<!--
+    Kinolenta — «galereyadagi video» bandi uchun.
+
+    Alohida ikonka kerak edi: lavha qo'shish menyusida kamera bilan galereya YONMA-YON
+    turadi va ikkalasida ham `ic_video` ishlatilsa, qaysi biri kamerani ochishini
+    foydalanuvchi faqat matndan bilib olardi.
+
+    Chiziq uslubi qolgan ikonkalar bilan bir xil (2dp, yumaloq uchlar).
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:pathData="M4.2 2h15.6A2.2 2.2 0 0 1 22 4.2v15.6a2.2 2.2 0 0 1-2.2 2.2H4.2A2.2 2.2 0 0 1 2 19.8V4.2A2.2 2.2 0 0 1 4.2 2z"
+        android:strokeColor="#FF000000"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+    <path
+        android:pathData="M7 2v20M17 2v20M2 12h20M2 7h5M2 17h5M17 17h5M17 7h5"
+        android:strokeColor="#FF000000"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+</vector>

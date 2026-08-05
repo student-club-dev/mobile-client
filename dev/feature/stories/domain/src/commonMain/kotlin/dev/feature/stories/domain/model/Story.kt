@@ -3,11 +3,11 @@ package dev.feature.stories.domain.model
 import dev.feature.connections.domain.model.StudentSummary
 import kotlinx.datetime.Instant
 
-/** Lavha turi. Video hozircha faqat **kiruvchi** tomonda (klientda video tanlagich yo'q). */
+/** Hikoya turi. Video hozircha faqat **kiruvchi** tomonda (klientda video tanlagich yo'q). */
 enum class StoryKind { IMAGE, VIDEO }
 
 /**
- * Bitta lavha (`handoff/07-STORIES.md` §3).
+ * Bitta hikoya (`handoff/07-STORIES.md` §3).
  *
  * ⚠️ [url] va [thumbUrl] **token bilan** so'raladi (`Authorization: Bearer`) — oddiy
  * `Image.load` ishlamaydi. Chat biriktirmalaridan farqli, story medialarini faqat muallif
@@ -35,8 +35,8 @@ data class Story(
     /**
      * Telefondagi **`StudentClub`** papkasidagi nusxa (`dev.core.uikit.media`).
      *
-     * O'z lavhangiz yuborilgandan keyin ham telefonda qoladi, ya'ni uni ko'rish uchun
-     * serverdan qayta yuklab olish shart emas. Boshqa odamning lavhasida doim `null`.
+     * O'z hikoyangiz yuborilgandan keyin ham telefonda qoladi, ya'ni uni ko'rish uchun
+     * serverdan qayta yuklab olish shart emas. Boshqa odamning hikoyasida doim `null`.
      */
     val localUri: String? = null,
     /**
@@ -83,15 +83,15 @@ data class StoryGroup(
     val hasUnseen: Boolean,
     val lastCreatedAt: Instant,
 ) {
-    /** Ochilganda qaysi lavhadan boshlash — birinchi ko'rilmagani, bo'lmasa boshidan. */
+    /** Ochilganda qaysi hikoyadan boshlash — birinchi ko'rilmagani, bo'lmasa boshidan. */
     val startIndex: Int get() = stories.indexOfFirst { !it.seen }.takeIf { it >= 0 } ?: 0
 }
 
 /**
- * Arxiv sahifasi (`GET /v1/stories/archive`) — muddati o'tgan **o'z** lavhalarim.
+ * Arxiv sahifasi (`GET /v1/stories/archive`) — muddati o'tgan **o'z** hikoyalarim.
  *
  * Lenta va `mine` dan farqli o'laroq bu ro'yxat uzoq bo'lishi mumkin (har kuni 20 tagacha
- * lavha), shuning uchun u sahifalanadi.
+ * hikoya), shuning uchun u sahifalanadi.
  */
 data class StoryArchivePage(
     /** Yangidan eskiga. */
@@ -131,7 +131,7 @@ object StoryLimits {
     const val MAX_VIDEO_BYTES = 48 * 1024 * 1024
 
     /**
-     * Lavha videosining eng uzun davomiyligi — **1 daqiqa**.
+     * Hikoya videosining eng uzun davomiyligi — **1 daqiqa**.
      *
      * Klientda ham tekshiriladi: uzun videoni yuklab bo'lgach `422` bilan rad etilishi
      * foydalanuvchi uchun eng yomon variant — u trafikni ham, vaqtni ham sarflab

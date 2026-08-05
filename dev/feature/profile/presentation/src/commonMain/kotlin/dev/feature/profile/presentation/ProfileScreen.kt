@@ -53,7 +53,7 @@ import org.koin.compose.viewmodel.koinViewModel
 /**
  * Profil bo'limlari — Telegramdagi kabi **postlar**.
  *
- * Post = lavha (`feature:stories`): 24 soat bog'langanlarga ko'rinadi, keyin yo'qolmaydi —
+ * Post = hikoya (`feature:stories`): 24 soat bog'langanlarga ko'rinadi, keyin yo'qolmaydi —
  * faqat egasiga ko'rinadigan [ARCHIVE] ga o'tadi (`STORY_ARCHIVE_BACKEND.md`).
  */
 private enum class ProfileTab(val label: String) {
@@ -178,8 +178,10 @@ fun ProfileScreen(
                 photos.error?.let { ScText(it, 12.5f, FontWeight.SemiBold, Sc.Danger) }
 
                 // --- Ma'lumotlar --------------------------------------------------------
+                // Rasmiy nom emas, qisqasi: karta ustuni tor va uzun nom to'rt qatorga
+                // yoyilardi. To'liq nom "Universitetim" ekranida turadi.
                 val university = state.universities
-                    .firstOrNull { it.id == state.profile?.universityId }?.name
+                    .firstOrNull { it.id == state.profile?.universityId }?.shortName
                 val phone = state.profile?.phoneNumber ?: state.contact.takeIf { it.isNotBlank() }
                 InfoCard {
                     phone?.let { InfoRow(formatUzPhoneFull(it), "Mobil raqam") }

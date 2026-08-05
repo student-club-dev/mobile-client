@@ -185,12 +185,12 @@ internal fun UniversitySelectorRow(university: University?, onClick: () -> Unit,
         }
         Column(Modifier.weight(1f)) {
             Text(
-                university?.name ?: "Universitetni tanlang",
+                university?.shortName ?: "Universitetni tanlang",
                 style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.5f.sp, fontWeight = FontWeight.Bold, color = palette.ink),
                 maxLines = 1, overflow = TextOverflow.Ellipsis,
             )
             Text(
-                university?.let { "${it.city} · Universitet" } ?: "Ro‘yxatdan tanlang",
+                university?.let { it.display.subtitle.ifBlank { it.monogram } } ?: "Ro‘yxatdan tanlang",
                 style = TextStyle(fontFamily = AppFontFamily, fontSize = 10.5f.sp, color = palette.inkFaint),
                 maxLines = 1, overflow = TextOverflow.Ellipsis,
             )
@@ -306,7 +306,9 @@ fun UniversityPickerScreen(
 
         if (picker.loading) {
             // Universitet qatorlarining skeleti — ro'yxat kelganda joy o'zgarmaydi.
-            ScShimmerList(rows = 6, leading = false, modifier = Modifier.weight(1f), spacing = 10.dp)
+            // `leading = true` — qatorlarda qisqartma kvadrati bor; skeletda bo'lmasa
+            // ro'yxat kelganda butun ustun o'ngga siljib ketardi.
+            ScShimmerList(rows = 6, modifier = Modifier.weight(1f), spacing = 10.dp)
         } else {
             LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(picker.results, key = { it.id }) { uni ->
@@ -338,11 +340,34 @@ private fun UniversityRow(uni: University, selected: Boolean, onClick: () -> Uni
             Modifier.size(36.dp).background(if (selected) palette.primary else accent.copy(alpha = 0.12f), RoundedCornerShape(10.dp)),
             contentAlignment = Alignment.Center,
         ) {
-            Text(uni.monogram, style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, color = if (selected) Color.White else accent))
+            // Qisqartma 6 belgigacha bo'ladi (`SamDVU`) — 36.dp kvadratga sig'ishi uchun
+            // shrift uzunlikka qarab kichrayadi.
+            Text(
+                uni.monogram,
+                style = TextStyle(
+                    fontFamily = AppFontFamily,
+                    fontSize = (if (uni.monogram.length >= 5) 9.5f else if (uni.monogram.length == 4) 11f else 13f).sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = if (selected) Color.White else accent,
+                ),
+                maxLines = 1,
+            )
         }
         Column(Modifier.weight(1f)) {
-            Text(uni.name, style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = palette.ink), maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(uni.city, style = TextStyle(fontFamily = AppFontFamily, fontSize = 10.5f.sp, color = palette.inkFaint))
+            // Ikki qator: bitta qatorda rasmiy nomlarning yarmi uch nuqtaga aylanardi va
+            // qo'shni qatorlarni bir-biridan ajratib bo'lmasdi.
+            Text(
+                uni.shortName,
+                style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = palette.ink, lineHeight = 17.sp),
+                maxLines = 2, overflow = TextOverflow.Ellipsis,
+            )
+            if (uni.display.subtitle.isNotBlank()) {
+                Text(
+                    uni.display.subtitle,
+                    style = TextStyle(fontFamily = AppFontFamily, fontSize = 10.5f.sp, color = palette.inkFaint),
+                    maxLines = 1, overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
         if (selected) {
             Box(Modifier.size(20.dp).background(palette.primary, RoundedCornerShape(999.dp)), contentAlignment = Alignment.Center) {

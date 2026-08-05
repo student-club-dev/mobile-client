@@ -50,7 +50,7 @@ import dev.feature.stories.domain.model.Story
 import dev.feature.stories.domain.model.StoryKind
 
 /**
- * Lavha ko'ruvchisi — to'liq ekran, tepada progress chiziqlari.
+ * Hikoya ko'ruvchisi — to'liq ekran, tepada progress chiziqlari.
  *
  * Boshqaruv Instagram/Telegram bilan bir xil: **o'ng yarmiga tegish** — keyingi,
  * **chap yarmiga** — oldingi, **ushlab turish** — pauza. Rasm [Story.DEFAULT_IMEGE_MS]
@@ -74,7 +74,7 @@ internal fun StoryViewerDialog(
     /**
      * Muallif ustiga bosildi — uning profili ochiladi (Telegram/Instagramdagidek).
      *
-     * `null` — bosish o'chirilgan: o'z lavhangizda ochadigan profil yo'q.
+     * `null` — bosish o'chirilgan: o'z hikoyangizda ochadigan profil yo'q.
      */
     onOpenAuthor: ((String) -> Unit)? = null,
 ) {
@@ -83,11 +83,11 @@ internal fun StoryViewerDialog(
     /** Barmoq ekranda ushlab turilibdi ([StoryTapZone]). */
     var held by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
-    // Lavha almashsa ro'yxat yopiladi — u aynan shu postniki.
+    // Hikoya almashsa ro'yxat yopiladi — u aynan shu postniki.
     var viewersOpen by remember(story.id) { mutableStateOf(false) }
     val isVideo = story.kind == StoryKind.VIDEO
 
-    // Ustiga oyna chiqqanda lavha o'zi keyingisiga o'tib ketmasin: o'chirishni tasdiqlash
+    // Ustiga oyna chiqqanda hikoya o'zi keyingisiga o'tib ketmasin: o'chirishni tasdiqlash
     // ham, ko'rganlar ro'yxati ham ushlab turish bilan bir xil — vaqt to'xtaydi.
     val paused = held || confirmDelete || viewersOpen
 
@@ -108,7 +108,7 @@ internal fun StoryViewerDialog(
     // to'ladi; to'lgach o'zi keyingisiga o'tadi.
     //
     // ⚠️ Videoda bu ishlamaydi: uni pleyerning o'zi tugatadi (`onEnded`). Ikkalasi birga
-    // ishlasa lavha davomiylikdan oldin sakrab ketardi.
+    // ishlasa hikoya davomiylikdan oldin sakrab ketardi.
     LaunchedEffect(story.id, paused, isVideo) {
         if (isVideo || paused) return@LaunchedEffect
         // Qolgan vaqt — pauzadan keyin ham to'liq 5 soniya kutib qolmaslik uchun.
@@ -133,7 +133,7 @@ internal fun StoryViewerDialog(
                 // qolib, foydalanuvchi sababini bilmasdi.
                 Box(Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
                     ScText(
-                        "Bu lavhaning fayli saqlanmagan — arxivda faqat yozuvi qoldi.",
+                        "Bu hikoyaning fayli saqlanmagan — arxivda faqat yozuvi qoldi.",
                         14f,
                         FontWeight.Medium,
                         Color.White,
@@ -146,7 +146,7 @@ internal fun StoryViewerDialog(
                     // ⚠️ Story medialari **token bilan** so'raladi (§11.2) — faqat muallif va
                     // unga bog'langan odam o'qiy oladi, ya'ni tokensiz pleyer `404` olardi.
                     headers = mediaHeaders,
-                    // Lavha o'zi o'ynaydi va boshqaruv paneli ko'rsatilmaydi: bu Instagram
+                    // Hikoya o'zi o'ynaydi va boshqaruv paneli ko'rsatilmaydi: bu Instagram
                     // uslubidagi ekran, u yerda pauza/tugma emas, ekranni ushlab turish bilan
                     // boshqariladi — shuning uchun ijro `paused` ga bog'langan.
                     autoPlay = !paused,
@@ -204,8 +204,8 @@ internal fun StoryViewerDialog(
                 Spacer(Modifier.height(10.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     // Avatar va ism — bitta bosiladigan bo'lak: muallifning profili
-                    // ochiladi. Ular tepadagi qatorda, ya'ni lavhani surish zonalaridan
-                    // ([StoryTapZone]) tashqarida — bosish keyingi lavhaga o'tkazmaydi.
+                    // ochiladi. Ular tepadagi qatorda, ya'ni hikoyani surish zonalaridan
+                    // ([StoryTapZone]) tashqarida — bosish keyingi hikoyaga o'tkazmaydi.
                     Row(
                         Modifier.weight(1f)
                             .clip(RoundedCornerShape(percent = 50))
@@ -227,7 +227,7 @@ internal fun StoryViewerDialog(
                         Spacer(Modifier.width(9.dp))
                         Column(Modifier.weight(1f)) {
                             ScText(group.author.displayName, 13.5f, FontWeight.Bold, Color.White, maxLines = 1)
-                            // O'z lavhamda ko'rishlar soni bor; boshqalarnikida u ATAYLAB `null`.
+                            // O'z hikoyamda ko'rishlar soni bor; boshqalarnikida u ATAYLAB `null`.
                             //
                             // Bosilsa — kim ko'rgani ([StoryViewersSheet]). Ro'yxat arxivdagi
                             // post uchun ham ochiladi: son muzlagan bo'lsa ham qatorlar joyida.
@@ -243,7 +243,7 @@ internal fun StoryViewerDialog(
                         }
                     }
                     story.viewsCount?.let {
-                        // Ko'rishlar soni faqat muallifda bor — ya'ni bu **mening** lavham.
+                        // Ko'rishlar soni faqat muallifda bor — ya'ni bu **mening** hikoyam.
                         // Loyihada alohida "trash" ikonkasi yo'q — chatda ham o'chirish
                         // `Close` bilan ko'rsatiladi (`ChatScreen`dagi ActionRow).
                         ScText(
@@ -278,7 +278,7 @@ internal fun StoryViewerDialog(
             }
 
             // Kim ko'rgani — o'z postimda, ko'rishlar soni bosilganda. Tegish zonalarining
-            // ustida turadi, ya'ni ro'yxat ochiqda ekranga tegish lavhani surmaydi.
+            // ustida turadi, ya'ni ro'yxat ochiqda ekranga tegish hikoyani surmaydi.
             if (viewersOpen) {
                 StoryViewersSheet(storyId = story.id, onClose = { viewersOpen = false })
             }
@@ -294,7 +294,7 @@ internal fun StoryViewerDialog(
 }
 
 /**
- * Tepadagi bo'lakli oq chiziq — har lavha uchun bittadan.
+ * Tepadagi bo'lakli oq chiziq — har hikoya uchun bittadan.
  *
  * Ko'rilganlari to'liq, keyingilari bo'sh, **faol bo'lagi** esa [progress] bo'yicha to'ladi.
  * Vaqtni bu komponent o'zi sanamaydi: rasmda uni animatsiya, videoda esa **pleyerning
@@ -356,10 +356,10 @@ private fun DeleteConfirm(onCancel: () -> Unit, onConfirm: () -> Unit) {
             Modifier.clip(RoundedCornerShape(20.dp)).background(Sc.Card).padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            ScText("Lavhani o'chirasizmi?", 16f, FontWeight.ExtraBold, Sc.Ink)
+            ScText("Hikoyani o'chirasizmi?", 16f, FontWeight.ExtraBold, Sc.Ink)
             // Story TAHRIRLANMAYDI — o'chirib, qaytadan qo'yiladi (§7).
             ScText(
-                "Lavha darhol yo'qoladi. Tahrirlash imkoni yo'q — o'chirib, qaytadan qo'yish kerak.",
+                "Hikoya darhol yo'qoladi. Tahrirlash imkoni yo'q — o'chirib, qaytadan qo'yish kerak.",
                 13f,
                 FontWeight.Medium,
                 Sc.Muted,

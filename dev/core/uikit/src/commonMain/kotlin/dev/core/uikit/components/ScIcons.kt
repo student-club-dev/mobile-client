@@ -25,6 +25,7 @@ import dev.core.uikit.generated.resources.ic_close
 import dev.core.uikit.generated.resources.ic_copy
 import dev.core.uikit.generated.resources.ic_debate
 import dev.core.uikit.generated.resources.ic_emoji
+import dev.core.uikit.generated.resources.ic_empty
 import dev.core.uikit.generated.resources.ic_filter
 import dev.core.uikit.generated.resources.ic_gamepad
 import dev.core.uikit.generated.resources.ic_home
@@ -169,6 +170,9 @@ object ScIcons {
 
     /** Pitsa bo'lagi ("Ovqatlar") — ko'p rangli, [ScGlyph] bilan chiziladi. */
     val Pizza: ImageVector @Composable get() = vectorResource(Res.drawable.ic_pizza)
+
+    /** Bo'sh quti — [ScEmptyState] ning zaxira ikonasi ("mavjud emas"). */
+    val Empty: ImageVector @Composable get() = vectorResource(Res.drawable.ic_empty)
 
     // --- Ko'p rangli (ranglari XML da, [ScGlyph] bilan chiziladi) ----------
 

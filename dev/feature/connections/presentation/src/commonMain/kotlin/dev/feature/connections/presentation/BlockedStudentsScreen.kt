@@ -113,9 +113,9 @@ fun BlockedStudentsScreen(
 
                 error != null && state.items.isEmpty() -> ErrorBlock(error, vm::refresh)
 
-                state.isEmpty -> Hint(
-                    "Hech kimni bloklamagansiz.\nTalaba qatoridagi \"⋮\" menyusidan bloklash mumkin.",
-                )
+                // Bloklangan yo'q — ro'yxat o'rniga hech nima chizilmaydi (sarlavha ostidagi
+                // izoh bo'limning nimaligini allaqachon aytadi).
+                state.isEmpty -> Unit
 
                 else -> LazyColumn(
                     Modifier.fillMaxWidth(),
@@ -248,13 +248,6 @@ private fun ErrorBlock(message: String, onRetry: () -> Unit) {
                 .clickable(onClick = onRetry)
                 .padding(horizontal = 20.dp, vertical = 11.dp),
         ) { ScText("Qayta urinish", 12.5f, FontWeight.ExtraBold, Color.White, maxLines = 1) }
-    }
-}
-
-@Composable
-private fun Hint(text: String) {
-    Box(Modifier.fillMaxWidth().padding(horizontal = 32.dp, vertical = 28.dp), contentAlignment = Alignment.Center) {
-        ScText(text, 13.5f, FontWeight.Medium, Sc.Muted, lineHeight = 20f)
     }
 }
 

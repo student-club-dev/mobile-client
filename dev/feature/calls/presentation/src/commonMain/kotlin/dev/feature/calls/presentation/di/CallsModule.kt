@@ -61,8 +61,14 @@ fun callsModule() = module {
                 // avtorizatsiyali REST so'rovi: Ktor `Auth` plagini 401 da o'zi refresh
                 // qiladi va yangi juftlikni `TokenStore` ga yozadi. `ice-servers` ataylab
                 // tanlangan: u eng yengil qo'ng'iroq endpointi.
-                if (refresh) runCatching { get<CallsRemoteDataSource>().iceServers() }
-                get<TokenStore>().tokens()?.accessToken
+                //
+                // ⚠️ Faqat SESSIYA BOR bo'lganda: tokenlarsiz bu so'rov yangilaydigan narsa
+                // yo'q va login ekranida 401 bo'lib qaytaveradi.
+                val store = get<TokenStore>()
+                if (refresh && store.tokens() != null) {
+                    runCatching { get<CallsRemoteDataSource>().iceServers() }
+                }
+                store.tokens()?.accessToken
             },
             scope = get(named(WS_SCOPE)),
         )

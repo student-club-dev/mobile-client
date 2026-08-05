@@ -35,7 +35,7 @@ fun storiesModule() = module {
     }
 
     viewModelOf(::StoriesViewModel)
-    // Lavha ko'ruvchisidagi «kim ko'rgan» ro'yxati — arxivdagi post uchun ham.
+    // Hikoya ko'ruvchisidagi «kim ko'rgan» ro'yxati — arxivdagi post uchun ham.
     viewModelOf(::StoryViewersViewModel)
     // Profildagi «Postlar» / «Arxivlangan postlar» bo'limi — lentadan alohida holat.
     viewModelOf(::MyPostsViewModel)

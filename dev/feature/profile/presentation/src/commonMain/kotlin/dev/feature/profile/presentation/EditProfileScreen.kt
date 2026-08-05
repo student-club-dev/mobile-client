@@ -55,6 +55,7 @@ import dev.core.uikit.components.ScGradientButton
 import dev.core.uikit.components.ScHeader
 import dev.core.uikit.components.ScHeaderTitle
 import dev.core.uikit.components.ScIcons
+import dev.core.uikit.components.ScMonogramTile
 import dev.core.uikit.components.ScText
 import dev.core.uikit.components.ScUploadRing
 import dev.core.uikit.components.scUploadPercent
@@ -269,7 +270,7 @@ fun EditProfileScreen(onBack: () -> Unit, vm: ProfileViewModel = koinViewModel()
                 Icon(ScIcons.Cap, null, tint = Sc.Muted, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(9.dp))
                 ScText(
-                    selectedUni?.name ?: "Universitetni tanlang",
+                    selectedUni?.shortName ?: "Universitetni tanlang",
                     14f, FontWeight.SemiBold,
                     if (selectedUni != null) Sc.Ink else Sc.Muted,
                     Modifier.weight(1f),
@@ -287,10 +288,8 @@ fun EditProfileScreen(onBack: () -> Unit, vm: ProfileViewModel = koinViewModel()
                             if (uniQuery.isBlank()) {
                                 state.universities
                             } else {
-                                state.universities.filter {
-                                    it.name.contains(uniQuery, ignoreCase = true) ||
-                                        it.city.contains(uniQuery, ignoreCase = true)
-                                }
+                                // Qisqartma bo'yicha ham: "TATU" → Toshkent axborot…
+                                state.universities.filter { it.matches(uniQuery) }
                             }
                             ).take(40)
                     }
@@ -462,10 +461,15 @@ private fun UniversityRow(uni: University, selected: Boolean, onClick: () -> Uni
             .padding(horizontal = 12.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        ScText(uni.monogram, 12.5f, FontWeight.ExtraBold, Sc.Brand, Modifier.width(50.dp), maxLines = 1)
+        // Qat'iy 50.dp li matn o'rniga tile: qisqartma 6 belgigacha bo'lishi mumkin va
+        // kengligi belgilanmagan matn qo'shni ustunni surib yuborardi.
+        ScMonogramTile(uni.monogram, Sc.TintBlue, Sc.Brand, size = 42.dp, radius = 13.dp, fontSize = 13f)
+        Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
-            ScText(uni.name, 13.5f, FontWeight.Bold, Sc.Ink, maxLines = 2)
-            ScText(uni.city, 11.5f, FontWeight.Medium, Sc.Muted, maxLines = 1)
+            ScText(uni.shortName, 13.5f, FontWeight.Bold, Sc.Ink, lineHeight = 17f, maxLines = 2)
+            if (uni.display.subtitle.isNotBlank()) {
+                ScText(uni.display.subtitle, 11.5f, FontWeight.Medium, Sc.Muted, maxLines = 1)
+            }
         }
         if (selected) {
             Icon(AppIcons.Check, null, tint = Sc.Brand, modifier = Modifier.size(17.dp))

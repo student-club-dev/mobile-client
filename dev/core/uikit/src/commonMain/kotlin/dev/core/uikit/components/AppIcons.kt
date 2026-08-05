@@ -12,6 +12,7 @@ import dev.core.uikit.generated.resources.ic_chevron_down
 import dev.core.uikit.generated.resources.ic_clock
 import dev.core.uikit.generated.resources.ic_eye
 import dev.core.uikit.generated.resources.ic_eye_off
+import dev.core.uikit.generated.resources.ic_film
 import dev.core.uikit.generated.resources.ic_google
 import dev.core.uikit.generated.resources.ic_image_icon
 import dev.core.uikit.generated.resources.ic_video
@@ -116,6 +117,10 @@ object AppIcons {
     /** Video kamerasi — «Kamera» ([Camera]) dan farqli: bu galereyadagi videoni bildiradi. */
     val Video: ImageVector @Composable get() = vectorResource(Res.drawable.ic_video)
     val ImageIcon: ImageVector @Composable get() = vectorResource(Res.drawable.ic_image_icon)
+
+    /** Kinolenta — GALEREYADAGI video ([Video] esa kamerani bildiradi). */
+    val Film: ImageVector @Composable get() = vectorResource(Res.drawable.ic_film)
+
     val UserPlus: ImageVector @Composable get() = vectorResource(Res.drawable.ic_user_plus)
 
     // --- Ijtimoiy logolar (ranglari o'zgarmaydi, `Image` bilan chiziladi) --

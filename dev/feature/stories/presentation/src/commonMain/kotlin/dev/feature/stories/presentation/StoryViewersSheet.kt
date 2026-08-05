@@ -52,7 +52,7 @@ import kotlinx.coroutines.launch
 import org.koin.compose.viewmodel.koinViewModel
 
 /**
- * «Kim ko'rgan» ro'yxati — lavha ko'ruvchisining ustiga chiqadigan varaq.
+ * «Kim ko'rgan» ro'yxati — hikoya ko'ruvchisining ustiga chiqadigan varaq.
  *
  * `ModalBottomSheet` **ataylab ishlatilmadi**: ro'yxat to'liq ekranli `Dialog` ichida
  * ochiladi, varaq esa o'ziga alohida oyna yasaydi — u story oynasining orqasiga tushib,
@@ -193,7 +193,7 @@ data class StoryViewersState(
 /**
  * `GET /v1/stories/{id}/views` — **faqat o'z** postim uchun.
  *
- * Ro'yxat lavha ko'ruvchisidan chaqiriladi va shu sababli alohida ViewModel'da: postlar
+ * Ro'yxat hikoya ko'ruvchisidan chaqiriladi va shu sababli alohida ViewModel'da: postlar
  * ro'yxatining holati bilan bir joyda tursa, ko'ruvchi yopilganda ham xotirada qolardi.
  */
 class StoryViewersViewModel(
@@ -254,7 +254,7 @@ class StoryViewersViewModel(
     }
 }
 
-/** Ekran balandligining ulushi — orqada lavhaning bir qismi ko'rinib tursin. */
+/** Ekran balandligining ulushi — orqada hikoyaning bir qismi ko'rinib tursin. */
 private const val SHEET_HEIGHT = 0.62f
 
 /** Oxirigacha shuncha qator qolganda keyingi sahifa so'raladi. */

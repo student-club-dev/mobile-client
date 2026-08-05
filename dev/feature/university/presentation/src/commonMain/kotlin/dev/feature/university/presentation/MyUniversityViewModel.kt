@@ -138,9 +138,10 @@ class MyUniversityViewModel(
         _picker.update { it.copy(query = q, results = filter(allUniversities.value, q)) }
     }
 
+    // Qidiruv qisqartmani ham qamraydi (`University.matches`): ro'yxatda "TATU" deb
+    // yozgan foydalanuvchi rasmiy nomni ("Muhammad al-Xorazmiy nomidagi…") bilishi shart emas.
     private fun filter(list: List<University>, q: String): List<University> =
-        if (q.isBlank()) list.take(200)
-        else list.filter { it.name.contains(q, ignoreCase = true) || it.city.contains(q, ignoreCase = true) }.take(200)
+        if (q.isBlank()) list.take(200) else list.filter { it.matches(q) }.take(200)
 
     /** Universitetni tanlash — local DB'ga qo'shadi va profilga bog'laydi. */
     fun selectUniversity(uni: University) {

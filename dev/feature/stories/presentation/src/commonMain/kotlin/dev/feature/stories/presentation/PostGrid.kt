@@ -153,18 +153,20 @@ private fun PostCell(
     }
 }
 
+/**
+ * Postlar ro'yxati hali kelmagan.
+ *
+ * Bo'sh holat plitkasi bu yerda YO'Q: post yo'q bo'lsa bo'lim umuman chizilmaydi. Faqat
+ * yuklanish ko'rsatiladi — "bo'sh" deb yozish ro'yxat kelmasidan oldin yolg'on bo'lardi.
+ */
 @Composable
-internal fun EmptyPosts(title: String, subtitle: String, loading: Boolean) {
-    Column(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(Sc.Card)
-            .padding(horizontal = 20.dp, vertical = 30.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(6.dp),
+internal fun PostsLoadingNote() {
+    Box(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(Sc.Card),
+        contentAlignment = Alignment.Center,
     ) {
-        // Yuklanayotganda "bo'sh" deb yozish noto'g'ri bo'lardi — ro'yxat hali kelmagan.
-        ScText(if (loading) "Yuklanmoqda…" else title, 16f, FontWeight.ExtraBold, Sc.Ink, maxLines = 1)
-        if (!loading) {
-            ScText(subtitle, 13f, FontWeight.Medium, Sc.MutedLight, maxLines = 3)
+        Box(Modifier.padding(horizontal = 20.dp, vertical = 30.dp)) {
+            ScText("Yuklanmoqda…", 16f, FontWeight.ExtraBold, Sc.Ink, maxLines = 1)
         }
     }
 }

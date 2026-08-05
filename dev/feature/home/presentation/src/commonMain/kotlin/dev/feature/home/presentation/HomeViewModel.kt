@@ -59,7 +59,6 @@ data class HomeUiState(
     /** Profil rasmi manzili (`null` — bosh harf ko'rsatiladi). */
     val avatarUrl: String? = null,
     val universityMonogram: String? = null,
-    val courseLabel: String? = null,
     /**
      * Chegirma bo'limlari — Home'da ATIGI IKKITASI: "Ovqatlanish" (butun `FOOD` guruhi) va
      * "Kiyim-kechak" (talabaning jinsiga mos). Uchinchi e'lon bo'limi — [rentals].
@@ -103,7 +102,7 @@ class HomeViewModel(
     observeListingsByKind: ObserveListingsByKindUseCase,
     private val refreshListings: RefreshListingsUseCase,
     private val connectionsRepository: ConnectionsRepository,
-    notificationRepository: NotificationRepository,
+    private val notificationRepository: NotificationRepository,
 ) : ViewModel() {
 
     /**
@@ -124,6 +123,12 @@ class HomeViewModel(
         refreshStudents()
         // Offline-first: universitetlarni backend'dan sinxronlashga urinamiz.
         viewModelScope.launch { universityRepository.refresh() }
+        // Qo'ng'iroq ikonasidagi nuqta ([HomeUiState.hasUnreadNotifications]) local keshdan
+        // o'qiladi. Ro'yxatni ham shu yerda yangilaymiz — aks holda nuqta faqat foydalanuvchi
+        // bildirishnomalar ekranini OCHGANDAN keyin paydo bo'lardi, ya'ni "yangi bildirishnoma
+        // bor" degan yagona belgi hech qachon o'z vaqtida ko'rinmasdi. Xatosi yutiladi: bosh
+        // ekran bildirishnoma so'rovi tufayli hech nima ko'rsatmaydi.
+        viewModelScope.launch { runCatching { notificationRepository.refresh() } }
         // Chegirma bo'limlari backend feed'idan yuradi — `POST /v1/catalog/*` +
         // `/v1/discounts/search`. Busiz ekran faqat local seed'ni ko'rsatib turardi.
         // Xato bo'lsa kesh saqlanadi (repository o'zi hal qiladi).
@@ -173,8 +178,9 @@ class HomeViewModel(
             // Rasm ham shu tartibda: profil keshi, so'ng sessiya qatoridagi nusxa.
             avatarUrl = profile?.avatarUrl?.takeIf { it.isNotBlank() }
                 ?: user?.photoUrl?.takeIf { it.isNotBlank() },
+            // Kurs ATAYLAB olinmaydi: bosh ekran sarlavhasida talabaning nechanchi
+            // bosqichda o'qishi ko'rsatilmaydi (u yerda faqat universitet mo'ljali).
             monogram = uni?.monogram,
-            course = profile?.courseYear?.let(::courseLabel),
         )
     }
 
@@ -220,7 +226,6 @@ class HomeViewModel(
             userName = h.name,
             avatarUrl = h.avatarUrl,
             universityMonogram = h.monogram,
-            courseLabel = h.course,
             offerSections = c.sections,
             tasks = c.tasks,
             rentals = c.rentals,
@@ -304,7 +309,6 @@ class HomeViewModel(
         val name: String,
         val avatarUrl: String?,
         val monogram: String?,
-        val course: String?,
     )
     private data class Content(
         val sections: List<HomeOfferSection>,
@@ -364,13 +368,3 @@ private const val CLOTHING_TYPE = "kiyim"
 
 /** Home'da faqat bir nechta karta ko'rinadi — butun ro'yxatni tortishning hojati yo'q. */
 private const val HOME_STUDENTS_SIZE = 10
-
-// Profil "1".."4" yozadi (EditProfileScreen); eski yozuvlarda "ONE".."FOUR" uchraydi.
-private fun courseLabel(courseYear: String): String = when (courseYear) {
-    "1", "ONE" -> "1-kurs"
-    "2", "TWO" -> "2-kurs"
-    "3", "THREE" -> "3-kurs"
-    "4", "FOUR" -> "4-kurs"
-    "MASTER" -> "Magistr"
-    else -> courseYear
-}

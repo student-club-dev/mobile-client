@@ -34,7 +34,8 @@ fun appModules() = coreModules() +
     // E'lonlar — `/v1/student-listings*` allaqachon bor, shuning uchun o'z bayrog'i bilan.
     listingsModule(STUDENT_LISTINGS_REMOTE_ENABLED) +
     jobsModule(REMOTE_SYNC_ENABLED) +
-    notificationsModule() +
+    // Bildirishnomalar ro'yxati — o'z bayrog'i bilan (`GET /v1/notifications` kutilmoqda).
+    notificationsModule(NOTIFICATIONS_REMOTE_ENABLED) +
     clubsModule() +
     settingsModule() +
     universityModule(REMOTE_SYNC_ENABLED) +

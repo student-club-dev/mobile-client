@@ -36,10 +36,10 @@ data class MyPostsState(
 )
 
 /**
- * Profil postlari — o'z lavhalarim, ikki ro'yxatda.
+ * Profil postlari — o'z hikoyalarim, ikki ro'yxatda.
  *
  * Lenta ([StoriesViewModel]) dan **ataylab ajratilgan**: u bosh ekranda yashaydi va
- * boshqalarning lavhalari bilan birga aylanadi, bu yerda esa faqat meniki va arxiv kerak.
+ * boshqalarning hikoyalari bilan birga aylanadi, bu yerda esa faqat meniki va arxiv kerak.
  * Bitta ViewModel'ga qo'shilsa profil ochilganda butun lenta ham qayta yuklanardi.
  */
 class MyPostsViewModel(

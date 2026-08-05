@@ -23,7 +23,6 @@ class LocalDataSeeder(
     suspend fun seedIfEmpty() = withContext(dispatchers.io) {
         seedJobs()
         seedAds()
-        seedNotifications()
         seedClubs()
     }
 
@@ -56,21 +55,10 @@ class LocalDataSeeder(
         }
     }
 
-    /**
-     * Bildirishnomalar ro'yxati — backendda faqat qurilma tokenini ro'yxatdan o'tkazish
-     * (`POST /v1/devices`) bor, ro'yxat endpoint'i yo'q.
-     */
-    private fun seedNotifications() {
-        val q = db.notificationQueries
-        if (q.count().executeAsOne() > 0) return
-        q.transaction {
-            q.insert("nt-1", "Yangi ish taklifi", "Uzum Market — Frontend Intern lavozimiga mos keldingiz.", "JOB", "10 daqiqa oldin", 1, 0)
-            q.insert("nt-2", "Chegirma tugayapti", "Chorsu Cafe'dagi 25% chegirma bugun tugaydi.", "DISCOUNT", "2 soat oldin", 2, 0)
-            q.insert("nt-3", "Yangi xabar", "Dilnoza Rahimova sizga xabar yozdi.", "CHAT", "3 soat oldin", 3, 0)
-            q.insert("nt-4", "E'loningiz ko'rildi", "\"MacBook Air M1\" e'loningizni 12 kishi ko'rdi.", "AD", "kecha", 4, 1)
-            q.insert("nt-5", "Xush kelibsiz! 🎉", "Student Club'ga xush kelibsiz. Profilingizni to'ldiring.", "SYSTEM", "2 kun oldin", 5, 1)
-        }
-    }
+    // Bildirishnomalar seed'i OLIB TASHLANDI: ro'yxat endi `GET /v1/notifications` dan
+    // keladi va `NotificationEntity` — o'sha javobning keshi (`NOTIFICATIONS_BACKEND.md`).
+    // Namuna qatorlari kesh bilan aralashib, "Dilnoza Rahimova sizga xabar yozdi" degan
+    // soxta yozuvni haqiqiy ro'yxat ustiga olib chiqardi.
 
     /** Klublar — `/v1/clubs` hali yo'q. */
     private fun seedClubs() {

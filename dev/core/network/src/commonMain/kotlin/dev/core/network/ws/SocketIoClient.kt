@@ -185,22 +185,51 @@ class SocketIoClient(
         var refreshToken = false
         while (currentCoroutineContext().isActive) {
             val startedAt = Clock.System.now().toEpochMilliseconds()
-            val ok = runSession(refreshToken)
+            val outcome = runSession(refreshToken)
             val lasted = Clock.System.now().toEpochMilliseconds() - startedAt
 
-            // Sessiya deyarli darhol tugadi → ehtimol token yaroqsiz. `03-WEBSOCKET.md`: server sabab
-            // bildirmaydi, faqat `disconnect`. Shuning uchun keyingi urinishdan oldin yangilaymiz.
-            refreshToken = !ok || lasted < SHORT_SESSION_MS
+            refreshToken = when (outcome) {
+                // Sessiya YO'Q (kirmagan foydalanuvchi) — yangilashning ma'nosi yo'q:
+                // refresh token ham yo'q, ya'ni `tokenProvider(refresh = true)` ichidagi
+                // "arzon avtorizatsiyali so'rov" faqat 401 olib qaytadi. Aynan shu yo'l
+                // login ekranida turgan ilovadan har urinishda `/v1/calls/ice-servers` ga
+                // (chatda — `/v1/conversations` ga) so'rov yuborardi.
+                SessionOutcome.NO_TOKEN -> false
+                // Sessiya deyarli darhol tugadi → ehtimol token yaroqsiz. `03-WEBSOCKET.md`:
+                // server sabab bildirmaydi, faqat `disconnect`. Shuning uchun keyingi
+                // urinishdan oldin yangilaymiz.
+                SessionOutcome.CONNECTED -> lasted < SHORT_SESSION_MS
+                SessionOutcome.FAILED -> true
+            }
             attempt = if (lasted > STABLE_SESSION_MS) 0 else attempt + 1
 
             if (!currentCoroutineContext().isActive) return
-            delay(backoffMs(attempt))
+            // Kirilmagan holatda eksponensial kechikish noto'g'ri bo'lardi: bu xato emas,
+            // shunchaki kutish. Tekshiruv local (tokenlar bazadan o'qiladi, tarmoq yo'q),
+            // shuning uchun qisqa va o'zgarmas oraliq — kirilgan zahoti kanal ko'tariladi.
+            if (outcome == SessionOutcome.NO_TOKEN) {
+                attempt = 0
+                delay(NO_SESSION_POLL_MS)
+            } else {
+                delay(backoffMs(attempt))
+            }
         }
     }
 
+    /** Bitta sessiya urinishining natijasi — [reconnectLoop] shunga qarab qaror qiladi. */
+    private enum class SessionOutcome {
+        /** Namespace'ga CONNECT tasdiqlandi (keyin uzilgan bo'lishi mumkin). */
+        CONNECTED,
+
+        /** Token bor edi, lekin ulanib bo'lmadi (tarmoq, proxy, yaroqsiz token). */
+        FAILED,
+
+        /** Saqlangan sessiya yo'q — ulanishga urinilmadi ham. */
+        NO_TOKEN,
+    }
+
     /**
-     * Bitta sessiya — avval WebSocket, u ulanmasa **polling**. Muvaffaqiyatli CONNECT
-     * bo'lgan bo'lsa `true`.
+     * Bitta sessiya — avval WebSocket, u ulanmasa **polling**.
      *
      * Nega ikki transport: Engine.IO ning o'zi ham shunday ishlaydi. WebSocket upgrade'ni
      * reverse-proxy (nginx'da `proxy_set_header Upgrade` unutilgan bo'lsa), korporativ
@@ -210,17 +239,17 @@ class SocketIoClient(
      * Polling'ga tushib qolsak ham [WS_RETRY_EVERY] sessiyada bir marta WebSocket qayta
      * sinaladi: server tuzatilgan kuni ilova o'zi yaxshiroq transportga qaytadi.
      */
-    private suspend fun runSession(refreshToken: Boolean): Boolean {
+    private suspend fun runSession(refreshToken: Boolean): SessionOutcome {
         val token = runCatching { tokenProvider(refreshToken) }.getOrNull()
         // Sessiya yo'q — ulanishga urinishning ma'nosi yo'q (kirmagan foydalanuvchi).
         if (token.isNullOrBlank()) {
-            Napier.w("WS: token yo'q — ulanmaymiz", tag = LOG_TAG)
-            return false
+            Napier.d("WS: token yo'q — ulanmaymiz", tag = LOG_TAG)
+            return SessionOutcome.NO_TOKEN
         }
 
         if (pollingRounds == 0) {
             namespaceClosed = false
-            if (runWebSocketSession(token)) return true
+            if (runWebSocketSession(token)) return SessionOutcome.CONNECTED
             Napier.w("WS transporti ulanmadi — polling'ga o'tamiz", tag = LOG_TAG)
         }
 
@@ -229,7 +258,7 @@ class SocketIoClient(
         // Polling ham ishlamasa hisoblagichni nolga qaytaramiz: muammo transportda emas,
         // tarmoqda — keyingi urinish yana WebSocket'dan boshlansin.
         pollingRounds = if (connected) (pollingRounds + 1) % WS_RETRY_EVERY else 0
-        return connected
+        return if (connected) SessionOutcome.CONNECTED else SessionOutcome.FAILED
     }
 
     // --- WebSocket transporti -------------------------------------------------------------
@@ -507,6 +536,13 @@ class SocketIoClient(
 
         /** Shundan uzun sessiya "barqaror" — kechikish hisoblagichi nolga qaytadi. */
         const val STABLE_SESSION_MS = 30_000L
+
+        /**
+         * Kirilmagan holatda tokenni qayta tekshirish oralig'i. Tarmoqqa chiqmaydi —
+         * faqat local `TokenStore` o'qiladi, shuning uchun qisqa bo'lishi mumkin va
+         * foydalanuvchi kirgach kanal deyarli darhol ko'tariladi.
+         */
+        const val NO_SESSION_POLL_MS = 2_000L
 
         fun backoffMs(attempt: Int): Long = when {
             attempt <= 0 -> 1_000L

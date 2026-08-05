@@ -184,8 +184,11 @@ class DatabaseSchemaTest {
         // 28.sqm — chat lentasidagi qo'ng'iroq yozuvi (`MessageEntity.call*`) va ovozli
         // xabar matni (`attachmentTranscript`) — `handoff/09-CALLS-REST.md` §4.
         // 29.sqm — e'lonning ko'rinish doirasi (`ListingEntity.audience`,
-        // `STUDENT_LISTINGS_BACKEND.md` §7.2.4): eski qatorlar 'ALL' bo'lib qoladi.
-        assertEquals(30L, StudentClubDatabase.Schema.version)
+        // `STUDENT_LISTINGS_BACKEND.md` §7.2.4): eski qatorlar 'ALL' bo'lib qoladi,
+        // 30.sqm — bildirishnomalar `GET /v1/notifications` keshiga aylandi
+        // (`NOTIFICATIONS_BACKEND.md`): `timeLabel`/`sortOrder` o'rniga `createdAt`,
+        // ustiga bosilganda ochiladigan ekran uchun `targetType`/`targetId`.
+        assertEquals(31L, StudentClubDatabase.Schema.version)
     }
 
     @Test
@@ -199,8 +202,8 @@ class DatabaseSchemaTest {
         assertEquals("DARK", db.appSettingQueries.selectByKey("theme_mode").executeAsOne())
 
         // Notification (C1)
-        db.notificationQueries.insert("n1", "Sarlavha", "Matn", "JOB", "hozir", 1, 0)
-        db.notificationQueries.insert("n2", "Sarlavha 2", "Matn 2", "CHAT", "hozir", 2, 1)
+        db.notificationQueries.upsert("n1", "Sarlavha", "Matn", "JOB", 1_700_000_000_000, "LISTING", "l-1", 0)
+        db.notificationQueries.upsert("n2", "Sarlavha 2", "Matn 2", "CHAT", 1_700_000_100_000, null, null, 1)
         assertEquals(1L, db.notificationQueries.countUnread().executeAsOne())
         db.notificationQueries.markAllRead()
         assertEquals(0L, db.notificationQueries.countUnread().executeAsOne())
@@ -619,7 +622,7 @@ class DatabaseSchemaTest {
         db.appSettingQueries.upsert("k", "v")
         assertEquals("v", db.appSettingQueries.selectByKey("k").executeAsOne())
 
-        db.notificationQueries.insert("n1", "T", "B", "SYSTEM", "hozir", 1, 0)
+        db.notificationQueries.upsert("n1", "T", "B", "SYSTEM", 1_700_000_000_000, null, null, 0)
         assertEquals(1L, db.notificationQueries.count().executeAsOne())
 
         // Eski Club satri ham joined ustuniga ega bo'lishi (DEFAULT 0) va setJoined ishlashi kerak.

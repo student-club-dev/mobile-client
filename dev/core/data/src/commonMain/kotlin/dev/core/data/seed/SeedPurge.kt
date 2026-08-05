@@ -12,7 +12,8 @@ import kotlinx.coroutines.withContext
  * (masalan "Dilnoza Rahimova" yoki "rent-chilonzor"). Bu qadam ularni tozalaydi.
  *
  * Faqat backendga ulangan bo'limlar tozalanadi — endpoint'i yo'qlari (ishlar, klublar,
- * bildirishnomalar, eski `ad` jadvali) o'z joyida qoladi.
+ * eski `ad` jadvali) o'z joyida qoladi. Bildirishnomalar bu ro'yxatda YO'Q va kerak
+ * emas: ularning jadvali `30.sqm` migratsiyasida butunlay almashtiriladi.
  *
  * Bir martalik: bajarilgani [PURGE_KEY] orqali `AppSetting` da belgilanadi. Keyinchalik
  * yana bir bo'lim backendga ko'chsa — [PURGE_VERSION] ni oshiring.

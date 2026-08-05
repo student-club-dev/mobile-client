@@ -56,6 +56,7 @@ import dev.core.uikit.components.ScGradientButton
 import dev.core.uikit.components.ScHeader
 import dev.core.uikit.components.ScIconTile
 import dev.core.uikit.components.ScIcons
+import dev.core.uikit.components.ScOverlay
 import dev.core.uikit.components.ScAvatar
 import dev.core.uikit.components.ScSectionHeader
 import dev.core.uikit.components.ScText
@@ -183,12 +184,12 @@ fun HomeScreen(
                 verticalArrangement = Arrangement.spacedBy(26.dp),
             ) {
                 // Story lentasi — eng tepada, bo'limlardan oldin (`handoff/07-STORIES.md` §2).
-                // O'z holatini o'zi boshqaradi: lenta bo'sh bo'lsa ham «Lavham» katakchasi
+                // O'z holatini o'zi boshqaradi: lenta bo'sh bo'lsa ham «Hikoyam» katakchasi
                 // qoladi, ya'ni bu yerda shart tekshirilmaydi.
                 StoriesRow(
                     myName = state.userName,
                     myAvatarUrl = state.avatarUrl,
-                    // Lavha muallifi ustiga bosilganda uning profili — CHATDAGI bilan bir xil
+                    // Hikoya muallifi ustiga bosilganda uning profili — CHATDAGI bilan bir xil
                     // varaq va bir xil bo'limlar (`rememberPeerProfileSections`). Varaqni shu
                     // yerda chizamiz: story moduli chat moduliga bog'lanolmaydi.
                     onOpenProfile = { author -> profileStudent = author },
@@ -228,23 +229,28 @@ fun HomeScreen(
             }
         }
 
-        HomeSideNav(
-            nav = sideNav,
-            state = state,
-            onOpenProfile = onOpenProfile,
-            onOpenUniversity = onOpenUniversity,
-            onOpenListings = onOpenListings,
-            // Kalitsiz — butun "Takliflar" feed'i (bo'lim filtri yo'q).
-            onOpenOffers = { onOpenDiscounts(null) },
-            onOpenRentals = onOpenRentals,
-            onOpenChat = onOpenChat,
-            onOpenNotifications = onOpenNotifications,
-            onOpenStudents = onOpenStudents,
-            onOpenStudentSearch = onOpenStudentSearch,
-            onOpenStudentRequests = onOpenStudentRequests,
-            onOpenMyListings = onOpenMyListings,
-            onOpenSettings = onOpenSettings,
-        )
+        // Panel EKRAN USTIDA emas, KARKAS ustida chiziladi: pastki navigatsiya paneli
+        // `NavHost` dan keyin keladi va aks holda ochiq panelning ustida qolib ketardi
+        // (`ScOverlay` izohiga q.). Holat shu yerda qoladi — faqat chizish ko'chadi.
+        ScOverlay(SideNavOverlayKey) {
+            HomeSideNav(
+                nav = sideNav,
+                state = state,
+                onOpenProfile = onOpenProfile,
+                onOpenUniversity = onOpenUniversity,
+                onOpenListings = onOpenListings,
+                // Kalitsiz — butun "Takliflar" feed'i (bo'lim filtri yo'q).
+                onOpenOffers = { onOpenDiscounts(null) },
+                onOpenRentals = onOpenRentals,
+                onOpenChat = onOpenChat,
+                onOpenNotifications = onOpenNotifications,
+                onOpenStudents = onOpenStudents,
+                onOpenStudentSearch = onOpenStudentSearch,
+                onOpenStudentRequests = onOpenStudentRequests,
+                onOpenMyListings = onOpenMyListings,
+                onOpenSettings = onOpenSettings,
+            )
+        }
     }
 
     profileStudent?.let { author ->
@@ -379,8 +385,8 @@ private fun HomeHeader(
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
                 )
-                val badge =
-                    listOfNotNull(state.universityMonogram, state.courseLabel).joinToString(" · ")
+                // Faqat universitet — kurs (nechanchi bosqich) ataylab ko'rsatilmaydi.
+                val badge = state.universityMonogram.orEmpty()
                 if (badge.isNotBlank()) {
                     CollapsingRow(p, fullHeight = 30.dp) {
                         Row(

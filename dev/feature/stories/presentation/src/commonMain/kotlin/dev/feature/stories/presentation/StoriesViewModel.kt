@@ -27,14 +27,14 @@ import kotlinx.coroutines.launch
 data class StoriesState(
     /** **Server tartibida**: avval ko'rilmaganlar, ular ichida yangidan eskiga. */
     val groups: List<StoryGroup> = emptyList(),
-    /** O'z faol lavhalarim — «Sizning lavhangiz» katakchasi uchun. */
+    /** O'z faol hikoyalarim — «Sizning hikoyangiz» katakchasi uchun. */
     val mine: List<Story> = emptyList(),
     val loading: Boolean = false,
-    /** Yangi lavha yuklanyapti — katakchada indikator. */
+    /** Yangi hikoya yuklanyapti — katakchada indikator. */
     val publishing: Boolean = false,
     /**
      * Yuklash foizi (`0f..1f`). Fayl ketib bo'lgach `null` bo'ladi va katakcha
-     * "tayyorlanmoqda" holatiga o'tadi: server lavhani yaratishi (video bo'lsa —
+     * "tayyorlanmoqda" holatiga o'tadi: server hikoyani yaratishi (video bo'lsa —
      * transkod qilishi) qancha davom etishini oldindan bilib bo'lmaydi.
      */
     val publishProgress: Float? = null,
@@ -43,7 +43,7 @@ data class StoriesState(
     val hasMine: Boolean get() = mine.isNotEmpty()
 }
 
-/** Ochilgan viewer holati — qaysi guruh, qaysi lavha. */
+/** Ochilgan viewer holati — qaysi guruh, qaysi hikoya. */
 @Immutable
 data class StoryViewerState(
     val group: StoryGroup? = null,
@@ -56,7 +56,7 @@ data class StoryViewerState(
 /**
  * Story lentasi va ko'ruvchisi.
  *
- * Kesh yo'q ([StoryRepository] izohi): lavha 24 soat yashaydi va istalgan payt muddati
+ * Kesh yo'q ([StoryRepository] izohi): hikoya 24 soat yashaydi va istalgan payt muddati
  * o'tishi mumkin, shu jumladan foydalanuvchi uni **ochib turganda**. Shuning uchun `404`
  * xato oynasi bilan emas, **lentani yangilash** bilan qarshi olinadi (§10).
  */
@@ -90,7 +90,7 @@ class StoriesViewModel(
         viewModelScope.launch {
             val feed = repository.feed()
             val mine = repository.mine()
-            // Faqat O'ZIMNIKIGA local nusxa qidiriladi — boshqa odamning lavhasi telefonda
+            // Faqat O'ZIMNIKIGA local nusxa qidiriladi — boshqa odamning hikoyasi telefonda
             // yo'q.
             val local = localMediaUrls()
             _state.update { current ->
@@ -107,21 +107,21 @@ class StoriesViewModel(
         }
     }
 
-    /** Guruhni ochadi — **birinchi ko'rilmagan** lavhadan (`StoryGroup.startIndex`). */
+    /** Guruhni ochadi — **birinchi ko'rilmagan** hikoyadan (`StoryGroup.startIndex`). */
     fun open(group: StoryGroup) {
         _viewer.value = StoryViewerState(group = group, index = group.startIndex)
         markViewed()
     }
 
     /**
-     * **O'z lavhalarimni** ochadi — Instagram/Telegramdagidek: lenta ularni ham ko'rsatadi.
+     * **O'z hikoyalarimni** ochadi — Instagram/Telegramdagidek: lenta ularni ham ko'rsatadi.
      *
      * `GET /v1/stories/feed` faqat **boshqalarnikini** qaytaradi (o'zingiz o'zingizga
      * bog'langan emassiz), shuning uchun guruh shu yerda `GET /v1/stories/me`
      * ([StoriesState.mine]) dan yig'iladi. Muallif — o'zim: ism va avatar tashqaridan
      * (bosh ekran profilidan) keladi, chunki story moduli profil modulini bilmaydi.
      *
-     * Lavhalar **eskidan yangiga** tartiblanadi — guruh ichidagi ko'rish tartibi shunday
+     * Hikoyalar **eskidan yangiga** tartiblanadi — guruh ichidagi ko'rish tartibi shunday
      * (`handoff/07-STORIES.md` §2), `mine` esa yangidan eskiga keladi.
      */
     fun openMine(name: String, avatarUrl: String?) {
@@ -135,7 +135,7 @@ class StoriesViewModel(
                     avatarUrl = avatarUrl,
                 ),
                 stories = stories,
-                // O'z lavham doim "ko'rilgan" — halqa boshqacha sababga ko'ra yonadi.
+                // O'z hikoyam doim "ko'rilgan" — halqa boshqacha sababga ko'ra yonadi.
                 hasUnseen = false,
                 lastCreatedAt = stories.last().createdAt,
             ),
@@ -144,12 +144,12 @@ class StoriesViewModel(
 
     fun close() {
         _viewer.value = StoryViewerState()
-        // Ko'rilgan lavhalar halqasi o'chishi kerak — lentani yangilaymiz.
+        // Ko'rilgan hikoyalar halqasi o'chishi kerak — lentani yangilaymiz.
         refresh()
     }
 
     /**
-     * Keyingi lavha; guruhning oxirida — **keyingi guruh** (Telegram/Instagram xulqi).
+     * Keyingi hikoya; guruhning oxirida — **keyingi guruh** (Telegram/Instagram xulqi).
      * Oxirgi guruh tugasa viewer yopiladi.
      */
     fun next() {
@@ -161,14 +161,14 @@ class StoriesViewModel(
             return
         }
         val groups = _state.value.groups
-        // ⚠️ Guruh lentada BO'LMASLIGI mumkin — o'z lavhalarim ([openMine]) feed'dan
-        // kelmaydi. U holda oxirida boshqa odamning lavhasiga sakrab o'tmaslik kerak.
+        // ⚠️ Guruh lentada BO'LMASLIGI mumkin — o'z hikoyalarim ([openMine]) feed'dan
+        // kelmaydi. U holda oxirida boshqa odamning hikoyasiga sakrab o'tmaslik kerak.
         val index = groups.indexOfFirst { it.author.id == group.author.id }
         val nextGroup = if (index < 0) null else groups.getOrNull(index + 1)
         if (nextGroup == null) close() else open(nextGroup)
     }
 
-    /** Oldingi lavha; guruh boshida bo'lsa hech narsa qilinmaydi (ekran yopilmaydi). */
+    /** Oldingi hikoya; guruh boshida bo'lsa hech narsa qilinmaydi (ekran yopilmaydi). */
     fun previous() {
         val current = _viewer.value
         if (current.index <= 0) return
@@ -176,7 +176,7 @@ class StoriesViewModel(
     }
 
     /**
-     * Lavha yaratadi. Fayl turi nomidan aniqlanadi; rasm uchun 12 MB, video uchun 48 MB
+     * Hikoya yaratadi. Fayl turi nomidan aniqlanadi; rasm uchun 12 MB, video uchun 48 MB
      * chegara serverda ham bor (§1).
      */
     fun publish(bytes: ByteArray, fileName: String, caption: String?) =
@@ -191,7 +191,7 @@ class StoriesViewModel(
         }
 
     /**
-     * Video lavha — media **diskdagi fayldan** yuklanadi.
+     * Video hikoya — media **diskdagi fayldan** yuklanadi.
      *
      * Rasmdan farqli o'laroq baytlar xotiraga o'qilmaydi: 48 MB lik `ByteArray` va uning
      * multipart nusxasi birga arzon telefonni xotiradan qoqib tashlardi.
@@ -228,7 +228,7 @@ class StoriesViewModel(
     /**
      * Yuborilgan media telefonda **qoladi** — «StudentClub» papkasida.
      *
-     * Nega: o'z lavhangizni ko'rish uchun uni serverdan qayta yuklab olish bekorga
+     * Nega: o'z hikoyangizni ko'rish uchun uni serverdan qayta yuklab olish bekorga
      * sarflangan trafik. Saqlash yiqilsa hech narsa bo'lmaydi — o'shanda media eskicha,
      * tarmoqdan o'qiladi.
      */
@@ -250,7 +250,7 @@ class StoriesViewModel(
             val result = create { fraction ->
                 _state.update { current ->
                     when {
-                        // Fayl to'liq ketdi. Endi server lavhani yaratmoqda (video bo'lsa —
+                        // Fayl to'liq ketdi. Endi server hikoyani yaratmoqda (video bo'lsa —
                         // transkod, `MEDIA_NOT_READY` bilan qayta urinishlar) va bu qancha
                         // davom etishi noma'lum — foiz o'rniga aylanma halqa.
                         fraction >= UPLOAD_DONE -> current.copy(publishProgress = null)
@@ -264,7 +264,7 @@ class StoriesViewModel(
             when (result) {
                 is Resource.Success -> {
                     _state.update {
-                        it.copy(publishing = false, publishProgress = null, message = "Lavha joylandi")
+                        it.copy(publishing = false, publishProgress = null, message = "Hikoya joylandi")
                     }
                     refresh()
                 }
@@ -291,7 +291,7 @@ class StoriesViewModel(
     /**
      * Video **siqilmoqda** — yuklash boshlanishidan oldingi bosqich.
      *
-     * Katakcha shu vaqt ichida ham band ko'rinadi: 4K lavha bir necha o'n soniya siqiladi
+     * Katakcha shu vaqt ichida ham band ko'rinadi: 4K hikoya bir necha o'n soniya siqiladi
      * va busiz foydalanuvchi "bosdim, hech nima bo'lmadi" deb ikkinchi marta tanlardi.
      */
     fun messageShown() = _state.update { it.copy(message = null) }
@@ -303,9 +303,9 @@ class StoriesViewModel(
      * xato kutib emas.
      */
     /**
-     * Lavha muallifi **men**mi.
+     * Hikoya muallifi **men**mi.
      *
-     * Profilni ochishdan oldin tekshiriladi: o'z lavhangda muallif ustiga bosish
+     * Profilni ochishdan oldin tekshiriladi: o'z hikoyangda muallif ustiga bosish
      * «bog'lanish» tugmalari bilan o'z profilingizni ochardi.
      */
     fun isMine(authorId: String): Boolean = _state.value.mine.any { it.authorId == authorId }
@@ -314,7 +314,7 @@ class StoriesViewModel(
 
     /**
      * `POST /v1/stories/{id}/view` — **idempotent** va fon amali: javobi kutilmaydi, xatosi
-     * ko'rsatilmaydi. O'z lavhangizni ko'rish umuman hisoblanmaydi (server tomonda).
+     * ko'rsatilmaydi. O'z hikoyangizni ko'rish umuman hisoblanmaydi (server tomonda).
      */
     private fun markViewed() {
         val id = _viewer.value.story?.id ?: return

@@ -55,7 +55,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import dev.core.uikit.components.ScBackHandler
+import dev.core.uikit.components.ScEmptyStateBox
+import dev.core.uikit.components.ScEmptyTitle
 import dev.core.uikit.components.ScIcons
+import dev.core.uikit.components.ScNotFoundTitle
 import dev.core.uikit.components.ScSearchOverlay
 import dev.core.uikit.components.ScText
 import dev.core.uikit.components.scBrandShadow
@@ -115,7 +118,7 @@ internal fun MessagesScreen(
     var blockFor by remember { mutableStateOf<ConversationItem?>(null) }
     var reportFor by remember { mutableStateOf<ConversationItem?>(null) }
 
-    /** Lavha muallifi bosildi — uning profili (bosh ekrandagi bilan bir xil varaq). */
+    /** Hikoya muallifi bosildi — uning profili (bosh ekrandagi bilan bir xil varaq). */
     var profileStudent by remember { mutableStateOf<StudentSummary?>(null) }
 
     val scope = rememberCoroutineScope()
@@ -303,7 +306,12 @@ internal fun MessagesScreen(
                     state = archivedState,
                     typing = typing,
                     contentPadding = listPadding,
-                    empty = if (query.isBlank()) "Arxiv bo'sh" else notFound,
+                    empty = if (query.isBlank()) {
+                        "Arxivga ko'chirilgan suhbat yo'q."
+                    } else {
+                        notFound
+                    },
+                    emptyTitle = if (query.isBlank()) ScEmptyTitle else ScNotFoundTitle,
                     onOpen = onOpen,
                     onLongPress = { actionFor = it },
                 )
@@ -334,8 +342,9 @@ internal fun MessagesScreen(
                                     typing = typing,
                                     contentPadding = listPadding,
                                     empty = if (query.isNotBlank()) notFound else {
-                                        "Suhbatlar yo'q.\n\"Do'stlar\" bo'limidan yozishni boshlang."
+                                        "\"Do'stlar\" bo'limidan yozishni boshlang."
                                     },
+                                    emptyTitle = if (query.isNotBlank()) ScNotFoundTitle else ScEmptyTitle,
                                     onOpen = onOpen,
                                     onLongPress = { actionFor = it },
                                 )
@@ -345,8 +354,9 @@ internal fun MessagesScreen(
                                     state = clubsState,
                                     contentPadding = listPadding,
                                     empty = if (query.isNotBlank()) notFound else {
-                                        "Klublar yo'q.\nUlar tez orada qo'shiladi."
+                                        "Klublar tez orada qo'shiladi."
                                     },
+                                    emptyTitle = if (query.isNotBlank()) ScNotFoundTitle else ScEmptyTitle,
                                     onToggleJoin = onToggleJoin,
                                     onOpen = onClubSoon,
                                 )
@@ -461,13 +471,17 @@ private fun ConversationsPage(
     typing: Set<String>,
     contentPadding: PaddingValues,
     empty: String,
+    emptyTitle: String,
     onOpen: (ConversationItem) -> Unit,
     onLongPress: (ConversationItem) -> Unit,
 ) {
     if (items.isEmpty()) {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            ScText(empty, 14f, FontWeight.Medium, Sc.Muted, lineHeight = 21f)
-        }
+        ScEmptyStateBox(
+            Modifier.fillMaxSize(),
+            title = emptyTitle,
+            message = empty,
+            icon = ScIcons.ChatRound,
+        )
         return
     }
     LazyColumn(
@@ -507,18 +521,17 @@ private fun ClubsPage(
     state: androidx.compose.foundation.lazy.LazyListState,
     contentPadding: PaddingValues,
     empty: String,
+    emptyTitle: String,
     onToggleJoin: (Club) -> Unit,
     onOpen: () -> Unit,
 ) {
     if (clubs.isEmpty()) {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            ScText(
-                empty,
-                14f, FontWeight.Medium, Sc.Muted,
-                Modifier.padding(horizontal = Sc.ScreenPadding),
-                lineHeight = 21f,
-            )
-        }
+        ScEmptyStateBox(
+            Modifier.fillMaxSize(),
+            title = emptyTitle,
+            message = empty,
+            icon = ScIcons.Users,
+        )
         return
     }
     LazyColumn(

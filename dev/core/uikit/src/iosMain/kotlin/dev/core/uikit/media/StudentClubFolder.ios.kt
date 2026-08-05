@@ -18,6 +18,11 @@ import platform.Foundation.NSURL
 import platform.Foundation.NSURLSession
 import platform.Foundation.NSUserDomainMask
 import platform.Foundation.create
+// ⚠️ Obj-C **kategoriya** metodlari — Kotlin/Native ularni kengaytma sifatida beradi va
+// import qilinmasa umuman ko'rinmaydi (`setValue` o'rniga stdlib'ning delegat versiyasi
+// topilib, xato tushunarsiz bo'lib chiqadi).
+import platform.Foundation.downloadTaskWithRequest
+import platform.Foundation.setValue
 import platform.Foundation.writeToFile
 import kotlin.coroutines.resume
 
@@ -71,7 +76,9 @@ actual suspend fun cacheRemoteToStudentClubFolder(
     }
 
     // `downloadTask` faylni diskka oqim bilan yozadi — video xotiraga o'qilmaydi.
-    val temp = suspendCancellableCoroutine { continuation ->
+    // Tur ATAYLAB ochiq yozilgan: u faqat `resume` chaqiruvidan kelib chiqadi va
+    // kompilyator uni lambda ichidan chiqarib ololmaydi.
+    val temp = suspendCancellableCoroutine<String?> { continuation ->
         val task = NSURLSession.sharedSession.downloadTaskWithRequest(request) { location, response, _ ->
             val code = (response as? NSHTTPURLResponse)?.statusCode?.toInt()
             // Xato javobining tanasi ham faylga tushadi: uni saqlasak keyingi ochilishda
