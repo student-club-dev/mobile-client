@@ -13,7 +13,9 @@ kotlin {
 
     sourceSets {
         commonMain.dependencies {
-            implementation(libs.kotlinx.coroutines.core)
+            // `api` — `AppMessageBus.messages` (SharedFlow) modul chegarasidan tashqarida,
+            // UI qatlamida o'qiladi.
+            api(libs.kotlinx.coroutines.core)
             api(libs.napier)
         }
         // Telefon/summa qoliplari (`format/Formats.kt`) — butun ilova shularga tayanadi.

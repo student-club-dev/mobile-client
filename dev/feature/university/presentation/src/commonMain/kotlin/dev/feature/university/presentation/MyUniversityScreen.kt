@@ -44,6 +44,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.core.uikit.components.ScCircleButton
+import dev.core.uikit.components.ScEmptyState
 import dev.core.uikit.components.ScGlyph
 import dev.core.uikit.components.ScGradientButton
 import dev.core.uikit.components.ScHeader
@@ -52,7 +53,9 @@ import dev.core.uikit.components.ScIconTile
 import dev.core.uikit.components.ScIcons
 import dev.core.uikit.components.ScAvatar
 import dev.core.uikit.components.ScMonogramTile
+import dev.core.uikit.components.ScNotFoundTitle
 import dev.core.uikit.components.ScSectionHeader
+import dev.core.uikit.components.ScPullRefresh
 import dev.core.uikit.components.ScSheetHandle
 import dev.core.uikit.components.ScSoftButton
 import dev.core.uikit.components.ScText
@@ -69,8 +72,9 @@ import dev.core.uikit.theme.Sc
 import dev.core.domain.model.DiscountOffer
 import dev.feature.listings.domain.model.Listing
 import dev.feature.listings.domain.model.formatSum
-import dev.feature.students.domain.model.FriendStatus
-import dev.feature.students.domain.model.Student
+import dev.feature.connections.domain.model.ConnectionView
+import dev.feature.connections.domain.model.SearchedStudent
+import dev.feature.connections.domain.model.StudentSummary
 import dev.feature.university.domain.model.University
 import org.koin.compose.viewmodel.koinViewModel
 import androidx.compose.runtime.ReadOnlyComposable
@@ -93,6 +97,11 @@ fun MyUniversityScreen(
     onOpenListing: (String) -> Unit = {},
     /** "Barchasi" — talaba e'lonlari ekrani, Yordam tab'i bilan. */
     onOpenTasks: () -> Unit = {},
+    /**
+     * Talaba bosildi — profil varag'ini karkas ochadi (`StudentShell`). Bo'limlar story va
+     * chat modullarida yashaydi, bu modul esa ularni ko'rmaydi.
+     */
+    onOpenStudent: (StudentSummary) -> Unit = {},
     vm: MyUniversityViewModel = koinViewModel(),
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
@@ -108,62 +117,63 @@ fun MyUniversityScreen(
             ScHeader {
                 ScHeaderTitle("Mening universitetim", modifier = Modifier.padding(top = 20.dp))
             }
-            LazyColumn(
-                Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(top = 18.dp, bottom = 120.dp),
-                verticalArrangement = Arrangement.spacedBy(22.dp),
-            ) {
-                item {
-                    UniversitiesSelector(Modifier.padding(horizontal = Sc.ScreenPadding)) {
-                        vm.loadUniversities(); showPicker = true
+            ScPullRefresh(refreshing = state.refreshing, onRefresh = vm::refresh) {
+                LazyColumn(
+                    Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(top = 18.dp, bottom = 120.dp),
+                    verticalArrangement = Arrangement.spacedBy(22.dp),
+                ) {
+                    item {
+                        UniversitiesSelector(Modifier.padding(horizontal = Sc.ScreenPadding)) {
+                            vm.loadUniversities(); showPicker = true
+                        }
                     }
-                }
 
-                val uni = state.university
-                if (uni == null) {
-                    item {
-                        EmptyUniversity(
-                            loading = state.loading,
-                            modifier = Modifier.padding(horizontal = Sc.ScreenPadding),
-                        )
-                    }
-                } else {
-                    item { UniversityCard(uni, state.mates.size, Modifier.padding(horizontal = Sc.ScreenPadding)) }
-                    item {
-                        ScSectionHeader(
-                            "Do'stlashish uchun talabalar",
-                            Modifier.padding(horizontal = Sc.ScreenPadding),
-                            action = if (state.mates.isNotEmpty()) "Barchasi" else null,
-                            onAction = { showStudents = true },
-                        )
-                    }
-                    if (state.mates.isEmpty()) {
+                    val uni = state.university
+                    if (uni == null) {
                         item {
-                            ScText(
-                                "Hozircha talaba yo'q.", 13f, FontWeight.Medium, Sc.Muted,
-                                Modifier.padding(horizontal = Sc.ScreenPadding),
+                            EmptyUniversity(
+                                loading = state.loading,
+                                modifier = Modifier.padding(horizontal = Sc.ScreenPadding),
                             )
                         }
                     } else {
-                        item {
-                            LazyRow(
-                                Modifier.fillMaxWidth(),
-                                contentPadding = PaddingValues(horizontal = Sc.ScreenPadding),
-                                horizontalArrangement = Arrangement.spacedBy(13.dp),
-                            ) {
-                                itemsIndexed(state.mates, key = { _, s -> s.id }) { index, s ->
-                                    MateCard(s, index) { vm.toggleFriend(s) }
+                        item { UniversityCard(uni, state.mates.size, Modifier.padding(horizontal = Sc.ScreenPadding)) }
+                        // Talaba yo'q bo'lsa BUTUN bo'lim (sarlavha ham) tushib qoladi: bo'sh
+                        // plitka ekranni cho'zardi, foydalanuvchiga esa hech nima bermasdi.
+                        if (state.mates.isNotEmpty()) {
+                            item {
+                                ScSectionHeader(
+                                    "Do'stlashish uchun talabalar",
+                                    Modifier.padding(horizontal = Sc.ScreenPadding),
+                                    action = "Barchasi",
+                                    onAction = { showStudents = true },
+                                )
+                            }
+                            item {
+                                LazyRow(
+                                    Modifier.fillMaxWidth(),
+                                    contentPadding = PaddingValues(horizontal = Sc.ScreenPadding),
+                                    horizontalArrangement = Arrangement.spacedBy(13.dp),
+                                ) {
+                                    itemsIndexed(state.mates, key = { _, s -> s.student.id }) { index, s ->
+                                        MateCard(
+                                            s, index,
+                                            onConnect = { vm.connect(s) },
+                                            onOpen = { onOpenStudent(s.student) },
+                                        )
+                                    }
                                 }
                             }
                         }
+                        // Universitetimga tegishli topshiriq e'lonlari — talabalardan keyin,
+                        // atrofdagi joylardan oldin (u ham "universitetim" haqidagi ma'lumot).
+                        tasksSection(state.tasks, onSeeAll = onOpenTasks, onOpen = onOpenListing)
                     }
-                    // Universitetimga tegishli topshiriq e'lonlari — talabalardan keyin,
-                    // atrofdagi joylardan oldin (u ham "universitetim" haqidagi ma'lumot).
-                    tasksSection(state.tasks, onSeeAll = onOpenTasks, onOpen = onOpenListing)
-                }
 
-                nearbySection("Ovqatlar", state.foods, onMap = { showFoodMap = true }) { selectedOffer = it }
-                nearbySection("Printerxonalar", state.printShops, onMap = { showPrintMap = true }) { selectedOffer = it }
+                    nearbySection("Ovqatlar", state.foods, onMap = { showFoodMap = true }) { selectedOffer = it }
+                    nearbySection("Printerxonalar", state.printShops, onMap = { showPrintMap = true }) { selectedOffer = it }
+                }
             }
         }
 
@@ -178,7 +188,8 @@ fun MyUniversityScreen(
         if (showStudents) {
             StudentsOverlay(
                 students = state.mates,
-                onFriend = { vm.toggleFriend(it) },
+                onConnect = { vm.connect(it) },
+                onOpenStudent = onOpenStudent,
                 onClose = { showStudents = false },
             )
         }
@@ -234,18 +245,31 @@ private fun UniversityCard(uni: University, matesCount: Int, modifier: Modifier 
         Row(horizontalArrangement = Arrangement.spacedBy(15.dp)) {
             ScMonogramTile(uni.monogram, Sc.TintGreenDeep, Sc.Success, size = 78.dp, radius = 22.dp, fontSize = 20f)
             Column(Modifier.weight(1f)) {
-                ScText(uni.name, 17f, FontWeight.ExtraBold, Sc.Ink, lineHeight = 21f, letterSpacing = -0.2f)
-                if (uni.city.isNotBlank()) {
+                // Qisqa nom — huquqiy shtampsiz va taxallussiz (`UniversityNaming`). Uch
+                // qatordan oshsa kesiladi: kartochka balandligi ro'yxatdagi eng uzun nomga
+                // qarab sakramasligi kerak. To'liq rasmiy nom pastda turadi.
+                ScText(
+                    uni.shortName, 17f, FontWeight.ExtraBold, Sc.Ink,
+                    lineHeight = 21f, letterSpacing = -0.2f, maxLines = 3,
+                )
+                val place = listOfNotNull(uni.branch, uni.shortCity.ifBlank { null }).joinToString(" · ")
+                if (place.isNotBlank()) {
                     Spacer(Modifier.height(8.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         Icon(
                             ScIcons.MapPin, null, tint = Sc.Muted,
                             modifier = Modifier.padding(top = 1.dp).size(15.dp),
                         )
-                        ScText(uni.city, 12.5f, FontWeight.Medium, Sc.Muted, lineHeight = 18f)
+                        ScText(place, 12.5f, FontWeight.Medium, Sc.Muted, lineHeight = 18f, maxLines = 2)
                     }
                 }
             }
+        }
+        // To'liq rasmiy nom — hujjatlarda shu yoziladi, shuning uchun butun ilovada
+        // aynan SHU YERDA, bir joyda saqlanadi. Qisqa nomdan farqi bo'lmasa ko'rsatilmaydi.
+        if (uni.name.trim() != uni.shortName) {
+            Spacer(Modifier.height(14.dp))
+            ScText(uni.name, 11.5f, FontWeight.Medium, Sc.MutedLight, lineHeight = 16f, maxLines = 4)
         }
         Spacer(Modifier.height(16.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(11.dp)) {
@@ -302,14 +326,22 @@ private fun EmptyUniversity(loading: Boolean, modifier: Modifier = Modifier) {
 // ---------------------------------------------------------------------------
 
 @Composable
-private fun MateCard(student: Student, index: Int, onFriend: () -> Unit) {
+private fun MateCard(
+    item: SearchedStudent,
+    index: Int,
+    onConnect: () -> Unit,
+    onOpen: () -> Unit,
+) {
     val (tint, accent) = tilePalette[index.mod(tilePalette.size)]
+    val student = item.student
     Column(
-        Modifier.width(150.dp).scCard(radius = 26.dp).padding(horizontal = 16.dp, vertical = 18.dp),
+        // Kartaning O'ZI profilni ochadi; "Bog'lanish" tugmasi o'z bosishini yutadi.
+        Modifier.width(150.dp).scCard(radius = 26.dp).clickable(onClick = onOpen)
+            .padding(horizontal = 16.dp, vertical = 18.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         ScAvatar(
-            name = student.firstName,
+            name = student.displayName,
             size = 62.dp,
             avatarUrl = student.avatarUrl,
             background = tint,
@@ -317,32 +349,36 @@ private fun MateCard(student: Student, index: Int, onFriend: () -> Unit) {
             shape = RoundedCornerShape(24.dp),
         )
         Spacer(Modifier.height(12.dp))
-        ScText(student.firstName, 16f, FontWeight.ExtraBold, Sc.Ink, maxLines = 1)
+        ScText(student.displayName, 16f, FontWeight.ExtraBold, Sc.Ink, maxLines = 1)
         Spacer(Modifier.height(3.dp))
-        ScText("${student.faculty} · ${courseText(student.course)}", 12.5f, FontWeight.SemiBold, Sc.Muted, maxLines = 1)
+        ScText(courseText(student.courseYear), 12.5f, FontWeight.SemiBold, Sc.Muted, maxLines = 1)
         Spacer(Modifier.height(14.dp))
-        FriendButton(student, onFriend)
+        ConnectButton(item.connectionStatus, onConnect)
     }
 }
 
+/**
+ * Bog'lanish tugmasi. Faqat [ConnectionView.NONE] holatida bosiladi — qolgan holatlar
+ * (kutilyapti, bog'langan, u so'rov yuborgan) "Do'stlar" ekranida boshqariladi.
+ */
 @Composable
-private fun FriendButton(student: Student, onFriend: () -> Unit) {
-    val pending = student.friendStatus != FriendStatus.NONE
-    val label = when (student.friendStatus) {
-        FriendStatus.FRIENDS -> "Do'st"
-        FriendStatus.PENDING -> "Kutilmoqda"
-        FriendStatus.NONE -> "+ Do'st"
+private fun ConnectButton(status: ConnectionView, onConnect: () -> Unit) {
+    val label = when (status) {
+        ConnectionView.NONE -> "+ Bog'lanish"
+        ConnectionView.PENDING_OUT -> "Yuborildi"
+        ConnectionView.PENDING_IN -> "So'rov bor"
+        ConnectionView.CONNECTED -> "Bog'langan"
     }
-    if (pending) {
-        ScSoftButton(
-            label, onFriend,
-            radius = 16.dp, verticalPadding = 10.dp, fontSize = 13.5f,
-            background = Sc.TintBlue, color = Sc.Brand,
+    if (status == ConnectionView.NONE) {
+        ScGradientButton(
+            label, onConnect,
+            radius = 16.dp, verticalPadding = 10.dp, fontSize = 13.5f, weight = FontWeight.Bold,
         )
     } else {
-        ScGradientButton(
-            label, onFriend,
-            radius = 16.dp, verticalPadding = 10.dp, fontSize = 13.5f, weight = FontWeight.Bold,
+        ScSoftButton(
+            label, {},
+            radius = 16.dp, verticalPadding = 10.dp, fontSize = 13.5f,
+            background = Sc.TintBlue, color = Sc.Brand,
         )
     }
 }
@@ -356,31 +392,23 @@ private fun FriendButton(student: Student, onFriend: () -> Unit) {
  * (`Listing.universityId`). Bir OTMdagi talaba bir xil fandan, bir xil o'qituvchining
  * topshirig'idan yordam so'raydi — shuning uchun bu ro'yxat universitet ekranida turadi.
  *
- * E'lon yo'q bo'lsa sarlavha baribir ko'rinadi va nima uchun bo'shligini aytadi: bo'lim
- * butunlay yashirilsa, foydalanuvchi bunday imkoniyat borligini umuman bilmay qolardi.
+ * E'lon yo'q bo'lsa bo'lim BUTUNLAY chizilmaydi — sarlavha ham, bo'sh holat ham. Ekranda
+ * faqat haqiqatan ma'lumoti bor bo'limlar qoladi.
  */
 private fun androidx.compose.foundation.lazy.LazyListScope.tasksSection(
     tasks: List<Listing>,
     onSeeAll: () -> Unit,
     onOpen: (String) -> Unit,
 ) {
+    if (tasks.isEmpty()) return
     item {
         ScSectionHeader(
             "📚 Fanlardan yordam",
             Modifier.padding(horizontal = Sc.ScreenPadding),
             subtitle = "Universitetimdagi topshiriq e'lonlari",
-            action = if (tasks.isNotEmpty()) "Barchasi" else null,
+            action = "Barchasi",
             onAction = onSeeAll,
         )
-    }
-    if (tasks.isEmpty()) {
-        item {
-            ScText(
-                "Hozircha topshiriq e'loni yo'q.", 13f, FontWeight.Medium, Sc.Muted,
-                Modifier.padding(horizontal = Sc.ScreenPadding),
-            )
-        }
-        return
     }
     items(tasks.take(5), key = { it.id }) { listing ->
         TaskCard(listing, Modifier.padding(horizontal = Sc.ScreenPadding)) { onOpen(listing.id) }
@@ -424,24 +452,25 @@ private fun androidx.compose.foundation.lazy.LazyListScope.nearbySection(
     onMap: () -> Unit,
     onOffer: (DiscountOffer) -> Unit,
 ) {
+    // Joy topilmasa sarlavha ham chizilmaydi — aks holda ekranda hech qayerga olib
+    // bormaydigan "Ovqatlar" yozuvi osilib qolardi.
+    if (offers.isEmpty()) return
     item {
         ScSectionHeader(
             title,
             Modifier.padding(horizontal = Sc.ScreenPadding),
-            action = if (offers.isNotEmpty()) "Xarita" else null,
+            action = "Xarita",
             actionIcon = ScIcons.Map,
             onAction = onMap,
         )
     }
-    if (offers.isNotEmpty()) {
-        item {
-            LazyRow(
-                Modifier.fillMaxWidth().padding(top = 14.dp),
-                contentPadding = PaddingValues(horizontal = Sc.ScreenPadding),
-                horizontalArrangement = Arrangement.spacedBy(13.dp),
-            ) {
-                items(offers, key = { it.id }) { NearbyOfferCard(it) { onOffer(it) } }
-            }
+    item {
+        LazyRow(
+            Modifier.fillMaxWidth().padding(top = 14.dp),
+            contentPadding = PaddingValues(horizontal = Sc.ScreenPadding),
+            horizontalArrangement = Arrangement.spacedBy(13.dp),
+        ) {
+            items(offers, key = { it.id }) { NearbyOfferCard(it) { onOffer(it) } }
         }
     }
 }
@@ -515,7 +544,12 @@ private fun UniversitySheet(
                         ScText("Ro'yxatni yuklab bo'lmadi.\nInternetni tekshiring.", 13f, FontWeight.Medium, Sc.Muted)
                     }
                     picker.results.isEmpty() -> CenterNote {
-                        ScText("Universitet topilmadi.", 13f, FontWeight.Medium, Sc.Muted)
+                        ScEmptyState(
+                            title = ScNotFoundTitle,
+                            message = "Bunday universitet ro'yxatda yo'q. Nomini boshqacha yozib ko'ring.",
+                            icon = ScIcons.Search,
+                            compact = true,
+                        )
                     }
                     else -> LazyColumn(
                         Modifier.fillMaxWidth(),
@@ -593,12 +627,14 @@ private fun UniversityPickRow(uni: University, index: Int, selected: Boolean, on
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(13.dp),
     ) {
-        ScMonogramTile(uni.monogram, tint, accent, size = 54.dp, radius = 16.dp, fontSize = 14f)
+        ScMonogramTile(uni.monogram, tint, accent, size = 54.dp, radius = 16.dp, fontSize = 16f)
         Column(Modifier.weight(1f)) {
-            ScText(uni.name, 14.5f, FontWeight.ExtraBold, Sc.Ink, lineHeight = 19f, maxLines = 2)
-            if (uni.city.isNotBlank()) {
+            ScText(uni.shortName, 14.5f, FontWeight.ExtraBold, Sc.Ink, lineHeight = 19f, maxLines = 2)
+            // Filial OLDINDA: ro'yxatda yonma-yon turgan «Samarqand davlat veterinariya …
+            // universiteti» qatorlarini faqat shu ajratadi.
+            if (uni.display.subtitle.isNotBlank()) {
                 Spacer(Modifier.height(4.dp))
-                ScText(uni.city, 12f, FontWeight.Medium, Sc.Muted, maxLines = 1)
+                ScText(uni.display.subtitle, 12f, FontWeight.Medium, Sc.Muted, maxLines = 1)
             }
         }
         // Radio — tanlanganda brend halqa + ichki nuqta.
@@ -619,13 +655,21 @@ private fun UniversityPickRow(uni: University, index: Int, selected: Boolean, on
 // ---------------------------------------------------------------------------
 
 @Composable
-private fun StudentsOverlay(students: List<Student>, onFriend: (Student) -> Unit, onClose: () -> Unit) {
+private fun StudentsOverlay(
+    students: List<SearchedStudent>,
+    onConnect: (SearchedStudent) -> Unit,
+    onOpenStudent: (StudentSummary) -> Unit,
+    onClose: () -> Unit,
+) {
     var query by remember { mutableStateOf("") }
-    var course by remember { mutableStateOf<Int?>(null) }
+    // Kurs — serverdagi shakl (`"1".."4"`, `"MASTER"`); `null` — "Hammasi".
+    var course by remember { mutableStateOf<String?>(null) }
+    // Qidiruv/filtr shu sahifadagi ro'yxat ustida ishlaydi: butun bazani qidirish
+    // "Do'stlar" ekranida (`GET /v1/students?q=`), bu yerda esa universitetim ro'yxati.
     val filtered = remember(students, query, course) {
         students.filter {
-            (query.isBlank() || it.fullName.contains(query, ignoreCase = true) || it.faculty.contains(query, ignoreCase = true)) &&
-                (course == null || it.course == course)
+            (query.isBlank() || it.student.displayName.contains(query, ignoreCase = true)) &&
+                (course == null || it.student.courseYear == course)
         }
     }
 
@@ -648,7 +692,7 @@ private fun StudentsOverlay(students: List<Student>, onFriend: (Student) -> Unit
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 CoursePill("Hammasi", course == null) { course = null }
-                listOf(1, 2, 3, 4, 5).forEach { c ->
+                listOf("1", "2", "3", "4", "MASTER").forEach { c ->
                     CoursePill(courseText(c), course == c) { course = c }
                 }
             }
@@ -661,12 +705,17 @@ private fun StudentsOverlay(students: List<Student>, onFriend: (Student) -> Unit
             contentPadding = PaddingValues(start = Sc.ScreenPadding, end = Sc.ScreenPadding, bottom = 110.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            itemsIndexed(filtered, key = { _, s -> s.id }) { index, s -> DetailedStudentCard(s, index, onFriend) }
+            itemsIndexed(filtered, key = { _, s -> s.student.id }) { index, s ->
+                DetailedStudentCard(s, index, onConnect, onOpen = { onOpenStudent(s.student) })
+            }
             if (filtered.isEmpty()) {
                 item {
-                    Box(Modifier.fillMaxWidth().padding(top = 40.dp), contentAlignment = Alignment.Center) {
-                        ScText("Talaba topilmadi.", 13f, FontWeight.Medium, Sc.Muted)
-                    }
+                    ScEmptyState(
+                        Modifier.padding(top = 24.dp),
+                        title = ScNotFoundTitle,
+                        message = "Bu shartlarga mos talaba yo'q. Qidiruvni yoki filtrni o'zgartiring.",
+                        icon = ScIcons.Users,
+                    )
                 }
             }
         }
@@ -687,43 +736,43 @@ private fun CoursePill(label: String, selected: Boolean, onClick: () -> Unit) {
 }
 
 @Composable
-private fun DetailedStudentCard(student: Student, index: Int, onFriend: (Student) -> Unit) {
+private fun DetailedStudentCard(
+    item: SearchedStudent,
+    index: Int,
+    onConnect: (SearchedStudent) -> Unit,
+    onOpen: () -> Unit,
+) {
     val (tint, accent) = tilePalette[index.mod(tilePalette.size)]
-    Column(Modifier.fillMaxWidth().scCard(radius = 22.dp).padding(15.dp)) {
+    val student = item.student
+    // Kartaning O'ZI profilni ochadi; "Bog'lanish" tugmasi o'z bosishini yutadi.
+    Column(Modifier.fillMaxWidth().scCard(radius = 22.dp).clickable(onClick = onOpen).padding(15.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(13.dp)) {
             ScAvatar(
-                name = student.fullName,
+                name = student.displayName,
                 size = 52.dp,
                 avatarUrl = student.avatarUrl,
                 background = tint,
                 initialColor = accent,
             )
             Column(Modifier.weight(1f)) {
-                ScText(student.fullName, 15.5f, FontWeight.ExtraBold, Sc.Ink, maxLines = 1)
+                ScText(student.displayName, 15.5f, FontWeight.ExtraBold, Sc.Ink, maxLines = 1)
                 Spacer(Modifier.height(3.dp))
-                ScText("${student.faculty} · ${courseText(student.course)}", 12.5f, FontWeight.Medium, Sc.Muted, maxLines = 1)
-                Spacer(Modifier.height(5.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    ScText("⭐ ${student.rating}", 11.5f, FontWeight.Bold, Sc.MutedLight)
-                    ScText("👥 ${student.friendsCount} do'st", 11.5f, FontWeight.Medium, Sc.MutedLight)
-                    ScText(student.universityMonogram, 11.5f, FontWeight.Medium, Sc.MutedLight)
+                ScText(courseText(student.courseYear), 12.5f, FontWeight.Medium, Sc.Muted, maxLines = 1)
+                // Presence serverdan keladi va talabaning sozlamasiga bo'ysunadi —
+                // yashirilgan bo'lsa `online = false` va qator umuman chizilmaydi.
+                if (student.online) {
+                    Spacer(Modifier.height(5.dp))
+                    ScText("🟢 Onlayn", 11.5f, FontWeight.Bold, Sc.Success)
                 }
             }
-            Box(Modifier.width(96.dp)) { FriendButton(student) { onFriend(student) } }
+            Box(Modifier.width(96.dp)) {
+                ConnectButton(item.connectionStatus) { onConnect(item) }
+            }
         }
-        if (student.interests.isNotEmpty()) {
+        // Bio — 140 belgigacha oddiy matn (havola/telefon serverda rad etiladi).
+        student.bio?.takeIf { it.isNotBlank() }?.let { bio ->
             Spacer(Modifier.height(10.dp))
-            Row(
-                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                student.interests.take(5).forEach { interest ->
-                    Box(
-                        Modifier.clip(RoundedCornerShape(10.dp)).background(Sc.TintBlue)
-                            .padding(horizontal = 10.dp, vertical = 5.dp),
-                    ) { ScText(interest, 11f, FontWeight.Medium, Sc.Brand, maxLines = 1) }
-                }
-            }
+            ScText(bio, 12.5f, FontWeight.Medium, Sc.Muted, maxLines = 2, lineHeight = 18f)
         }
     }
 }
@@ -823,4 +872,16 @@ private fun OffersMapSection(
 
 private fun hexRgb(argb: Long): String = "#" + (argb and 0xFFFFFF).toString(16).padStart(6, '0').uppercase()
 
-private fun courseText(course: Int): String = if (course >= 5) "Magistr" else "$course-kurs"
+/**
+ * Kurs yorlig'i. Server `"1".."4"` yoki `"MASTER"` qaytaradi; eski profillarda
+ * `"ONE".."FOUR"` uchraydi. Ko'rsatilmagan bo'lsa (`null`/bo'sh) — "Talaba".
+ */
+private fun courseText(courseYear: String?): String = when (courseYear) {
+    "1", "ONE" -> "1-kurs"
+    "2", "TWO" -> "2-kurs"
+    "3", "THREE" -> "3-kurs"
+    "4", "FOUR" -> "4-kurs"
+    "MASTER" -> "Magistr"
+    null, "" -> "Talaba"
+    else -> courseYear
+}

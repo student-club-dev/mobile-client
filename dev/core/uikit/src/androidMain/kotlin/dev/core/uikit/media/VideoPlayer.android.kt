@@ -9,6 +9,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
@@ -119,6 +120,7 @@ actual fun ScVideoPlayer(
     muted: Boolean,
     showControls: Boolean,
     contentScaleFit: Boolean,
+    state: ScVideoState?,
     onEnded: () -> Unit,
     onProgress: (positionMs: Long, durationMs: Long) -> Unit,
 ) {
@@ -179,8 +181,35 @@ actual fun ScVideoPlayer(
             // `duration` metadata o'qilmaguncha `TIME_UNSET` (manfiy) bo'ladi — chaqiruvchi
             // manfiy son bilan bo'lib yubormasin uchun `0` beramiz.
             val duration = player.duration.takeIf { it > 0 } ?: 0L
-            currentOnProgress(player.currentPosition.coerceAtLeast(0L), duration)
+            val position = player.currentPosition.coerceAtLeast(0L)
+            currentOnProgress(position, duration)
+            state?.let {
+                // Ko'chirish so'rovi hali bajarilmagan bo'lsa pozitsiyani YOZMAYMIZ: aks
+                // holda barmoq qo'yib yuborilgan zahoti chiziq eski joyga qaytib ketardi.
+                if (it.seekRequest == null) it.positionMs = position
+                it.durationMs = duration
+            }
             delay(PROGRESS_TICK_MS)
+        }
+    }
+
+    // Tashqi boshqaruv: play/pause va ko'chirish buyruqlari.
+    if (state != null) {
+        LaunchedEffect(player, state) {
+            snapshotFlow { state.playRequest }.collect { request ->
+                if (request != null) {
+                    player.playWhenReady = request
+                    state.consumePlay()
+                }
+            }
+        }
+        LaunchedEffect(player, state) {
+            snapshotFlow { state.seekRequest }.collect { target ->
+                if (target != null) {
+                    player.seekTo(target)
+                    state.consumeSeek()
+                }
+            }
         }
     }
 
@@ -188,6 +217,12 @@ actual fun ScVideoPlayer(
         val listener = object : Player.Listener {
             override fun onPlaybackStateChanged(playbackState: Int) {
                 if (playbackState == Player.STATE_ENDED) currentOnEnded()
+            }
+
+            // Boshqaruv paneli **haqiqiy** holatni ko'rsatishi kerak: buferlanish paytida
+            // `playWhenReady` rost bo'lsa ham video turibdi.
+            override fun onIsPlayingChanged(isPlaying: Boolean) {
+                state?.isPlaying = isPlaying
             }
 
             // Takror rejimida holat `ENDED` ga o'tmaydi — aylanish `MEDIA_ITEM_TRANSITION_REASON_REPEAT`

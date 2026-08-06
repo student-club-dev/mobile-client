@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -37,6 +36,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.PointerEventPass
@@ -51,6 +51,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.lerp
 import dev.core.uikit.components.AppIcons
 import dev.core.uikit.components.ScAvatar
+import dev.core.uikit.components.ScBackHandler
 import dev.core.uikit.components.ScIconTile
 import dev.core.uikit.components.ScIcons
 import dev.core.uikit.components.ScText
@@ -69,14 +70,19 @@ import kotlin.math.abs
  * ichidagi tugmalarga tarqalib ketgan edi. Yon panel ularning HAMMASI uchun bitta
  * ro'yxat beradi; mavjud tugmalar joyida qoladi — bu qo'shimcha yo'l, almashtiruv emas.
  *
- * Panel Home ekrani ichida chiziladi, ya'ni pastki navigatsiya paneli uning USTIDA
- * qoladi. Shu sababli ro'yxat ostiga [BottomBarGap] bo'shligi qo'yiladi — oxirgi
- * qator panel tagida yashirinib qolmasin.
+ * Panel HOME ekrani ichida e'lon qilinadi, lekin karkasning ustki qatlamida chiziladi
+ * (`ScOverlay`): ilgari u `NavHost` ichida qolib, pastki navigatsiya paneli va FAB uning
+ * USTIDA turardi — ochiq panelning oxirgi qatorlari to'silar, qorayish qatlami esa ularni
+ * qoraytirmasdi va tugmalari bosilaverardi. Endi panel eng ustki qatlam: pastki panel ham
+ * qorayish ostida qoladi.
  */
 private val SideNavWidth = 288.dp
 
-/** Pastki navigatsiya paneli uchun bo'sh joy — ro'yxatning oxirgi qatori u bilan to'qnashmasin. */
-private val BottomBarGap = 96.dp
+/** Karkasning ustki qatlamidagi o'rin kaliti (`ScOverlay`). */
+internal const val SideNavOverlayKey = "home-side-nav"
+
+/** Ro'yxat oxiridagi bo'shliq — oxirgi qator ekran qirrasiga yopishib qolmasin. */
+private val ListBottomGap = 20.dp
 
 /** Ochilish/yopilish davomiyligi — topbar siqilishi bilan bir xil egri ([ScEasing]). */
 private const val SideNavDuration = 280
@@ -230,13 +236,13 @@ internal fun Modifier.sideNavEdgeDrag(nav: SideNavState): Modifier {
  */
 @Composable
 internal fun SideNavHandle(onClick: () -> Unit, modifier: Modifier = Modifier) {
-    val shape = RoundedCornerShape(17.dp)
+    val shape = RoundedCornerShape(12.dp)
     val chevron = ScIcons.ChevronRight
     Box(
         modifier
             .padding(start = 8.dp)
             .size(HandleSize)
-            .scSoftShadow(12.dp, shape)
+            .scSoftShadow(8.dp, shape)
             .clip(shape)
             .background(Sc.Chip.copy(alpha = HandleAlpha))
             .border(1.dp, Sc.Handle.copy(alpha = HandleAlpha), shape)
@@ -245,8 +251,8 @@ internal fun SideNavHandle(onClick: () -> Unit, modifier: Modifier = Modifier) {
     ) {
         // `Arrangement.spacedBy` manfiy oraliqni qabul qilmaydi, shuning uchun ikkala
         // chevron markazdan teng masofaga suriladi — natijada zich `»` chiqadi.
-        Icon(chevron, "Yon menyu", tint = Sc.ChipInk, modifier = Modifier.size(21.dp).offset(x = (-5).dp))
-        Icon(chevron, null, tint = Sc.ChipInk, modifier = Modifier.size(21.dp).offset(x = 5.dp))
+        Icon(chevron, "Yon menyu", tint = Sc.ChipInk, modifier = Modifier.size(14.dp).offset(x = (-3.5).dp))
+        Icon(chevron, null, tint = Sc.ChipInk, modifier = Modifier.size(14.dp).offset(x = 3.5.dp))
     }
 }
 
@@ -265,8 +271,15 @@ internal fun Modifier.sideNavHandleSeam(): Modifier = this
         layout(placeable.width, 0) { placeable.place(0, -placeable.height / 2) }
     }
 
-/** Tutqich kvadrat — eni va bo'yi teng. */
-private val HandleSize = 52.dp
+/**
+ * Tutqich kvadrat — eni va bo'yi teng.
+ *
+ * 52dp juda katta edi: u topbardagi avatar bilan bir xil o'lchamda bo'lib, sarlavhaning
+ * ustiga chiqib turardi va ekranning eng ko'zga tashlanadigan elementiga aylanib qolgandi.
+ * 34dp — barmoq uchun yetarli (tegish maydoni atrofidagi bo'sh joy bilan birga ~48dp) va
+ * ko'z uni boshqaruv elementi sifatida o'qiydi.
+ */
+private val HandleSize = 34.dp
 
 /** Fon shaffofligi: 0 — ko'rinmas, 1 — to'liq to'q. Tagidagi kontent sal sezilib tursin. */
 private const val HandleAlpha = 0.82f
@@ -283,6 +296,8 @@ private const val HandleAlpha = 0.82f
  *
  * Har bir qator avval panelni yopadi, keyin o'z ekraniga o'tadi: qaytib kelinganda
  * panel ochiq holda qolib ketmasin.
+ *
+ * "Orqaga" ochiq panelni YOPADI, ekrandan chiqmaydi — modal qatlam uchun kutilgan xatti-harakat.
  */
 @Composable
 internal fun HomeSideNav(
@@ -304,8 +319,33 @@ internal fun HomeSideNav(
     if (!nav.visible) return
     val p = nav.progress.value
 
+    // Tizim "orqaga" si — ekrandan chiqmasdan panelni yopadi.
+    ScBackHandler { nav.close() }
+
     /** Qator bosilganda: avval yopish, keyin o'tish. */
     val go: (() -> Unit) -> () -> Unit = { action -> { nav.close(); action() } }
+
+    /** Panelning chap qirrasi: yopiqda butunlay ekrandan tashqarida. */
+    val panelX = lerp(-SideNavWidth, 0.dp, p)
+
+    // Qorayish qatlami panel qirrasida QUYUQROQ bo'lib, o'ngga qarab odatdagi darajasiga
+    // so'nadi — panel tagidan tushayotgan soya shu.
+    //
+    // Nega alohida "soya tasmasi" emas: to'rtburchak tasma panelning yumaloq burchaklarini
+    // takrorlay olmaydi va qirrada burchakli dog' qoldiradi. Gradient qorayishning O'ZIDA
+    // bo'lgani uchun panel ostida ham, burchaklar atrofida ham bir tekis yotadi.
+    //
+    // Nega elevation soyasining o'zi yetmaydi: platforma soyasi ham qora — allaqachon
+    // qoraygan fon ustida u deyarli sezilmaydi.
+    val density = LocalDensity.current
+    val shadowStartPx = with(density) { (panelX + SideNavWidth).toPx() }
+    val shadowEndPx = with(density) { (panelX + SideNavWidth + EdgeShadowWidth).toPx() }
+    val scrim = Brush.horizontalGradient(
+        0f to Color.Black.copy(alpha = 0.58f * p),
+        1f to Color.Black.copy(alpha = 0.42f * p),
+        startX = shadowStartPx,
+        endX = shadowEndPx,
+    )
 
     val drag = rememberDraggableState { delta -> nav.drag(delta) }
     Box(
@@ -316,20 +356,24 @@ internal fun HomeSideNav(
             onDragStopped = { velocity -> nav.settle(velocity) },
         ),
     ) {
-        // Fon — bosilsa panel yopiladi. Shaffofligi siljish bilan birga o'sadi.
+        // Fon — bosilsa panel yopiladi. Quyuqligi siljish bilan birga o'sadi.
+        // Ripple YO'Q: butun ekran bo'ylab yoyilgan to'lqin faqat chalg'itardi.
         Box(
             Modifier.fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.42f * p))
-                .clickable(onClick = nav::close),
+                .background(scrim)
+                .clickable(indication = null, interactionSource = null, onClick = nav::close),
         )
 
         Column(
             Modifier.width(SideNavWidth)
                 .fillMaxHeight()
-                .offset(x = lerp(-SideNavWidth, 0.dp, p))
-                .scSoftShadow(18.dp, PanelShape)
+                .offset(x = panelX)
+                .scSoftShadow(24.dp, PanelShape)
                 .clip(PanelShape)
-                .background(Sc.Card),
+                .background(Sc.Card)
+                // Panel USTIDAGI bosish fonga o'tib ketmasin: ustunning bo'sh joyi
+                // (qatorlar orasi, ro'yxat oxiri) bosilganda panel yopilib ketardi.
+                .clickable(indication = null, interactionSource = null) {},
         ) {
             SideNavHeader(state, onClick = go(onOpenProfile), onClose = nav::close)
 
@@ -363,8 +407,7 @@ internal fun HomeSideNav(
                 // bir bo'lim ikki joyda ikki xil belgi bilan turmasin.
                 SideNavItem("Sozlamalar", AppIcons.Settings, Sc.Chip, Sc.ChipInk, go(onOpenSettings))
 
-                // Pastki navigatsiya paneli panelning USTIDA turadi.
-                Spacer(Modifier.navigationBarsPadding().height(BottomBarGap))
+                Spacer(Modifier.height(ListBottomGap))
             }
         }
     }
@@ -372,6 +415,9 @@ internal fun HomeSideNav(
 
 /** O'ng qirralari yumaloq — panel chap chetdan chiqadi. */
 private val PanelShape = RoundedCornerShape(topEnd = 28.dp, bottomEnd = 28.dp)
+
+/** Panel qirrasidagi soya shu masofada so'nadi. */
+private val EdgeShadowWidth = 24.dp
 
 /**
  * Panel sarlavhasi — Home topbari bilan bir xil gradient: avatar, ism va universitet chipi.
@@ -409,7 +455,8 @@ private fun SideNavHeader(state: HomeUiState, onClick: () -> Unit, onClose: () -
                 Icon(ScIcons.Close, "Yopish", tint = Color.White, modifier = Modifier.size(15.dp))
             }
         }
-        val badge = listOfNotNull(state.universityMonogram, state.courseLabel).joinToString(" · ")
+        // Faqat universitet — kurs (nechanchi bosqich) ataylab ko'rsatilmaydi.
+        val badge = state.universityMonogram.orEmpty()
         if (badge.isNotBlank()) {
             Spacer(Modifier.height(12.dp))
             Row(

@@ -7,6 +7,7 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.interop.UIKitView
 import androidx.compose.ui.interop.UIKitViewController
@@ -72,6 +73,7 @@ actual fun ScVideoPlayer(
     muted: Boolean,
     showControls: Boolean,
     contentScaleFit: Boolean,
+    state: ScVideoState?,
     onEnded: () -> Unit,
     onProgress: (positionMs: Long, durationMs: Long) -> Unit,
 ) {
@@ -133,8 +135,37 @@ actual fun ScVideoPlayer(
             // ikkalasi ham `0` bo'lib ketadi (chaqiruvchi bunda chiziqni to'ldirmaydi).
             val duration = player.currentItem?.duration?.let { CMTimeGetSeconds(it) } ?: 0.0
             currentOnProgress(position.toMillis(), duration.toMillis())
+            state?.let {
+                // Ko'chirish so'rovi hali bajarilmagan bo'lsa pozitsiyani yozmaymiz —
+                // aks holda chiziq barmoq qo'yib yuborilgach eski joyga sakrardi.
+                if (it.seekRequest == null) it.positionMs = position.toMillis()
+                it.durationMs = duration.toMillis()
+                // `rate` — 0 dan katta bo'lsa ijro ketmoqda.
+                it.isPlaying = player.rate > 0f
+            }
         }
         onDispose { player.removeTimeObserver(observer) }
+    }
+
+    // Tashqi boshqaruv: play/pause va ko'chirish buyruqlari.
+    if (state != null) {
+        LaunchedEffect(player, state) {
+            snapshotFlow { state.playRequest }.collect { request ->
+                if (request != null) {
+                    if (request) player.play() else player.pause()
+                    state.isPlaying = request
+                    state.consumePlay()
+                }
+            }
+        }
+        LaunchedEffect(player, state) {
+            snapshotFlow { state.seekRequest }.collect { target ->
+                if (target != null) {
+                    player.seekToTime(CMTimeMakeWithSeconds(target / 1000.0, NSEC_PER_SEC.toInt()))
+                    state.consumeSeek()
+                }
+            }
+        }
     }
 
     // Ilova fonga ketganda to'xtatamiz: iOS o'zi to'xtatmaydi, video fonda ovoz chiqarib

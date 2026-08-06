@@ -1,0 +1,31 @@
+-- v30 -> v31 — bildirishnomalar `GET /v1/notifications` keshiga aylandi.
+--
+-- `NOTIFICATIONS_BACKEND.md`: ro'yxat endi serverdan keladi. Uch o'zgarish:
+--
+--   * `timeLabel` ("2 soat oldin") → `createdAt` (epoch ms). Tayyor matn faqat seed
+--     uchun to'g'ri edi: u yozilgan paytda muzlab qolardi va ertasiga ham "2 soat
+--     oldin" deb turardi. Endi yorliq har chizishda vaqtdan hisoblanadi.
+--   * `sortOrder` → `createdAt DESC`. Server tartibini qo'lda raqamlashning hojati yo'q.
+--   * `targetType`/`targetId` qo'shildi — bosilganda ochiladigan ekran.
+--
+-- Jadval ALMASHTIRILADI, ustunlar qo'shilmaydi: ichida faqat namuna (seed) qatorlari
+-- bor edi va ular `LocalDataSeeder` dan ham olib tashlandi. Ularni saqlab qolish —
+-- "Dilnoza Rahimova sizga xabar yozdi" degan soxta yozuvni haqiqiy ro'yxat ustiga
+-- olib chiqish demakdi. Birinchi `refresh()` da jadval serverdan to'ladi.
+
+-- `IF EXISTS` — `15.sqm`/`16.sqm` dagi kabi: migratsiya juda eski (yoki qisman qurilgan)
+-- bazada ham to'xtab qolmasligi kerak, jadval yo'qligi esa bu yerda xato emas.
+DROP TABLE IF EXISTS NotificationEntity;
+
+CREATE TABLE NotificationEntity (
+    id TEXT NOT NULL PRIMARY KEY,
+    title TEXT NOT NULL,
+    body TEXT NOT NULL,
+    type TEXT NOT NULL,
+    createdAt INTEGER NOT NULL,
+    targetType TEXT,
+    targetId TEXT,
+    read INTEGER NOT NULL
+);
+
+CREATE INDEX notification_created_at ON NotificationEntity(createdAt DESC);

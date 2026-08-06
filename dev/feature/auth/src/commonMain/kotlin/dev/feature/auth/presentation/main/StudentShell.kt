@@ -32,15 +32,20 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
+import androidx.navigation.NavController
+import androidx.navigation.NavOptionsBuilder
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -50,6 +55,9 @@ import androidx.navigation.navArgument
 import dev.core.common.push.PushRegistrar
 import dev.core.common.push.PushRoute
 import dev.core.uikit.components.ScIcons
+import dev.core.uikit.components.LocalScOverlayHost
+import dev.core.uikit.components.ScOverlayHost
+import dev.core.uikit.components.ScOverlayHostState
 import org.koin.compose.koinInject
 import dev.core.uikit.components.scSoftShadow
 import dev.core.uikit.components.scBrandShadow
@@ -69,13 +77,18 @@ import dev.feature.listings.presentation.MyListingsScreen
 import dev.feature.listings.presentation.PostListingScreen
 import dev.feature.listings.presentation.detail.ListingDetailScreen
 import dev.feature.listings.presentation.platform.rememberPhoneCaller
+import dev.feature.connections.domain.model.StudentSummary
 import dev.feature.connections.presentation.BlockedStudentsScreen
 import dev.feature.connections.presentation.ConnectionsScreen
 import dev.feature.connections.presentation.ConnectionsTab
+import dev.feature.connections.presentation.StudentProfileSheet
+import dev.feature.notifications.domain.model.NotificationTarget
+import dev.feature.notifications.domain.repository.NotificationRepository
 import dev.feature.notifications.presentation.NotificationsScreen
 import dev.feature.settings.presentation.SettingsScreen
 import dev.feature.university.presentation.MyUniversityScreen
 import dev.feature.chat.presentation.ChatScreen
+import dev.feature.chat.presentation.rememberPeerProfileSections
 import dev.feature.home.presentation.HomeScreen
 import dev.feature.profile.presentation.EditProfileScreen
 import dev.feature.profile.presentation.ProfileScreen
@@ -223,210 +236,303 @@ fun StudentShell(onLoggedOut: () -> Unit) {
     val pushRegistrar = koinInject<PushRegistrar>()
     LaunchedEffect(Unit) { runCatching { pushRegistrar.onSessionStarted() } }
 
-    // Bildirishnoma bosilgan bo'lsa — o'sha suhbatni ochamiz. Qiymat ilova ishga tushishidan
-    // oldin ham qo'yilgan bo'lishi mumkin, shuning uchun oqim sifatida kuzatiladi.
-    val pendingConversationId by PushRoute.pendingConversationId.collectAsState()
-    LaunchedEffect(pendingConversationId) {
-        val conversationId = pendingConversationId ?: return@LaunchedEffect
+    // Bildirishnoma bosilgan bo'lsa — konvertdagi ekranni ochamiz. Qiymat ilova ishga
+    // tushishidan oldin ham qo'yilgan bo'lishi mumkin, shuning uchun oqim sifatida kuzatiladi.
+    val notifications = koinInject<NotificationRepository>()
+    val pendingPush by PushRoute.pending.collectAsState()
+    LaunchedEffect(pendingPush) {
+        val payload = pendingPush ?: return@LaunchedEffect
         PushRoute.consume()
-        // Push'dan kelinganda suhbat Home ustiga qo'yiladi: orqaga bosilsa ilova yopilmay,
-        // bosh ekranga tushadi.
-        nav.navigateSafe("$CHAT?conversationId=${encodeArg(conversationId)}") {
-            popUpTo(StudentTab.HOME.route)
-        }
+
+        // §2.1 — bosilgan push ro'yxatdagi qatorni ham o'qilgan qiladi. Busiz foydalanuvchi
+        // bildirishnomani ko'rgan bo'lsa ham `unreadCount` uni sanashda davom etardi va
+        // qo'ng'iroq ikonkasidagi raqam hech qachon nolga tushmasdi.
+        payload.notificationId?.takeIf { it.isNotBlank() }?.let { notifications.markRead(it) }
+
+        // Konvertda `targetType` bo'lsa — o'sha; bo'lmasa eski chat push'i (`conversationId`).
+        val target = NotificationTarget.of(payload.targetType, payload.targetId)
+            .takeIf { it != NotificationTarget.None }
+            ?: payload.conversationId
+                ?.takeIf { it.isNotBlank() }
+                ?.let { NotificationTarget.Chat(it) }
+            ?: return@LaunchedEffect
+
+        // Push'dan kelinganda ekran Home ustiga qo'yiladi: orqaga bosilsa ilova yopilmay,
+        // bosh ekranga tushadi. (Ro'yxatdan bosilganda esa stack saqlanadi — qarang
+        // [openNotificationTarget].)
+        nav.openNotificationTarget(target) { popUpTo(StudentTab.HOME.route) }
     }
 
-    Box(Modifier.fillMaxSize().background(Sc.Bg)) {
-        NavHost(
-            navController = nav,
-            startDestination = StudentTab.HOME.route,
-            modifier = Modifier.fillMaxSize(),
-            // Sukut — tafsilot ekranlari uchun push/pop siljishi.
-            // Tab bo'limlari o'z composable'ida fade'ga almashtiriladi (pastga qarang).
-            enterTransition = PushEnter,
-            exitTransition = PushExit,
-            popEnterTransition = PopEnter,
-            popExitTransition = PopExit,
-        ) {
-            composable(
-                StudentTab.HOME.route,
-                enterTransition = TabEnter, exitTransition = TabExit,
-                popEnterTransition = TabEnter, popExitTransition = TabExit,
+    /**
+     * Ekranlarning MODAL qatlamlari (bosh ekrandagi yon panel) shu yerda chiziladi — pastki
+     * navigatsiya panelidan KEYIN. Aks holda panel modal qatlamning ustida qolib, qorayish
+     * qatlami uni qoraytirmasdi va tugmalari bosilaverardi (`ScOverlayHost` izohiga q.).
+     */
+    val overlay = remember { ScOverlayHostState() }
+
+    /**
+     * Ochilgan talaba profili — **butun karkas uchun bitta** varaq.
+     *
+     * Talaba ilovaning ko'p joyida ko'rinadi (bosh ekran, "Do'stlar", universitet, qidiruv),
+     * profil varag'ining bo'limlari esa story va chat modullarida yashaydi. Har ekran o'z
+     * varag'ini chizsa, o'sha ekranlar chat/story modullariga bog'lanardi — shuning uchun
+     * ular faqat "talaba bosildi" deb aytadi, varaqni esa shu yer ochadi.
+     */
+    var profileStudent by remember { mutableStateOf<StudentSummary?>(null) }
+
+    CompositionLocalProvider(LocalScOverlayHost provides overlay) {
+        Box(Modifier.fillMaxSize().background(Sc.Bg)) {
+            NavHost(
+                navController = nav,
+                startDestination = StudentTab.HOME.route,
+                modifier = Modifier.fillMaxSize(),
+                // Sukut — tafsilot ekranlari uchun push/pop siljishi.
+                // Tab bo'limlari o'z composable'ida fade'ga almashtiriladi (pastga qarang).
+                enterTransition = PushEnter,
+                exitTransition = PushExit,
+                popEnterTransition = PopEnter,
+                popExitTransition = PopExit,
             ) {
-                HomeScreen(
-                    onOpenProfile = { nav.navigateSafe(PROFILE) },
-                    onOpenChat = { nav.navigateSafe(CHAT) },
-                    onOpenNotifications = { nav.navigateSafe(NOTIFICATIONS) },
-                    // "Takliflar" tab'ini KONKRET bo'lim ochilgan holda ochadi ("Ovqatlar →
-                    // Barchasi"). [openListingsKind] dagi kabi `restoreState` YO'Q: saqlangan
-                    // holat tiklansa Navigation eski argumentlarni qaytarib, yangi `?group=`
-                    // bekor bo'lardi. Kalitsiz — odatdagi to'liq feed.
-                    onOpenDiscounts = { groupKey ->
-                        val key = encodeArg(groupKey)
-                        val route = StudentTab.OFFERS.route
-                        nav.navigateSafe(if (key == null) route else "$route?group=$key") {
-                            popUpTo(StudentTab.HOME.route) { saveState = true }
-                        }
-                    },
-                    // "Fanlardan yordam" — o'sha ekran, Yordam tab'i ochilgan holda.
-                    onOpenTasks = { openListingsKind(ListingKind.TASK) },
-                    // "E'lonlar" ekrani, darrov ijara tab'i ochilgan holda.
-                    onOpenRentals = { openListingsKind(ListingKind.RENTAL) },
-                    onOpenListing = { id -> nav.navigateSafe("$LISTING_DETAIL/${encodeArg(id)}") },
-                    onOpenStudents = { nav.navigateSafe(CONNECTIONS) },
-                    onOpenStudentSearch = { openConnectionsTab(ConnectionsTab.SEARCH) },
-                    onOpenStudentRequests = { openConnectionsTab(ConnectionsTab.REQUESTS) },
-                    onOpenChatWith = openChatWith,
-                    // Yon paneldagi bo'limlar. Universitet va E'lonlar — pastki paneldagi
-                    // TABLAR, shuning uchun oddiy tab almashish (holat saqlanadi).
-                    onOpenUniversity = { selectTab(StudentTab.UNIVERSITY.route) },
-                    onOpenListings = { selectTab(StudentTab.LISTINGS.route) },
-                    onOpenMyListings = { nav.navigateSafe(MY_LISTINGS) },
-                    // Sozlamalar — tafsilot ekrani, stack'ga qo'yiladi (orqaga → Home).
-                    onOpenSettings = { nav.navigateSafe(SETTINGS) },
+                composable(
+                    StudentTab.HOME.route,
+                    enterTransition = TabEnter, exitTransition = TabExit,
+                    popEnterTransition = TabEnter, popExitTransition = TabExit,
+                ) {
+                    HomeScreen(
+                        onOpenProfile = { nav.navigateSafe(PROFILE) },
+                        onOpenChat = { nav.navigateSafe(CHAT) },
+                        onOpenNotifications = { nav.navigateSafe(NOTIFICATIONS) },
+                        // "Takliflar" tab'ini KONKRET bo'lim ochilgan holda ochadi ("Ovqatlar →
+                        // Barchasi"). [openListingsKind] dagi kabi `restoreState` YO'Q: saqlangan
+                        // holat tiklansa Navigation eski argumentlarni qaytarib, yangi `?group=`
+                        // bekor bo'lardi. Kalitsiz — odatdagi to'liq feed.
+                        onOpenDiscounts = { groupKey ->
+                            val key = encodeArg(groupKey)
+                            val route = StudentTab.OFFERS.route
+                            nav.navigateSafe(if (key == null) route else "$route?group=$key") {
+                                popUpTo(StudentTab.HOME.route) { saveState = true }
+                            }
+                        },
+                        // "Fanlardan yordam" — o'sha ekran, Yordam tab'i ochilgan holda.
+                        onOpenTasks = { openListingsKind(ListingKind.TASK) },
+                        // "E'lonlar" ekrani, darrov ijara tab'i ochilgan holda.
+                        onOpenRentals = { openListingsKind(ListingKind.RENTAL) },
+                        onOpenListing = { id -> nav.navigateSafe("$LISTING_DETAIL/${encodeArg(id)}") },
+                        onOpenStudents = { nav.navigateSafe(CONNECTIONS) },
+                        onOpenStudentSearch = { openConnectionsTab(ConnectionsTab.SEARCH) },
+                        onOpenStudentRequests = { openConnectionsTab(ConnectionsTab.REQUESTS) },
+                        onOpenChatWith = openChatWith,
+                        // Yon paneldagi bo'limlar. Universitet va E'lonlar — pastki paneldagi
+                        // TABLAR, shuning uchun oddiy tab almashish (holat saqlanadi).
+                        onOpenUniversity = { selectTab(StudentTab.UNIVERSITY.route) },
+                        onOpenListings = { selectTab(StudentTab.LISTINGS.route) },
+                        onOpenMyListings = { nav.navigateSafe(MY_LISTINGS) },
+                        // Sozlamalar — tafsilot ekrani, stack'ga qo'yiladi (orqaga → Home).
+                        onOpenSettings = { nav.navigateSafe(SETTINGS) },
+                    )
+                }
+                composable(
+                    StudentTab.UNIVERSITY.route,
+                    enterTransition = TabEnter, exitTransition = TabExit,
+                    popEnterTransition = TabEnter, popExitTransition = TabExit,
+                ) {
+                    MyUniversityScreen(
+                        onOpenListing = { id -> nav.navigateSafe("$LISTING_DETAIL/${encodeArg(id)}") },
+                        onOpenTasks = { openListingsKind(ListingKind.TASK) },
+                        onOpenStudent = { profileStudent = it },
+                    )
+                }
+                composable(
+                    // "Takliflar" — bizneslardan keladigan e'lonlar, pastki paneldagi tab.
+                    // `?group=` — Home'dagi bo'lim ("Ovqatlar") tugmasidan; bo'sh bo'lsa butun feed.
+                    route = "${StudentTab.OFFERS.route}?group={group}",
+                    enterTransition = TabEnter, exitTransition = TabExit,
+                    popEnterTransition = TabEnter, popExitTransition = TabExit,
+                    arguments = listOf(
+                        navArgument("group") { type = NavType.StringType; nullable = true; defaultValue = null },
+                    ),
+                ) { entry ->
+                    // Tab — orqaga tugmasisiz (`onBack` berilmaydi).
+                    DiscountsScreen(initialGroupKey = entry.arguments?.getString("group"))
+                }
+                // Ijara / Xizmatlar / Ish e'lonlari — uchalasi bitta ekranda, tepadagi tab bilan.
+                // `kind` argumenti Home'dan konkret bo'limga o'tish uchun (masalan to'g'ridan-to'g'ri
+                // Ijara'ga), bo'sh bo'lsa Ish e'lonlari ochiladi.
+                composable(
+                    route = "${StudentTab.LISTINGS.route}?kind={kind}",
+                    enterTransition = TabEnter, exitTransition = TabExit,
+                    popEnterTransition = TabEnter, popExitTransition = TabExit,
+                    arguments = listOf(
+                        navArgument("kind") { type = NavType.StringType; nullable = true; defaultValue = null },
+                    ),
+                ) { entry ->
+                    ListingsBrowseScreen(
+                        onOpenListing = { id -> nav.navigateSafe("$LISTING_DETAIL/${encodeArg(id)}") },
+                        initialKind = entry.arguments?.getString("kind").toListingKind(),
+                    )
+                }
+                composable(
+                    route = "$LISTING_DETAIL/{listingId}",
+                    arguments = listOf(navArgument("listingId") { type = NavType.StringType }),
+                ) { entry ->
+                    val onCall = rememberPhoneCaller()
+                    ListingDetailScreen(
+                        listingId = entry.arguments?.getString("listingId").orEmpty(),
+                        onBack = { nav.popSafe() },
+                        onCall = onCall,
+                    )
+                }
+                composable(
+                    // `?studentId=` — "Do'stlar" ekranidan "Xabar" bosilganda;
+                    // `?conversationId=` — push bosilganda. Argumentsiz — suhbatlar ro'yxati.
+                    route = "$CHAT?studentId={studentId}&conversationId={conversationId}",
+                    arguments = listOf(
+                        navArgument("studentId") { type = NavType.StringType; nullable = true; defaultValue = null },
+                        navArgument("conversationId") { type = NavType.StringType; nullable = true; defaultValue = null },
+                    ),
+                ) { entry ->
+                    ChatScreen(
+                        // Tab emas — sarlavhada orqaga tugmasi turadi.
+                        onBack = { nav.popSafe() },
+                        openStudentId = entry.arguments?.getString("studentId"),
+                        openConversationId = entry.arguments?.getString("conversationId"),
+                        // Yangi suhbat faqat BOG'LANGAN odam bilan boshlanadi — "Do'stlar"
+                        // ro'yxatidagi «Xabar» tugmasi uni o'zi ochadi.
+                        onNewChat = { nav.navigateSafe(CONNECTIONS) },
+                    )
+                }
+                composable(
+                    route = "$POST_LISTING?listingId={listingId}",
+                    arguments = listOf(
+                        navArgument("listingId") { type = NavType.StringType; nullable = true; defaultValue = null },
+                    ),
+                ) { entry ->
+                    PostListingScreen(
+                        onClose = { nav.popSafe() },
+                        onPublished = { nav.popSafe() },
+                        editListingId = entry.arguments?.getString("listingId"),
+                        // Chegirma e'loni biznes turini so'raydi — u BusinessShell'da qoladi.
+                        availableKinds = studentListingKinds,
+                    )
+                }
+                composable(PROFILE) {
+                    ProfileScreen(
+                        onBack = { nav.popSafe() },
+                        onLoggedOut = onLoggedOut,
+                        onEditProfile = { nav.navigateSafe(EDIT_PROFILE) },
+                        onOpenSettings = { nav.navigateSafe(SETTINGS) },
+                        // Talabada biznes bo'limi ko'rinmaydi.
+                        showMyBusiness = false,
+                    )
+                }
+                composable(
+                    route = "$CONNECTIONS?tab={tab}",
+                    arguments = listOf(
+                        navArgument("tab") { type = NavType.StringType; nullable = true; defaultValue = null },
+                    ),
+                ) { entry ->
+                    ConnectionsScreen(
+                        onBack = { nav.popSafe() },
+                        onOpenStudent = { profileStudent = it },
+                        // Chat tab'i suhbatni o'zi ochadi (`POST /v1/conversations` idempotent).
+                        onOpenChat = { studentId, _ -> openChatWith(studentId) },
+                        // Home'dagi tugmalar kerakli bo'limni darrov ochadi. Nomi noto'g'ri
+                        // kelsa — sukut bo'yicha "Do'stlar" (ekranning o'z boshlang'ich holati).
+                        initialTab = entry.arguments?.getString("tab")
+                            ?.let { name -> ConnectionsTab.entries.firstOrNull { it.name == name } },
+                    )
+                }
+                composable(MY_LISTINGS) {
+                    MyListingsScreen(
+                        onCreate = { nav.navigateSafe(POST_LISTING) },
+                        // Tahrirlash — e'lon qo'yish oqimining o'zi, tayyor qiymatlar bilan.
+                        onEdit = { id -> nav.navigateSafe("$POST_LISTING?listingId=${encodeArg(id)}") },
+                        onBack = { nav.popSafe() },
+                        // Chegirmalar biznesniki — talabaning e'lonlari orasida ko'rinmaydi.
+                        filterDiscount = false,
+                    )
+                }
+                composable(NOTIFICATIONS) {
+                    NotificationsScreen(
+                        onBack = { nav.popSafe() },
+                        onOpenTarget = { target -> nav.openNotificationTarget(target) },
+                    )
+                }
+                composable(EDIT_PROFILE) { EditProfileScreen(onBack = { nav.popSafe() }) }
+                composable(SETTINGS) {
+                    SettingsScreen(
+                        onBack = { nav.popSafe() },
+                        onEditProfile = { nav.navigateSafe(EDIT_PROFILE) },
+                        onLoggedOut = onLoggedOut,
+                        onOpenBlocked = { nav.navigateSafe(BLOCKED) },
+                    )
+                }
+                composable(BLOCKED) { BlockedStudentsScreen(onBack = { nav.popSafe() }) }
+            }
+
+            // Klaviatura ochilganda pastki panel ko'rsatilmaydi: kontent klaviatura ustiga
+            // ko'tarilgani uchun panel matn maydonining tagida osilib qolardi va joy egallardi.
+            val keyboardOpen = WindowInsets.ime.getBottom(LocalDensity.current) > 0
+            // Chat endi tab emas — panel u yerda o'z-o'zidan chizilmaydi (`current in tabRoutes`).
+            if (current in tabRoutes && !keyboardOpen) {
+                BottomBar(
+                    current = current,
+                    onSelect = selectTab,
+                    onFab = { nav.navigateSafe(POST_LISTING) },
+                    modifier = Modifier.align(Alignment.BottomCenter),
                 )
             }
-            composable(
-                StudentTab.UNIVERSITY.route,
-                enterTransition = TabEnter, exitTransition = TabExit,
-                popEnterTransition = TabEnter, popExitTransition = TabExit,
-            ) {
-                MyUniversityScreen(
-                    onOpenListing = { id -> nav.navigateSafe("$LISTING_DETAIL/${encodeArg(id)}") },
-                    onOpenTasks = { openListingsKind(ListingKind.TASK) },
-                )
-            }
-            composable(
-                // "Takliflar" — bizneslardan keladigan e'lonlar, pastki paneldagi tab.
-                // `?group=` — Home'dagi bo'lim ("Ovqatlar") tugmasidan; bo'sh bo'lsa butun feed.
-                route = "${StudentTab.OFFERS.route}?group={group}",
-                enterTransition = TabEnter, exitTransition = TabExit,
-                popEnterTransition = TabEnter, popExitTransition = TabExit,
-                arguments = listOf(
-                    navArgument("group") { type = NavType.StringType; nullable = true; defaultValue = null },
-                ),
-            ) { entry ->
-                // Tab — orqaga tugmasisiz (`onBack` berilmaydi).
-                DiscountsScreen(initialGroupKey = entry.arguments?.getString("group"))
-            }
-            // Ijara / Xizmatlar / Ish e'lonlari — uchalasi bitta ekranda, tepadagi tab bilan.
-            // `kind` argumenti Home'dan konkret bo'limga o'tish uchun (masalan to'g'ridan-to'g'ri
-            // Ijara'ga), bo'sh bo'lsa Ish e'lonlari ochiladi.
-            composable(
-                route = "${StudentTab.LISTINGS.route}?kind={kind}",
-                enterTransition = TabEnter, exitTransition = TabExit,
-                popEnterTransition = TabEnter, popExitTransition = TabExit,
-                arguments = listOf(
-                    navArgument("kind") { type = NavType.StringType; nullable = true; defaultValue = null },
-                ),
-            ) { entry ->
-                ListingsBrowseScreen(
-                    onOpenListing = { id -> nav.navigateSafe("$LISTING_DETAIL/${encodeArg(id)}") },
-                    initialKind = entry.arguments?.getString("kind").toListingKind(),
-                )
-            }
-            composable(
-                route = "$LISTING_DETAIL/{listingId}",
-                arguments = listOf(navArgument("listingId") { type = NavType.StringType }),
-            ) { entry ->
-                val onCall = rememberPhoneCaller()
-                ListingDetailScreen(
-                    listingId = entry.arguments?.getString("listingId").orEmpty(),
-                    onBack = { nav.popSafe() },
-                    onCall = onCall,
-                )
-            }
-            composable(
-                // `?studentId=` — "Do'stlar" ekranidan "Xabar" bosilganda;
-                // `?conversationId=` — push bosilganda. Argumentsiz — suhbatlar ro'yxati.
-                route = "$CHAT?studentId={studentId}&conversationId={conversationId}",
-                arguments = listOf(
-                    navArgument("studentId") { type = NavType.StringType; nullable = true; defaultValue = null },
-                    navArgument("conversationId") { type = NavType.StringType; nullable = true; defaultValue = null },
-                ),
-            ) { entry ->
-                ChatScreen(
-                    // Tab emas — sarlavhada orqaga tugmasi turadi.
-                    onBack = { nav.popSafe() },
-                    openStudentId = entry.arguments?.getString("studentId"),
-                    openConversationId = entry.arguments?.getString("conversationId"),
-                )
-            }
-            composable(
-                route = "$POST_LISTING?listingId={listingId}",
-                arguments = listOf(
-                    navArgument("listingId") { type = NavType.StringType; nullable = true; defaultValue = null },
-                ),
-            ) { entry ->
-                PostListingScreen(
-                    onClose = { nav.popSafe() },
-                    onPublished = { nav.popSafe() },
-                    editListingId = entry.arguments?.getString("listingId"),
-                    // Chegirma e'loni biznes turini so'raydi — u BusinessShell'da qoladi.
-                    availableKinds = studentListingKinds,
-                )
-            }
-            composable(PROFILE) {
-                ProfileScreen(
-                    onBack = { nav.popSafe() },
-                    onLoggedOut = onLoggedOut,
-                    onEditProfile = { nav.navigateSafe(EDIT_PROFILE) },
-                    onOpenSettings = { nav.navigateSafe(SETTINGS) },
-                    // Talabada biznes bo'limi ko'rinmaydi.
-                    showMyBusiness = false,
-                )
-            }
-            composable(
-                route = "$CONNECTIONS?tab={tab}",
-                arguments = listOf(
-                    navArgument("tab") { type = NavType.StringType; nullable = true; defaultValue = null },
-                ),
-            ) { entry ->
-                ConnectionsScreen(
-                    onBack = { nav.popSafe() },
-                    // Chat tab'i suhbatni o'zi ochadi (`POST /v1/conversations` idempotent).
-                    onOpenChat = { studentId, _ -> openChatWith(studentId) },
-                    // Home'dagi tugmalar kerakli bo'limni darrov ochadi. Nomi noto'g'ri
-                    // kelsa — sukut bo'yicha "Do'stlar" (ekranning o'z boshlang'ich holati).
-                    initialTab = entry.arguments?.getString("tab")
-                        ?.let { name -> ConnectionsTab.entries.firstOrNull { it.name == name } },
-                )
-            }
-            composable(MY_LISTINGS) {
-                MyListingsScreen(
-                    onCreate = { nav.navigateSafe(POST_LISTING) },
-                    // Tahrirlash — e'lon qo'yish oqimining o'zi, tayyor qiymatlar bilan.
-                    onEdit = { id -> nav.navigateSafe("$POST_LISTING?listingId=${encodeArg(id)}") },
-                    onBack = { nav.popSafe() },
-                    // Chegirmalar biznesniki — talabaning e'lonlari orasida ko'rinmaydi.
-                    filterDiscount = false,
-                )
-            }
-            composable(NOTIFICATIONS) { NotificationsScreen(onBack = { nav.popSafe() }) }
-            composable(EDIT_PROFILE) { EditProfileScreen(onBack = { nav.popSafe() }) }
-            composable(SETTINGS) {
-                SettingsScreen(
-                    onBack = { nav.popSafe() },
-                    onEditProfile = { nav.navigateSafe(EDIT_PROFILE) },
-                    onLoggedOut = onLoggedOut,
-                    onOpenBlocked = { nav.navigateSafe(BLOCKED) },
-                )
-            }
-            composable(BLOCKED) { BlockedStudentsScreen(onBack = { nav.popSafe() }) }
+
+            // Modal qatlamlar — karkasning ENG OXIRGI bolasi, ya'ni pastki panel ham, FAB ham
+            // ularning TAGIDA qoladi.
+            ScOverlayHost(overlay)
         }
 
-        // Klaviatura ochilganda pastki panel ko'rsatilmaydi: kontent klaviatura ustiga
-        // ko'tarilgani uchun panel matn maydonining tagida osilib qolardi va joy egallardi.
-        val keyboardOpen = WindowInsets.ime.getBottom(LocalDensity.current) > 0
-        // Chat endi tab emas — panel u yerda o'z-o'zidan chizilmaydi (`current in tabRoutes`).
-        if (current in tabRoutes && !keyboardOpen) {
-            BottomBar(
-                current = current,
-                onSelect = selectTab,
-                onFab = { nav.navigateSafe(POST_LISTING) },
-                modifier = Modifier.align(Alignment.BottomCenter),
+        profileStudent?.let { student ->
+            StudentProfileSheet(
+                studentId = student.id,
+                // Ro'yxatdagi qisqa profil darrov uzatiladi — varaq bo'sh holatda ochilmasin.
+                known = student,
+                onClose = { profileStudent = null },
+                // Bosh ekran va chatdagi profil bilan AYNAN bir xil bo'limlar.
+                sections = rememberPeerProfileSections(student.id),
+                onOpenChat = { id ->
+                    profileStudent = null
+                    openChatWith(id)
+                },
             )
         }
+    }
+}
+
+/**
+ * Bildirishnoma → ekran.
+ *
+ * Xarita AYNAN shu yerda: `notifications` moduli navigatsiya grafini ko'rmaydi va ko'rmasligi
+ * ham kerak — u faqat "nimaga tegishli" ligini ([NotificationTarget]) biladi, "qaysi route"
+ * ekanini emas. Shu sabab route nomlari o'zgarsa yoki ekran ko'chsa, tuzatish faqat shu
+ * funksiyada bo'ladi.
+ *
+ * Ro'yxatdan bosilganda hamma yo'nalish stack'ga QO'YILADI (sukut bo'yicha [options] bo'sh):
+ * orqaga bosilganda foydalanuvchi bildirishnomalar ro'yxatiga qaytadi va qolganini ham ko'rib
+ * chiqa oladi. Push'dan kelinganda esa chaqiruvchi [options] orqali stack'ni Home'ga tushiradi —
+ * aks holda "Orqaga" bosilishi ilovani butunlay yopardi.
+ */
+private fun NavController.openNotificationTarget(
+    target: NotificationTarget,
+    options: NavOptionsBuilder.() -> Unit = {},
+) {
+    when (target) {
+        is NotificationTarget.Chat ->
+            navigateSafe("$CHAT?conversationId=${encodeArg(target.conversationId)}", options)
+        is NotificationTarget.Listing ->
+            navigateSafe("$LISTING_DETAIL/${encodeArg(target.listingId)}", options)
+        NotificationTarget.ConnectionRequests ->
+            navigateSafe("$CONNECTIONS?tab=${ConnectionsTab.REQUESTS.name}", options)
+        NotificationTarget.MyListings -> navigateSafe(MY_LISTINGS, options)
+        NotificationTarget.Profile -> navigateSafe(PROFILE, options)
+        // Ekran almashmaydi — bildirishnoma faqat o'qilgan bo'ladi (ekran o'zi hal qiladi).
+        NotificationTarget.None -> Unit
     }
 }
 

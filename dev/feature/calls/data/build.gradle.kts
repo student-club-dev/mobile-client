@@ -18,8 +18,13 @@ kotlin {
             // yo'q, bu esa o'sha kodning saqlanadigan nashri).
             implementation(libs.webrtc.android)
             implementation(libs.kotlinx.coroutines.android)
-            // Jonli qo'ng'iroq bildirishnomasi (`NotificationCompat`) — old plan xizmati.
+            // Qo'ng'iroq bildirishnomalari (`NotificationCompat`) — old plan xizmati va
+            // kiruvchi qo'ng'iroqning to'liq ekranli oynasi.
             implementation(libs.androidx.core.ktx)
+            // `CallActionReceiver` — bildirishnomadagi "Javob berish"/"Rad etish". Tizim
+            // qabul qiluvchini O'ZI yaratadi, ya'ni unga bog'liqlikni konstruktor orqali
+            // berib bo'lmaydi: jonli `CallController` Koin'dan olinadi.
+            implementation(libs.koin.core)
         }
     }
 }

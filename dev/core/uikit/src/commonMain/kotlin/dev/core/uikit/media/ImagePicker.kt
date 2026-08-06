@@ -25,6 +25,22 @@ fun interface ImagePicker {
 expect fun rememberImagePicker(onResult: (PickedImage?) -> Unit): ImagePicker
 
 /**
+ * Kamerani ochib **shu yerda** surat olish (Android: `TakePicture`,
+ * iOS: `UIImagePickerController` + kamera manbasi).
+ *
+ * Natija galereyadan tanlanganidan farq qilmaydi — o'sha [PickedImage], ya'ni chaqiruvchi
+ * uchun ikkisi bir xil ko'rinadi ([rememberVideoCapture] videoda ham shunday).
+ *
+ * ⚠️ Olingan surat foydalanuvchining galereyasiga **tushmaydi**: fayl ilova keshiga
+ * yoziladi va baytlari o'qilgach o'chiriladi. Bu ataylab — tasodifan bosilgan tugma
+ * galereyani keraksiz suratlar bilan to'ldirmasligi kerak.
+ *
+ * [onResult] `null` — bekor qilindi, kamera yo'q yoki ruxsat berilmadi.
+ */
+@Composable
+expect fun rememberImageCapture(onResult: (PickedImage?) -> Unit): ImagePicker
+
+/**
  * **Bir nechta** rasm tanlagich (chat uchun) — bittalik [rememberImagePicker] dan alohida,
  * chunki ikkala platformada ham boshqa API ishlatiladi (Android `PickMultipleVisualMedia`,
  * iOS `PHPickerConfiguration.selectionLimit`).

@@ -2,7 +2,9 @@ package dev.feature.calls.presentation.di
 
 import dev.feature.calls.data.engine.AndroidCallEngineFactory
 import dev.feature.calls.data.engine.CallEngineFactory
+import dev.feature.calls.data.session.AndroidCallAudio
 import dev.feature.calls.data.session.AndroidCallPresence
+import dev.feature.calls.data.session.CallAudio
 import dev.feature.calls.data.session.CallPresence
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.module.Module
@@ -16,4 +18,8 @@ actual fun callsPlatformModule(): Module = module {
 
     // Old plan xizmati — usiz Android 14+ fonda mikrofonni JIMGINA o'chirib qo'yadi.
     single<CallPresence> { AndroidCallPresence(androidContext()) }
+
+    // Jiringlash, gudok va ovoz marshruti — `single`, chunki u `AudioManager` rejimini
+    // va audio fokusni ushlab turadi: bir vaqtda ikkita egasi bo'lmasligi kerak.
+    single<CallAudio> { AndroidCallAudio(androidContext()) }
 }

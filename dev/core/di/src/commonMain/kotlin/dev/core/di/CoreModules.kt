@@ -10,6 +10,7 @@ import dev.core.data.repository.RegionRepositoryImpl
 import dev.core.data.remote.ApiDiscountRemoteDataSource
 import dev.core.data.remote.DiscountRemoteDataSource
 import dev.core.data.seed.LocalDataSeeder
+import dev.core.data.seed.SeedPurge
 import dev.core.database.DatabaseFactory
 import dev.core.database.DriverFactory
 import dev.core.database.sql.StudentClubDatabase
@@ -26,6 +27,7 @@ import dev.core.domain.usecase.LogoutUseCase
 import dev.core.domain.usecase.ObserveCurrentUserUseCase
 import dev.core.domain.usecase.RegisterUseCase
 import dev.core.domain.usecase.RequestPhoneOtpUseCase
+import dev.core.domain.usecase.RequestRegistrationOtpUseCase
 import dev.core.domain.usecase.ResetPasswordUseCase
 import dev.core.domain.usecase.RevokeDeviceSessionUseCase
 import dev.core.domain.usecase.SetPasswordUseCase
@@ -62,13 +64,14 @@ const val DEFAULT_BASE_URL = DEV_BASE_URL
 /**
  * Offline-first sinxronlash yoqilganmi (B4).
  *
- * `student-club.json` (talaba API'si) **auth**, **profil**, **geo**, **media**, "Siz uchun"
- * feed'ini (**catalog** + **discounts**), shuningdek **connections** va **chat** ni beradi.
- * Ishlar/talabalar ro'yxati/universitetlar/klublar uchun endpoint hali yo'q — ular local
- * bazadan (seed) ishlaydi, shuning uchun bu umumiy bayroq `false` bo'lib qoladi.
+ * Faqat **endpoint'i hali yo'q** bo'limlar uchun qoldi: **ishlar** (`/v1/jobs`), **klublar**
+ * (`/v1/clubs`) va eski `ad` jadvali. Ular local bazadan (seed) ishlaydi, shuning uchun
+ * bayroq `false`.
  *
- * Bayroqqa **bog'liq bo'lmaganlari**: feed ([DISCOUNTS_REMOTE_ENABLED]), profil,
- * bog'lanishlar va chat — ular doim backenddan ishlaydi.
+ * Qolgan hamma narsa backendda va bu bayroqqa **bog'liq emas**: auth, profil, geo, media,
+ * "Siz uchun" feed'i ([DISCOUNTS_REMOTE_ENABLED]), talaba e'lonlari
+ * ([STUDENT_LISTINGS_REMOTE_ENABLED]), talabalar ro'yxati (`GET /v1/students`),
+ * bog'lanishlar, chat, qo'ng'iroq va story.
  */
 const val REMOTE_SYNC_ENABLED = false
 
@@ -76,8 +79,9 @@ const val REMOTE_SYNC_ENABLED = false
  * "Siz uchun" bo'limi backend'dan keladimi — `POST /v1/catalog/groups` + `/v1/catalog/types`
  * (ElonUz katalogining 27 ta biznes turi) va `POST /v1/discounts/search`.
  *
- * `false` qilinsa ekran faqat local seed (`listings.json`) bilan ishlaydi. Tarmoq xatosi
- * bo'lganda ham kesh saqlanadi — refresh DB'ni faqat muvaffaqiyatli javobda almashtiradi.
+ * ⚠️ Namuna ma'lumot (`listings.json`) olib tashlandi — `false` qilinsa ekranda faqat
+ * oldingi so'rovlardan qolgan kesh ko'rinadi, birinchi ishga tushirishda esa bo'sh bo'ladi.
+ * Tarmoq xatosida kesh saqlanadi: refresh DB'ni faqat muvaffaqiyatli javobda almashtiradi.
  */
 const val DISCOUNTS_REMOTE_ENABLED = true
 
@@ -86,13 +90,26 @@ const val DISCOUNTS_REMOTE_ENABLED = true
  *
  * `STUDENT_LISTINGS_RESPONSE.md` bo'yicha modul tayyor: yaratish, e'lon qilish, qidiruv,
  * xarita va muddati o'tishi. Shu sabab u umumiy [REMOTE_SYNC_ENABLED] bayrog'iga bog'liq
- * emas — o'sha bayroq hali endpoint'i yo'q bo'limlar (ishlar, klublar, universitetlar)
- * uchun `false` bo'lib turibdi.
+ * emas — o'sha bayroq hali endpoint'i yo'q bo'limlar (ishlar, klublar) uchun `false`.
  *
  * `false` qilinsa ilova butunlay local bazada ishlaydi (backendsiz rejim): e'lon darrov
- * faol bo'ladi, rasm `data:` URI sifatida saqlanadi.
+ * faol bo'ladi, rasm `data:` URI sifatida saqlanadi. Namuna e'lonlar yo'q — ro'yxat
+ * foydalanuvchi o'zi joylagan e'lonlardan iborat bo'ladi.
  */
 const val STUDENT_LISTINGS_REMOTE_ENABLED = true
+
+/**
+ * Bildirishnomalar ro'yxati backenddan keladimi — `GET /v1/notifications` +
+ * `POST /v1/notifications/read` (`01-NOTIFICATIONS_BACKEND.md`).
+ *
+ * 2026-08-05 dan boshlab ikkala endpoint ham serverda va spec'da bor, shuning uchun `true`.
+ *
+ * ⚠️ Ro'yxatga yozuvchi hodisalar `02-PUSH_CATALOG` bilan keladi: dastlab ro'yxat BO'SH
+ * ko'rinishi mumkin, lekin `404` bermaydi.
+ *
+ * Push (`POST /v1/devices`) bunga BOG'LIQ EMAS: u allaqachon serverda va doim ishlaydi.
+ */
+const val NOTIFICATIONS_REMOTE_ENABLED = true
 
 /** Coil ishlatadigan rasm klientining Koin nomi. */
 const val IMAGE_CLIENT = "imageHttpClient"
@@ -149,6 +166,10 @@ val repositoryModule = module {
 
     // Dizayndagi namuna ma'lumot bilan bazani to'ldiruvchi (bo'sh bo'lsa).
     single { LocalDataSeeder(get(), get()) }
+
+    // Eski o'rnatmalarda qolgan namuna ma'lumotni bir marta o'chiradi (backendga ulangan
+    // bo'limlar uchun) — qarang: `SeedPurge`.
+    single { SeedPurge(get(), get()) }
 }
 
 val domainModule = module {
@@ -159,6 +180,7 @@ val domainModule = module {
     factory { CancelRegistrationUseCase(get()) }
     factory { LogoutUseCase(get()) }
     factory { ObserveCurrentUserUseCase(get()) }
+    factory { RequestRegistrationOtpUseCase(get()) }
     factory { RequestPhoneOtpUseCase(get()) }
     factory { VerifyPhoneOtpUseCase(get()) }
     factory { ForgotPasswordUseCase(get()) }

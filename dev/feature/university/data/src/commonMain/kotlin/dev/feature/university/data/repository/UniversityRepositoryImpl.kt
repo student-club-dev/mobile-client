@@ -48,10 +48,20 @@ class UniversityRepositoryImpl(
         q.upsert(university.id, university.name, university.city, university.monogram, university.faculty, university.accent)
     }
 
+    /**
+     * Universitetlar katalogini prof-emis'dan bir marta to'ldiradi.
+     *
+     * ⚠️ Versiya belgisidan tashqari **jadval bo'shligi ham** tekshiriladi. Faqat belgiga
+     * ishonilganda jadval tashqaridan tozalansa (masalan `SeedPurge`) ro'yxat abadiy bo'sh
+     * qolardi: belgi "yuklangan" deb turardi, ma'lumot esa yo'q edi. Natijada hech qayerda —
+     * ro'yxatdan o'tishda ham, "Do'stlar" filtrida ham — universitet tanlab bo'lmasdi.
+     */
     override suspend fun ensureRemoteUniversities() {
         val settings = db.appSettingQueries
-        val done = withContext(dispatchers.io) { settings.selectByKey(UNI_SOURCE_KEY).executeAsOneOrNull() }
-        if (done == UNI_SOURCE_VERSION) return
+        val (done, cached) = withContext(dispatchers.io) {
+            settings.selectByKey(UNI_SOURCE_KEY).executeAsOneOrNull() to q.count().executeAsOne()
+        }
+        if (done == UNI_SOURCE_VERSION && cached > 0) return
         when (val res = fetchSelectableUniversities()) {
             is Resource.Success -> withContext(dispatchers.io) {
                 q.transaction {

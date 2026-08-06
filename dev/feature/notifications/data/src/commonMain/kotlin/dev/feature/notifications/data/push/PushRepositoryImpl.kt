@@ -6,9 +6,11 @@ import dev.core.common.network.NetworkConnectivity
 import dev.core.common.push.PushRegistrar
 import dev.core.network.generated.api.NotificationsApi
 import dev.core.network.generated.model.DevicePlatformDto
+import dev.core.network.generated.model.DeviceTokenTypeDto
 import dev.core.network.generated.model.RegisterDeviceDto
 import dev.core.network.response.safeCall
 import dev.feature.notifications.domain.push.DevicePlatform
+import dev.feature.notifications.domain.push.DeviceTokenType
 import dev.feature.notifications.domain.push.PushRepository
 import dev.feature.notifications.domain.push.PushTokenSource
 import kotlinx.coroutines.CoroutineScope
@@ -49,7 +51,15 @@ class PushRepositoryImpl(
 
     private suspend fun send(token: String): Resource<Unit> = safeCall(connectivity) {
         api.devicesRegister(
-            RegisterDeviceDto(token = token, platform = tokenSource.platform.toDto()),
+            RegisterDeviceDto(
+                token = token,
+                platform = tokenSource.platform.toDto(),
+                // `tokenType` ATAYLAB aniq yuboriladi. Server berilmagan holat uchun o'z
+                // sukutiga ega (`IOS → APNS`), lekin u serverning ichki qarori: o'zgarsa,
+                // tarqatilgan ilova o'z tokenini uni adreslay olmaydigan xizmatga
+                // topshirib qo'yardi va push jimgina o'chardi.
+                tokenType = tokenSource.tokenType.toDto(),
+            ),
         ).body()
     }
 
@@ -70,6 +80,12 @@ class PushRepositoryImpl(
         refreshJob = null
         // MUHIM: tokenlar tozalanishidan OLDIN chaqiriladi, aks holda so'rov 401 bo'lardi.
         unregister()
+    }
+
+    private fun DeviceTokenType.toDto(): DeviceTokenTypeDto = when (this) {
+        DeviceTokenType.FCM -> DeviceTokenTypeDto.FCM
+        DeviceTokenType.APNS -> DeviceTokenTypeDto.APNS
+        DeviceTokenType.APNS_VOIP -> DeviceTokenTypeDto.APNS_VOIP
     }
 
     private fun DevicePlatform.toDto(): DevicePlatformDto = when (this) {

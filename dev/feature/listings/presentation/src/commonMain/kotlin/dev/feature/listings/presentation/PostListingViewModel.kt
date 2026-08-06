@@ -12,6 +12,7 @@ import dev.feature.listings.domain.model.BusinessType
 import dev.feature.listings.domain.model.EmploymentType
 import dev.feature.listings.domain.model.JobCatalog
 import dev.feature.listings.domain.model.Listing
+import dev.feature.listings.domain.model.ListingAudience
 import dev.feature.listings.domain.model.ListingDetails
 import dev.feature.listings.domain.model.ListingIds
 import dev.feature.listings.domain.model.ListingKind
@@ -36,6 +37,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -81,6 +84,23 @@ class PostListingViewModel(
 
     private val _state = MutableStateFlow(PostListingUiState())
     val state: StateFlow<PostListingUiState> = _state.asStateFlow()
+
+    init {
+        // Ko'rinish doirasi tanlovi universitetsiz ma'nosiz — profil kelgach ochiladi.
+        // Universitet keyin olib tashlansa tanlov ham `ALL` ga qaytadi, aks holda e'lon
+        // jimgina hech kimga ko'rinmay qolardi.
+        universityId
+            .onEach { id ->
+                val known = id != null
+                _state.update {
+                    it.copy(
+                        hasUniversity = known,
+                        audience = if (known) it.audience else ListingAudience.ALL,
+                    )
+                }
+            }
+            .launchIn(viewModelScope)
+    }
 
     /** Tahrirlanayotgan e'lonning id/yaratilgan vaqti — publish o'shani upsert qiladi. */
     private var editingId: String? = null
@@ -150,6 +170,8 @@ class PostListingViewModel(
     /** Holatda faqat 9 xonali milliy raqam turadi — "+998" va probellar saqlanmaydi. */
     fun onContactPhone(v: String) = _state.update { it.copy(contactPhone = v.toUzPhoneDigits()) }
     fun onDuration(days: Int) = _state.update { it.copy(durationDays = days) }
+
+    fun onAudience(value: ListingAudience) = _state.update { it.copy(audience = value) }
     fun consumeMessage() = _state.update { it.copy(message = null) }
 
     // -----------------------------------------------------------------------
@@ -453,6 +475,7 @@ class PostListingViewModel(
             contactPhone = s.contactPhone.toUzPhoneDigits().ifBlank { null }?.let { UZ_PHONE_CODE + it },
             // Tahrirlashda e'lon o'z universitetida qoladi; yangi e'lon egasinikiga bog'lanadi.
             universityId = editingUniversityId ?: universityId.value,
+            audience = s.audience,
             // Chegirmada kategoriyaga xos maydonlar shu yerda saqlanadi.
             attributes = s.discount.attributeValues.takeIf { kind == ListingKind.DISCOUNT }.orEmpty(),
             branches = s.branches,
@@ -577,6 +600,9 @@ class PostListingViewModel(
             contactPhone = contactPhone.orEmpty().toUzPhoneDigits(),
             branches = branches,
             durationDays = ((validTo - validFrom) / MILLIS_PER_DAY).toInt().coerceAtLeast(1),
+            audience = audience,
+            hasUniversity = universityId != null ||
+                this@PostListingViewModel.universityId.value != null,
             editing = true,
         )
 

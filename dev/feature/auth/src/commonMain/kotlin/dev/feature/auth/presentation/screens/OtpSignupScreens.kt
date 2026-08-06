@@ -18,16 +18,24 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.LinkAnnotation
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.withStyle
@@ -73,7 +81,21 @@ fun OtpScreen(
     confirmLabel: String = "Tasdiqlash",
     palette: AppPalette = appPalette,
 ) {
-    AppScreenScaffold(scroll = true) {
+    AppScreenScaffold(
+        scroll = true,
+        // Tugma scroll maydonidan TASHQARIDA: klaviatura kodni kiritish uchun ochiq
+        // turadi va "Tasdiqlash" uning ustida ko'rinib qoladi (ilgari u klaviatura
+        // ostida qolib ketardi).
+        bottomBar = {
+            PrimaryButton(
+                confirmLabel,
+                onVerify,
+                enabled = state.otpValid && !state.isLoading,
+                trailingIcon = AppIcons.Check,
+            )
+            ErrorText(state.error)
+        },
+    ) {
         BackButton(onBack)
         Spacer(Modifier.height(24.dp))
         Box(
@@ -122,11 +144,6 @@ fun OtpScreen(
                 )
             }
         }
-
-        Spacer(Modifier.height(22.dp))
-        PrimaryButton(confirmLabel, onVerify, enabled = state.otpValid && !state.isLoading, trailingIcon = AppIcons.Check)
-
-        ErrorText(state.error)
 
         Spacer(Modifier.height(20.dp))
     }
@@ -200,7 +217,28 @@ fun SignUpScreen(
     onCreate: () -> Unit,
     palette: AppPalette = appPalette,
 ) {
-    AppScreenScaffold(scroll = true, horizontalPadding = 20, topPadding = 54) {
+    // Qaysi hujjat ochiq — `null` bo'lsa varaq yopiq.
+    var openDocument by remember { mutableStateOf<LegalDocument?>(null) }
+
+    AppScreenScaffold(
+        scroll = true,
+        horizontalPadding = 20,
+        topPadding = 54,
+        // Rozilik qatori ham, tugma ham mixlangan: forma uzun va klaviatura ochilganda
+        // ular ekrandan chiqib ketardi.
+        bottomBar = {
+            Spacer(Modifier.height(12.dp))
+            TermsConsentRow(
+                accepted = state.termsAccepted,
+                onToggle = vm::toggleTerms,
+                onOpenDocument = { openDocument = it },
+                palette = palette,
+            )
+            ErrorText(state.error)
+            Spacer(Modifier.height(12.dp))
+            PrimaryButton("Hisob yaratish", onCreate, enabled = state.termsAccepted && !state.isLoading)
+        },
+    ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(11.dp)) {
             BackButton(onBack)
             ScreenTitle("Hisob yaratish", size = 21)
@@ -277,24 +315,53 @@ fun SignUpScreen(
         }
 
         Spacer(Modifier.height(12.dp))
-        Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(9.dp), modifier = Modifier.clickableNoRipple { vm.toggleTerms() }) {
-            CheckBoxSmall(state.termsAccepted, palette)
-            Text(
-                buildAnnotatedString {
-                    withStyle(androidx.compose.ui.text.SpanStyle(color = palette.primary, fontWeight = FontWeight.Bold)) { append("Foydalanish shartlari") }
-                    withStyle(androidx.compose.ui.text.SpanStyle(color = palette.label)) { append(" va ") }
-                    withStyle(androidx.compose.ui.text.SpanStyle(color = palette.primary, fontWeight = FontWeight.Bold)) { append("Maxfiylik siyosati") }
-                    withStyle(androidx.compose.ui.text.SpanStyle(color = palette.label)) { append("ga roziman.") }
-                },
-                style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.5f.sp, lineHeight = 16.sp),
-            )
-        }
+    }
 
-        ErrorText(state.error)
+    openDocument?.let { document ->
+        LegalDocumentSheet(document = document, onClose = { openDocument = null })
+    }
+}
 
-        Spacer(Modifier.height(20.dp))
-        Spacer(Modifier.height(16.dp))
-        PrimaryButton("Hisob yaratish", onCreate, enabled = state.termsAccepted && !state.isLoading)
+/**
+ * Rozilik qatori — katakcha + ikkita **bosiladigan** havola.
+ *
+ * ⚠️ Havolalar `LinkAnnotation` bilan: matn ichida qolgani uchun qator bo'linishi
+ * tabiiy ishlaydi va bosish AYNAN so'zning ustida ushlanadi. Qatorning qolgan qismini
+ * bosish esa katakchani belgilaydi — ikkalasi bir-biriga xalaqit bermaydi.
+ */
+@Composable
+private fun TermsConsentRow(
+    accepted: Boolean,
+    onToggle: () -> Unit,
+    onOpenDocument: (LegalDocument) -> Unit,
+    palette: AppPalette,
+) {
+    val linkStyle = TextLinkStyles(
+        style = SpanStyle(color = palette.primary, fontWeight = FontWeight.Bold),
+    )
+    Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+        Box(Modifier.clickableNoRipple(onToggle)) { CheckBoxSmall(accepted, palette) }
+        Text(
+            buildAnnotatedString {
+                withLink(
+                    LinkAnnotation.Clickable(
+                        tag = LegalDocument.TERMS.name,
+                        styles = linkStyle,
+                        linkInteractionListener = { onOpenDocument(LegalDocument.TERMS) },
+                    ),
+                ) { append("Foydalanish shartlari") }
+                withStyle(SpanStyle(color = palette.label)) { append(" va ") }
+                withLink(
+                    LinkAnnotation.Clickable(
+                        tag = LegalDocument.PRIVACY.name,
+                        styles = linkStyle,
+                        linkInteractionListener = { onOpenDocument(LegalDocument.PRIVACY) },
+                    ),
+                ) { append("Maxfiylik siyosati") }
+                withStyle(SpanStyle(color = palette.label)) { append("ga roziman.") }
+            },
+            style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.5f.sp, lineHeight = 16.sp),
+        )
     }
 }
 
@@ -331,7 +398,7 @@ fun ForgotPasswordScreen(
             ScreenTitle("Parolni tiklash", size = 23)
             Spacer(Modifier.height(8.dp))
             Text(
-                "Raqamingiz va yangi parolni kiriting — so‘ng SMS orqali 6 xonali kod yuboramiz.",
+                "Telefon raqamingizni kiriting — SMS orqali 6 xonali kod yuboramiz. Yangi parolni kod tasdiqlangandan keyin belgilaysiz.",
                 style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.sp, color = palette.inkMuted, textAlign = androidx.compose.ui.text.style.TextAlign.Center, lineHeight = 19.sp),
                 modifier = Modifier.padding(horizontal = 6.dp),
             )
@@ -351,28 +418,8 @@ fun ForgotPasswordScreen(
             textLetterSpacing = 0.5f,
         )
 
-        Spacer(Modifier.height(13.dp))
-        FieldLabel("Yangi parol")
-        Spacer(Modifier.height(7.dp))
-        GlassTextField(
-            value = state.password,
-            onValueChange = vm::onPasswordChange,
-            placeholder = "••••••••",
-            leading = AppIcons.Lock,
-            trailing = {
-                Icon(
-                    if (state.passwordVisible) AppIcons.EyeOff else AppIcons.Eye,
-                    null, tint = palette.inkFaint,
-                    modifier = Modifier.size(18.dp).clickableNoRipple { vm.togglePasswordVisible() },
-                )
-            },
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-            visualTransformation = if (state.passwordVisible) VisualTransformation.None
-            else PasswordVisualTransformation(),
-        )
-
         Spacer(Modifier.height(18.dp))
-        PrimaryButton("Kod yuborish", onSend, enabled = state.resetReady && !state.isLoading)
+        PrimaryButton("Kod yuborish", onSend, enabled = state.forgotReady && !state.isLoading)
 
         state.info?.let {
             Spacer(Modifier.height(12.dp))
@@ -389,6 +436,108 @@ fun ForgotPasswordScreen(
             Spacer(Modifier.width(7.dp))
             Text("Kirishga qaytish", style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = palette.primary))
         }
+    }
+}
+
+// ===========================================================================
+// 1j — YANGI PAROL (kod tasdiqlangandan keyin)
+// ===========================================================================
+
+/**
+ * Parolni tiklashning oxirgi qadami — yangi parol shu yerda so'raladi.
+ *
+ * Raqam va SMS kod allaqachon holatda: [onSave] `password/reset` ga uchalasini birga
+ * yuboradi. Kod noto'g'ri bo'lsa xato shu ekranda ko'rinadi va foydalanuvchi orqaga
+ * qaytib kodni tuzatishi mumkin.
+ */
+@Composable
+fun NewPasswordScreen(
+    state: AuthFlowState,
+    vm: AuthFlowViewModel,
+    onBack: () -> Unit,
+    onSave: () -> Unit,
+    palette: AppPalette = appPalette,
+) {
+    AppScreenScaffold(scroll = true) {
+        BackButton(onBack)
+        Spacer(Modifier.height(30.dp))
+        Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+            Box(
+                Modifier.size(84.dp)
+                    .background(palette.primary.copy(alpha = 0.14f), RoundedCornerShape(26.dp)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Box(
+                    Modifier.size(56.dp).background(palette.primaryBrush, RoundedCornerShape(18.dp)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(AppIcons.ShieldCheck, null, tint = Color.White, modifier = Modifier.size(28.dp))
+                }
+            }
+            Spacer(Modifier.height(20.dp))
+            ScreenTitle("Yangi parol", size = 23)
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "Raqamingiz tasdiqlandi. Endi yangi parolni o‘ylab toping — kamida 8 belgi.",
+                style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.sp, color = palette.inkMuted, textAlign = androidx.compose.ui.text.style.TextAlign.Center, lineHeight = 19.sp),
+                modifier = Modifier.padding(horizontal = 6.dp),
+            )
+        }
+
+        Spacer(Modifier.height(26.dp))
+        FieldLabel("Yangi parol")
+        Spacer(Modifier.height(7.dp))
+        GlassTextField(
+            value = state.password,
+            onValueChange = vm::onPasswordChange,
+            placeholder = "••••••••",
+            leading = AppIcons.Lock,
+            focused = true,
+            trailing = {
+                Icon(
+                    if (state.passwordVisible) AppIcons.EyeOff else AppIcons.Eye,
+                    null, tint = palette.inkFaint,
+                    modifier = Modifier.size(18.dp).clickableNoRipple { vm.togglePasswordVisible() },
+                )
+            },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+            visualTransformation = if (state.passwordVisible) VisualTransformation.None
+            else PasswordVisualTransformation(),
+        )
+
+        Spacer(Modifier.height(13.dp))
+        FieldLabel("Parolni takrorlang")
+        Spacer(Modifier.height(7.dp))
+        GlassTextField(
+            value = state.passwordConfirm,
+            onValueChange = vm::onPasswordConfirmChange,
+            placeholder = "••••••••",
+            leading = AppIcons.Lock,
+            trailing = {
+                Icon(
+                    if (state.passwordVisible) AppIcons.EyeOff else AppIcons.Eye,
+                    null, tint = palette.inkFaint,
+                    modifier = Modifier.size(18.dp).clickableNoRipple { vm.togglePasswordVisible() },
+                )
+            },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+            visualTransformation = if (state.passwordVisible) VisualTransformation.None
+            else PasswordVisualTransformation(),
+        )
+
+        // Mos kelmagani darhol ko'rinadi — tugmani bosib ko'rishni kutmasdan.
+        if (state.passwordMismatch) ErrorText("Parollar mos kelmadi.")
+
+        Spacer(Modifier.height(18.dp))
+        PrimaryButton(
+            "Parolni saqlash", onSave,
+            enabled = state.newPasswordReady && !state.isLoading,
+            trailingIcon = AppIcons.Check,
+        )
+
+        ErrorText(state.error)
+
+        Spacer(Modifier.height(20.dp))
     }
 }
 

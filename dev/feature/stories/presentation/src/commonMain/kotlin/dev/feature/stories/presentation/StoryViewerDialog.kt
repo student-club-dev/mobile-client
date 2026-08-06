@@ -3,8 +3,11 @@ package dev.feature.stories.presentation
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChange
+import kotlin.math.abs
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -50,7 +53,7 @@ import dev.feature.stories.domain.model.Story
 import dev.feature.stories.domain.model.StoryKind
 
 /**
- * Lavha ko'ruvchisi — to'liq ekran, tepada progress chiziqlari.
+ * Hikoya ko'ruvchisi — to'liq ekran, tepada progress chiziqlari.
  *
  * Boshqaruv Instagram/Telegram bilan bir xil: **o'ng yarmiga tegish** — keyingi,
  * **chap yarmiga** — oldingi, **ushlab turish** — pauza. Rasm [Story.DEFAULT_IMEGE_MS]
@@ -74,15 +77,22 @@ internal fun StoryViewerDialog(
     /**
      * Muallif ustiga bosildi — uning profili ochiladi (Telegram/Instagramdagidek).
      *
-     * `null` — bosish o'chirilgan: o'z lavhangizda ochadigan profil yo'q.
+     * `null` — bosish o'chirilgan: o'z hikoyangizda ochadigan profil yo'q.
      */
     onOpenAuthor: ((String) -> Unit)? = null,
 ) {
     val group = state.group ?: return
     val story = state.story ?: return
-    var paused by remember { mutableStateOf(false) }
+    /** Barmoq ekranda ushlab turilibdi ([StoryTapZone]). */
+    var held by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
+    // Hikoya almashsa ro'yxat yopiladi — u aynan shu postniki.
+    var viewersOpen by remember(story.id) { mutableStateOf(false) }
     val isVideo = story.kind == StoryKind.VIDEO
+
+    // Ustiga oyna chiqqanda hikoya o'zi keyingisiga o'tib ketmasin: o'chirishni tasdiqlash
+    // ham, ko'rganlar ro'yxati ham ushlab turish bilan bir xil — vaqt to'xtaydi.
+    val paused = held || confirmDelete || viewersOpen
 
     /**
      * Tepadagi chiziqning to'lish ulushi (`0f..1f`) — **rasm uchun**.
@@ -101,7 +111,7 @@ internal fun StoryViewerDialog(
     // to'ladi; to'lgach o'zi keyingisiga o'tadi.
     //
     // ⚠️ Videoda bu ishlamaydi: uni pleyerning o'zi tugatadi (`onEnded`). Ikkalasi birga
-    // ishlasa lavha davomiylikdan oldin sakrab ketardi.
+    // ishlasa hikoya davomiylikdan oldin sakrab ketardi.
     LaunchedEffect(story.id, paused, isVideo) {
         if (isVideo || paused) return@LaunchedEffect
         // Qolgan vaqt — pauzadan keyin ham to'liq 5 soniya kutib qolmaslik uchun.
@@ -120,14 +130,26 @@ internal fun StoryViewerDialog(
     Dialog(onDismissRequest = onClose, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         StatusBarAppearance(darkIcons = false)
         Box(Modifier.fillMaxSize().background(Color.Black)) {
-            if (isVideo) {
+            if (story.mediaPurged && story.localUri == null) {
+                // Arxivda bir yillik saqlash muddati o'tgan — fayl serverda yo'q
+                // (`url` → 404). Pleyer/rasm yuklovchisiga bermaymiz: ekran jimgina qora
+                // qolib, foydalanuvchi sababini bilmasdi.
+                Box(Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
+                    ScText(
+                        "Bu hikoyaning fayli saqlanmagan — arxivda faqat yozuvi qoldi.",
+                        14f,
+                        FontWeight.Medium,
+                        Color.White,
+                    )
+                }
+            } else if (isVideo) {
                 ScVideoPlayer(
                     // Telefondagi nusxa bo'lsa — o'sha: tarmoq ham, kutish ham yo'q.
                     url = story.displayUrl,
                     // ⚠️ Story medialari **token bilan** so'raladi (§11.2) — faqat muallif va
                     // unga bog'langan odam o'qiy oladi, ya'ni tokensiz pleyer `404` olardi.
                     headers = mediaHeaders,
-                    // Lavha o'zi o'ynaydi va boshqaruv paneli ko'rsatilmaydi: bu Instagram
+                    // Hikoya o'zi o'ynaydi va boshqaruv paneli ko'rsatilmaydi: bu Instagram
                     // uslubidagi ekran, u yerda pauza/tugma emas, ekranni ushlab turish bilan
                     // boshqariladi — shuning uchun ijro `paused` ga bog'langan.
                     autoPlay = !paused,
@@ -152,22 +174,18 @@ internal fun StoryViewerDialog(
                 )
             }
 
-            // Tegish zonalari — eng pastda, ustidagi tugmalar ularni to'sadi.
+            // Boshqaruv zonasi — eng pastda, ustidagi tugmalar uni to'sadi.
             //
-            // Telegram/Instagram boshqaruvi: chap yarmi — oldingi, o'ng yarmi — keyingi,
-            // **ushlab turish** esa pauza (rasmda chiziq to'xtaydi, videoda ijro ham).
-            Row(Modifier.fillMaxSize()) {
-                StoryTapZone(
-                    Modifier.weight(1f),
-                    onHold = { paused = it },
-                    onTap = onPrevious,
-                )
-                StoryTapZone(
-                    Modifier.weight(1f),
-                    onHold = { paused = it },
-                    onTap = onNext,
-                )
-            }
+            // Telegram/Instagram boshqaruvi bitta imo-ishora ishlovchisida:
+            // chap yarmiga tegish — oldingi, o'ng yarmiga — keyingi, **ushlab turish** —
+            // pauza, **yon tomonga surish** — oldingi/keyingi hikoya.
+            Box(
+                Modifier.fillMaxSize().storyGestures(
+                    onHold = { held = it },
+                    onPrevious = onPrevious,
+                    onNext = onNext,
+                ),
+            )
 
             // Tepadagi gradient — progress va ism har qanday rasmda o'qilsin.
             Box(
@@ -185,8 +203,8 @@ internal fun StoryViewerDialog(
                 Spacer(Modifier.height(10.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     // Avatar va ism — bitta bosiladigan bo'lak: muallifning profili
-                    // ochiladi. Ular tepadagi qatorda, ya'ni lavhani surish zonalaridan
-                    // ([StoryTapZone]) tashqarida — bosish keyingi lavhaga o'tkazmaydi.
+                    // ochiladi. Ular tepadagi qatorda, ya'ni hikoyani surish zonalaridan
+                    // ([StoryTapZone]) tashqarida — bosish keyingi hikoyaga o'tkazmaydi.
                     Row(
                         Modifier.weight(1f)
                             .clip(RoundedCornerShape(percent = 50))
@@ -208,19 +226,25 @@ internal fun StoryViewerDialog(
                         Spacer(Modifier.width(9.dp))
                         Column(Modifier.weight(1f)) {
                             ScText(group.author.displayName, 13.5f, FontWeight.Bold, Color.White, maxLines = 1)
-                            // O'z lavhamda ko'rishlar soni bor; boshqalarnikida u ATAYLAB `null`.
-                            story.viewsCount?.let {
+                            // O'z hikoyamda ko'rishlar soni bor; boshqalarnikida u ATAYLAB `null`.
+                            //
+                            // Bosilsa — kim ko'rgani ([StoryViewersSheet]). Ro'yxat arxivdagi
+                            // post uchun ham ochiladi: son muzlagan bo'lsa ham qatorlar joyida.
+                            story.viewsCount?.let { views ->
                                 ScText(
-                                    "$it marta ko'rilgan",
+                                    // Nol — "0 marta ko'rilgan" emas: son sifatida u
+                                    // ma'nosiz va sovuq ko'rinardi.
+                                    if (views == 0) "Hali hech kim ko'rmagan" else "$views marta ko'rilgan",
                                     11f,
                                     FontWeight.Medium,
                                     Color.White.copy(alpha = 0.75f),
+                                    Modifier.clickable { viewersOpen = true },
                                 )
                             }
                         }
                     }
                     story.viewsCount?.let {
-                        // Ko'rishlar soni faqat muallifda bor — ya'ni bu **mening** lavham.
+                        // Ko'rishlar soni faqat muallifda bor — ya'ni bu **mening** hikoyam.
                         // Loyihada alohida "trash" ikonkasi yo'q — chatda ham o'chirish
                         // `Close` bilan ko'rsatiladi (`ChatScreen`dagi ActionRow).
                         ScText(
@@ -254,11 +278,15 @@ internal fun StoryViewerDialog(
                 }
             }
 
+            // Kim ko'rgani — o'z postimda, ko'rishlar soni bosilganda. Tegish zonalarining
+            // ustida turadi, ya'ni ro'yxat ochiqda ekranga tegish hikoyani surmaydi.
+            if (viewersOpen) {
+                StoryViewersSheet(storyId = story.id, onClose = { viewersOpen = false })
+            }
+
             if (confirmDelete) {
-                // Pauza: dialog ochiq turganda lavha o'zi keyingisiga o'tib ketmasin.
-                paused = true
                 DeleteConfirm(
-                    onCancel = { confirmDelete = false; paused = false },
+                    onCancel = { confirmDelete = false },
                     onConfirm = { confirmDelete = false; onDelete(story.id) },
                 )
             }
@@ -267,7 +295,7 @@ internal fun StoryViewerDialog(
 }
 
 /**
- * Tepadagi bo'lakli oq chiziq — har lavha uchun bittadan.
+ * Tepadagi bo'lakli oq chiziq — har hikoya uchun bittadan.
  *
  * Ko'rilganlari to'liq, keyingilari bo'sh, **faol bo'lagi** esa [progress] bo'yicha to'ladi.
  * Vaqtni bu komponent o'zi sanamaydi: rasmda uni animatsiya, videoda esa **pleyerning
@@ -299,28 +327,83 @@ private fun StoryProgress(count: Int, current: Int, progress: Float) {
 }
 
 /**
- * Ekranning yarmi — bosilsa o'tish, **ushlab turilsa pauza**.
+ * Hikoya ko'ruvchisining **yagona** imo-ishora ishlovchisi: tegish, ushlab turish va
+ * yon tomonga surish.
  *
- * `clickable` yaramaydi: u faqat bosib-qo'yib yuborishni biladi, "barmoq turgan vaqt"
- * haqida hech nima demaydi. `detectTapGestures` esa bosishning boshi va oxirini alohida
- * beradi — pauza aynan shu oraliqda.
+ * Nega bitta joyda: `detectTapGestures` birinchi `down` ni **iste'mol qiladi**, ya'ni
+ * uning yonidagi (yoki ustidagi) surish ishlovchisi hech qachon ishga tushmasdi — ilgari
+ * ekranda faqat tegish ishlar, surish esa hech narsa qilmasdi. Shuning uchun uchala
+ * harakat bitta `awaitEachGesture` sikli ichida ajratiladi:
+ *
+ * - barmoq qo'yildi → **pauza** (chiziq va video to'xtaydi);
+ * - gorizontal siljish `touchSlop` dan oshdi → bu **surish**, tegish bekor qilinadi;
+ * - barmoq ko'tarilganda: surilgan bo'lsa yo'nalish bo'yicha oldingi/keyingi, aks holda
+ *   qaysi yarmida bosilgani bo'yicha oldingi/keyingi.
+ *
+ * ⚠️ Vertikal siljish TEGILMAYDI — u iste'mol qilinmaydi, ya'ni kelajakda "pastga
+ * surib yopish" qo'shilsa shu yerga qo'shiladi, hozircha esa oddiy tegish deb hisoblanadi.
  */
-@Composable
-private fun StoryTapZone(modifier: Modifier, onHold: (Boolean) -> Unit, onTap: () -> Unit) {
-    Box(
-        modifier.fillMaxHeight().pointerInput(Unit) {
-            detectTapGestures(
-                onPress = {
-                    onHold(true)
-                    // Barmoq ko'tarilgunicha (yoki imo-ishora bekor bo'lgunicha) kutamiz.
-                    tryAwaitRelease()
+private fun Modifier.storyGestures(
+    onHold: (Boolean) -> Unit,
+    onPrevious: () -> Unit,
+    onNext: () -> Unit,
+): Modifier = pointerInput(onPrevious, onNext) {
+    val slop = viewConfiguration.touchSlop
+    // Chegara dp'da beriladi — zich ekranda ham, siyragida ham barmoq bir xil masofa yuradi.
+    val swipeThreshold = SwipeThreshold.toPx()
+    awaitEachGesture {
+        // ⚠️ `requireUnconsumed` — sukut bo'yicha `true`: ustidagi tugmalar (muallif,
+        // «O'chirish», yopish) bosishni allaqachon iste'mol qilgan bo'ladi va ular
+        // bosilganda hikoya SURILMASLIGI kerak.
+        val down = awaitFirstDown()
+        onHold(true)
+        var dragX = 0f
+        var swiping = false
+        var canceled = false
+        try {
+            while (true) {
+                val event = awaitPointerEvent()
+                val change = event.changes.firstOrNull { it.id == down.id }
+                if (change == null) {
+                    canceled = true
+                    break
+                }
+                if (!change.pressed) break
+                dragX += change.positionChange().x
+                if (!swiping && abs(dragX) > slop) {
+                    swiping = true
+                    // Surish boshlandi — endi bu tegish emas, pauza ham tugadi.
                     onHold(false)
-                },
-                onTap = { onTap() },
-            )
-        },
-    )
+                }
+                // Surish paytida hodisani o'zimiz iste'mol qilamiz: tagidagi
+                // (yoki ustidagi) elementlar uni ikkinchi marta talqin qilmasin.
+                if (swiping) change.consume()
+            }
+        } finally {
+            onHold(false)
+        }
+        if (canceled) return@awaitEachGesture
+        when {
+            // Surish: barmoq CHAPGA ketdi → keyingi hikoya (kontent chapga suriladi),
+            // O'NGGA ketdi → oldingi. Yo'nalish Telegram/Instagram bilan bir xil.
+            swiping && dragX <= -swipeThreshold -> onNext()
+            swiping && dragX >= swipeThreshold -> onPrevious()
+            // Sust surish — hech qayerga o'tilmaydi (tasodifiy tegishdan himoya).
+            swiping -> Unit
+            // Oddiy tegish: ekranning qaysi yarmi bosilgani hal qiladi.
+            down.position.x < size.width / 2f -> onPrevious()
+            else -> onNext()
+        }
+    }
 }
+
+/**
+ * Surish shu masofadan oshsa hikoya almashadi.
+ *
+ * `touchSlop` (~8dp) o'zi yetarli emas: u shunchaki "bu surish" degan chegara, undan
+ * biroz oshgan tasodifiy siljishda ham hikoya sakrab ketardi.
+ */
+private val SwipeThreshold = 24.dp
 
 @Composable
 private fun DeleteConfirm(onCancel: () -> Unit, onConfirm: () -> Unit) {
@@ -329,10 +412,10 @@ private fun DeleteConfirm(onCancel: () -> Unit, onConfirm: () -> Unit) {
             Modifier.clip(RoundedCornerShape(20.dp)).background(Sc.Card).padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            ScText("Lavhani o'chirasizmi?", 16f, FontWeight.ExtraBold, Sc.Ink)
+            ScText("Hikoyani o'chirasizmi?", 16f, FontWeight.ExtraBold, Sc.Ink)
             // Story TAHRIRLANMAYDI — o'chirib, qaytadan qo'yiladi (§7).
             ScText(
-                "Lavha darhol yo'qoladi. Tahrirlash imkoni yo'q — o'chirib, qaytadan qo'yish kerak.",
+                "Hikoya darhol yo'qoladi. Tahrirlash imkoni yo'q — o'chirib, qaytadan qo'yish kerak.",
                 13f,
                 FontWeight.Medium,
                 Sc.Muted,

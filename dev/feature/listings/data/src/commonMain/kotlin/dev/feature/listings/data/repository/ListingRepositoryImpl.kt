@@ -280,6 +280,7 @@ class ListingRepositoryImpl(
             finalPrice = e.finalPrice,
             contactPhone = e.contactPhone,
             universityId = e.universityId,
+            audience = e.audience,
             branchesJson = e.branchesJson,
             validFrom = e.validFrom,
             validTo = e.validTo,

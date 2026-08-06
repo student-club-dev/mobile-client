@@ -183,7 +183,15 @@ class DatabaseSchemaTest {
         // `STUDENT_LISTINGS_BACKEND.md` §7.2.4): "Universitetimda" bo'limi shu ustundan,
         // 28.sqm — chat lentasidagi qo'ng'iroq yozuvi (`MessageEntity.call*`) va ovozli
         // xabar matni (`attachmentTranscript`) — `handoff/09-CALLS-REST.md` §4.
-        assertEquals(29L, StudentClubDatabase.Schema.version)
+        // 29.sqm — e'lonning ko'rinish doirasi (`ListingEntity.audience`,
+        // `STUDENT_LISTINGS_BACKEND.md` §7.2.4): eski qatorlar 'ALL' bo'lib qoladi,
+        // 30.sqm — bildirishnomalar `GET /v1/notifications` keshiga aylandi
+        // (`NOTIFICATIONS_BACKEND.md`): `timeLabel`/`sortOrder` o'rniga `createdAt`,
+        // ustiga bosilganda ochiladigan ekran uchun `targetType`/`targetId`,
+        // 31.sqm — profilga yashash manzili (`ProfileEntity.regionId`/`districtId`):
+        // yangi ish e'lonlari digesti universitet YOKI tuman bo'yicha mos keladi
+        // (`02-PUSH_CATALOG_RESPONSE.md` §4).
+        assertEquals(32L, StudentClubDatabase.Schema.version)
     }
 
     @Test
@@ -197,8 +205,8 @@ class DatabaseSchemaTest {
         assertEquals("DARK", db.appSettingQueries.selectByKey("theme_mode").executeAsOne())
 
         // Notification (C1)
-        db.notificationQueries.insert("n1", "Sarlavha", "Matn", "JOB", "hozir", 1, 0)
-        db.notificationQueries.insert("n2", "Sarlavha 2", "Matn 2", "CHAT", "hozir", 2, 1)
+        db.notificationQueries.upsert("n1", "Sarlavha", "Matn", "JOB", 1_700_000_000_000, "LISTING", "l-1", 0)
+        db.notificationQueries.upsert("n2", "Sarlavha 2", "Matn 2", "CHAT", 1_700_000_100_000, null, null, 1)
         assertEquals(1L, db.notificationQueries.countUnread().executeAsOne())
         db.notificationQueries.markAllRead()
         assertEquals(0L, db.notificationQueries.countUnread().executeAsOne())
@@ -229,6 +237,9 @@ class DatabaseSchemaTest {
             bio = "5/5 · Dasturiy injiniring",
             // Sukut `NOBODY` — raqam ko'pchilikda yopiq (`handoff/08-PROFILE.md` §4).
             phoneVisibility = "NOBODY",
+            // Yashash manzili (31.sqm) — ish e'lonlari digestining geo yarmi.
+            regionId = "TOSHKENT_SHAHRI",
+            districtId = "CHILONZOR",
         )
         val profile = db.profileQueries.selectCurrent().executeAsOne()
         assertEquals("Quvonchbek", profile.firstName)
@@ -239,6 +250,8 @@ class DatabaseSchemaTest {
         assertEquals("https://cdn.studentclub.uz/avatars/uid-1.jpg", profile.avatarUrl)
         assertEquals("5/5 · Dasturiy injiniring", profile.bio)
         assertEquals("NOBODY", profile.phoneVisibility)
+        assertEquals("TOSHKENT_SHAHRI", profile.regionId)
+        assertEquals("CHILONZOR", profile.districtId)
 
         db.profileQueries.clear()
         assertNull(db.profileQueries.selectCurrent().executeAsOneOrNull())
@@ -617,7 +630,7 @@ class DatabaseSchemaTest {
         db.appSettingQueries.upsert("k", "v")
         assertEquals("v", db.appSettingQueries.selectByKey("k").executeAsOne())
 
-        db.notificationQueries.insert("n1", "T", "B", "SYSTEM", "hozir", 1, 0)
+        db.notificationQueries.upsert("n1", "T", "B", "SYSTEM", 1_700_000_000_000, null, null, 0)
         assertEquals(1L, db.notificationQueries.count().executeAsOne())
 
         // Eski Club satri ham joined ustuniga ega bo'lishi (DEFAULT 0) va setJoined ishlashi kerak.
@@ -831,6 +844,9 @@ class DatabaseSchemaTest {
         val migrated = db.listingQueries.selectById("l-1").executeAsOne()
         assertEquals("DISCOUNT", migrated.kind)
         assertEquals(55_000L, migrated.price)
+        // 29.sqm — mavjud e'lon 'ALL' bo'lib qoladi: migratsiya hech bir e'lonni jimgina
+        // universitet doirasiga qamab qo'ymasligi kerak.
+        assertEquals("ALL", migrated.audience)
         assertTrue(
             migrated.detailsJson.contains("\"businessType\":\"CAFE_RESTAURANT\""),
             "biznes turi detailsJson ga ko'chmadi: ${migrated.detailsJson}",
@@ -879,6 +895,7 @@ class DatabaseSchemaTest {
                 """"businessName":"Chaykhana Navruz","categoryKey":"PIZZA",""" +
                 """"isDiscounted":true,"discountType":"PERCENT","discountValue":20}""",
             universityId: String? = null,
+            audience: String = "ALL",
         ) = q.upsert(
             id = id,
             ownerId = "u1",
@@ -896,6 +913,7 @@ class DatabaseSchemaTest {
             finalPrice = 44_000,
             contactPhone = "+998901234567",
             universityId = universityId,
+            audience = audience,
             branchesJson = """[{"id":"br1","lat":41.2856,"lng":69.2034,"address":"Chilonzor 9-kvartal, 42-uy"}]""",
             validFrom = 0,
             validTo = validTo,

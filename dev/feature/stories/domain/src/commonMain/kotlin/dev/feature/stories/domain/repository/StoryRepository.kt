@@ -7,12 +7,12 @@ import dev.feature.stories.domain.model.StoryGroup
 import dev.feature.stories.domain.model.StoryViewerPage
 
 /**
- * Story — 24 soatlik lavhalar (`handoff/07-STORIES.md`).
+ * Story — 24 soatlik hikoyalar (`handoff/07-STORIES.md`).
  *
  * Eshik **chat bilan aynan bir xil**: faqat bog'langan talabalar ko'radi, bloklangan odam
- * hech qachon ko'rmaydi. Bog'lanish uzilsa lavha lentadan **darhol** yo'qoladi.
+ * hech qachon ko'rmaydi. Bog'lanish uzilsa hikoya lentadan **darhol** yo'qoladi.
  *
- * Kesh yo'q — ma'lumot tez eskiradi (har lavha 24 soat yashaydi va istalgan payt muddati
+ * Kesh yo'q — ma'lumot tez eskiradi (har hikoya 24 soat yashaydi va istalgan payt muddati
  * o'tishi mumkin). Muddati o'tgan story [feed] va [mine] dan **hech qachon** qaytmaydi,
  * ya'ni `expiresAt` ni klientda tekshirish shart emas. Yagona istisno — [archive]: u
  * ataylab **faqat** muddati o'tganlarini beradi va uni faqat muallif ko'radi.
@@ -25,21 +25,21 @@ interface StoryRepository {
      */
     suspend fun feed(): Resource<List<StoryGroup>>
 
-    /** `GET /v1/stories/mine` — faol lavhalarim + **haqiqiy** `viewsCount`. */
+    /** `GET /v1/stories/mine` — faol hikoyalarim + **haqiqiy** `viewsCount`. */
     suspend fun mine(): Resource<List<Story>>
 
     /**
-     * `GET /v1/stories/archive` — **muddati o'tgan** lavhalarim (profildagi «Arxivlangan
+     * `GET /v1/stories/archive` — **muddati o'tgan** hikoyalarim (profildagi «Arxivlangan
      * postlar»).
      *
      * ⚠️ Faqat muallifga: arxiv lentaga ham, `mine` ga ham hech qachon tushmaydi va uni
-     * boshqa hech kim o'qiy olmaydi. Ya'ni 24 soat tugagach lavha **yo'qolmaydi**, egasi
+     * boshqa hech kim o'qiy olmaydi. Ya'ni 24 soat tugagach hikoya **yo'qolmaydi**, egasi
      * uchun shu ro'yxatga o'tadi (`STORY_ARCHIVE_BACKEND.md`).
      */
     suspend fun archive(page: Int = 1, size: Int = DEFAULT_ARCHIVE_PAGE): Resource<StoryArchivePage>
 
     /**
-     * Rasm/video yuklab, lavha yaratadi: `POST /v1/media/chat-upload` → `POST /v1/stories`.
+     * Rasm/video yuklab, hikoya yaratadi: `POST /v1/media/chat-upload` → `POST /v1/stories`.
      *
      * ⚠️ Video darhol tayyor bo'lmasligi mumkin — yuklash `PROCESSING` qaytarsa server
      * `422 MEDIA_NOT_READY` beradi. Implementatsiya buni **o'zi kutadi** (bir necha marta
@@ -58,7 +58,7 @@ interface StoryRepository {
     ): Resource<Story>
 
     /**
-     * O'sha lavha yaratish, lekin media **diskdagi fayldan** yuklanadi.
+     * O'sha hikoya yaratish, lekin media **diskdagi fayldan** yuklanadi.
      *
      * Video uchun: story videosi 48 MB gacha bo'lishi mumkin va uni `ByteArray` ga o'qish
      * (ustiga multipart nusxasi) arzon telefonni xotiradan qoqib tashlardi.
@@ -72,7 +72,7 @@ interface StoryRepository {
     ): Resource<Story>
 
     /**
-     * `POST /v1/stories/{id}/view` — har lavha ochilganda. **Idempotent**, o'z story'ingiz
+     * `POST /v1/stories/{id}/view` — har hikoya ochilganda. **Idempotent**, o'z story'ingiz
      * hisoblanmaydi.
      *
      * Fon amali: xatosi ko'rsatilmaydi va hech narsani to'smaydi (`Unit` qaytadi).

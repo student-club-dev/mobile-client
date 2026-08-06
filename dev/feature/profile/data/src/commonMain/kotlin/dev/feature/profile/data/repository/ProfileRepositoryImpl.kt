@@ -147,6 +147,8 @@ class ProfileRepositoryImpl(
                 email = p.email,
                 bio = p.bio,
                 phoneVisibility = p.phoneVisibility,
+                regionId = p.regionId,
+                districtId = p.districtId,
             )
         }
     }

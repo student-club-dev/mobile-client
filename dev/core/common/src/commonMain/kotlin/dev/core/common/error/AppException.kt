@@ -35,13 +35,20 @@ sealed class AppException(
     class NoInternet(cause: Throwable? = null) :
         AppException("Internet aloqasi yo'q. Ulanishni tekshirib, qayta urining.", cause)
 
-    /** So'rov muddati tugadi. */
-    class Timeout(cause: Throwable? = null) :
-        AppException("So'rov vaqti tugadi. Qayta urining.", cause)
+    /** So'rov muddati tugadi. [reason] — konvertdagi `message` (bo'lsa). */
+    class Timeout(cause: Throwable? = null, val reason: String? = null) :
+        AppException(reason ?: "So'rov vaqti tugadi. Qayta urining.", cause)
 
-    /** Sessiya tugagan yoki kirilmagan — login kerak. */
-    class Unauthorized(cause: Throwable? = null) :
-        AppException("Sessiya tugagan. Iltimos, qaytadan kiring.", cause)
+    /**
+     * Sessiya tugagan yoki kirilmagan — login kerak.
+     *
+     * [reason] — backend konvertidagi `message`. ⚠️ **Kirish** so'rovi ham 401 qaytaradi:
+     * parol xato bo'lganda server "Telefon raqam yoki parol noto'g'ri" deydi va aynan
+     * shuni ko'rsatish kerak. Ilgari bu matn tashlanib, hamma joyda "Sessiya tugagan"
+     * chiqardi — foydalanuvchi parolini emas, sessiyasini ayblardi.
+     */
+    class Unauthorized(cause: Throwable? = null, val reason: String? = null) :
+        AppException(reason ?: "Sessiya tugagan. Iltimos, qaytadan kiring.", cause)
 
     /**
      * Ruxsat yo'q (403).
@@ -57,9 +64,14 @@ sealed class AppException(
     class NotFound(cause: Throwable? = null, val reason: String? = null) :
         AppException(reason ?: "Ma'lumot topilmadi.", cause)
 
-    /** Server xatosi (5xx). */
-    class Server(val code: Int? = null, cause: Throwable? = null) :
-        AppException("Serverda xatolik. Birozdan so'ng qayta urining.", cause)
+    /**
+     * Server xatosi (5xx).
+     *
+     * [reason] — konvertdagi `message` (bo'lsa). Server o'zi tushuntirsa (masalan
+     * "Xizmat vaqtincha o'chirilgan") foydalanuvchi umumiy matn o'rniga o'shani ko'radi.
+     */
+    class Server(val code: Int? = null, cause: Throwable? = null, val reason: String? = null) :
+        AppException(reason ?: "Serverda xatolik. Birozdan so'ng qayta urining.", cause)
 
     /**
      * Kiritilgan ma'lumot noto'g'ri (validatsiya / 4xx).

@@ -22,9 +22,11 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -67,9 +69,18 @@ class ScCollapsingHeaderState internal constructor(
     private val midPx: Float,
     private val maxPx: Float,
     private val scope: CoroutineScope,
-    /** Yoyish mumkinmi — rasm umuman bo'lmasa sarlavha faqat yig'ilgan holatda turadi. */
-    private val expandable: Boolean,
 ) {
+    /**
+     * Yoyish mumkinmi — rasm umuman bo'lmasa sarlavha faqat yig'ilgan holatda turadi.
+     *
+     * ⚠️ Konstruktor parametri EMAS, o'zgaruvchan holat. Rasm ro'yxati serverdan **kechroq**
+     * keladi, ya'ni bu qiymat `false` dan `true` ga o'zgaradi. Ilgari u `remember(...)`
+     * kaliti edi va o'zgargan zahoti butun holat qayta qurilardi: `heightPx` sukut
+     * qiymatiga (`midPx`) **sakrab** qaytardi — animatsiyasiz, barmoq ostida.
+     */
+    var expandable by mutableStateOf(true)
+        internal set
+
     var heightPx by mutableFloatStateOf(midPx)
         private set
 
@@ -117,10 +128,22 @@ class ScCollapsingHeaderState internal constructor(
         ): Offset {
             val delta = available.y
             // `available` — kontent yutmagan qoldiq, ya'ni ro'yxat allaqachon tepasida.
-            // Shundagina sarlavha yoyiladi.
-            if (delta > 0 && expandable && heightPx < maxPx) {
+            // Shundagina sarlavha ochila boshlaydi.
+            //
+            // ⚠️ Yuqori chegara [expandable] ga qarab O'ZGARADI, lekin qaytish yo'li
+            // **har doim ochiq**:
+            //
+            //   toolbar → odatiy   — doim (bu shunchaki yig'ilgan sarlavhaning qaytishi);
+            //   odatiy  → rasm     — faqat rasm bo'lsa.
+            //
+            // Ilgari butun shart `expandable` ostida edi va rasmi yo'q profilda sarlavha
+            // bir marta yig'ilgach **abadiy topbar bo'lib qolardi**: pastga qancha
+            // tortmang, ochilmasdi. Foydalanuvchi buni "animatsiya ishlamayapti" deb
+            // ko'radi — va haq, chunki qaytish yo'li umuman yo'q edi.
+            val ceiling = if (expandable) maxPx else midPx
+            if (delta > 0 && heightPx < ceiling) {
                 snapJob?.cancel()
-                val next = (heightPx + delta).coerceAtMost(maxPx)
+                val next = (heightPx + delta).coerceAtMost(ceiling)
                 val used = next - heightPx
                 heightPx = next
                 return Offset(0f, used)
@@ -190,9 +213,16 @@ fun rememberScCollapsingHeaderState(
     val midPx = with(density) { collapsedHeight.toPx() }
     val maxPx = with(density) { expandedHeight.toPx() }
     val scope = rememberCoroutineScope()
-    return remember(minPx, midPx, maxPx, expandable, scope) {
-        ScCollapsingHeaderState(minPx, midPx, maxPx, scope, expandable)
+    // Kalitlarda [expandable] YO'Q: u rasm kelishi bilan o'zgaradi va holatni qayta qurish
+    // sarlavhani animatsiyasiz sakratardi (qarang [ScCollapsingHeaderState.expandable]).
+    val state = remember(minPx, midPx, maxPx, scope) {
+        ScCollapsingHeaderState(minPx, midPx, maxPx, scope)
     }
+    state.expandable = expandable
+    // Yoyish imkoni yo'qolsa (oxirgi rasm o'chirildi) sarlavha odatiy balandligiga
+    // **animatsiya bilan** qaytadi — to'satdan kesilib qolmasin.
+    LaunchedEffect(expandable) { if (!expandable) state.collapse() }
+    return state
 }
 
 /** Yig'ilgan topbar balandligi — status bar'dan pastda (Material'dagi standart). */

@@ -23,6 +23,7 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -104,7 +105,15 @@ fun StudentProfileSheet(
             .orEmpty()
     }
     var photoIndex by remember(photos.size) { mutableIntStateOf(0) }
-    var tab by remember(sections.size) { mutableIntStateOf(0) }
+    // Tanlov raqam bilan emas, **yorliq** bilan eslab qolinadi.
+    //
+    // Bo'limlar bir vaqtda kelmaydi: postlar bitta so'rovdan, media/fayl/havolalar
+    // boshqasidan. Ro'yxat kengayganda raqamli indeks boshqa bo'limni ko'rsatib qolardi
+    // (yoki `remember(sections.size)` uni nolga qaytarib, foydalanuvchi ochgan bo'limni
+    // almashtirib yuborardi) — ya'ni ekran barmoq ostida o'zgarardi. Yorliq esa bo'lim
+    // qayerga surilishidan qat'i nazar o'shaligicha qoladi.
+    var selectedLabel by remember(student?.id) { mutableStateOf<String?>(null) }
+    val tab = sections.indexOfFirst { it.label == selectedLabel }.takeIf { it >= 0 } ?: 0
 
     Dialog(onDismissRequest = onClose, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         BoxWithConstraints(Modifier.fillMaxSize().background(Sc.Bg)) {
@@ -114,11 +123,12 @@ fun StudentProfileSheet(
                 expandable = photos.isNotEmpty(),
             )
 
-            Column(
-                Modifier.fillMaxSize()
-                    .nestedScroll(header.nestedScrollConnection)
-                    .verticalScroll(rememberScrollState()),
-            ) {
+            // Sarlavha aylanadigan qismning ICHIDA emas, USTIDA — Telegramdagidek
+            // **mixlangan**: u yig'ilib topbarga aylanadi, lekin hech qachon ekrandan
+            // surilib ketmaydi. Ilgari u ustunning birinchi bolasi edi, ya'ni topbargacha
+            // yig'ilgach ro'yxat bilan birga yuqoriga chiqib ketardi va orqaga tugmasi
+            // ham u bilan yo'qolardi.
+            Column(Modifier.fillMaxSize()) {
                 ScProfileHeader(
                     state = header,
                     name = student?.displayName ?: "Talaba",
@@ -146,7 +156,13 @@ fun StudentProfileSheet(
                 )
 
                 Column(
-                    Modifier.fillMaxWidth().padding(horizontal = 14.dp),
+                    Modifier.fillMaxWidth()
+                        .weight(1f)
+                        // Aylanish shu yerda: sarlavha `nestedScroll` orqali avval o'zi
+                        // yig'iladi, kontent esa undan keyin suriladi.
+                        .nestedScroll(header.nestedScrollConnection)
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 14.dp),
                     verticalArrangement = Arrangement.spacedBy(14.dp),
                 ) {
                     Spacer(Modifier.height(2.dp))
@@ -214,10 +230,10 @@ fun StudentProfileSheet(
                     if (sections.isNotEmpty()) {
                         SectionTabs(
                             labels = sections.map { it.label },
-                            selected = tab.coerceIn(0, sections.lastIndex),
-                            onSelect = { tab = it },
+                            selected = tab,
+                            onSelect = { selectedLabel = sections[it].label },
                         )
-                        sections[tab.coerceIn(0, sections.lastIndex)].content()
+                        sections[tab].content()
                     }
 
                     state.message?.let { ScText(it, 12.5f, FontWeight.SemiBold, Sc.Danger) }

@@ -2,6 +2,7 @@ package dev.feature.notifications.data.push
 
 import com.google.firebase.messaging.FirebaseMessaging
 import dev.feature.notifications.domain.push.DevicePlatform
+import dev.feature.notifications.domain.push.DeviceTokenType
 import dev.feature.notifications.domain.push.PushTokenSource
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.tasks.await
@@ -15,6 +16,7 @@ import kotlinx.coroutines.tasks.await
 private class FirebasePushTokenSource : PushTokenSource {
 
     override val platform = DevicePlatform.ANDROID
+    override val tokenType = DeviceTokenType.FCM
 
     /**
      * `getToken()` — Play Services yo'q qurilmada yoki `google-services.json` sozlanmaganda

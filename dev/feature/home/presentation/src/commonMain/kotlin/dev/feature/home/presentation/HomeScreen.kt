@@ -56,6 +56,8 @@ import dev.core.uikit.components.ScGradientButton
 import dev.core.uikit.components.ScHeader
 import dev.core.uikit.components.ScIconTile
 import dev.core.uikit.components.ScIcons
+import dev.core.uikit.components.ScOverlay
+import dev.core.uikit.components.ScPullRefresh
 import dev.core.uikit.components.ScAvatar
 import dev.core.uikit.components.ScSectionHeader
 import dev.core.uikit.components.ScText
@@ -68,6 +70,7 @@ import dev.core.uikit.components.ScShimmerLine
 import dev.core.uikit.components.ScShimmerCard
 import dev.core.uikit.theme.Sc
 import dev.feature.stories.presentation.StoriesCollapsed
+import dev.feature.stories.presentation.storiesCollapsedStackWidth
 import dev.feature.chat.presentation.rememberPeerProfileSections
 import dev.feature.connections.domain.model.StudentSummary
 import dev.feature.connections.presentation.StudentProfileSheet
@@ -96,8 +99,14 @@ internal val ScEasing = CubicBezierEasing(0.4f, 0f, 0.2f, 1f)
 /** Shu masofadan ortiq scroll qilinganda topbar siqiladi (maketda `scrollTop > 36`). */
 private val CondenseThreshold = 36.dp
 
-/** Topbardagi yig'ilgan story to'plamining eni — 3 ta ustma-ust doira + oraliq. */
-private val CollapsedStoriesWidth = 78.dp
+/**
+ * Yig'ilgan to'plam bilan avatar orasidagi bo'shliq.
+ *
+ * To'plamning O'ZI qancha joy egallashi [storiesCollapsedStackWidth] dan olinadi — ya'ni
+ * haqiqiy doiralar soniga qarab. Ilgari bu yerda qat'iy 78dp turardi (3 ta doira uchun):
+ * hikoya bitta bo'lganda avatar bilan ism orasida ~50dp bo'sh joy qolib ketardi.
+ */
+private val CollapsedStoriesGap = 10.dp
 
 @Composable
 fun HomeScreen(
@@ -178,73 +187,89 @@ fun HomeScreen(
             // surilganda ham joyida qoladi.
             SideNavHandle(sideNav::open, Modifier.sideNavHandleSeam())
 
-            Column(
-                Modifier.fillMaxWidth().weight(1f).verticalScroll(scroll).padding(top = 22.dp),
-                verticalArrangement = Arrangement.spacedBy(26.dp),
+            // Tepadan pastga tortish — bosh ekrandagi barcha bo'lim serverdan qayta
+            // o'qiladi. O'ram AYNAN scroll qilinadigan qism atrofida: indikator topbar
+            // ostidan chiqadi, sarlavhaning ustiga emas.
+            ScPullRefresh(
+                refreshing = state.refreshing,
+                onRefresh = vm::refresh,
+                modifier = Modifier.weight(1f),
             ) {
-                // Story lentasi — eng tepada, bo'limlardan oldin (`handoff/07-STORIES.md` §2).
-                // O'z holatini o'zi boshqaradi: lenta bo'sh bo'lsa ham «Lavham» katakchasi
-                // qoladi, ya'ni bu yerda shart tekshirilmaydi.
-                StoriesRow(
-                    myName = state.userName,
-                    myAvatarUrl = state.avatarUrl,
-                    // Lavha muallifi ustiga bosilganda uning profili — CHATDAGI bilan bir xil
-                    // varaq va bir xil bo'limlar (`rememberPeerProfileSections`). Varaqni shu
-                    // yerda chizamiz: story moduli chat moduliga bog'lanolmaydi.
-                    onOpenProfile = { author -> profileStudent = author },
-                )
+                Column(
+                    Modifier.fillMaxSize().verticalScroll(scroll).padding(top = 22.dp),
+                    verticalArrangement = Arrangement.spacedBy(26.dp),
+                ) {
+                    // Story lentasi — eng tepada, bo'limlardan oldin (`handoff/07-STORIES.md` §2).
+                    // O'z holatini o'zi boshqaradi: lenta bo'sh bo'lsa ham «Hikoyam» katakchasi
+                    // qoladi, ya'ni bu yerda shart tekshirilmaydi.
+                    StoriesRow(
+                        myName = state.userName,
+                        myAvatarUrl = state.avatarUrl,
+                        // Hikoya muallifi ustiga bosilganda uning profili — CHATDAGI bilan bir xil
+                        // varaq va bir xil bo'limlar (`rememberPeerProfileSections`). Varaqni shu
+                        // yerda chizamiz: story moduli chat moduliga bog'lanolmaydi.
+                        onOpenProfile = { author -> profileStudent = author },
+                    )
 
-                // Birinchi yuklanish, keshda hech narsa yo'q — bo'limlar o'rniga skelet.
-                if (state.loading) {
-                    HomeSkeleton()
+                    // Birinchi yuklanish, keshda hech narsa yo'q — bo'limlar o'rniga skelet.
+                    if (state.loading) {
+                        HomeSkeleton()
+                    }
+                    // Bo'limlar TARTIBI qat'iy: Ovqatlanish → Kiyim-kechak → Fanlardan yordam →
+                    // Ijara kvartiralar. Birinchi ikkitasi katalogdan keladi (sarlavhalar
+                    // serverniki), keyingi ikkitasi — talaba e'lonlari. Qolgan turlar
+                    // ("Siz uchun", ish, xizmat) o'z ekranlarida.
+                    state.offerSections.forEach { section ->
+                        OfferSection(section, onOpenDiscounts)
+                    }
+                    TasksSection(state.tasks, onOpenTasks, onOpenListing)
+                    RentalsSection(state.rentals, onOpenRentals, onOpenListing)
+                    StudentsSection(
+                        title = "Universitetimda",
+                        subtitle = "Bir universitetda o'qiyotgan talabalar",
+                        students = state.universityStudents,
+                        onSeeAll = onOpenStudentSearch,
+                        onConnect = vm::connect,
+                        onMessage = onOpenChatWith,
+                        onOpenStudent = { profileStudent = it },
+                    )
+                    StudentsSection(
+                        title = "Barcha talabalar",
+                        subtitle = "Yangi qo'shilganlar birinchi",
+                        students = state.allStudents,
+                        onSeeAll = onOpenStudentSearch,
+                        onConnect = vm::connect,
+                        onMessage = onOpenChatWith,
+                        onOpenStudent = { profileStudent = it },
+                    )
+                    // Pastki navigatsiya + FAB uchun joy.
+                    Spacer(Modifier.height(96.dp))
                 }
-                // Bo'limlar TARTIBI qat'iy: Ovqatlanish → Kiyim-kechak → Fanlardan yordam →
-                // Ijara kvartiralar. Birinchi ikkitasi katalogdan keladi (sarlavhalar
-                // serverniki), keyingi ikkitasi — talaba e'lonlari. Qolgan turlar
-                // ("Siz uchun", ish, xizmat) o'z ekranlarida.
-                state.offerSections.forEach { section ->
-                    OfferSection(section, onOpenDiscounts)
-                }
-                TasksSection(state.tasks, onOpenTasks, onOpenListing)
-                RentalsSection(state.rentals, onOpenRentals, onOpenListing)
-                StudentsSection(
-                    title = "Universitetimda",
-                    subtitle = "Bir universitetda o'qiyotgan talabalar",
-                    students = state.universityStudents,
-                    onSeeAll = onOpenStudentSearch,
-                    onConnect = vm::connect,
-                    onMessage = onOpenChatWith,
-                )
-                StudentsSection(
-                    title = "Barcha talabalar",
-                    subtitle = "Yangi qo'shilganlar birinchi",
-                    students = state.allStudents,
-                    onSeeAll = onOpenStudentSearch,
-                    onConnect = vm::connect,
-                    onMessage = onOpenChatWith,
-                )
-                // Pastki navigatsiya + FAB uchun joy.
-                Spacer(Modifier.height(96.dp))
             }
         }
 
-        HomeSideNav(
-            nav = sideNav,
-            state = state,
-            onOpenProfile = onOpenProfile,
-            onOpenUniversity = onOpenUniversity,
-            onOpenListings = onOpenListings,
-            // Kalitsiz — butun "Takliflar" feed'i (bo'lim filtri yo'q).
-            onOpenOffers = { onOpenDiscounts(null) },
-            onOpenRentals = onOpenRentals,
-            onOpenChat = onOpenChat,
-            onOpenNotifications = onOpenNotifications,
-            onOpenStudents = onOpenStudents,
-            onOpenStudentSearch = onOpenStudentSearch,
-            onOpenStudentRequests = onOpenStudentRequests,
-            onOpenMyListings = onOpenMyListings,
-            onOpenSettings = onOpenSettings,
-        )
+        // Panel EKRAN USTIDA emas, KARKAS ustida chiziladi: pastki navigatsiya paneli
+        // `NavHost` dan keyin keladi va aks holda ochiq panelning ustida qolib ketardi
+        // (`ScOverlay` izohiga q.). Holat shu yerda qoladi — faqat chizish ko'chadi.
+        ScOverlay(SideNavOverlayKey) {
+            HomeSideNav(
+                nav = sideNav,
+                state = state,
+                onOpenProfile = onOpenProfile,
+                onOpenUniversity = onOpenUniversity,
+                onOpenListings = onOpenListings,
+                // Kalitsiz — butun "Takliflar" feed'i (bo'lim filtri yo'q).
+                onOpenOffers = { onOpenDiscounts(null) },
+                onOpenRentals = onOpenRentals,
+                onOpenChat = onOpenChat,
+                onOpenNotifications = onOpenNotifications,
+                onOpenStudents = onOpenStudents,
+                onOpenStudentSearch = onOpenStudentSearch,
+                onOpenStudentRequests = onOpenStudentRequests,
+                onOpenMyListings = onOpenMyListings,
+                onOpenSettings = onOpenSettings,
+            )
+        }
     }
 
     profileStudent?.let { author ->
@@ -339,18 +364,25 @@ private fun HomeHeader(
                 )
                 // Topbar siqilganda lenta ekrandan chiqib ketadi — o'shanda uning o'rnini
                 // Telegramdagidek kichik, ustma-ust tushgan avatarlar egallaydi.
+                //
+                // Kenglik HAQIQIY doiralar soniga qarab: hikoya umuman bo'lmasa 0 (ya'ni
+                // avatar ismga yopishadi), bittasi bo'lsa bitta doira eni.
+                // `includeMine = false` — yonidagi avatar allaqachon menikim.
+                val stack = storiesCollapsedStackWidth(includeMine = false)
+                val stackWidth = if (stack > 0.dp) stack + CollapsedStoriesGap else 0.dp
                 Box(
-                    Modifier.width(lerp(0.dp, CollapsedStoriesWidth, p)).clipToBounds().alpha(p),
+                    Modifier.width(lerp(0.dp, stackWidth, p)).clipToBounds().alpha(p),
                     contentAlignment = Alignment.CenterStart,
                 ) {
                     StoriesCollapsed(
                         myName = state.userName,
                         myAvatarUrl = state.avatarUrl,
                         onClick = onOpenStories,
-                        modifier = Modifier.padding(start = 10.dp),
+                        modifier = Modifier.padding(start = CollapsedStoriesGap),
                         // Ko'k gradient ustida halqa oq bo'lishi kerak — brend ko'ki fonda
                         // yo'qolib ketardi.
                         ringBrush = Brush.linearGradient(listOf(Color.White, Color.White)),
+                        includeMine = false,
                     )
                 }
             }
@@ -379,8 +411,8 @@ private fun HomeHeader(
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
                 )
-                val badge =
-                    listOfNotNull(state.universityMonogram, state.courseLabel).joinToString(" · ")
+                // Faqat universitet — kurs (nechanchi bosqich) ataylab ko'rsatilmaydi.
+                val badge = state.universityMonogram.orEmpty()
                 if (badge.isNotBlank()) {
                     CollapsingRow(p, fullHeight = 30.dp) {
                         Row(
@@ -834,6 +866,7 @@ private fun StudentsSection(
     onSeeAll: () -> Unit,
     onConnect: (String) -> Unit,
     onMessage: (String) -> Unit,
+    onOpenStudent: (StudentSummary) -> Unit,
 ) {
     if (students.isEmpty()) return
     Column(verticalArrangement = Arrangement.spacedBy(13.dp)) {
@@ -842,7 +875,10 @@ private fun StudentsSection(
             val student = result.student
             val (tint, accent) = studentVisuals[index.mod(studentVisuals.size)]
             Column(
+                // Kartaning O'ZI profilni ochadi; "Xabar"/"Bog'lanish" tugmasi o'z
+                // bosishini yutadi.
                 Modifier.width(150.dp).scCard(radius = 26.dp)
+                    .clickable { onOpenStudent(student) }
                     .padding(horizontal = 16.dp, vertical = 18.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {

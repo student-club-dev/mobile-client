@@ -120,7 +120,7 @@ class StudentProfileViewModel(
     private suspend fun universityName(universityId: String?): String? {
         if (universityId == null) return null
         return runCatching {
-            universityRepository.observeUniversities().first().firstOrNull { it.id == universityId }?.name
+            universityRepository.observeUniversities().first().firstOrNull { it.id == universityId }?.shortName
         }.getOrNull()
     }
 }

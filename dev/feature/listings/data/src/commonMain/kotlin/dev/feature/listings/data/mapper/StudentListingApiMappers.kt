@@ -13,6 +13,7 @@ import dev.core.network.media.MediaUrl
 import dev.feature.listings.domain.model.EmploymentType
 import dev.feature.listings.domain.model.ExperienceLevel
 import dev.feature.listings.domain.model.Listing
+import dev.feature.listings.domain.model.ListingAudience
 import dev.feature.listings.domain.model.ListingBranch
 import dev.feature.listings.domain.model.ListingDetails
 import dev.feature.listings.domain.model.ListingKind
@@ -51,9 +52,20 @@ import kotlinx.serialization.json.encodeToJsonElement
  * 2. **`details`** — serverda polimorf JSON obyekt (ajratgich `kind`), `schedule` esa ichma-ich
  *    obyekt. Local ustunda esa u yassi saqlanadi (`scheduleDays`, `startTime`…).
  *
- * `details` generatorda [JsonObject] bo'lib chiqadi — `oneOf` dan ishlatib bo'ladigan Kotlin
- * kodi chiqmaydi va backend spec'da tur sxemalarini umuman e'lon qilmagan. Shakl shu yerda,
- * qo'lda, spec §4 bo'yicha tasvirlangan.
+ * `details` generatorda [JsonObject] bo'lib chiqadi (`cleanSwagger` qadam 12) va shakl shu
+ * yerda — [DetailsWire] da — tasvirlanadi.
+ *
+ * ⚠️ **Nega generatsiya qilingan `TaskDetailsDto`/`RentalDetailsDto`/… ishlatilmadi.**
+ * 2026-08-05 dan boshlab ular spec'da bor va bu yerdagi shakl ular bilan maydonma-maydon
+ * solishtirib chiqildi — nom ham, tur ham, ixtiyoriylik ham bir xil. Farq bittada:
+ * generatsiya qilingan variantda `serviceType`, `taskCategory`, `shift` va qo'shnilari
+ * **Kotlin enum'i**, bu yerda esa `String`.
+ *
+ * Farq ataylab saqlandi. Server katalogga bitta yangi xizmat sohasi qo'shsa, enum variantida
+ * kotlinx butun `details` ni pars qila olmaydi va e'lon turga xos MA'LUMOTINING HAMMASINI
+ * yo'qotadi (xona soni, maosh, muddat — hammasi). `String` variantida esa `toEnumOrNull`
+ * faqat o'sha bitta maydonni `null` qiladi, qolgani joyida qoladi. Bu `cleanSwagger` qadam 11
+ * (`lenientEnums`) bilan bir xil qaror va bir xil sabab.
  */
 private val json = Json {
     ignoreUnknownKeys = true
@@ -315,12 +327,13 @@ fun StudentListingDto.toDomain(apiOrigin: String): Listing {
         description = description,
         images = images.mapNotNull { MediaUrl.normalize(it, apiOrigin) },
         priceUnit = priceUnit?.value?.toEnumOrNull(PriceUnit.entries) ?: listingKind.defaultPriceUnit(),
-        price = price.toLong(),
-        priceMax = priceMax?.toLong(),
+        price = price,
+        priceMax = priceMax,
         currency = currency,
         isNegotiable = isNegotiable,
         contactPhone = contactPhone,
         universityId = universityId,
+        audience = audience.value.toEnumOrNull(ListingAudience.entries) ?: ListingAudience.ALL,
         branches = branches.map { branch ->
             ListingBranch(
                 id = branch.id,
@@ -379,9 +392,12 @@ fun StudentListingPageDto.toDomain(apiOrigin: String): ListingPage = ListingPage
  * Yaratish so'rovi. [submit] `true` bo'lsa server to'liq validatsiya qiladi va e'lon
  * o'sha so'rovning o'zida faol bo'ladi; `false` — validatsiyasiz qoralama.
  *
- * `audience` **yuborilmaydi**: `MY_UNIVERSITY` / `NEARBY_UNIVERSITIES` Faza 2 gacha
- * amalda emas va ularni yuborish e'lonni egasi mo'ljallaganidan kengroq ko'rsatardi.
- * `ownerId` ham yuborilmaydi — server uni token'dan oladi.
+ * `ownerId` yuborilmaydi — server uni token'dan oladi.
+ *
+ * `audience` universitetsiz e'londa **doim `ALL`**: `MY_UNIVERSITY` /
+ * `NEARBY_UNIVERSITIES` qaysi OTM ekanini `universityId` dan oladi va usiz e'lon hech
+ * kimga ko'rinmay qolardi. Bu shart formada ham bor, lekin bu yerda ham qo'yilgan —
+ * qoralama universitet tanlanishidan oldin saqlanishi mumkin.
  *
  * Turi serverga mos kelmasa (chegirma) — `null`.
  */
@@ -396,11 +412,12 @@ fun Listing.toCreateDto(submit: Boolean): CreateStudentListingDto? {
         description = description,
         images = images,
         priceUnit = priceUnit.toCreateUnit(),
-        price = price.toWirePrice(),
-        priceMax = priceMax?.toWirePrice(),
+        price = price,
+        priceMax = priceMax,
         isNegotiable = isNegotiable,
         contactPhone = contactPhone,
         universityId = universityId,
+        audience = effectiveAudience().toCreateAudience(),
         branches = branches.map { it.toDto() },
         validFrom = validFrom.toIsoOrNull(),
         validTo = validTo.toIsoOrNull(),
@@ -418,11 +435,12 @@ fun Listing.toUpdateDto(): UpdateStudentListingDto? {
         description = description,
         images = images,
         priceUnit = priceUnit.toUpdateUnit(),
-        price = price.toWirePrice(),
-        priceMax = priceMax?.toWirePrice(),
+        price = price,
+        priceMax = priceMax,
         isNegotiable = isNegotiable,
         contactPhone = contactPhone,
         universityId = universityId,
+        audience = effectiveAudience().toUpdateAudience(),
         branches = branches.map { it.toDto() },
         validFrom = validFrom.toIsoOrNull(),
         validTo = validTo.toIsoOrNull(),
@@ -430,6 +448,18 @@ fun Listing.toUpdateDto(): UpdateStudentListingDto? {
         optionGroups = optionGroups.map { it.toDto() },
     )
 }
+
+/**
+ * Universitetsiz e'lon uchun doim `ALL` — qarang [toCreateDto] izohi.
+ */
+private fun Listing.effectiveAudience(): ListingAudience =
+    if (universityId.isNullOrBlank()) ListingAudience.ALL else audience
+
+private fun ListingAudience.toCreateAudience(): CreateStudentListingDto.Audience =
+    CreateStudentListingDto.Audience.entries.first { it.value == name }
+
+private fun ListingAudience.toUpdateAudience(): UpdateStudentListingDto.Audience =
+    UpdateStudentListingDto.Audience.entries.first { it.value == name }
 
 /** `POST /{id}/status` faqat shu uchtasini qabul qiladi; qolgani serverning ishi. */
 fun ListingStatus.toStatusDto(): SetListingStatusDto? = when (this) {
@@ -499,16 +529,6 @@ private fun ListingKind.defaultPriceUnit(): PriceUnit = when (this) {
 
 /** Serverning o'z maksimal amal muddati (§6) — bo'sh `validTo` uchun zaxira. */
 private const val MAX_VALIDITY_MILLIS = 90L * 24 * 60 * 60 * 1000
-
-/**
- * Narx domenda `Long`, spec'da esa formatsiz `integer` — ya'ni `Int` (§2.2 da `int64`
- * deyilgan, kelishmovchilik backendga yozildi).
- *
- * Oddiy `toInt()` chegaradan oshganda **manfiy** songa aylanadi va e'lon "−2 mlrd so'm"
- * bo'lib ketardi. Talaba e'lonlarida 2.1 mlrd so'mga yetadigan narx amalda yo'q, lekin
- * kesib qo'yish hech bo'lmasa ma'noli xato — server uni `422` bilan qaytaradi.
- */
-private fun Long.toWirePrice(): Int = coerceIn(0L, Int.MAX_VALUE.toLong()).toInt()
 
 /** Buzuq sana butun e'lonni yiqitmasin — "berilmagan" deb o'qiladi. */
 private fun String?.toEpochMillisOrNull(): Long? =

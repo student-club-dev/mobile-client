@@ -60,8 +60,14 @@ fun chatModule() = module {
                 // Token muddati o'tgan bo'lsa uni yangilashning eng ishonchli yo'li — arzon
                 // avtorizatsiyali REST so'rovi: Ktor `Auth` plagini 401 da o'zi refresh
                 // qiladi va yangi juftlikni `TokenStore` ga yozadi.
-                if (refresh) runCatching { get<ChatRemoteDataSource>().conversations(page = 1, size = 1) }
-                get<TokenStore>().tokens()?.accessToken
+                //
+                // ⚠️ Faqat SESSIYA BOR bo'lganda: tokenlarsiz bu so'rov yangilaydigan narsa
+                // yo'q va login ekranida 401 bo'lib qaytaveradi.
+                val store = get<TokenStore>()
+                if (refresh && store.tokens() != null) {
+                    runCatching { get<ChatRemoteDataSource>().conversations(page = 1, size = 1) }
+                }
+                store.tokens()?.accessToken
             },
             scope = get(named(WS_SCOPE)),
         )

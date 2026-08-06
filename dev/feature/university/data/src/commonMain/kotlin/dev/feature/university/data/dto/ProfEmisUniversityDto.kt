@@ -15,13 +15,18 @@ data class ProfEmisUniversityDto(
     @SerialName("region_id") val regionId: Int = 0,
 )
 
+/**
+ * ⚠️ Manba **logotip bermaydi** (`licence_pdf_file`, ijtimoiy tarmoq havolalari bor, rasm
+ * yo'q), shuning uchun ro'yxatdagi belgi — nomdan hosil qilingan qisqartma
+ * (`UniversityNaming`). Nom va manzil xom holicha saqlanadi: qisqartirish qoidasi
+ * yaxshilanganda saqlangan qatorlarni qayta yuklash kerak bo'lmasin.
+ */
 fun ProfEmisUniversityDto.toUniversity(): University {
     val name = nameUz.ifBlank { nameRu }.ifBlank { nameEn }.ifBlank { "Universitet #$id" }
     return University(
         id = "emis-$id",
         name = name,
-        city = address.ifBlank { "O'zbekiston" },
-        monogram = universityMonogram(name),
+        city = address,
         faculty = null,
         accent = UNI_ACCENTS[(id % UNI_ACCENTS.size + UNI_ACCENTS.size) % UNI_ACCENTS.size],
     )
@@ -30,15 +35,3 @@ fun ProfEmisUniversityDto.toUniversity(): University {
 private val UNI_ACCENTS = listOf(
     0xFF6C47FF, 0xFF2563EB, 0xFF059669, 0xFFD97706, 0xFFBE185D, 0xFF0EA5E9, 0xFF7C3AED,
 )
-
-private fun universityMonogram(name: String): String {
-    val skip = setOf("va", "nomidagi", "davlat", "the", "of", "and", "milliy")
-    val letters = name.split(' ', '-', '.', ',')
-        .map { it.trim() }
-        .filter { it.length > 1 && it.lowercase() !in skip }
-        .mapNotNull { it.firstOrNull()?.uppercaseChar() }
-    return when {
-        letters.size >= 2 -> letters.take(4).joinToString("")
-        else -> name.filter { it.isLetter() }.take(3).uppercase().ifBlank { "OTM" }
-    }
-}

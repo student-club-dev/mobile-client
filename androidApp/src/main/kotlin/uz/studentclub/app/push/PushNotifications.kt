@@ -14,14 +14,20 @@ import uz.studentclub.app.R
 /**
  * Push bildirishnomalarini ko'rsatish (Android).
  *
- * Server yuboradigan tana — `handoff/05-PUSH-SETUP.md` §4:
+ * Server yuboradigan tana — `02-PUSH_CATALOG_BACKEND.md` §2:
  * ```jsonc
  * {
  *   "title": "Aziz Karimov",           // yuboruvchining ismi; ism topilmasa "Yangi xabar"
  *   "body": "<matn>",
- *   "data": { "conversationId": "cnv_01H8X", "senderId": "…", "senderName": "Aziz Karimov" }
+ *   "data": {
+ *     "kind": "CHAT", "notificationId": "clx…",
+ *     "targetType": "CHAT", "targetId": "cnv_01H8X",
+ *     "conversationId": "cnv_01H8X"    // chat va qo'ng'iroqda saqlanib qolgan eski kalit
+ *   }
  * }
  * ```
+ * Konvertdagi qiymati yo'q kalit UMUMAN yuborilmaydi (bo'sh satr yoki `"null"` emas), ya'ni
+ * yo'q extra — "bu bildirishnoma hech qayerga olib bormaydi" degani.
  * Sarlavhani **server** beradi va biz uni o'zgartirmasdan ko'rsatamiz: fondagi `notification`
  * xabarini tizim o'zi chizadi, ya'ni ismni ilova tomonda qo'yib bo'lmaydi.
  *
@@ -37,8 +43,15 @@ object PushNotifications {
     /** Chat xabarlari kanali. Manifestdagi `default_notification_channel_id` bilan bir xil. */
     const val CHANNEL_CHAT = "chat_messages"
 
-    /** Suhbat id'si — push `data` sida ham, intent extra'sida ham shu nom bilan yuradi. */
+    /**
+     * Konvert kalitlari — push `data` sida ham, intent extra'sida ham AYNAN shu nom bilan
+     * yuradi. Fonda kelgan `notification` xabarini tizim o'zi chizadi va `data` ni intent
+     * extra'lariga o'zi ko'chiradi, ya'ni ikkala yo'lda ham nomlar bir xil bo'lishi shart.
+     */
     const val EXTRA_CONVERSATION_ID = "conversationId"
+    const val EXTRA_NOTIFICATION_ID = "notificationId"
+    const val EXTRA_TARGET_TYPE = "targetType"
+    const val EXTRA_TARGET_ID = "targetId"
 
     /**
      * Kanalni yaratadi (Android 8+). Idempotent — takror chaqirish xavfsiz, shuning uchun
@@ -57,21 +70,33 @@ object PushNotifications {
         context.getSystemService(NotificationManager::class.java)?.createNotificationChannel(channel)
     }
 
-    /** Bitta suhbat uchun bildirishnoma. */
-    fun showMessage(context: Context, title: String?, body: String?, conversationId: String?) {
+    /**
+     * Bitta bildirishnoma qatori.
+     *
+     * [data] — push konvertining o'zi. Konvert BUTUNLIGICHA intent'ga ko'chiriladi: qaysi
+     * ekran ochilishini va qaysi qator o'qilgan deb belgilanishini ilova qatlami hal qiladi
+     * (`StudentShell`), bu yer esa faqat qiymatlarni uzatadi.
+     */
+    fun showMessage(context: Context, title: String?, body: String?, data: Map<String, String>) {
         ensureChannel(context)
 
+        val conversationId = data[EXTRA_CONVERSATION_ID]
+        val targetId = data[EXTRA_TARGET_ID]
         val intent = Intent(context, MainActivity::class.java).apply {
             // Ilova allaqachon ochiq bo'lsa yangi nusxa yaratilmaydi — mavjud oynaga
             // `onNewIntent` orqali keladi (MainActivity `singleTop`).
             flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
-            putExtra(EXTRA_CONVERSATION_ID, conversationId)
+            EXTRAS.forEach { key -> data[key]?.let { putExtra(key, it) } }
         }
+        // Guruhlash kaliti: suhbat bo'lsa suhbat bo'yicha, aks holda nishon bo'yicha. Ikkalasi
+        // ham bo'lmasa (masalan tizim xabari) — barchasi bitta qatorga tushmasin uchun
+        // sarlavha+matn bo'yicha.
+        val groupKey = conversationId ?: targetId ?: "$title|$body"
         val pending = PendingIntent.getActivity(
             context,
-            // Har suhbat uchun alohida `requestCode` — aks holda PendingIntent qayta
+            // Har guruh uchun alohida `requestCode` — aks holda PendingIntent qayta
             // ishlatilib, birinchi suhbatning id'si hamma bildirishnomada qolib ketardi.
-            conversationId?.hashCode() ?: 0,
+            groupKey.hashCode(),
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
@@ -87,11 +112,18 @@ object PushNotifications {
             .build()
 
         // Bir suhbat — bitta bildirishnoma qatori (yangisi eskisini almashtiradi).
-        val id = conversationId?.hashCode() ?: 0
         runCatching {
             // Android 13+ da ruxsat berilmagan bo'lsa `notify` jimgina e'tiborsiz qoladi,
             // lekin ba'zi qurilmalarda SecurityException tashlaydi — servisni yiqitmaymiz.
-            NotificationManagerCompat.from(context).notify(id, notification)
+            NotificationManagerCompat.from(context).notify(groupKey.hashCode(), notification)
         }
     }
+
+    /** Intent'ga ko'chiriladigan konvert kalitlari. */
+    private val EXTRAS = listOf(
+        EXTRA_CONVERSATION_ID,
+        EXTRA_NOTIFICATION_ID,
+        EXTRA_TARGET_TYPE,
+        EXTRA_TARGET_ID,
+    )
 }

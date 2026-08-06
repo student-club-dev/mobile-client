@@ -95,18 +95,40 @@ class ApiAuthRepository(
         }
 
     /**
-     * Hisob backendda darhol ochiladi (spec shunday), lekin ILOVA uchun sessiya hali
-     * ochilmaydi: [authenticate] ga `persistSession = false` beramiz — tokenlar saqlanadi
-     * (OTP so'rovlari uchun), local `UserEntity` esa YOZILMAYDI. Shuning uchun tasdiqlanmagan
-     * foydalanuvchi ilovaga kira olmaydi ([completeRegistration] ni kuting).
+     * `POST /auth/student/register/otp` — **tokensiz**: hisob hali yo'q.
+     *
+     * Xuddi shu `OtpRequestDto` ishlatiladi, lekin endpoint boshqa va kodlar ham boshqa:
+     * `otp/request` bergan kod bu yerga yaramaydi.
      */
-    override suspend fun register(identifier: AuthIdentifier, password: String): Resource<User> =
+    override suspend fun requestRegistrationOtp(phone: String): Resource<OtpChallenge> =
+        safeCall(connectivity) {
+            val result = api.studentRegistrationOtpRequest(OtpRequestDto(phoneNumber = phone)).body()
+            OtpChallenge(
+                expiresInSeconds = result.expiresInSeconds,
+                resendCooldownSeconds = result.resendCooldownSeconds,
+            )
+        }
+
+    /**
+     * Hisob shu chaqiruvda ochiladi va raqam allaqachon tasdiqlangan bo'ladi
+     * ([otpCode] serverda tekshiriladi), lekin ILOVA uchun sessiya hali ochilmaydi:
+     * [authenticate] ga `persistSession = false` beramiz — tokenlar saqlanadi, local
+     * `UserEntity` esa YOZILMAYDI. Shuning uchun profil saqlanmaguncha foydalanuvchi
+     * ilovaga kira olmaydi ([completeRegistration] ni kuting).
+     */
+    override suspend fun register(
+        identifier: AuthIdentifier,
+        password: String,
+        otpCode: String?,
+    ): Resource<User> =
         authenticate(identifier, persistSession = false) {
             api.studentAuthRegister(
                 RegisterDto(
                     password = password,
                     email = (identifier as? AuthIdentifier.Email)?.value,
                     phoneNumber = (identifier as? AuthIdentifier.Phone)?.value,
+                    // Telefonsiz (email) ro'yxatda kod umuman kerak emas va yuborilmaydi.
+                    otpCode = otpCode?.takeIf { identifier is AuthIdentifier.Phone },
                     deviceName = deviceName,
                     platform = platformName,
                 ),
@@ -264,7 +286,10 @@ class ApiAuthRepository(
 
     override suspend fun requestPhoneOtp(phone: String): Resource<OtpChallenge> =
         safeCall(connectivity) {
-            val result = api.request(OtpRequestDto(phoneNumber = phone)).body()
+            // ⚠️ `studentOtpRequest`, oddiy `request` EMAS: `register/otp` qo'shilgach
+            // spec'da ikkita `…Controller_request` paydo bo'ldi va cleanSwagger (qadam 6)
+            // ikkalasini kontroller nomi bilan ajratdi.
+            val result = api.studentOtpRequest(OtpRequestDto(phoneNumber = phone)).body()
             OtpChallenge(
                 expiresInSeconds = result.expiresInSeconds,
                 resendCooldownSeconds = result.resendCooldownSeconds,

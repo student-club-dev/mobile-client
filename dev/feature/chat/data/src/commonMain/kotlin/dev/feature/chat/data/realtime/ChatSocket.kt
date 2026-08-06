@@ -334,6 +334,8 @@ class ChatSocket(private val socket: SocketIoClient) {
         mediaId: String? = null,
         stickerId: String? = null,
         albumId: String? = null,
+        /** Albom o'lchami — faqat birinchi rasmda (`2..10`), push matni uchun. */
+        albumSize: Int? = null,
         gif: JsonObject? = null,
         sticker: JsonObject? = null,
         replyToMessageId: String? = null,
@@ -349,6 +351,7 @@ class ChatSocket(private val socket: SocketIoClient) {
                 mediaId?.let { put("mediaId", JsonPrimitive(it)) }
                 stickerId?.let { put("stickerId", JsonPrimitive(it)) }
                 albumId?.let { put("albumId", JsonPrimitive(it)) }
+                albumSize?.let { put("albumSize", JsonPrimitive(it)) }
                 gif?.let { put("gif", it) }
                 // Qidiruvdan kelgan stiker — `stickerId` bilan BIRGA ketmaydi
                 // (`SendPayload.validate` buni oldindan to'sadi).

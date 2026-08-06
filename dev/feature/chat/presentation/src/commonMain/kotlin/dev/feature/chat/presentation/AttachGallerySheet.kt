@@ -147,19 +147,18 @@ internal fun AttachGallerySheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         containerColor = Sc.Card,
-        // ⚠️ **Yarim balandlikda** ochiladi (Telegramdagidek): suhbat tepada ko'rinib turadi,
-        // ya'ni kimga yuborayotganingizni yo'qotmaysiz. Ko'proq rasm kerak bo'lsa varaq
-        // yuqoriga tortiladi.
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false),
+        // Varaq DARROV to'liq ochiladi: yarim holatda to'rning atigi ikki qatori ko'rinib,
+        // rasm tanlashdan oldin har safar varaqni yuqoriga tortishga to'g'ri kelardi.
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
     ) {
         val showGrid = gallery.access == GalleryAccess.GRANTED || gallery.access == GalleryAccess.LIMITED
 
         Column(
             Modifier.fillMaxWidth().navigationBarsPadding()
-                // To'r ko'rinsa varaq deyarli butun ekranni egallaydi — LazyVerticalGrid
+                // To'r ko'rinsa varaq butun bo'sh balandlikni egallaydi — LazyVerticalGrid
                 // ga **cheklangan balandlik** kerak, aks holda u o'lchanmaydi. Ruxsat
                 // so'ralayotgan holatda esa varaq matn bo'yicha kichik qoladi.
-                .then(if (showGrid) Modifier.fillMaxHeight(0.92f) else Modifier),
+                .then(if (showGrid) Modifier.fillMaxHeight() else Modifier),
         ) {
             // Sarlavha — Telegramdagidek faqat tanlov bo'lganda paydo bo'ladi va nechta
             // ekanini aytadi. Bo'sh holatda joy egallamaydi: to'r yuqoriroq turadi.

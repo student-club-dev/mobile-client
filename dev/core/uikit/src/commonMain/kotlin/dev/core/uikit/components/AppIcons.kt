@@ -4,7 +4,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.vector.ImageVector
 import dev.core.uikit.generated.resources.Res
 import dev.core.uikit.generated.resources.ic_apple
-import dev.core.uikit.generated.resources.ic_building
 import dev.core.uikit.generated.resources.ic_calendar
 import dev.core.uikit.generated.resources.ic_camera
 import dev.core.uikit.generated.resources.ic_check
@@ -12,6 +11,7 @@ import dev.core.uikit.generated.resources.ic_chevron_down
 import dev.core.uikit.generated.resources.ic_clock
 import dev.core.uikit.generated.resources.ic_eye
 import dev.core.uikit.generated.resources.ic_eye_off
+import dev.core.uikit.generated.resources.ic_film
 import dev.core.uikit.generated.resources.ic_google
 import dev.core.uikit.generated.resources.ic_image_icon
 import dev.core.uikit.generated.resources.ic_video
@@ -19,13 +19,10 @@ import dev.core.uikit.generated.resources.ic_lock
 import dev.core.uikit.generated.resources.ic_log_out
 import dev.core.uikit.generated.resources.ic_mail
 import dev.core.uikit.generated.resources.ic_pencil
-import dev.core.uikit.generated.resources.ic_scan_face
 import dev.core.uikit.generated.resources.ic_settings
 import dev.core.uikit.generated.resources.ic_shield_check
-import dev.core.uikit.generated.resources.ic_star
 import dev.core.uikit.generated.resources.ic_store
 import dev.core.uikit.generated.resources.ic_telegram
-import dev.core.uikit.generated.resources.ic_user_plus
 import org.jetbrains.compose.resources.vectorResource
 
 /**
@@ -45,9 +42,6 @@ object AppIcons {
     /** `ic_university` */
     val GraduationCap: ImageVector @Composable get() = ScIcons.Cap
 
-    /** `ic_call` */
-    val Phone: ImageVector @Composable get() = ScIcons.PhoneCall
-
     /** `ic_search` */
     val Search: ImageVector @Composable get() = ScIcons.Search
 
@@ -65,12 +59,6 @@ object AppIcons {
 
     /** `ic_bell` */
     val Bell: ImageVector @Composable get() = ScIcons.Bell
-
-    /** `ic_tag` */
-    val Tag: ImageVector @Composable get() = ScIcons.DiscountTag
-
-    /** `ic_users` */
-    val Users: ImageVector @Composable get() = ScIcons.Users
 
     /** `ic_add` */
     val Plus: ImageVector @Composable get() = ScIcons.Plus
@@ -104,19 +92,18 @@ object AppIcons {
     val Check: ImageVector @Composable get() = vectorResource(Res.drawable.ic_check)
     val ChevronDown: ImageVector @Composable get() = vectorResource(Res.drawable.ic_chevron_down)
     val ShieldCheck: ImageVector @Composable get() = vectorResource(Res.drawable.ic_shield_check)
-    val ScanFace: ImageVector @Composable get() = vectorResource(Res.drawable.ic_scan_face)
     val Store: ImageVector @Composable get() = vectorResource(Res.drawable.ic_store)
-    val Building: ImageVector @Composable get() = vectorResource(Res.drawable.ic_building)
     val Settings: ImageVector @Composable get() = vectorResource(Res.drawable.ic_settings)
     val LogOut: ImageVector @Composable get() = vectorResource(Res.drawable.ic_log_out)
     val Pencil: ImageVector @Composable get() = vectorResource(Res.drawable.ic_pencil)
-    val Star: ImageVector @Composable get() = vectorResource(Res.drawable.ic_star)
     val Camera: ImageVector @Composable get() = vectorResource(Res.drawable.ic_camera)
 
     /** Video kamerasi — «Kamera» ([Camera]) dan farqli: bu galereyadagi videoni bildiradi. */
     val Video: ImageVector @Composable get() = vectorResource(Res.drawable.ic_video)
     val ImageIcon: ImageVector @Composable get() = vectorResource(Res.drawable.ic_image_icon)
-    val UserPlus: ImageVector @Composable get() = vectorResource(Res.drawable.ic_user_plus)
+
+    /** Kinolenta — GALEREYADAGI video ([Video] esa kamerani bildiradi). */
+    val Film: ImageVector @Composable get() = vectorResource(Res.drawable.ic_film)
 
     // --- Ijtimoiy logolar (ranglari o'zgarmaydi, `Image` bilan chiziladi) --
 

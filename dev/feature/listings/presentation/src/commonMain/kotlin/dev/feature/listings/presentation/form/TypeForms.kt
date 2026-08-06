@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -73,7 +74,10 @@ fun ListingFormShell(
     vm: PostListingViewModel,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    Column(Modifier.fillMaxSize()) {
+    // ⚠️ `imePadding` KARKASda: pastdagi "Qoralama / E'lon berish" qatori formaning
+    // ichida emas, ustunning oxirida turadi — klaviatura ochilganda u ham ko'tarilishi
+    // kerak, aks holda tugmalar klaviatura ostida qolib ketardi.
+    Column(Modifier.fillMaxSize().imePadding()) {
         Column(
             Modifier.weight(1f).verticalScroll(rememberScrollState()).scTopInset(),
             verticalArrangement = Arrangement.spacedBy(18.dp),

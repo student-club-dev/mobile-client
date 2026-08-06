@@ -335,6 +335,14 @@ fun ScIconTile(
     )
 }
 
+/**
+ * Kvadrat belgi — universitet qisqartmasi (`TATU`, `SamDVU`), ism bosh harflari va h.k.
+ *
+ * [fontSize] — **uch belgili** matn uchun o'lchov: qisqartmalar 2 dan 6 belgigacha bo'ladi
+ * (`IT` … `SamDVU`) va bitta o'lchov bilan uzunlari kvadratdan chiqib ketardi. Shuning uchun
+ * o'lcham matn uzunligiga qarab kichrayadi — kesib tashlash yoki uch nuqta chiqarishdan
+ * ko'ra shu yaxshi: qisqartmaning oxirgi harfi (muassasa turi) ma'no tashiydi.
+ */
 @Composable
 fun ScMonogramTile(
     text: String,
@@ -345,8 +353,14 @@ fun ScMonogramTile(
     radius: Dp = 24.dp,
     fontSize: Float = 24f,
 ) {
+    val scaled = when (text.length) {
+        0, 1, 2, 3 -> fontSize
+        4 -> fontSize * 0.84f
+        5 -> fontSize * 0.70f
+        else -> fontSize * 0.60f
+    }
     ScIconTile(background, modifier, size, radius) {
-        ScText(text, fontSize, FontWeight.ExtraBold, color, maxLines = 1)
+        ScText(text, scaled, FontWeight.ExtraBold, color, maxLines = 1)
     }
 }
 

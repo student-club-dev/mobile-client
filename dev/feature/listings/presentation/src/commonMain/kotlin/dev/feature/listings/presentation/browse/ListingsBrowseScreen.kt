@@ -37,7 +37,9 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.material3.Text
 import dev.core.uikit.components.ScCircleButton
+import dev.core.uikit.components.ScEmptyState
 import dev.core.uikit.components.ScGlyph
+import dev.core.uikit.components.ScNotFoundTitle
 import dev.core.uikit.components.ScHeader
 import dev.core.uikit.components.ScHeaderSubtitle
 import dev.core.uikit.components.ScHeaderTitle
@@ -48,6 +50,7 @@ import dev.core.uikit.components.ScText
 import dev.core.uikit.components.scCard
 import dev.core.uikit.components.scStyle
 import dev.core.uikit.components.ScSearchOverlay
+import dev.core.uikit.components.ScPullRefresh
 import dev.core.uikit.map.OfferMarker
 import dev.core.uikit.map.OffersMapOverlay
 import dev.core.uikit.map.rememberUserLocation
@@ -112,42 +115,50 @@ fun ListingsBrowseScreen(
             }
             Spacer(Modifier.height(15.dp))
 
-            LazyColumn(
-                Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(
-                    start = Sc.ScreenPadding, end = Sc.ScreenPadding,
-                    bottom = if (onBack == null) 110.dp else 24.dp,
-                ),
-                verticalArrangement = Arrangement.spacedBy(13.dp),
-            ) {
-                items(withDistance, key = { (listing, _) -> listing.id }) { (listing, nearest) ->
-                    ListingCard(
-                        listing = listing,
-                        distanceLabel = nearest?.distanceLabel(),
-                        branchLabel = nearest?.branch?.display(),
-                        palette = palette,
-                        onClick = { onOpenListing(listing.id) },
-                    )
-                }
-                when {
-                    // Cheksiz skroll: oxirgi kartochka ko'ringanda keyingi sahifa so'raladi.
-                    // Kompozitsiyaning O'ZI so'rov sababi — alohida scroll listener kerak emas.
-                    // Xato bo'lsa avtomatik urinish TO'XTAYDI: aks holda uzilgan tarmoqda
-                    // ro'yxat oxiri cheksiz halqaga aylanardi.
-                    state.hasNext -> item(key = "more") {
-                        val failed = state.error
-                        if (failed == null) {
-                            LaunchedEffect(state.nextCursor) { vm.loadMore() }
-                            BrowseFooter(loading = true)
-                        } else {
-                            BrowseMoreError(failed) { vm.consumeError(); vm.loadMore() }
+            // Tepadan tortish — ro'yxatni birinchi sahifadan qayta o'qiydi.
+            // `state.refreshing` ATAYLAB `state.loading` dan alohida: birinchi yuklanish
+            // skeletni ko'rsatadi, bu esa foydalanuvchi o'zi so'ragan yangilanish.
+            ScPullRefresh(refreshing = state.refreshing, onRefresh = vm::refresh) {
+                LazyColumn(
+                    Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(
+                        start = Sc.ScreenPadding, end = Sc.ScreenPadding,
+                        bottom = if (onBack == null) 110.dp else 24.dp,
+                    ),
+                    verticalArrangement = Arrangement.spacedBy(13.dp),
+                ) {
+                    items(withDistance, key = { (listing, _) -> listing.id }) { (listing, nearest) ->
+                        ListingCard(
+                            listing = listing,
+                            distanceLabel = nearest?.distanceLabel(),
+                            branchLabel = nearest?.branch?.display(),
+                            palette = palette,
+                            onClick = { onOpenListing(listing.id) },
+                        )
+                    }
+                    when {
+                        // Cheksiz skroll: oxirgi kartochka ko'ringanda keyingi sahifa so'raladi.
+                        // Kompozitsiyaning O'ZI so'rov sababi — alohida scroll listener kerak emas.
+                        // Xato bo'lsa avtomatik urinish TO'XTAYDI: aks holda uzilgan tarmoqda
+                        // ro'yxat oxiri cheksiz halqaga aylanardi.
+                        state.hasNext -> item(key = "more") {
+                            val failed = state.error
+                            if (failed == null) {
+                                LaunchedEffect(state.nextCursor) { vm.loadMore() }
+                                BrowseFooter(loading = true)
+                            } else {
+                                BrowseMoreError(failed) { vm.consumeError(); vm.loadMore() }
+                            }
                         }
+                        state.loading -> item(key = "loading") { BrowseFooter(loading = true) }
+                        state.error != null -> item(key = "error") {
+                            BrowseErrorState(state.error!!, onRetry = vm::refresh)
+                        }
+                        // Bo'limda umuman e'lon bo'lmasa — hech nima chizilmaydi. Plitka faqat
+                        // filtr/qidiruv hammasini kesib tashlaganda chiqadi: u yerda foydalanuvchi
+                        // o'zi qilgan amalning javobini kutadi.
+                        state.isFilteredEmpty -> item(key = "empty") { BrowseNotFoundState(state.kind) }
                     }
-                    state.loading -> item(key = "loading") { BrowseFooter(loading = true) }
-                    state.error != null -> item(key = "error") {
-                        BrowseErrorState(state.error!!, onRetry = vm::refresh)
-                    }
-                    state.listings.isEmpty() -> item(key = "empty") { BrowseEmptyState(state) }
                 }
             }
         }
@@ -299,7 +310,7 @@ private fun RowScope.KindSegment(kind: ListingKind, selected: Boolean, onClick: 
 
 /**
  * Bo'lim belgisi (qo'llanma: Yordam=`ic_book`, Ijara=`ic_home_filled`,
- * Xizmat=`ic_tools`, Ish=`ic_briefcase`).
+ * Xizmat=`ic_service`, Ish=`ic_briefcase`).
  *
  * Faol segment gradient ustida turadi — belgi oq rangga bo'yaladi. Nofaolida esa
  * ko'p rangli ikonalar o'z ranglarida ([ScGlyph], ya'ni bo'yalmaydi), bir rangli
@@ -415,30 +426,21 @@ private fun BrowseErrorState(message: String, onRetry: () -> Unit) {
 }
 
 /**
- * Bo'sh holat. Ikki holat ajratiladi: bo'limda umuman e'lon yo'qmi yoki filtr hammasini
- * kesib tashladimi — foydalanuvchi nima qilishi kerakligi bu ikkisida boshqacha.
+ * «Topilmadi» — faqat filtr/qidiruv hammasini kesib tashlaganda.
+ *
+ * Bo'limda umuman e'lon bo'lmagan holat chizilmaydi: foydalanuvchi hech narsa so'ramagan
+ * bo'lsa, unga "hozircha bo'sh" plitkasini ko'rsatishning hojati yo'q — ro'yxat shunchaki
+ * bo'sh qoladi.
  */
 @Composable
-private fun BrowseEmptyState(state: ListingsBrowseUiState) {
-    val message = when {
-        state.isFilteredEmpty -> "Bu shartlarga mos e'lon topilmadi. Filtrni yumshating yoki qidiruvni o'zgartiring."
-        else -> emptySectionMessage(state.kind)
-    }
-    Column(
-        Modifier.fillMaxWidth().padding(top = 60.dp, start = 20.dp, end = 20.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        ScIconTile(state.kind.tint(), size = 96.dp, radius = 30.dp) {
-            KindGlyph(state.kind, onGradient = false, size = 46.dp)
-        }
-        Spacer(Modifier.height(18.dp))
-        ScText(if (state.isFilteredEmpty) "Natija yo'q" else "Hozircha bo'sh", 19f, FontWeight.ExtraBold, Sc.Ink)
-        Spacer(Modifier.height(6.dp))
-        Text(
-            message,
-            style = scStyle(14f, FontWeight.Medium, Sc.Muted, lineHeight = 21f).copy(textAlign = TextAlign.Center),
-        )
-    }
+private fun BrowseNotFoundState(kind: ListingKind) {
+    ScEmptyState(
+        Modifier.padding(top = 26.dp),
+        title = ScNotFoundTitle,
+        message = "Bu shartlarga mos e'lon topilmadi. Filtrni yumshating yoki qidiruvni o'zgartiring.",
+        tint = kind.tint(),
+        glyph = { KindGlyph(kind, onGradient = false, size = 46.dp) },
+    )
 }
 
 /** Bo'lim plitkasining tint foni. */
@@ -448,14 +450,6 @@ private fun ListingKind.tint(): Color = when (this) {
     ListingKind.RENTAL -> Sc.TintGreen
     ListingKind.SERVICE -> Sc.TintBlue
     ListingKind.JOB, ListingKind.DISCOUNT -> Sc.TintAmber
-}
-
-private fun emptySectionMessage(kind: ListingKind): String = when (kind) {
-    ListingKind.RENTAL -> "Hali ijara e'loni joylanmagan. Birinchi bo'lib siz joylashingiz mumkin."
-    ListingKind.SERVICE -> "Hali xizmat e'loni yo'q. O'z xizmatingizni joylab ko'ring."
-    ListingKind.JOB -> "Hali ish e'loni yo'q. Tez orada paydo bo'ladi."
-    ListingKind.DISCOUNT -> "Hali chegirma e'loni yo'q."
-    ListingKind.TASK -> "Hali topshiriq yo'q. Yordam kerak bo'lsa birinchi bo'lib so'rang."
 }
 
 // ---------------------------------------------------------------------------

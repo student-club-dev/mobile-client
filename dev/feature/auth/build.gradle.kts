@@ -22,7 +22,6 @@ kotlin {
             // Ishlar feature'i — Home domendan Job o'qiydi, StudentShell JobsScreen'ni ochadi.
             api(projects.dev.feature.jobs.domain)
             implementation(projects.dev.feature.jobs.presentation)
-            api(projects.dev.feature.students.domain)
             // "Do'stlar" (Connections) ekrani — StudentShell uni ochadi.
             implementation(projects.dev.feature.connections.presentation)
             implementation(projects.dev.feature.notifications.domain)
@@ -35,6 +34,10 @@ kotlin {
             implementation(projects.dev.feature.ads.presentation)
             // Chat feature'i — StudentShell ChatScreen'ni ochadi.
             implementation(projects.dev.feature.chat.presentation)
+            // Talaba profili varag'ining «Postlar» bo'limi story modulida: karkas varaqni
+            // o'zi ochgani uchun (`rememberPeerProfileSections`) uning ViewModel'i ham
+            // shu modulning klasspatida bo'lishi kerak.
+            implementation(projects.dev.feature.stories.presentation)
             // Home agregator ekrani — StudentShell HomeScreen'ni ochadi.
             implementation(projects.dev.feature.home.presentation)
 

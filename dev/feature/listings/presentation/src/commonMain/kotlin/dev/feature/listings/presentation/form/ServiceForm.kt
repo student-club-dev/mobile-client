@@ -179,6 +179,7 @@ fun ServiceForm(state: PostListingUiState, palette: AppPalette, vm: PostListingV
             subtitle = "Xaritadan joyni belgilang",
         )
 
+        AudienceSection(state, vm)
         ValiditySection(state, vm)
     }
 }

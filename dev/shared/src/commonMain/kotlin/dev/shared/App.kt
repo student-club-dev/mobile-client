@@ -22,11 +22,13 @@ import io.github.aakira.napier.Napier
 import coil3.network.ktor3.KtorNetworkFetcherFactory
 import coil3.request.Options
 import dev.core.data.seed.LocalDataSeeder
+import dev.core.data.seed.SeedPurge
 import dev.core.di.IMAGE_CLIENT
 import dev.core.network.NetworkConfig
 import dev.core.network.media.MediaUrl
 import dev.core.network.media.apiOrigin
-import dev.core.uikit.generated.resources.Res
+import dev.core.uikit.components.ScToastHost
+import dev.core.uikit.media.purgeLegacyGalleryMedia
 import dev.core.uikit.theme.AppTheme
 import dev.feature.settings.domain.model.ThemeMode
 import dev.feature.settings.domain.repository.SettingsRepository
@@ -77,15 +79,22 @@ private fun AppScaffold(content: @Composable () -> Unit) {
             .build()
     }
 
-    // Local bazani dizayndagi namuna ma'lumot bilan to'ldiramiz (bo'sh bo'lsagina).
-    // "Siz uchun" e'lonlari bundlangan JSON'dan (composeResources/files/listings.json) o'qiladi.
+    // Endpoint'i hali yo'q bo'limlarni (ishlar, klublar, bildirishnomalar) namuna ma'lumot
+    // bilan to'ldiramiz. Backendga ulanganlari seed'dan olib tashlangan.
     val seeder = koinInject<LocalDataSeeder>()
+    // Eski o'rnatmalarda qolgan namuna qatorlarni bir marta o'chiradi.
+    val seedPurge = koinInject<SeedPurge>()
     // Universitetlar ro'yxati prof-emis'dan (barcha tanlash joylari shu manbani ishlatadi).
     val universityRepository = koinInject<UniversityRepository>()
     LaunchedEffect(Unit) {
-        val listingsJson = runCatching { Res.readBytes("files/listings.json").decodeToString() }.getOrNull()
-        seeder.seedIfEmpty(listingsJson)
+        // Tozalash seed'DAN OLDIN: aks holda yangi seed qatorlari ham o'chib ketardi.
+        runCatching { seedPurge.purgeOnce() }
+        seeder.seedIfEmpty()
         runCatching { universityRepository.ensureRemoteUniversities() }
+        // Eski versiyalar galereyaga yozib qo'ygan `story_…` / `chat_…` nusxalari — bir
+        // marta o'chiriladi. Endi media ilovaning shaxsiy papkasida turadi va galereyada
+        // umuman ko'rinmaydi (`StudentClubFolder`).
+        runCatching { purgeLegacyGalleryMedia() }
     }
 
     // Foydalanuvchi tanlagan mavzu (Sozlamalar). SYSTEM bo'lsa qurilma rejimiga ergashadi.
@@ -120,6 +129,10 @@ private fun AppScaffold(content: @Composable () -> Unit) {
             // o'z insetlarini o'zi qo'yadi. Kiruvchi qo'ng'iroq foydalanuvchi qaysi
             // ekranda turganidan qat'i nazar ko'rinishi kerak.
             CallHost()
+            // Xato/xabar toastlari — HAMMA narsadan ustida va insetdan tashqarida: ular
+            // status bar ostidan tushadi va foydalanuvchi qaysi ekranda bo'lishidan
+            // qat'i nazar ko'rinishi kerak (`AppMessageBus`).
+            ScToastHost()
         }
     }
 }

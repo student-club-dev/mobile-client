@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -55,6 +56,7 @@ import dev.core.uikit.components.ScGradientButton
 import dev.core.uikit.components.ScHeader
 import dev.core.uikit.components.ScHeaderTitle
 import dev.core.uikit.components.ScIcons
+import dev.core.uikit.components.ScMonogramTile
 import dev.core.uikit.components.ScText
 import dev.core.uikit.components.ScUploadRing
 import dev.core.uikit.components.scUploadPercent
@@ -104,8 +106,12 @@ fun EditProfileScreen(onBack: () -> Unit, vm: ProfileViewModel = koinViewModel()
     var courseYear by remember(profile) { mutableStateOf(profile?.courseYear) }
     var gender by remember(profile) { mutableStateOf(profile?.gender) }
     var bio by remember(profile) { mutableStateOf(profile?.bio.orEmpty()) }
+    var regionId by remember(profile) { mutableStateOf(profile?.regionId) }
+    var districtId by remember(profile) { mutableStateOf(profile?.districtId) }
 
     var uniExpanded by remember { mutableStateOf(false) }
+    var regionExpanded by remember { mutableStateOf(false) }
+    var districtExpanded by remember { mutableStateOf(false) }
     var uniQuery by remember { mutableStateOf("") }
     var saving by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -117,6 +123,11 @@ fun EditProfileScreen(onBack: () -> Unit, vm: ProfileViewModel = koinViewModel()
 
     // Ekran ochilganda ro'yxatni bir marta o'qiymiz — rasmlar local keshda saqlanmaydi.
     LaunchedEffect(Unit) { vm.loadPhotos() }
+
+    // Viloyat/tuman katalogi. Kalit — profildagi viloyat: profil keshdan kechroq kelsa
+    // (birinchi kadrda `null`) tumanlar ham o'sha paytda qayta so'raladi.
+    val addressCatalog by vm.addressCatalog.collectAsStateWithLifecycle()
+    LaunchedEffect(profile?.regionId) { vm.loadAddressCatalog(profile?.regionId) }
 
     /**
      * Rasm tanlangan — u **to'plamga** qo'shiladi va serverda **birinchi o'ringa** tushadi,
@@ -130,7 +141,9 @@ fun EditProfileScreen(onBack: () -> Unit, vm: ProfileViewModel = koinViewModel()
         vm.addPhoto(picked.bytes, picked.fileName)
     }
 
-    Column(Modifier.fillMaxSize().background(Sc.Bg).verticalScroll(rememberScrollState())) {
+    // Klaviatura ochilganda ustun uning ustiga ko'tariladi — pastdagi maydonlar va
+    // "Saqlash" tugmasi klaviatura ostida qolib ketmasin.
+    Column(Modifier.fillMaxSize().background(Sc.Bg).imePadding().verticalScroll(rememberScrollState())) {
         ScHeader(horizontalPadding = 18.dp) {
             Row(
                 Modifier.fillMaxWidth().padding(top = 18.dp),
@@ -269,7 +282,7 @@ fun EditProfileScreen(onBack: () -> Unit, vm: ProfileViewModel = koinViewModel()
                 Icon(ScIcons.Cap, null, tint = Sc.Muted, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(9.dp))
                 ScText(
-                    selectedUni?.name ?: "Universitetni tanlang",
+                    selectedUni?.shortName ?: "Universitetni tanlang",
                     14f, FontWeight.SemiBold,
                     if (selectedUni != null) Sc.Ink else Sc.Muted,
                     Modifier.weight(1f),
@@ -287,10 +300,8 @@ fun EditProfileScreen(onBack: () -> Unit, vm: ProfileViewModel = koinViewModel()
                             if (uniQuery.isBlank()) {
                                 state.universities
                             } else {
-                                state.universities.filter {
-                                    it.name.contains(uniQuery, ignoreCase = true) ||
-                                        it.city.contains(uniQuery, ignoreCase = true)
-                                }
+                                // Qisqartma bo'yicha ham: "TATU" → Toshkent axborot…
+                                state.universities.filter { it.matches(uniQuery) }
                             }
                             ).take(40)
                     }
@@ -328,6 +339,64 @@ fun EditProfileScreen(onBack: () -> Unit, vm: ProfileViewModel = koinViewModel()
                 }
             }
 
+            // Yashash manzili — yangi ish e'lonlari haqidagi xabarnoma shunga tayanadi
+            // (`02-PUSH_CATALOG_RESPONSE.md` §4: universitet BIR XIL yoki e'lon shu
+            // tumanda). To'ldirilmasa hech narsa buzilmaydi — tavsiyalar faqat
+            // universitet bo'yicha keladi, shuning uchun maydon ixtiyoriy.
+            FieldLabel("Yashash joyi (ixtiyoriy)")
+            ScText(
+                "Yaqin atrofdagi ish e'lonlarini yuborishimiz uchun",
+                11.5f, FontWeight.Medium, Sc.MutedLight,
+            )
+            val selectedRegion = addressCatalog.regions.firstOrNull { it.id == regionId }
+            PickerField(
+                icon = ScIcons.MapPin,
+                text = selectedRegion?.name ?: "Viloyatni tanlang",
+                filled = selectedRegion != null,
+            ) {
+                regionExpanded = !regionExpanded
+                districtExpanded = false
+            }
+            if (regionExpanded) {
+                Column(Modifier.fillMaxWidth().scCard(radius = 20.dp).padding(9.dp)) {
+                    addressCatalog.regions.forEach { region ->
+                        NamedRow(region.name, selected = region.id == regionId) {
+                            // Viloyat almashsa tuman ham bekor qilinadi: eski tuman yangi
+                            // viloyatga tegishli emas va server uni juftlik sifatida o'qiydi.
+                            if (region.id != regionId) districtId = null
+                            regionId = region.id
+                            regionExpanded = false
+                            vm.selectRegion(region.id)
+                        }
+                    }
+                }
+            }
+            // Tuman faqat viloyat tanlangach ma'noli — tumanlar ro'yxati viloyatniki.
+            if (regionId != null) {
+                val selectedDistrict = addressCatalog.districts.firstOrNull { it.id == districtId }
+                PickerField(
+                    icon = ScIcons.MapPin,
+                    text = selectedDistrict?.name ?: "Tumanni tanlang",
+                    filled = selectedDistrict != null,
+                ) {
+                    districtExpanded = !districtExpanded
+                    regionExpanded = false
+                }
+                if (districtExpanded) {
+                    Column(Modifier.fillMaxWidth().scCard(radius = 20.dp).padding(9.dp)) {
+                        addressCatalog.districts.forEach { district ->
+                            NamedRow(district.name, selected = district.id == districtId) {
+                                districtId = district.id
+                                districtExpanded = false
+                            }
+                        }
+                        if (addressCatalog.districts.isEmpty()) {
+                            ScText("Topilmadi", 12.5f, FontWeight.Medium, Sc.Muted, Modifier.padding(8.dp))
+                        }
+                    }
+                }
+            }
+
             if (error != null) {
                 ScText(error!!, 12.5f, FontWeight.SemiBold, Sc.Danger)
             }
@@ -359,6 +428,8 @@ fun EditProfileScreen(onBack: () -> Unit, vm: ProfileViewModel = koinViewModel()
                         universityId = universityId,
                         courseYear = courseYear,
                         gender = gender,
+                        regionId = regionId,
+                        districtId = districtId,
                         // Bo'sh satr — serverda "tozalash" degani, `null` esa "tegilmasin".
                         bio = bio.trim(),
                     )
@@ -433,6 +504,52 @@ private fun ProfilePhotoStrip(
     )
 }
 
+/** Viloyat/tuman kabi "bosib ro'yxat ochadigan" maydon — universitet maydoni bilan bir xil. */
+@Composable
+private fun PickerField(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    text: String,
+    filled: Boolean,
+    onClick: () -> Unit,
+) {
+    Row(
+        Modifier.fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(Sc.FieldBg)
+            .border(1.dp, Sc.Border, RoundedCornerShape(16.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 13.dp, vertical = 15.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(icon, null, tint = Sc.Muted, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(9.dp))
+        ScText(
+            text, 14f, FontWeight.SemiBold,
+            if (filled) Sc.Ink else Sc.Muted,
+            Modifier.weight(1f),
+            maxLines = 1,
+        )
+        Icon(ScIcons.ChevronUpDown, null, tint = Sc.Muted, modifier = Modifier.size(17.dp))
+    }
+}
+
+/** Ochilgan ro'yxatdagi bitta nom (viloyat/tuman). */
+@Composable
+private fun NamedRow(name: String, selected: Boolean, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        ScText(name, 13.5f, FontWeight.SemiBold, Sc.Ink, Modifier.weight(1f), maxLines = 1)
+        if (selected) {
+            Icon(AppIcons.Check, null, tint = Sc.Brand, modifier = Modifier.size(17.dp))
+        }
+    }
+}
+
 @Composable
 private fun FieldLabel(text: String) {
     ScText(text, 12.5f, FontWeight.Bold, Sc.InkSoft, maxLines = 1)
@@ -462,10 +579,15 @@ private fun UniversityRow(uni: University, selected: Boolean, onClick: () -> Uni
             .padding(horizontal = 12.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        ScText(uni.monogram, 12.5f, FontWeight.ExtraBold, Sc.Brand, Modifier.width(50.dp), maxLines = 1)
+        // Qat'iy 50.dp li matn o'rniga tile: qisqartma 6 belgigacha bo'lishi mumkin va
+        // kengligi belgilanmagan matn qo'shni ustunni surib yuborardi.
+        ScMonogramTile(uni.monogram, Sc.TintBlue, Sc.Brand, size = 42.dp, radius = 13.dp, fontSize = 13f)
+        Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
-            ScText(uni.name, 13.5f, FontWeight.Bold, Sc.Ink, maxLines = 2)
-            ScText(uni.city, 11.5f, FontWeight.Medium, Sc.Muted, maxLines = 1)
+            ScText(uni.shortName, 13.5f, FontWeight.Bold, Sc.Ink, lineHeight = 17f, maxLines = 2)
+            if (uni.display.subtitle.isNotBlank()) {
+                ScText(uni.display.subtitle, 11.5f, FontWeight.Medium, Sc.Muted, maxLines = 1)
+            }
         }
         if (selected) {
             Icon(AppIcons.Check, null, tint = Sc.Brand, modifier = Modifier.size(17.dp))

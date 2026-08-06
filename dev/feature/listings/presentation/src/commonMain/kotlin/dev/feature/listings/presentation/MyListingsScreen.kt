@@ -45,6 +45,7 @@ import dev.core.uikit.components.scStyle
 import dev.core.uikit.components.scTopInset
 import dev.core.uikit.theme.Sc
 import dev.core.uikit.components.ScShimmerList
+import dev.core.uikit.components.ScPullRefresh
 import dev.feature.listings.domain.model.Listing
 import dev.feature.listings.domain.model.ListingStatus
 import dev.feature.listings.domain.model.formatSum
@@ -131,20 +132,28 @@ fun MyListingsScreen(
         } else if (listings.isEmpty()) {
             EmptyState(onCreate, filterDiscount)
         } else {
-            LazyColumn(
-                Modifier.fillMaxWidth().weight(1f),
-                contentPadding = PaddingValues(
-                    start = Sc.ScreenPadding, end = Sc.ScreenPadding, top = 8.dp, bottom = 110.dp,
-                ),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+            // Tepadan tortish — o'z e'lonlarim serverdan qayta o'qiladi (status boshqa
+            // qurilmada yoki moderatsiyada o'zgargan bo'lishi mumkin).
+            ScPullRefresh(
+                refreshing = state.refreshing,
+                onRefresh = vm::refresh,
+                modifier = Modifier.weight(1f),
             ) {
-                items(listings, key = { it.id }) { listing ->
-                    MyListingCard(
-                        listing = listing,
-                        onEdit = { onEdit(listing.id) },
-                        onTogglePaused = { vm.togglePaused(listing) },
-                        onDelete = { vm.delete(listing) },
-                    )
+                LazyColumn(
+                    Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(
+                        start = Sc.ScreenPadding, end = Sc.ScreenPadding, top = 8.dp, bottom = 110.dp,
+                    ),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    items(listings, key = { it.id }) { listing ->
+                        MyListingCard(
+                            listing = listing,
+                            onEdit = { onEdit(listing.id) },
+                            onTogglePaused = { vm.togglePaused(listing) },
+                            onDelete = { vm.delete(listing) },
+                        )
+                    }
                 }
             }
         }

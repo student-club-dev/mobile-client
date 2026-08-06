@@ -91,7 +91,8 @@ class ListingsBrowseViewModel(
         if (_state.value.sort == ListingSort.NEAREST) reload()
     }
 
-    fun refresh() = reload()
+    /** "Tepadan tortib yangilash" — ro'yxat birinchi sahifadan qayta o'qiladi. */
+    fun refresh() = reload(pulled = true)
 
     /** Cheksiz skroll — ro'yxatning oxiriga yetganda. */
     fun loadMore() {
@@ -197,12 +198,16 @@ class ListingsBrowseViewModel(
     // Qidiruv
     // -----------------------------------------------------------------------
 
-    private fun reload(debounceMs: Long = 0) {
+    /**
+     * [pulled] — chaqiruv "tepadan tortish" dan keldi: o'shanda skelet emas, aylanma
+     * indikator ko'rsatiladi va mavjud ro'yxat ekranda qolib turadi.
+     */
+    private fun reload(debounceMs: Long = 0, pulled: Boolean = false) {
         searchJob?.cancel()
         moreJob?.cancel()
         searchJob = viewModelScope.launch {
             if (debounceMs > 0) delay(debounceMs)
-            _state.update { it.copy(loading = true, error = null) }
+            _state.update { it.copy(loading = !pulled, refreshing = pulled, error = null) }
 
             when (val res = search(_state.value.toQuery())) {
                 is Resource.Success -> _state.update { s ->
@@ -213,12 +218,13 @@ class ListingsBrowseViewModel(
                         // Kursorli rejimda server `total` bermaydi — o'shanda yuklangani.
                         totalCount = res.data.total ?: res.data.items.size,
                         loading = false,
+                        refreshing = false,
                         loaded = true,
                     )
                 }
                 is Resource.Error -> _state.update {
                     it.copy(listings = emptyList(), hasNext = false, nextCursor = null,
-                        loading = false, loaded = true, error = res.message)
+                        loading = false, refreshing = false, loaded = true, error = res.message)
                 }
                 Resource.Loading -> Unit
             }
@@ -264,6 +270,8 @@ data class ListingsBrowseUiState(
     val canSortByDistance: Boolean = false,
 
     val loading: Boolean = false,
+    /** Foydalanuvchi ekranni pastga tortdi — kontent joyida, tepada aylanma indikator. */
+    val refreshing: Boolean = false,
     val loadingMore: Boolean = false,
     /** Keyingi sahifa bormi (cheksiz skroll). */
     val hasNext: Boolean = false,

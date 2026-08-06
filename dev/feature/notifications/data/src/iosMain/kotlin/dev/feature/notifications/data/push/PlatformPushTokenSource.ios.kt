@@ -1,6 +1,7 @@
 package dev.feature.notifications.data.push
 
 import dev.feature.notifications.domain.push.DevicePlatform
+import dev.feature.notifications.domain.push.DeviceTokenType
 import dev.feature.notifications.domain.push.PushTokenSource
 import kotlinx.coroutines.flow.Flow
 
@@ -18,6 +19,16 @@ import kotlinx.coroutines.flow.Flow
  */
 private class ApnsPushTokenSource : PushTokenSource {
     override val platform = DevicePlatform.IOS
+
+    /**
+     * ⚠️ `APNS`, `FCM` EMAS. iPhone o'zining XOM APNs tokenini ro'yxatdan o'tkazadi va
+     * server Apple bilan to'g'ridan-to'g'ri gaplashadi (`PUSH_APNS_BACKEND.md`). Bu yerda
+     * `FCM` yozilsa token uni umuman adreslay olmaydigan xizmatga topshirilardi.
+     *
+     * PushKit (VoIP) tokeni bu manbaga TUSHMAYDI — u alohida, `APNS_VOIP` turi bilan
+     * ro'yxatdan o'tadi va oddiysini ALMASHTIRMAYDI (`04-CALLS_RESPONSE.md` §2).
+     */
+    override val tokenType = DeviceTokenType.APNS
     override suspend fun currentToken(): String? = PushTokenBridge.latest
     override val tokenRefreshes: Flow<String> = PushTokenBridge.tokens
 }
@@ -33,7 +44,23 @@ object IosPushBridge {
     /** `AppDelegate` APNs tokenini o'n oltilik matn ko'rinishida uzatadi. */
     fun setToken(token: String) = PushTokenBridge.publish(token)
 
-    /** Push bosilganda — `userInfo["conversationId"]`. */
-    fun openConversation(conversationId: String?) =
-        dev.core.common.push.PushRoute.set(conversationId)
+    /**
+     * Push bosilganda — `userInfo` dagi konvert (`02-PUSH_CATALOG_BACKEND.md` §2).
+     *
+     * Swift tomoni kalitlarni bittalab uzatadi: `userInfo` — `[AnyHashable: Any]`, ya'ni
+     * uni Kotlin tomonga xarita sifatida berish har bir qiymatni `Any` qilib tashlardi.
+     */
+    fun openTarget(
+        notificationId: String?,
+        targetType: String?,
+        targetId: String?,
+        conversationId: String?,
+    ) = dev.core.common.push.PushRoute.set(
+        dev.core.common.push.PushRoute.Payload(
+            notificationId = notificationId,
+            targetType = targetType,
+            targetId = targetId,
+            conversationId = conversationId,
+        ),
+    )
 }

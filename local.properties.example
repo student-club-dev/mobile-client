@@ -21,3 +21,19 @@ sdk.dir=/Users/<foydalanuvchi>/Library/Android/sdk
 #
 # Backend ham tokenni AYNAN shu Web client ID bilan tekshirishi shart.
 GOOGLE_WEB_CLIENT_ID=1234567890-abcdefghijklmnop.apps.googleusercontent.com
+
+# Release imzo kaliti. Sozlanmasa release build DEBUG kaliti bilan imzolanadi — sinov
+# APK'si sifatida ishlaydi, lekin Play Store uni QABUL QILMAYDI.
+#
+# Kalit yaratish (bir marta, xavfsiz joyda saqlang — yo'qotsangiz ilovani yangilab
+# bo'lmaydi):
+#   keytool -genkeypair -v -keystore ~/keys/studentclub-release.jks \
+#     -alias studentclub -keyalg RSA -keysize 2048 -validity 10000
+#
+# Yangi SHA-1 ni Google Cloud'dagi **Android** OAuth client'ga qo'shishni unutmang,
+# aks holda release build'da Google orqali kirish ishlamaydi:
+#   ./gradlew :androidApp:signingReport
+RELEASE_STORE_FILE=/Users/<foydalanuvchi>/keys/studentclub-release.jks
+RELEASE_STORE_PASSWORD=
+RELEASE_KEY_ALIAS=studentclub
+RELEASE_KEY_PASSWORD=

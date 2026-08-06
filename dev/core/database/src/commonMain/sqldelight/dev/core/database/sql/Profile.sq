@@ -26,7 +26,11 @@ CREATE TABLE ProfileEntity (
     bio TEXT,
     -- EVERYONE | CONNECTIONS | NOBODY (sukut) — raqamni kim ko'radi.
     -- `lastSeenVisibility` dan MUSTAQIL sozlama.
-    phoneVisibility TEXT
+    phoneVisibility TEXT,
+    -- Yashash manzili — ish e'lonlari digestining geo yarmi shunga tayanadi
+    -- (`02-PUSH_CATALOG_RESPONSE.md` §4). Id'lar e'lon geo katalogi bilan bir fazoda.
+    regionId TEXT,
+    districtId TEXT
 );
 
 selectCurrent:
@@ -35,8 +39,9 @@ SELECT * FROM ProfileEntity LIMIT 1;
 upsert:
 INSERT OR REPLACE INTO ProfileEntity(
     uid, firstName, lastName, phoneNumber, role, universityId, universityEmail, birthYear, courseYear,
-    gender, lastSeenVisibility, avatarUrl, businessName, businessType, email, bio, phoneVisibility
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+    gender, lastSeenVisibility, avatarUrl, businessName, businessType, email, bio, phoneVisibility,
+    regionId, districtId
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 clear:
 DELETE FROM ProfileEntity;

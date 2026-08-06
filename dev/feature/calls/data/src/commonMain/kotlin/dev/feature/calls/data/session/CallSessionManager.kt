@@ -64,6 +64,8 @@ class CallSessionManager(
     private val accessToken: () -> String?,
     /** Tizim ilmog'i — Android'da old plan xizmati, iOS'da (keyinroq) CallKit. */
     private val presence: CallPresence,
+    /** Eshitiladigan tomoni: jiringlash, gudok, tugash signali va ovoz marshruti. */
+    private val audio: CallAudio,
     private val scope: CoroutineScope,
     private val clock: Clock = Clock.System,
 ) : CallController {
@@ -82,6 +84,10 @@ class CallSessionManager(
 
     /** Ulanish hodisasi allaqachon yuborilganmi — `call:connected` bir marta yetadi. */
     private var connectedSent = false
+
+    /** ICE tiklash urinishlari soni — cheksiz sikl bo'lmasin. */
+    private var iceRestartAttempts = 0
+    private var iceRecoveryTimer: Job? = null
 
     private var socketJobs: List<Job> = emptyList()
 
@@ -106,6 +112,18 @@ class CallSessionManager(
             scope.launch { watchReconnect() },
             scope.launch { watchToken() },
         )
+
+        // Sovuq start: jarayon o'lgan, tizimdagi jiringlash oynasi esa qolib ketgan
+        // bo'lishi mumkin (u ilova jarayonidan uzoq yashaydi). Sessiya yo'q ekan, u
+        // oyna baribir foydasiz: javob berish uchun kerak bo'lgan SDP taklifi jarayon
+        // bilan birga yo'qolgan, ya'ni "Javob berish" ishlamasdi.
+        //
+        // ⚠️ Bu yerda serverdan SO'RALMAYDI. Bu metod ilova har ochilganda ishlaydi
+        // (`CallHost` ildizda, hatto kirish ekranida ham), ya'ni `GET /calls/active`
+        // qo'yilsa u har ishga tushishda bitta keraksiz so'rov bo'lardi — kirmagan
+        // foydalanuvchida esa `401`. Javob esa hech narsani o'zgartirmasdi: qo'ng'iroq
+        // serverda tirik bo'lsa ham biz unga qo'shila olmaymiz.
+        if (_session.value == null) presence.onCallEnded()
     }
 
     override fun stop() {
@@ -136,7 +154,49 @@ class CallSessionManager(
             // ulgurgan. UI shunda jimgina yopiladi.
             if (ack?.error?.code == CallErrorCode.CALL_NOT_FOUND) {
                 closeLocally(CallStatus.FAILED, CallEndReason.FAILED)
+            } else if (ack == null) {
+                // Ack umuman kelmadi — socket yana uzilgan yoki server jim. Bunda
+                // qo'ng'iroq tirikmi degan savolga REST javob beradi.
+                verifyActiveCall()
             }
+        }
+    }
+
+    /**
+     * `GET /v1/calls/active` bo'yicha **jonli sessiyani** serverga solishtiradi.
+     *
+     * ⚠️ Faqat [watchReconnect] dan, faqat sessiya BOR bo'lganda va faqat `call:connected`
+     * ack'i umuman kelmaganda chaqiriladi. Ya'ni bu so'rov ilova ochilganda emas, aynan
+     * "socket qaytdi, lekin qo'ng'iroq tirikmi — bilmayapmiz" holatida ketadi. Uni
+     * `start()` ga qo'yish har ishga tushishda bitta keraksiz so'rov degani bo'lardi
+     * (`CallHost` ildizda turadi, hatto kirish ekranida ham).
+     *
+     * Bu tekshiruv faqat **yopadi**, hech qachon ochmaydi: javob berish uchun SDP taklifi
+     * kerak, u esa faqat `call:incoming` bilan keladi.
+     *
+     * Poyga himoyasi: REST so'rovi ketayotganda haqiqiy `call:incoming` kelib qolishi
+     * mumkin. Shuning uchun javob qaytganda sessiya **o'zgarmaganligi** tekshiriladi —
+     * o'zgargan bo'lsa tegilmaydi.
+     */
+    private suspend fun verifyActiveCall() {
+        val before = _session.value ?: return
+        val result = repository.activeCall()
+        // Tarmoq xatosi — hech narsa qilinmaydi. "Bilmayman" hech qachon "tugadi" degani
+        // emas: aks holda bitta uzilgan so'rov jonli qo'ng'iroqni yopib qo'yardi.
+        val active = when (result) {
+            is Resource.Success -> result.data
+            else -> return
+        }
+        if (active != null && active.status.isLive && active.callId == before.callId) return
+
+        // Serverda bu qo'ng'iroq jonli emas.
+        val current = _session.value
+        if (current !== before) return
+        if (current.status.isLive) {
+            Napier.i("calls: server jonli qo'ng'iroqni bilmaydi — local sessiya yopiladi")
+            // Statistika YUBORILMAYDI: bu qo'ng'iroq bizning tomonimizda o'lchanmagan
+            // (jarayon o'lgan yoki media umuman oqmagan).
+            closeLocally(CallStatus.ENDED, CallEndReason.CANCELED, sendStats = false)
         }
     }
 
@@ -188,8 +248,16 @@ class CallSessionManager(
         //    ack'ida keladi), shuning uchun ENG QAT'IY variantdan boshlaymiz: relay.
         //    Aks holda offer'ga host/srflx nomzod tushib, IP manzil taklif bilan birga
         //    ketardi — aynan `relayOnly` to'sadigan narsa (`…PROTOCOL.md` §11).
+        //
+        // ⚠️ Yagona istisno — TURN umuman berilmagan holat. O'shanda `relay` siyosati
+        //    himoya emas, kafolatlangan muvaffaqiyatsizlik bo'lardi: yig'iladigan nomzod
+        //    qolmaydi va qo'ng'iroq 30 soniya "Ulanmoqda" da turib `FAILED` bo'ladi.
+        val relayOnly = ice.hasTurn
+        if (!relayOnly) {
+            Napier.w("Qo'ng'iroq: TURN yo'q — relay majburlanmaydi", tag = LOG_TAG)
+        }
         val newEngine = engineFactory.create()
-        val offer = newEngine.createOffer(media, relayOnly = true, iceServers = ice.servers)
+        val offer = newEngine.createOffer(media, relayOnly = relayOnly, iceServers = ice.servers)
         if (offer == null) {
             newEngine.close()
             return "Mikrofonga ruxsat berilmagan yoki qurilma band."
@@ -205,7 +273,7 @@ class CallSessionManager(
             direction = CallDirection.OUTGOING,
             media = media,
             status = CallStatus.RINGING,
-            relayOnly = true,
+            relayOnly = relayOnly,
             cameraEnabled = media == CallMedia.VIDEO,
             speakerOn = media == CallMedia.VIDEO,
         )
@@ -219,13 +287,21 @@ class CallSessionManager(
             return ackError(ack)
         }
 
+        // Server «bu juftlik avval gaplashgan» desa (`relayOnly = false`) siyosat
+        // bo'shatiladi: endi host/srflx nomzodlar ham yig'iladi va bir tarmoqdagi ikki
+        // telefon TURN'siz, sezilarli tez ulanadi.
+        val serverRelayOnly = ack.relayOnly ?: true
+        if (!serverRelayOnly) engine?.relaxIceTransportPolicy()
+
         _session.update {
             it.copy(
                 callId = ack.callId,
-                relayOnly = ack.relayOnly ?: true,
+                relayOnly = serverRelayOnly && it.relayOnly,
                 ringingExpiresAt = parseInstant(ack.expiresAt),
             )
         }
+        // Endi qo'ng'iroq haqiqatan mavjud — quloqqa gudok beriladi.
+        audio.startOutgoingRingback()
         startRingingTimer()
         return null
     }
@@ -258,6 +334,12 @@ class CallSessionManager(
             cameraEnabled = false,
             speakerOn = parseEnum(event.media, CallMedia.AUDIO) == CallMedia.VIDEO,
         )
+        // Telefon jiringlaydi va tebranadi — tizim qo'ng'irog'idagidek.
+        audio.startIncomingRinging()
+        presence.onIncomingCall(
+            peerName = _session.value?.peer?.fullName.orEmpty(),
+            video = parseEnum(event.media, CallMedia.AUDIO) == CallMedia.VIDEO,
+        )
         // Chaquvchiga «telefon jiringlayapti» deymiz. Bu freym bir vaqtda bizning
         // mavjudligimizni ham qayd etadi va uzilish oynasini to'g'ri ishlatadi.
         socket.sendRinging(event.callId)
@@ -280,11 +362,14 @@ class CallSessionManager(
             Resource.Loading -> IceServers() // ham local tarmoqda ulanish bo'lishi mumkin.
         }
 
+        // Chaquvchining talabi (`relayOnly`) hurmat qilinadi, lekin TURN olinmagan bo'lsa
+        // uni majburlash qo'ng'iroqni o'ldirardi — qarang [call] dagi izoh.
+        val relayOnly = current.relayOnly && ice.hasTurn
         val newEngine = engineFactory.create()
         val answer = newEngine.createAnswer(
             remoteOfferSdp = offer,
             media = current.media,
-            relayOnly = current.relayOnly,
+            relayOnly = relayOnly,
             iceServers = ice.servers,
         )
         if (answer == null) {
@@ -301,7 +386,10 @@ class CallSessionManager(
             return if (ack?.error?.code == CallErrorCode.INVALID_CALL_STATE) null else ackError(ack)
         }
         cancelRingingTimer()
-        _session.update { it.copy(status = CallStatus.CONNECTING, relayOnly = ack.relayOnly ?: it.relayOnly) }
+        // Jiringlash to'xtaydi va ovoz suhbat rejimiga o'tadi — javob berilgan zahoti,
+        // media oqishini kutmasdan: aks holda birinchi soniyalarda ovoz eshitilmasdi.
+        _session.update { it.copy(status = CallStatus.CONNECTING, relayOnly = relayOnly && (ack.relayOnly ?: true)) }
+        audio.onCallActive(_session.value?.speakerOn == true)
         startConnectingTimer()
         return null
     }
@@ -371,7 +459,7 @@ class CallSessionManager(
     override fun toggleSpeaker() {
         val current = _session.value ?: return
         val enabled = !current.speakerOn
-        engine?.setSpeakerEnabled(enabled)
+        audio.setSpeaker(enabled)
         _session.update { it.copy(speakerOn = enabled) }
     }
 
@@ -391,7 +479,10 @@ class CallSessionManager(
         val current = _session.value ?: return
         if (current.callId != callId) return
         cancelRingingTimer()
-        _session.update { it.copy(status = CallStatus.CONNECTING, relayOnly = relayOnly) }
+        if (!relayOnly) engine?.relaxIceTransportPolicy()
+        _session.update { it.copy(status = CallStatus.CONNECTING, relayOnly = relayOnly && it.relayOnly) }
+        // Gudok to'xtaydi: suhbatdosh javob berdi.
+        audio.onCallActive(current.speakerOn)
         startConnectingTimer()
         engine?.acceptAnswer(sdp)
     }
@@ -480,8 +571,8 @@ class CallSessionManager(
                 when (event) {
                     is CallEngineEvent.LocalCandidate -> sendCandidate(event)
                     CallEngineEvent.Connected -> onIceConnected()
-                    CallEngineEvent.Disconnected -> Napier.d("Qo'ng'iroq: ICE uzildi", tag = LOG_TAG)
-                    CallEngineEvent.Failed -> hangUp()
+                    CallEngineEvent.Disconnected -> onIceDisconnected()
+                    CallEngineEvent.Failed -> onIceFailed()
                     is CallEngineEvent.RemoteVideo -> _session.update { it.copy(remoteVideo = event.enabled) }
                     CallEngineEvent.RenegotiationNeeded -> renegotiate()
                 }
@@ -520,16 +611,73 @@ class CallSessionManager(
         val current = _session.value ?: return@launch
         if (current.callId.isEmpty()) return@launch
         cancelConnectingTimer()
+        // Ulanish tiklandi — tiklash urinishlari hisobi nolga qaytadi.
+        iceRecoveryTimer?.cancel()
+        iceRecoveryTimer = null
+        iceRestartAttempts = 0
         if (!connectedSent) {
             connectedSent = true
             socket.connected(current.callId)
         }
         if (current.status != CallStatus.ACTIVE) {
             _session.update { it.copy(status = CallStatus.ACTIVE, connectedAt = clock.now()) }
+            // Ovoz marshruti aynan shu yerda ham qo'yiladi: media oqishidan oldin
+            // qo'yilgani ba'zi qurilmalarda WebRTC audio moduli ishga tushganda tushib
+            // qolardi va suhbat quloqchinda qolib ketardi.
+            audio.onCallActive(current.speakerOn)
             startMaxDurationTimer()
             publishMediaState()
         }
     }.let { }
+
+    /**
+     * ICE `disconnected` — odatda **vaqtinchalik**: tarmoq almashdi, lift, tunnel.
+     *
+     * Qo'ng'iroq darhol yopilmaydi; libwebrtc ko'pincha o'zi tiklaydi. Lekin cheksiz
+     * kutib ham bo'lmaydi — muhlat ichida tiklanmasa ICE qayta ishga tushiriladi.
+     */
+    private fun onIceDisconnected() {
+        Napier.d("Qo'ng'iroq: ICE uzildi — tiklanishi kutilmoqda", tag = LOG_TAG)
+        scheduleIceRecovery(ICE_RECOVERY_GRACE_MS)
+    }
+
+    /** ICE `failed` — o'zi tiklanmaydi, faqat qayta ishga tushirish yordam beradi. */
+    private fun onIceFailed() {
+        Napier.w("Qo'ng'iroq: ICE yiqildi", tag = LOG_TAG)
+        scheduleIceRecovery(0)
+    }
+
+    /**
+     * ICE ni qayta ishga tushiradi (`iceRestart`) — yangi nomzodlar bilan yangi urinish.
+     *
+     * ⚠️ Ikkala tomon ham bir vaqtda tiklashga urinsa qayta muzokara to'qnashadi (glare).
+     * Shuning uchun **chaqirilgan tomon kutib turadi**: chaquvchi odatda birinchi bo'ladi
+     * va uning taklifi yetib kelsa, bu yerdagi urinish keraksiz bo'lib qoladi.
+     */
+    private fun scheduleIceRecovery(delayMs: Long) {
+        if (iceRecoveryTimer?.isActive == true) return
+        iceRecoveryTimer = scope.launch {
+            val current = _session.value ?: return@launch
+            val roleDelay = if (current.direction == CallDirection.INCOMING) ICE_RESTART_CALLEE_DELAY_MS else 0
+            delay(delayMs + roleDelay)
+
+            // Kutish paytida o'zi tiklangan bo'lsa `onIceConnected` bu ishni allaqachon
+            // bekor qilgan bo'lardi — bu yergacha yetib kelish "hali ham uzuq" degani.
+            val live = _session.value?.takeIf { it.status.isLive && it.callId.isNotEmpty() } ?: return@launch
+            if (iceRestartAttempts >= MAX_ICE_RESTARTS) {
+                Napier.w("Qo'ng'iroq: ICE tiklanmadi — yopiladi", tag = LOG_TAG)
+                closeLocally(CallStatus.FAILED, CallEndReason.FAILED)
+                return@launch
+            }
+            iceRestartAttempts++
+            Napier.d("Qo'ng'iroq: ICE qayta ishga tushirilmoqda ($iceRestartAttempts)", tag = LOG_TAG)
+            val offer = engine?.createRenegotiationOffer(iceRestart = true) ?: return@launch
+            socket.sendRenegotiate(live.callId, offer)
+            // Bu urinish ham natija bermasa keyingisi (yoki yopilish) shu yerdan boshlanadi.
+            iceRecoveryTimer = null
+            scheduleIceRecovery(ICE_RECOVERY_GRACE_MS)
+        }
+    }
 
     private fun renegotiate() = scope.launch {
         val current = _session.value ?: return@launch
@@ -615,13 +763,35 @@ class CallSessionManager(
             }
         }
         _session.value = current.copy(status = status, endReason = endReason)
-        teardown()
+        teardown(audibleReason(endReason, answered))
     }
 
-    private fun teardown() {
+    /**
+     * Qaysi tugash sababi **eshitilishi** kerak — tizim telefonidagi odat bo'yicha.
+     *
+     * «Band» va «aloqa yo'q» har doim chalinadi: ular foydalanuvchiga nima bo'lganini
+     * aytadi. «Tugatildi» signali esa faqat haqiqatan gaplashilgan bo'lsa — javob
+     * berilmagan qo'ng'iroqni bekor qilish yoki kiruvchini rad etish jim bo'ladi.
+     */
+    private fun audibleReason(endReason: CallEndReason?, answered: Boolean): CallEndReason? =
+        when (endReason) {
+            CallEndReason.BUSY, CallEndReason.FAILED -> endReason
+            CallEndReason.HANGUP, CallEndReason.DECLINED -> endReason.takeIf { answered }
+            else -> null
+        }
+
+    /**
+     * [endReason] — tugash signali uchun: "band", "aloqa yo'q" va oddiy tugatish har xil
+     * eshitiladi, tizim telefonidagi kabi. `null` bo'lsa jim yopiladi.
+     */
+    private fun teardown(endReason: CallEndReason? = null) {
         presence.onCallEnded()
+        audio.stop(endReason)
         cancelRingingTimer()
         cancelConnectingTimer()
+        iceRecoveryTimer?.cancel()
+        iceRecoveryTimer = null
+        iceRestartAttempts = 0
         maxDurationTimer?.cancel()
         maxDurationTimer = null
         engineJob?.cancel()
@@ -671,6 +841,21 @@ class CallSessionManager(
 
         /** Socket bucket'i sekundiga 15 ta to'ladi — ~200 ms odatda yetadi. */
         const val ICE_RETRY_BASE_MS = 250L
+
+        /**
+         * ICE uzilgandan keyin shuncha kutiladi — libwebrtc ko'pincha o'zi tiklaydi.
+         * Wi-Fi → mobil o'tish odatda 2–4 soniya oladi, shuning uchun 6 s.
+         */
+        const val ICE_RECOVERY_GRACE_MS = 6_000L
+
+        /**
+         * Chaqirilgan tomon tiklashni shuncha kechiktiradi — glare'ni kamaytiradi:
+         * chaquvchi birinchi bo'ladi va uning taklifi kelsa bu urinish keraksiz bo'ladi.
+         */
+        const val ICE_RESTART_CALLEE_DELAY_MS = 1_500L
+
+        /** Shuncha urinishdan keyin qo'ng'iroq `FAILED` bo'lib yopiladi. */
+        const val MAX_ICE_RESTARTS = 2
 
         /**
          * Token o'zgarganini tekshirish oralig'i.

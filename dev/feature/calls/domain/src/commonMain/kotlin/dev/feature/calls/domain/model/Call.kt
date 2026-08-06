@@ -115,6 +115,19 @@ data class IceServers(
     val servers: List<IceServer> = emptyList(),
     val ttlSeconds: Int = DEFAULT_TTL_SECONDS,
 ) {
+    /**
+     * Ro'yxatda **haqiqiy TURN** bormi.
+     *
+     * ⚠️ Bu tekshiruvsiz `relayOnly` halokatli: `iceTransportPolicy = RELAY` da klient
+     * FAQAT relay nomzod yig'adi va TURN bo'lmasa nomzodlar umuman bo'lmaydi — qo'ng'iroq
+     * "Ulanmoqda" da turib, 30 soniyadan keyin `FAILED` bo'ladi. STUN (`stun:`) bu yerda
+     * hisobga olinmaydi: u srflx beradi, relay emas.
+     */
+    val hasTurn: Boolean
+        get() = servers.any { server ->
+            server.urls.any { it.startsWith("turn:") || it.startsWith("turns:") }
+        }
+
     companion object {
         const val DEFAULT_TTL_SECONDS = 3600
 
@@ -162,4 +175,26 @@ data class CallStats(
     val packetsReceived: Int? = null,
     val bytesSent: Long? = null,
     val bytesReceived: Long? = null,
+)
+
+/**
+ * Serverdagi **jonli** qo'ng'iroqning qisqa tavsifi — `GET /v1/calls/active`
+ * (`04-CALLS_RESPONSE.md` §4).
+ *
+ * [CallSession] dan farqi: bu **media emas, faqat fakt**. Unda SDP taklifi yo'q, ya'ni
+ * bundan qo'ng'iroqqa javob berib bo'lmaydi — javob berish uchun kerak bo'lgan offer
+ * faqat WebSocket'dagi `call:incoming` bilan keladi. Shuning uchun bu model ikki narsaga
+ * ishlatiladi: jiringlashni **to'xtatish** (server "bunday qo'ng'iroq yo'q" desa) va
+ * qaysi qo'ng'iroq jonli ekanini tekshirish.
+ */
+data class ActiveCall(
+    val callId: String,
+    val conversationId: String,
+    val status: CallStatus,
+    val media: CallMedia,
+    /** `true` — chaquvchi qarshi tomon, ya'ni javob berish kerak bo'lgan qo'ng'iroq. */
+    val incoming: Boolean,
+    val peerId: String? = null,
+    val peerName: String? = null,
+    val peerAvatarUrl: String? = null,
 )

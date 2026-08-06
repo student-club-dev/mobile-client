@@ -1,6 +1,7 @@
 package dev.feature.calls.domain.repository
 
 import dev.core.common.Resource
+import dev.feature.calls.domain.model.ActiveCall
 import dev.feature.calls.domain.model.CallPage
 import dev.feature.calls.domain.model.CallStats
 import dev.feature.calls.domain.model.IceServers
@@ -23,6 +24,19 @@ interface CallRepository {
      * «qo'ng'iroq hozircha mavjud emas» deydi.
      */
     suspend fun iceServers(forceRefresh: Boolean = false): Resource<IceServers>
+
+    /**
+     * Serverdagi **jonli** qo'ng'iroq — `GET /v1/calls/active` (`04-CALLS_RESPONSE.md` §4).
+     *
+     * `null` — faol qo'ng'iroq yo'q va bu **kutilgan javob**, xato emas: server `404` emas,
+     * `200` + `call: null` qaytaradi. Muddati o'tgan (`expiresAt` o'tmishda) qo'ng'iroq ham
+     * `null` bilan bir xil ma'noda.
+     *
+     * Nima uchun REST: ilova butunlay yopiq bo'lganda kelgan qo'ng'iroq (VoIP push) uchun
+     * WebSocket ulanishini kutib bo'lmaydi — u ulangunicha qo'ng'iroq allaqachon tugagan
+     * bo'lishi mumkin va telefon **bo'sh joyga jiringlab** turardi.
+     */
+    suspend fun activeCall(): Resource<ActiveCall?>
 
     /**
      * Qo'ng'iroqlar tarixi — `GET /v1/calls`, eng yangisi birinchi.

@@ -4,6 +4,9 @@
     <bytecodeTargetLevel target="17">
       <module name="StudentClub.dev.feature.business" target="21" />
       <module name="StudentClub.dev.feature.clubs.presentation" target="21" />
+      <module name="StudentClub.dev.feature.students.data" target="21" />
+      <module name="StudentClub.dev.feature.students.domain" target="21" />
+      <module name="StudentClub.dev.feature.students.presentation" target="21" />
       <module name="StudentClubs.dev.api-client" target="21" />
       <module name="StudentClubs.dev.core.common" target="21" />
       <module name="StudentClubs.dev.core.data" target="21" />

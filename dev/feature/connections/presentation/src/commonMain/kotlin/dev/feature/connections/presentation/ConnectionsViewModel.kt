@@ -57,6 +57,8 @@ data class ConnectionsUiState(
 
     val connections: List<ConnectedStudent> = emptyList(),
     val loading: Boolean = false,
+    /** "Tepadan tortib yangilash" ketyapti — ro'yxat joyida, tepada aylanma indikator. */
+    val refreshing: Boolean = false,
 
     /** Amal bajarilayotgan talabalar (tugma o'chirilgan holatda turadi). */
     val busyIds: Set<String> = emptySet(),
@@ -117,6 +119,27 @@ class ConnectionsViewModel(
     fun refreshAll() {
         loadConnections()
         loadRequests()
+    }
+
+    /**
+     * "Tepadan tortib yangilash" — ochiq bo'lim serverdan qayta o'qiladi.
+     *
+     * Barcha uch ro'yxat birdan yangilanadi, chunki ular bir-biriga bog'liq: so'rov qabul
+     * qilinsa u so'rovlardan chiqib bog'langanlarga o'tadi va qidiruvdagi tugmasi ham
+     * o'zgaradi. Faqat ochiq bo'limni yangilash boshqasini eskirgan holda qoldirardi.
+     */
+    fun refreshCurrentTab() {
+        if (_state.value.refreshing) return
+        viewModelScope.launch {
+            _state.update { it.copy(refreshing = true) }
+            try {
+                loadConnections().join()
+                loadRequests().join()
+                reloadStudents()
+            } finally {
+                _state.update { it.copy(refreshing = false) }
+            }
+        }
     }
 
     fun selectTab(tab: ConnectionsTab) {
@@ -188,16 +211,26 @@ class ConnectionsViewModel(
         searchJob?.cancel()
         searchJob = viewModelScope.launch {
             if (debounce) delay(SEARCH_DEBOUNCE_MS)
-            _state.update { it.copy(searching = true) }
-            when (val res = repository.students(_state.value.filter)) {
-                is Resource.Success -> _state.update {
-                    it.copy(results = res.data.items, searching = false, searched = true)
-                }
-                is Resource.Error -> _state.update {
-                    it.copy(searching = false, searched = true, message = res.message)
-                }
-                Resource.Loading -> Unit
+            reloadStudents()
+        }
+    }
+
+    /**
+     * Talabalar ro'yxatini serverdan bir marta o'qiydi.
+     *
+     * `suspend`: chaqiruvchi uning tugashini KUTA oladi — "tepadan tortish" indikatori
+     * hamma so'rov qaytgunicha aylanishi kerak.
+     */
+    private suspend fun reloadStudents() {
+        _state.update { it.copy(searching = true) }
+        when (val res = repository.students(_state.value.filter)) {
+            is Resource.Success -> _state.update {
+                it.copy(results = res.data.items, searching = false, searched = true)
             }
+            is Resource.Error -> _state.update {
+                it.copy(searching = false, searched = true, message = res.message)
+            }
+            Resource.Loading -> Unit
         }
     }
 
@@ -228,7 +261,12 @@ class ConnectionsViewModel(
                     )
                 }
                 loadRequests()
-                if (connected) loadConnections()
+                if (connected) {
+                    loadConnections()
+                    // Darhol bog'lanish sodir bo'ldi — qidiruv ro'yxatidagi holat ham
+                    // serverdagisi bilan tenglashtiriladi.
+                    reloadStudents()
+                }
             }
             // 429 — rad etilgandan keyingi sovish muddati yoki daqiqalik limit. Server qolgan
             // vaqtni bermaydi, shuning uchun taymer YO'Q — faqat xabar.
@@ -244,6 +282,12 @@ class ConnectionsViewModel(
                 updateSearchStatus(request.student.id, ConnectionView.CONNECTED)
                 loadRequests()
                 loadConnections()
+                // ⚠️ Qidiruv ro'yxati ham SERVERDAN qayta o'qiladi, faqat local
+                // `updateSearchStatus` bilan cheklanmasdan: qabul qilingandan keyin
+                // serverdagi `connectionStatus` o'zgaradi va "Yangi odamlar" filtri
+                // yoqilgan bo'lsa bu odam ro'yxatdan butunlay chiqib ketishi kerak.
+                // Ilgari u eski tugmasi bilan osilib qolardi ("update ishlamayapti").
+                reloadStudents()
             }
             is Resource.Error -> {
                 // `404` uchala holatni bildiradi (so'rov yo'q / sizga emas / javob berilgan) —

@@ -41,7 +41,10 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.core.uikit.components.ScAvatar
 import dev.core.uikit.components.ScCircleButton
+import dev.core.uikit.components.ScEmptyState
+import dev.core.uikit.components.ScEmptyTitle
 import dev.core.uikit.components.ScHeader
+import dev.core.uikit.components.ScNotFoundTitle
 import dev.core.uikit.components.ScHeaderTitle
 import dev.core.uikit.components.ScIconTile
 import dev.core.uikit.components.ScIcons
@@ -49,6 +52,7 @@ import dev.core.uikit.components.ScText
 import dev.core.uikit.components.scCard
 import dev.core.uikit.components.scStyle
 import dev.core.uikit.components.ScShimmerList
+import dev.core.uikit.components.ScPullRefresh
 import dev.core.uikit.theme.Sc
 import dev.feature.connections.domain.model.ConnectionRequest
 import dev.feature.connections.domain.model.ConnectionView
@@ -72,6 +76,14 @@ import org.koin.compose.viewmodel.koinViewModel
 fun ConnectionsScreen(
     onBack: () -> Unit = {},
     onOpenChat: (studentId: String, name: String) -> Unit = { _, _ -> },
+    /**
+     * Talaba bosildi — profil varag'ini **karkas** ochadi (`StudentShell`).
+     *
+     * Nega bu yerda emas: varaqning bo'limlari (Postlar/Media/Fayllar/Havolalar) story va
+     * chat modullarida yashaydi, bu modul esa ularni ko'rmaydi — ko'rsa bog'lanish halqasi
+     * paydo bo'lardi (`StudentProfileSheet` izohiga q.).
+     */
+    onOpenStudent: (StudentSummary) -> Unit = {},
     /**
      * Ekran qaysi bo'lim ochilgan holda kelsin (Home'dagi tugmalar). `null` — sukut
      * bo'yicha "Do'stlar". Faqat BIR MARTA qo'llaniladi: aks holda foydalanuvchi tab'ni
@@ -121,31 +133,43 @@ fun ConnectionsScreen(
 
             Spacer(Modifier.height(14.dp))
 
-            when (state.tab) {
-                ConnectionsTab.SEARCH -> SearchSection(
-                    state = state,
-                    onQuery = vm::onQueryChange,
-                    onClear = vm::clearQuery,
-                    onConnect = vm::connect,
-                    onOpenChat = onOpenChat,
-                    onMenu = { menuFor = it },
-                    vm = vm,
-                    modifier = Modifier.weight(1f),
-                )
-                ConnectionsTab.REQUESTS -> RequestsSection(
-                    state = state,
-                    onSelect = vm::selectRequestsTab,
-                    onAccept = vm::accept,
-                    onDecline = vm::decline,
-                    onMenu = { menuFor = it },
-                    modifier = Modifier.weight(1f),
-                )
-                ConnectionsTab.CONNECTED -> ConnectedSection(
-                    state = state,
-                    onOpenChat = onOpenChat,
-                    onMenu = { menuFor = it },
-                    modifier = Modifier.weight(1f),
-                )
+            // Tepadan tortish — OCHIQ bo'lim serverdan qayta o'qiladi. Bog'lanish holati
+            // ikki tomonlama: suhbatdosh so'rovni boshqa qurilmada qabul qilgan bo'lishi
+            // mumkin va ekranga qaytmasdan buni bilishning boshqa yo'li yo'q edi.
+            ScPullRefresh(
+                refreshing = state.refreshing,
+                onRefresh = vm::refreshCurrentTab,
+                modifier = Modifier.weight(1f),
+            ) {
+                when (state.tab) {
+                    ConnectionsTab.SEARCH -> SearchSection(
+                        state = state,
+                        onQuery = vm::onQueryChange,
+                        onClear = vm::clearQuery,
+                        onConnect = vm::connect,
+                        onOpenChat = onOpenChat,
+                        onMenu = { menuFor = it },
+                        onOpenStudent = onOpenStudent,
+                        vm = vm,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                    ConnectionsTab.REQUESTS -> RequestsSection(
+                        state = state,
+                        onSelect = vm::selectRequestsTab,
+                        onAccept = vm::accept,
+                        onDecline = vm::decline,
+                        onMenu = { menuFor = it },
+                        onOpenStudent = onOpenStudent,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                    ConnectionsTab.CONNECTED -> ConnectedSection(
+                        state = state,
+                        onOpenChat = onOpenChat,
+                        onMenu = { menuFor = it },
+                        onOpenStudent = onOpenStudent,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
             }
         }
 
@@ -254,6 +278,7 @@ private fun SearchSection(
     onConnect: (StudentSummary) -> Unit,
     onOpenChat: (String, String) -> Unit,
     onMenu: (StudentSummary) -> Unit,
+    onOpenStudent: (StudentSummary) -> Unit,
     vm: ConnectionsViewModel,
     modifier: Modifier = Modifier,
 ) {
@@ -271,10 +296,12 @@ private fun SearchSection(
             state.searched && state.results.isEmpty() -> Hint(
                 if (state.query.isNotBlank()) {
                     // Qidiruv `firstName` va `lastName` ni ALOHIDA tekshiradi — to'liq ism ishlamaydi.
-                    "Hech kim topilmadi.\nBitta so'z yozing — to'liq ism bo'yicha qidiruv ishlamaydi."
+                    "Bitta so'z yozing — to'liq ism bo'yicha qidiruv ishlamaydi."
                 } else {
-                    "Bu filtrlarga mos talaba yo'q"
+                    "Bu filtrlarga mos talaba yo'q."
                 },
+                icon = ScIcons.Search,
+                title = ScNotFoundTitle,
             )
             else -> LazyColumn(
                 Modifier.fillMaxWidth(),
@@ -286,6 +313,7 @@ private fun SearchSection(
                         student = result.student,
                         subtitle = state.subtitleOf(result.student),
                         onMenu = { onMenu(result.student) },
+                        onOpen = { onOpenStudent(result.student) },
                     ) {
                         val busy = result.student.id in state.busyIds
                         when (result.connectionStatus) {
@@ -371,6 +399,7 @@ private fun RequestsSection(
     onAccept: (ConnectionRequest) -> Unit,
     onDecline: (ConnectionRequest) -> Unit,
     onMenu: (StudentSummary) -> Unit,
+    onOpenStudent: (StudentSummary) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier.fillMaxWidth()) {
@@ -384,9 +413,8 @@ private fun RequestsSection(
         }
         Spacer(Modifier.height(12.dp))
         val list = state.requests
-        if (list.isEmpty()) {
-            Hint(if (state.requestsTab == RequestsTab.INCOMING) "Kiruvchi so'rov yo'q" else "Chiquvchi so'rov yo'q")
-        } else {
+        // So'rov yo'q bo'lsa hech nima chizilmaydi — chiplarning ostida bo'sh joy qoladi.
+        if (list.isNotEmpty()) {
             LazyColumn(
                 Modifier.fillMaxWidth(),
                 contentPadding = PaddingValues(horizontal = Sc.ScreenPadding, vertical = 4.dp),
@@ -398,6 +426,7 @@ private fun RequestsSection(
                         student = request.student,
                         subtitle = state.subtitleOf(request.student),
                         onMenu = { onMenu(request.student) },
+                        onOpen = { onOpenStudent(request.student) },
                     ) {
                         if (state.requestsTab == RequestsTab.INCOMING) {
                             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -419,15 +448,13 @@ private fun ConnectedSection(
     state: ConnectionsUiState,
     onOpenChat: (String, String) -> Unit,
     onMenu: (StudentSummary) -> Unit,
+    onOpenStudent: (StudentSummary) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     if (state.connections.isEmpty()) {
+        // Yuklanayotgan bo'lsa skelet; bo'sh bo'lsa umuman hech nima.
         if (state.loading) {
             ScShimmerList(rows = 6, modifier = modifier.padding(horizontal = Sc.ScreenPadding))
-        } else {
-            Box(modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
-                Hint("Hali bog'lanmagansiz.\n\"Qidiruv\" bo'limidan do'st toping.")
-            }
         }
         return
     }
@@ -441,6 +468,7 @@ private fun ConnectedSection(
                 student = connected.student,
                 subtitle = state.subtitleOf(connected.student),
                 onMenu = { onMenu(connected.student) },
+                onOpen = { onOpenStudent(connected.student) },
             ) {
                 PillButton("Xabar") { onOpenChat(connected.student.id, connected.student.displayName) }
             }
@@ -457,10 +485,15 @@ private fun PersonRow(
     student: StudentSummary,
     subtitle: String?,
     onMenu: () -> Unit,
+    onOpen: () -> Unit,
     action: @Composable () -> Unit,
 ) {
     Row(
-        Modifier.fillMaxWidth().scCard(radius = 18.dp, elevation = 5.dp).padding(12.dp),
+        // Qatorning O'ZI profilni ochadi. Amal tugmalari ("Xabar", "Qabul") va menyu
+        // o'z bosishlarini yutadi, ya'ni ular bilan to'qnashmaydi.
+        Modifier.fillMaxWidth().scCard(radius = 18.dp, elevation = 5.dp)
+            .clickable(onClick = onOpen)
+            .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(11.dp),
     ) {
@@ -576,10 +609,12 @@ private fun PillButton(
 }
 
 @Composable
-private fun Hint(text: String) {
-    Box(Modifier.fillMaxWidth().padding(horizontal = 32.dp, vertical = 28.dp), contentAlignment = Alignment.Center) {
-        ScText(text, 13.5f, FontWeight.Medium, Sc.Muted, lineHeight = 20f)
-    }
+private fun Hint(
+    text: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector? = null,
+    title: String = ScEmptyTitle,
+) {
+    ScEmptyState(title = title, message = text, icon = icon)
 }
 
 @Composable

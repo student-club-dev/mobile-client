@@ -14,9 +14,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
@@ -38,32 +35,47 @@ import dev.core.uikit.theme.Sc
 // bo'limlarning MAZMUNI moduldan modulga farq qiladi va u shu yerda qoladi — suhbat
 // tarixidan yig'ilgan rasm/fayl/havolalarni chatdan boshqa hech kim bilmaydi.
 
+/**
+ * Uch ustunli media to'ri — **oddiy `Column` + `Row`**, `LazyVerticalGrid` EMAS.
+ *
+ * ⚠️ Ilgari bu yerda `userScrollEnabled = false` va qo'lda hisoblangan balandlikka ega
+ * `LazyVerticalGrid` turardi. U ko'rinmaydigan, lekin og'ir nuqson keltirdi: lazy tartib
+ * o'zi aylanmasa ham **nested scroll dispatcher'iga ega** va joylashuvi o'zgarganda
+ * (rasmlar kelganda) ota-scrollga delta uzatadi. Bu bo'lim esa profil varag'ining
+ * `verticalScroll` ustunida, ustida yig'iluvchi sarlavha bilan yashaydi — natijada
+ * media kelgan zahoti sarlavha **o'z-o'zidan topbargacha yig'ilib** qolardi va uni
+ * qaytarib ochib bo'lmasdi (foydalanuvchi barmog'i umuman ishtirok etmagan holda).
+ *
+ * Qatorlarga bo'lish esa hech narsa hisoblamaydi va balandlik tabiiy chiqadi. Aynan shu
+ * sabab `PostGrid` da ham lazy to'r ishlatilmagan — izohi o'sha yerda.
+ */
 @Composable
 internal fun ChatPhotoGrid(photos: List<ChatMediaItem>, onOpen: (Int) -> Unit) {
-    // Ichki to'r o'zi aylanmaydi — balandligi qatorlar soniga qarab hisoblanadi, aks holda
-    // tashqi `verticalScroll` bilan ziddiyat chiqadi.
-    val rows = (photos.size + PHOTO_COLUMNS - 1) / PHOTO_COLUMNS
-    LazyVerticalGrid(
-        columns = GridCells.Fixed(PHOTO_COLUMNS),
-        userScrollEnabled = false,
-        horizontalArrangement = Arrangement.spacedBy(PHOTO_GAP),
+    Column(
+        Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(PHOTO_GAP),
-        contentPadding = PaddingValues(0.dp),
-        modifier = Modifier.fillMaxWidth().height((PHOTO_CELL + PHOTO_GAP) * rows),
     ) {
-        itemsIndexed(photos, key = { _, photo -> photo.messageId }) { index, photo ->
-            Box(
-                Modifier.aspectRatio(1f)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(Sc.Chip)
-                    .clickable { onOpen(index) },
-            ) {
-                AsyncImage(
-                    model = photo.url,
-                    contentDescription = "Rasm",
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize(),
-                )
+        photos.chunked(PHOTO_COLUMNS).forEachIndexed { rowIndex, row ->
+            Row(horizontalArrangement = Arrangement.spacedBy(PHOTO_GAP)) {
+                row.forEachIndexed { columnIndex, photo ->
+                    Box(
+                        Modifier.weight(1f)
+                            .aspectRatio(1f)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(Sc.Chip)
+                            .clickable { onOpen(rowIndex * PHOTO_COLUMNS + columnIndex) },
+                    ) {
+                        AsyncImage(
+                            model = photo.url,
+                            contentDescription = "Rasm",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
+                }
+                // Oxirgi qator to'lmasa qolgan joy bo'sh qoladi — aks holda ikkita rasm
+                // butun kenglikka cho'zilib, katak o'lchamlari qatorma-qator o'zgarardi.
+                repeat(PHOTO_COLUMNS - row.size) { Spacer(Modifier.weight(1f)) }
             }
         }
     }
@@ -125,15 +137,6 @@ internal fun ChatFileList(files: List<ChatFileUi>, onOpen: (ChatFileUi) -> Unit)
     }
 }
 
-@Composable
-internal fun ChatEmptySection(text: String) {
-    Box(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(Sc.Card).padding(28.dp),
-        contentAlignment = Alignment.Center,
-    ) { ScText(text, 13f, FontWeight.Medium, Sc.MutedLight) }
-}
-
 
 private const val PHOTO_COLUMNS = 3
-private val PHOTO_CELL = 108.dp
 private val PHOTO_GAP = 4.dp

@@ -50,6 +50,14 @@
     <!-- Kiruvchi qo'ng'iroq ekranini yoqilmagan telefonda ham ko'rsatish. -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
+    <!-- Kiruvchi qo'ng'iroqning TO'LIQ EKRANLI oynasi. Android 14+ da bu ruxsat faqat
+         qo'ng'iroq va budilnik ilovalariga avtomatik beriladi; berilmasa bildirishnoma
+         oddiy "heads-up" bo'lib chiqadi — qo'ng'iroq baribir ko'rinadi va eshitiladi. -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+
+    <!-- Kiruvchi qo'ng'iroqda tebranish (tebranish rejimida yagona bildirgich). -->
+    <uses-permission android:name="android.permission.VIBRATE" />
+
     <application
         android:name=".StudentClubApp"
         android:allowBackup="true"
@@ -83,6 +91,12 @@
             android:name="dev.feature.calls.data.session.CallForegroundService"
             android:exported="false"
             android:foregroundServiceType="microphone|camera" />
+
+        <!-- Kiruvchi qo'ng'iroq bildirishnomasidagi "Javob berish" / "Rad etish".
+             `exported="false"` — freym faqat ilovaning o'z bildirishnomasidan keladi. -->
+        <receiver
+            android:name="dev.feature.calls.data.session.CallActionReceiver"
+            android:exported="false" />
 
         <!-- FCM: token yangilanishi va old plandagi xabarlar. -->
         <service

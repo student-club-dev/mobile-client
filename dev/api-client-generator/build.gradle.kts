@@ -76,6 +76,10 @@ val apiServerUrl = "https://api.studentclub.uz/v1"
  * 2. **Xato javoblarining tanasi olib tashlanadi** — aks holda har bir 401/404 uchun keraksiz
  *    inline model generatsiya qilinadi. Xatolarni konvert plagini + `AppException` hal qiladi.
  * 3. **`/v1` prefiksi yo'llardan olib tashlanadi** — u bazaviy manzilda (`servers`) turadi.
+ * 3a. **Eski geo yo'llari tashlanadi** (`/v1/regions`, `/v1/districts`) — serverda admin panel
+ *    uchun qolgan, ilova esa `/v1/geo/…` kontrakt yo'llarini ishlatadi. Spec'da tursa
+ *    `getRegions`/`getDistricts` takrorlanib, generator KERAKLI metodlarni ham
+ *    `geoRegionsGetRegions` deb qayta nomlaydi.
  * 4. **Tipsiz nullable maydonlar tiplanadi.** NestJS `string | null` ni `{"type":"object",
  *    "nullable":true}` deb yozadi; generator undan `kotlin.Any?` chiqaradi va kotlinx.serialization
  *    uni kompilyatsiya qilolmaydi. Haqiqiy tip `format` → `example` → maydon nomi bo'yicha tiklanadi.
@@ -252,6 +256,19 @@ val cleanSwagger = tasks.register("cleanSwagger") {
         val paths = root["paths"] as MutableMap<String, Any?>
         val methods = setOf("get", "post", "put", "patch", "delete", "head", "options")
 
+        // Eski geo yo'llari — serverda admin panel uchun qolgan, ilova ularni ISHLATMAYDI
+        // (kontrakt yo'llari `/v1/geo/*`). Ular spec'da tursa `getRegions`/`getDistricts`
+        // ikki martadan takrorlanadi va generator to'qnashuvni yo'l nomi bilan hal qiladi:
+        // `geoRegionsGetRegions` / `regionsGetRegions`. Ya'ni bu ikki o'lik yo'l KERAKLI
+        // metodlarning nomini buzadi. Spec faylining o'ziga tegmaymiz — u backend yuborgan
+        // holida qoladi, tashlab yuborish shu yerda bo'ladi.
+        val droppedPaths = listOf("/v1/regions", "/v1/districts")
+        droppedPaths.forEach { dead ->
+            if (paths.remove(dead) != null) {
+                logger.lifecycle("cleanSwagger: $dead tashlandi (eski geo yo'li, /v1/geo/* ishlatiladi)")
+            }
+        }
+
         // OpenAPI operationId'lari BUTUN spec bo'yicha noyob bo'lishi shart, shuning uchun
         // qisqartirishdan oldin takrorlanadiganlarini global ro'yxatdan topamiz.
         val shortNames = mutableListOf<String>()
@@ -382,16 +399,23 @@ val cleanSwagger = tasks.register("cleanSwagger") {
         // (12) Polimorf `oneOf` → erkin JSON obyekt (`JsonObject`).
         //
         // Talaba e'lonining `details` maydoni to'rt turdan biri bo'ladi va ajratgichi —
-        // `kind` (`STUDENT_LISTINGS_BACKEND.md` §4). Generator `oneOf` uchun ishlatib
-        // bo'ladigan Kotlin kodi chiqara olmaydi, ustiga backend spec'da `TaskDetailsDto` va
-        // qo'shnilarini UMUMAN e'lon qilmagan — `$ref` lar bo'shliqqa qaraydi va generatsiya
-        // yiqiladi.
+        // `kind` (`STUDENT_LISTINGS_BACKEND.md` §4).
+        //
+        // Backend 2026-08-05 dagi javobida bu qadamni olib tashlashni taklif qildi — endi
+        // `TaskDetailsDto` va qo'shnilari spec'da haqiqatan e'lon qilingan (`@ApiExtraModels`),
+        // ya'ni ilgarigi sabab ("$ref bo'shliqqa qaraydi") yo'qoldi. Qadam SHUNGA QARAMAY
+        // qoldirildi, chunki olib tashlab ko'rilganda generator ancha yomonrog'ini chiqardi:
+        // to'rttala variantni BITTA yassi `StudentListingDtoDetails` klassiga qo'shib yubordi
+        // va `kind` enum'ida oxirgi variantning yagona qiymati — `JOB` — qolib ketdi. Ya'ni
+        // TASK/RENTAL/SERVICE e'loni kelgan zahoti `kind` deserializatsiyasi yiqilib, butun
+        // ro'yxat javobi pars bo'lmasdi. Bu qadam 11 to'xtatgan nuqsonning aynan o'zi.
         //
         // Shuning uchun tugun erkin obyektga aylantiriladi va `typeMappings` orqali
-        // `JsonObject` bo'lib chiqadi: turga xos qism qo'lda — `StudentListingApiMappers.kt`
-        // da — o'qiladi, xuddi local bazadagi `detailsJson` ustuni kabi. Yutuq faqat
-        // texnik emas: noma'lum tur kelganda javob yiqilmaydi, `details` xom JSON bo'lib
-        // qoladi va domen uni o'zi hal qiladi.
+        // `JsonObject` bo'lib chiqadi. Yangilik shundaki, endi to'rtta DTO ALOHIDA klass
+        // bo'lib generatsiya qilinadi (ular `components.schemas` da mustaqil turibdi, ya'ni
+        // `oneOf` yechilgani ularga ta'sir qilmaydi) — `StudentListingApiMappers.kt` xom JSON
+        // ni `kind` bo'yicha o'sha TIPLANGAN klassga o'giradi, qo'lda maydon terib emas.
+        // Noma'lum tur kelganda javob baribir yiqilmaydi: `details` xom JSON bo'lib qoladi.
         var polymorphicNodes = 0
         fun collapseOneOf(node: Any?) {
             when (node) {

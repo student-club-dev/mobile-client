@@ -65,14 +65,16 @@ class ApiGeoRepository(
 }
 
 /**
- * ⚠️ `nearestMetro` ataylab tashlab yuborilmoqda: [ResolvedAddress] da unga joy yo'q va uni
- * ko'rsatadigan ekran ham yo'q. Kerak bo'lsa (ijara e'lonlarida foydali) domen modeliga
- * maydon qo'shish yetarli — server uni allaqachon beradi.
+ * `nearestMetro` — server tomondan **haqiqiy** qiymat (`metro_stations` seed qilingandan
+ * keyin, `DISCOUNTS_BUSINESS_API_RESPONSE.md` §2.3). Uzoqdagi bekatni server o'zi kesib
+ * tashlaydi (3 km), shuning uchun bu yerda qo'shimcha filtr kerak emas — kelgan qiymat
+ * mo'ljal sifatida ishlatishga tayyor.
  */
 internal fun ReverseGeocodeResponseDto.toResolved(): ResolvedAddress = ResolvedAddress(
     address = address.orEmpty(),
     regionId = regionId,
     districtId = districtId,
+    nearestMetro = nearestMetro?.takeIf { it.isNotBlank() },
 )
 
 /**

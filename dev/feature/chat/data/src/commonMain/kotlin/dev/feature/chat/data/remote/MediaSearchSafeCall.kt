@@ -5,6 +5,8 @@ import dev.core.common.error.AppException
 import dev.core.common.error.toAppException
 import dev.core.common.errorOf
 import dev.core.common.network.NetworkConnectivity
+import dev.core.network.response.parseErrorEnvelope
+import dev.core.network.response.toAppException
 import dev.feature.chat.data.mapper.apiErrorCodeOf
 import dev.feature.chat.data.mapper.gifErrorKindOf
 import dev.feature.chat.domain.model.GifErrorKind
@@ -40,7 +42,10 @@ internal suspend fun <T> mediaSearchSafeCall(
     } catch (e: ResponseException) {
         val status = e.response.status.value
         val body = runCatching { e.response.bodyAsText() }.getOrNull().orEmpty()
-        mediaSearchError(gifErrorKindOf(status, apiErrorCodeOf(body)), e.toAppException(), e)
+        // Tanadagi matn ham olinadi: tur `UNKNOWN` bo'lib chiqsa foydalanuvchi
+        // "GIF qidiruvida xatolik" o'rniga serverning O'Z sababini ko'radi.
+        val typed = parseErrorEnvelope(body, status) ?: e.response.status.toAppException(e)
+        mediaSearchError(gifErrorKindOf(status, apiErrorCodeOf(body)), typed, e)
     } catch (e: AppException) {
         // Konvert ichidagi xato (`success=false`) — status 2xx bo'lishi ham mumkin.
         mediaSearchError(GifErrorKind.UNKNOWN, e, e)
@@ -51,12 +56,20 @@ internal suspend fun <T> mediaSearchSafeCall(
     }
 }
 
-/** Xatoni [GifErrorKind] ga aylantirib, `Resource.Error.cause` ichida [GifException] bilan uzatadi. */
+/**
+ * Xatoni [GifErrorKind] ga aylantirib, `Resource.Error.cause` ichida [GifException] bilan
+ * uzatadi.
+ *
+ * Matn tanlash qoidasi: tur ANIQ bo'lsa ([GifErrorKind.NETWORK], `RATE_LIMITED`…) uning
+ * maslahati serverning texnik matnidan foydaliroq — "keyinroq urinib ko'ring" nima
+ * qilishni aytadi. [GifErrorKind.UNKNOWN] da esa aksincha: bizda aytadigan gap yo'q,
+ * shuning uchun serverning O'Z xabari ko'rsatiladi.
+ */
 private fun mediaSearchError(
     kind: GifErrorKind,
     appException: AppException,
     cause: Throwable? = null,
 ): Resource.Error = errorOf(appException).copy(
-    message = kind.userMessage,
+    message = if (kind == GifErrorKind.UNKNOWN) appException.userMessage else kind.userMessage,
     cause = GifException(kind, cause),
 )

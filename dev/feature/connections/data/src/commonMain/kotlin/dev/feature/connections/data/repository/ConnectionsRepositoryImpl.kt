@@ -114,6 +114,7 @@ class ConnectionsRepositoryImpl(
         reason: ReportReason,
         targetStudentId: String?,
         messageId: String?,
+        callId: String?,
         note: String?,
     ): Resource<Unit> = safeCall(connectivity) {
         api.report(
@@ -121,6 +122,7 @@ class ConnectionsRepositoryImpl(
                 reason = reason.toDto(),
                 targetStudentId = targetStudentId,
                 messageId = messageId,
+                callId = callId,
                 // Server 1000 belgidan uzun izohni rad etadi — shu yerda kesamiz.
                 note = note?.trim()?.takeIf { it.isNotEmpty() }?.take(MAX_NOTE_LENGTH),
             ),

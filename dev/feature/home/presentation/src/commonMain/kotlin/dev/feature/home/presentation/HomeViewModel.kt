@@ -59,7 +59,6 @@ data class HomeUiState(
     /** Profil rasmi manzili (`null` — bosh harf ko'rsatiladi). */
     val avatarUrl: String? = null,
     val universityMonogram: String? = null,
-    val courseLabel: String? = null,
     /**
      * Chegirma bo'limlari — Home'da ATIGI IKKITASI: "Ovqatlanish" (butun `FOOD` guruhi) va
      * "Kiyim-kechak" (talabaning jinsiga mos). Uchinchi e'lon bo'limi — [rentals].
@@ -91,6 +90,12 @@ data class HomeUiState(
      * qo'yilmaydi.
      */
     val loading: Boolean = false,
+    /**
+     * Foydalanuvchi ekranni pastga tortdi va yangilanish ketyapti — tepadagi aylanma
+     * indikator shu bayroq bilan turadi ([loading] dan farqli: bu skelet emas, kontent
+     * joyida qoladi).
+     */
+    val refreshing: Boolean = false,
 )
 
 class HomeViewModel(
@@ -103,7 +108,7 @@ class HomeViewModel(
     observeListingsByKind: ObserveListingsByKindUseCase,
     private val refreshListings: RefreshListingsUseCase,
     private val connectionsRepository: ConnectionsRepository,
-    notificationRepository: NotificationRepository,
+    private val notificationRepository: NotificationRepository,
 ) : ViewModel() {
 
     /**
@@ -120,10 +125,23 @@ class HomeViewModel(
     /** Birinchi chegirma `refresh()` i tugaguncha `true` — Home skeletini shu boshqaradi. */
     private val refreshing = MutableStateFlow(true)
 
+    /**
+     * "Tepadan tortib yangilash" ketyapti. [refreshing] dan ALOHIDA: u birinchi
+     * yuklanishning skeletini boshqaradi, bu esa foydalanuvchi o'zi so'ragan yangilanishning
+     * aylanma indikatorini — kontent joyida turgan holda.
+     */
+    private val pullRefreshing = MutableStateFlow(false)
+
     init {
         refreshStudents()
         // Offline-first: universitetlarni backend'dan sinxronlashga urinamiz.
         viewModelScope.launch { universityRepository.refresh() }
+        // Qo'ng'iroq ikonasidagi nuqta ([HomeUiState.hasUnreadNotifications]) local keshdan
+        // o'qiladi. Ro'yxatni ham shu yerda yangilaymiz — aks holda nuqta faqat foydalanuvchi
+        // bildirishnomalar ekranini OCHGANDAN keyin paydo bo'lardi, ya'ni "yangi bildirishnoma
+        // bor" degan yagona belgi hech qachon o'z vaqtida ko'rinmasdi. Xatosi yutiladi: bosh
+        // ekran bildirishnoma so'rovi tufayli hech nima ko'rsatmaydi.
+        viewModelScope.launch { runCatching { notificationRepository.refresh() } }
         // Chegirma bo'limlari backend feed'idan yuradi — `POST /v1/catalog/*` +
         // `/v1/discounts/search`. Busiz ekran faqat local seed'ni ko'rsatib turardi.
         // Xato bo'lsa kesh saqlanadi (repository o'zi hal qiladi).
@@ -173,8 +191,9 @@ class HomeViewModel(
             // Rasm ham shu tartibda: profil keshi, so'ng sessiya qatoridagi nusxa.
             avatarUrl = profile?.avatarUrl?.takeIf { it.isNotBlank() }
                 ?: user?.photoUrl?.takeIf { it.isNotBlank() },
+            // Kurs ATAYLAB olinmaydi: bosh ekran sarlavhasida talabaning nechanchi
+            // bosqichda o'qishi ko'rsatilmaydi (u yerda faqat universitet mo'ljali).
             monogram = uni?.monogram,
-            course = profile?.courseYear?.let(::courseLabel),
         )
     }
 
@@ -213,14 +232,18 @@ class HomeViewModel(
         )
     }
 
+    private val extras = combine(
+        notificationRepository.observeUnreadCount(),
+        pullRefreshing,
+    ) { unread, pulling -> unread to pulling }
+
     val state: StateFlow<HomeUiState> = combine(
-        header, content, notificationRepository.observeUnreadCount(), _universityStudents, _students,
-    ) { h, c, unread, universityStudents, students ->
+        header, content, extras, _universityStudents, _students,
+    ) { h, c, (unread, pulling), universityStudents, students ->
         HomeUiState(
             userName = h.name,
             avatarUrl = h.avatarUrl,
             universityMonogram = h.monogram,
-            courseLabel = h.course,
             offerSections = c.sections,
             tasks = c.tasks,
             rentals = c.rentals,
@@ -231,10 +254,43 @@ class HomeViewModel(
             },
             hasUnreadNotifications = unread > 0,
             loading = c.loading,
+            refreshing = pulling,
         )
     }
         .catch { emit(HomeUiState()) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HomeUiState())
+
+    /**
+     * Ekran pastga tortildi — bosh ekrandagi HAMMA manba qayta o'qiladi.
+     *
+     * Bo'limlar turli repozitoriylardan keladi va ularning har biri o'z keshini yangilaydi;
+     * oqimlar (`observe…`) natijani o'zi ekranga olib chiqadi, ya'ni bu yerda holatga
+     * qo'lda yozish kerak emas.
+     *
+     * Har bir chaqiruv `runCatching` bilan: bittasi yiqilsa qolganlari baribir yangilanadi,
+     * xato esa `safeApiCall` ichida allaqachon toast qilingan.
+     */
+    fun refresh() {
+        if (pullRefreshing.value) return
+        viewModelScope.launch {
+            pullRefreshing.value = true
+            try {
+                val universityId = observeProfileUseCase().first()?.universityId
+                runCatching { refreshProfileUseCase() }
+                runCatching { universityRepository.refresh() }
+                runCatching { discountRepository.refresh() }
+                runCatching { refreshListings(ListingKind.TASK) }
+                runCatching { refreshListings(ListingKind.RENTAL) }
+                runCatching { notificationRepository.refresh() }
+                loadUniversityStudents(universityId)
+                refreshStudents()
+            } finally {
+                pullRefreshing.value = false
+                // Birinchi yuklanish bayrog'i ham tushadi: skelet qolib ketmasin.
+                refreshing.value = false
+            }
+        }
+    }
 
     /** Universitet manzili (prof-emis `address`) — viloyatni aniqlash uchun. */
     private suspend fun addressOf(universityId: String?): String? {
@@ -304,7 +360,6 @@ class HomeViewModel(
         val name: String,
         val avatarUrl: String?,
         val monogram: String?,
-        val course: String?,
     )
     private data class Content(
         val sections: List<HomeOfferSection>,
@@ -356,18 +411,11 @@ private fun clothingSection(
 /** Ovqat bo'limining katalog guruhi kaliti. */
 private const val FOOD_GROUP = "FOOD"
 
-/** Kiyim biznes turining kaliti (local seed'dagi `listings.json` bilan bir xil). */
+/**
+ * Kiyim biznes turining kaliti. Katalog turlari serverdan keladi va kalit hali barqaror
+ * emas — shu sabab yuqorida nom bo'yicha zaxira moslik ham bor.
+ */
 private const val CLOTHING_TYPE = "kiyim"
 
 /** Home'da faqat bir nechta karta ko'rinadi — butun ro'yxatni tortishning hojati yo'q. */
 private const val HOME_STUDENTS_SIZE = 10
-
-// Profil "1".."4" yozadi (EditProfileScreen); eski yozuvlarda "ONE".."FOUR" uchraydi.
-private fun courseLabel(courseYear: String): String = when (courseYear) {
-    "1", "ONE" -> "1-kurs"
-    "2", "TWO" -> "2-kurs"
-    "3", "THREE" -> "3-kurs"
-    "4", "FOUR" -> "4-kurs"
-    "MASTER" -> "Magistr"
-    else -> courseYear
-}

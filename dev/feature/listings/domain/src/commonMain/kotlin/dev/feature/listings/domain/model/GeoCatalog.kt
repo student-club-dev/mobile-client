@@ -1,10 +1,26 @@
 package dev.feature.listings.domain.model
 
 /** Viloyat (yoki Toshkent shahri / Qoraqalpog'iston). */
-data class Region(val id: String, val name: String, val districts: List<District>)
+data class Region(val id: String, val name: String, val districts: List<District> = emptyList())
 
 /** Tuman yoki shahar. */
 data class District(val id: String, val name: String)
+
+/**
+ * Toshkent metro bekati (`GET /v1/geo/metro-stations` — 4 liniya, 50 bekat).
+ *
+ * Bekat **mo'ljal** sifatida ishlatiladi: teskari geokodlash javobidagi `nearestMetro`
+ * shu ro'yxatdan keladi. [line] — liniya kaliti (`CHILONZOR` · `OZBEKISTON` ·
+ * `YUNUSOBOD` · `HALQA`); guruhlash nom bo'yicha emas, aynan shu maydon bo'yicha
+ * qilinadi (nom takrorlanishi mumkin).
+ */
+data class MetroStation(
+    val id: String,
+    val name: String,
+    val line: String,
+    val lat: Double,
+    val lng: Double,
+)
 
 /**
  * O'zbekiston viloyat/tuman ma'lumotnomasi — lokatsiya tanlash uchun.
@@ -15,6 +31,15 @@ data class District(val id: String, val name: String)
  */
 object GeoCatalog {
 
+    /**
+     * Mo'ljal sifatida ko'rsatiladigan eng uzoq masofa.
+     *
+     * Backend bilan **bir xil** (javob §2.3): undan uzoqdagi bekat mo'ljal emas,
+     * adashtiruvchi ma'lumot. Shu sabab zaxira yo'lda ham aynan shu chegara ishlaydi —
+     * aks holda ikki yo'l ikki xil javob berardi.
+     */
+    const val METRO_LANDMARK_RADIUS_METERS = 3_000.0
+
     fun regions(): List<Region> = all
 
     fun region(id: String?): Region? = all.firstOrNull { it.id == id }
@@ -23,6 +48,22 @@ object GeoCatalog {
 
     fun district(regionId: String?, districtId: String?): District? =
         districts(regionId).firstOrNull { it.id == districtId }
+
+    /**
+     * Nuqtaga eng yaqin bekat — [METRO_LANDMARK_RADIUS_METERS] ichida bo'lsa.
+     *
+     * Ro'yxat backenddan keladi ([stations] bo'sh bo'lsa `null`): Toshkentdan tashqarida
+     * metro yo'q, ya'ni bo'sh javob normal holat, xato emas.
+     */
+    fun nearestStation(
+        stations: List<MetroStation>,
+        lat: Double,
+        lng: Double,
+    ): MetroStation? = stations
+        .map { it to Geo.distanceMeters(lat, lng, it.lat, it.lng) }
+        .filter { (_, meters) -> meters <= METRO_LANDMARK_RADIUS_METERS }
+        .minByOrNull { (_, meters) -> meters }
+        ?.first
 
     /** "Mirzo Ulug'bek" → "MIRZO_ULUGBEK" — barqaror ASCII id. */
     private fun slug(name: String): String = buildString {

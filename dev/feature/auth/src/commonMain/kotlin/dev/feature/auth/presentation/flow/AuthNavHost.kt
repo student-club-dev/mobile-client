@@ -19,6 +19,7 @@ import dev.core.uikit.components.AnimatedSplashScreen
 import dev.feature.auth.oauth.GoogleSignInResult
 import dev.feature.auth.oauth.rememberGoogleSignIn
 import dev.feature.auth.presentation.screens.ForgotPasswordScreen
+import dev.feature.auth.presentation.screens.NewPasswordScreen
 import dev.feature.auth.presentation.screens.OnboardingScreen
 import dev.feature.auth.presentation.screens.OtpScreen
 import dev.feature.auth.presentation.screens.ProfileScreen
@@ -45,8 +46,11 @@ private object Route {
     /** Parolni tiklash: raqam kiritish. */
     const val FORGOT = "forgot"
 
-    /** Parolni tiklash: SMS kodni kiritish (yangi parol allaqachon holatda). */
+    /** Parolni tiklash: SMS kodni kiritish. */
     const val RESET_CODE = "reset_code"
+
+    /** Parolni tiklash: yangi parol (kod kiritilgandan KEYIN). */
+    const val NEW_PASSWORD = "new_password"
 
     const val SUCCESS = "success"
     const val PROFILE = "profile"
@@ -79,10 +83,24 @@ fun AuthNavHost(vm: AuthFlowViewModel = koinViewModel()) {
         return
     }
     // Chiqishdan keyin "0 dan" kirish ekrani: tanishtiruv faqat ilk ochilishda ko'rsatiladi.
-    val startDestination = when {
-        loggedIn == true -> Route.HOME
-        onboardingSeen == true -> Route.WELCOME
-        else -> Route.ONBOARDING
+    //
+    // ⚠️ **Bir marta** hisoblanadi va keyin o'zgarmaydi (`rememberSaveable`). Bu qiymat
+    // faqat "qayerdan boshlanamiz" degan savolga javob beradi; keyingi o'tishlarni
+    // navigatsiyaning o'zi bajaradi.
+    //
+    // Nega shunday: `NavHost` grafni `remember(startDestination)` bilan quradi, ya'ni bu
+    // qiymat o'zgarsa graf QAYTA quriladi va `navController.graph = …` butun back stack'ni
+    // boshidan tiklaydi. Kirish paytida esa qiymat ALBATTA o'zgaradi: `loggedIn` local
+    // sessiya bazasidan kelib, `false` dan `true` ga sakraydi. Natijada HOME ikki marta
+    // ochilardi — avval `AuthEvent.Authenticated` bilan, so'ng grafning qayta qurilishi
+    // bilan. Ikkinchisi `StudentShell` ni noldan quradi (ma'lumot qayta tortiladi, ekran
+    // bir lahza bo'shab qotadi).
+    val startDestination = rememberSaveable {
+        when {
+            loggedIn == true -> Route.HOME
+            onboardingSeen == true -> Route.WELCOME
+            else -> Route.ONBOARDING
+        }
     }
 
     val nav = rememberNavController()
@@ -115,6 +133,8 @@ fun AuthNavHost(vm: AuthFlowViewModel = koinViewModel()) {
                 // Ro'yxat yakunlandi — tabrik ekrani, so'ng profilni to'ldirish.
                 AuthEvent.Registered -> nav.navigate(Route.SUCCESS) { popUpTo(Route.WELCOME) }
                 AuthEvent.ResetCodeSent -> nav.navigate(Route.RESET_CODE) { launchSingleTop = true }
+                // Kod kiritildi — yangi parol ekraniga (so'rov hali ketmagan).
+                AuthEvent.ResetCodeEntered -> nav.navigate(Route.NEW_PASSWORD) { launchSingleTop = true }
                 // Parol yangilandi — kirish ekraniga qaytamiz (yangi parol bilan kiradi).
                 AuthEvent.PasswordReset -> nav.navigate(Route.WELCOME) {
                     popUpTo(Route.WELCOME) { inclusive = true }
@@ -185,21 +205,30 @@ fun AuthNavHost(vm: AuthFlowViewModel = koinViewModel()) {
             ForgotPasswordScreen(
                 state = state, vm = vm,
                 onBack = { nav.popBackStack() },
-                onSend = vm::requestPasswordReset,
+                onSend = { vm.requestPasswordReset() },
                 onBackToLogin = { nav.popBackStack() },
             )
         }
 
-        // Yangi parol AVVALGI ekranda olinadi — bu yerda kod tasdiqlanishi bilan
-        // `password/reset` (raqam + kod + yangi parol) bitta so'rovda yuboriladi.
+        // Kod bu yerda faqat KIRITILADI — backendda uni alohida tekshiradigan endpoint yo'q.
+        // Tasdiqlash yangi parol bilan birga (`password/reset`) keyingi ekranda ketadi.
         composable(Route.RESET_CODE) {
             OtpScreen(
                 state = state, vm = vm,
                 onBack = { nav.popBackStack() },
                 title = "Tiklash kodi",
-                confirmLabel = "Parolni saqlash",
-                onVerify = vm::resetPassword,
+                confirmLabel = "Davom etish",
+                onVerify = vm::confirmResetCode,
                 onResend = vm::resendCode,
+            )
+        }
+
+        composable(Route.NEW_PASSWORD) {
+            NewPasswordScreen(
+                state = state, vm = vm,
+                // Orqaga — kod ekraniga: kod noto'g'ri bo'lsa uni tuzatib qaytadi.
+                onBack = { nav.popBackStack() },
+                onSave = vm::resetPassword,
             )
         }
 

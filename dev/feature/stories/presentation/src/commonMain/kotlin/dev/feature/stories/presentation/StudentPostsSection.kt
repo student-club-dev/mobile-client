@@ -22,9 +22,9 @@ import org.koin.compose.viewmodel.koinViewModel
 /**
  * **Boshqa talabaning postlari** — uning profilidagi «Postlar» bo'limi.
  *
- * ⚠️ Manba — lenta (`GET /v1/stories/feed`), chunki backendda «falonchining lavhalari»
+ * ⚠️ Manba — lenta (`GET /v1/stories/feed`), chunki backendda «falonchining hikoyalari»
  * degan alohida endpoint yo'q. Bu ayni paytda **to'g'ri eshik** ham: lentaga faqat
- * bog'langan odamlarning va faqat muddati o'tmagan lavhalari tushadi, ya'ni bu yerda
+ * bog'langan odamlarning va faqat muddati o'tmagan hikoyalari tushadi, ya'ni bu yerda
  * ko'rish huquqi qo'shimcha tekshirishsiz o'z-o'zidan hal bo'ladi.
  *
  * Arxiv ko'rinmaydi — u faqat egasiga (`STORY_ARCHIVE_BACKEND.md`).
@@ -40,17 +40,13 @@ fun StudentPostsSection(
     LaunchedEffect(studentId) { vm.load(studentId) }
 
     val stories = state.group?.stories.orEmpty()
-    if (stories.isEmpty()) {
-        EmptyPosts(
-            title = "Post yo'q",
-            subtitle = "Bu talabaning hozirda faol posti yo'q",
-            loading = state.loading,
-        )
-    } else {
+    // Yuklanish yozuvi YO'Q va bo'sh holat ham yo'q: bo'lim umuman ma'lumoti bor bo'lgandagina
+    // qo'shiladi (`rememberPeerProfileSections`). Ya'ni bu yerga faqat to'lgan ro'yxat keladi.
+    if (stories.isNotEmpty()) {
         PostGrid(
             stories = stories,
             // Boshqa odamning postida sana ham, ko'rishlar soni ham ko'rsatilmaydi:
-            // `viewsCount` unda ATAYLAB `null` (§3), sana esa 24 soatlik lavhada ortiqcha.
+            // `viewsCount` unda ATAYLAB `null` (§3), sana esa 24 soatlik hikoyada ortiqcha.
             archived = true,
             onOpen = { index -> vm.open(index) },
             modifier = modifier,
@@ -72,12 +68,12 @@ fun StudentPostsSection(
 
 @Immutable
 data class StudentPostsState(
-    /** Lentadagi shu muallif guruhi; `null` — faol lavhasi yo'q. */
+    /** Lentadagi shu muallif guruhi; `null` — faol hikoyasi yo'q. */
     val group: StoryGroup? = null,
     val loading: Boolean = true,
 )
 
-/** Profildagi «Postlar» bo'limi uchun — bitta muallifning faol lavhalari. */
+/** Profildagi «Postlar» bo'limi uchun — bitta muallifning faol hikoyalari. */
 class StudentPostsViewModel(
     private val repository: StoryRepository,
     private val tokenStore: TokenStore,
@@ -117,7 +113,7 @@ class StudentPostsViewModel(
     fun next() {
         val current = _viewer.value
         val group = current.group ?: return
-        // Oxirgi lavhadan keyin yopiladi: bu profil ichidagi bo'lim, lentadagidek
+        // Oxirgi hikoyadan keyin yopiladi: bu profil ichidagi bo'lim, lentadagidek
         // keyingi odamga o'tib ketish bu yerda kutilmagan bo'lardi.
         if (current.index + 1 < group.stories.size) {
             _viewer.value = current.copy(index = current.index + 1)

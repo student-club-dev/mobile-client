@@ -1,0 +1,15 @@
+-- v31 -> v32 — profilga yashash manzili (`regionId` / `districtId`).
+--
+-- `02-PUSH_CATALOG_RESPONSE.md` §4: yangi ish e'lonlari digesti talabaga MOS bo'lsa
+-- yuboriladi, moslik esa "universitet BIR XIL **YOKI** e'lon talaba yashaydigan tumanda"
+-- degani. Ya'ni manzilsiz talaba digestning geo yarmini umuman olmaydi.
+--
+-- Ikkala ustun ham ixtiyoriy: profil to'ldirilmagan bo'lsa moslik faqat universitet
+-- bo'yicha ishlaydi (bu ataylab — VA emas, YOKI).
+--
+-- ⚠️ Qiymat **local birlamchi**: `PATCH /v1/profile/me` uni qabul qiladi, lekin
+-- `GET /v1/profile/me` javobida (`UserProfileDto`) hali qaytarmaydi. Shu sabab u
+-- keshdan o'qiladi va serverdan kelgan javob uni USTIDAN YOZMAYDI (qarang
+-- `ProfileRepositoryImpl`). Server javobga qo'shgach bu izoh keraksiz bo'ladi.
+ALTER TABLE ProfileEntity ADD COLUMN regionId TEXT;
+ALTER TABLE ProfileEntity ADD COLUMN districtId TEXT;

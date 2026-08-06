@@ -3,6 +3,7 @@ package dev.feature.auth.presentation.flow
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.core.common.Resource
+import dev.core.common.error.AppMessageBus
 import dev.core.domain.model.User
 import dev.core.domain.usecase.CancelRegistrationUseCase
 import dev.core.domain.usecase.CompleteRegistrationUseCase
@@ -11,9 +12,8 @@ import dev.core.domain.usecase.LoginUseCase
 import dev.core.domain.usecase.LoginWithGoogleUseCase
 import dev.core.domain.usecase.ObserveCurrentUserUseCase
 import dev.core.domain.usecase.RegisterUseCase
-import dev.core.domain.usecase.RequestPhoneOtpUseCase
+import dev.core.domain.usecase.RequestRegistrationOtpUseCase
 import dev.core.domain.usecase.ResetPasswordUseCase
-import dev.core.domain.usecase.VerifyPhoneOtpUseCase
 import dev.feature.profile.domain.model.UserProfile
 import dev.feature.profile.domain.usecase.SaveProfileUseCase
 import dev.feature.settings.domain.repository.SettingsRepository
@@ -43,8 +43,11 @@ sealed interface AuthEvent {
     /** Ro'yxat yakunlandi (raqam tasdiqlandi yoki o'tkazib yuborildi) — muvaffaqiyat ekraniga. */
     data object Registered : AuthEvent
 
-    /** Parolni tiklash kodi yuborildi — kod + yangi parol ekraniga. */
+    /** Parolni tiklash kodi yuborildi — kod kiritish ekraniga. */
     data object ResetCodeSent : AuthEvent
+
+    /** Kod to'liq kiritildi — endi yangi parol ekraniga. */
+    data object ResetCodeEntered : AuthEvent
 
     /** Parol yangilandi — kirish ekraniga qaytamiz. */
     data object PasswordReset : AuthEvent
@@ -64,8 +67,8 @@ sealed interface AuthEvent {
  * - **ro'yxat** — telefon (yoki email) + parol; hisob darhol ochiladi, so'ng SMS kod bilan
  *   raqam tasdiqlanadi (`otp/request` + `otp/verify` — ikkalasi ham **sessiya** talab qiladi,
  *   shuning uchun ular ro'yxatdan KEYIN keladi va o'tkazib yuborilishi mumkin);
- * - **parolni tiklash** — raqamga SMS kod (`password/forgot`) → kod + yangi parol
- *   (`password/reset`).
+ * - **parolni tiklash** — raqamga SMS kod (`password/forgot`) → kodni kiritish → yangi parol
+ *   (`password/reset` uchalasini bitta so'rovda oladi).
  *
  * Token yangilash bu yerda emas — u tarmoq qatlamida avtomatik (`createHttpClient`).
  */
@@ -75,8 +78,7 @@ class AuthFlowViewModel(
     private val registerUseCase: RegisterUseCase,
     private val completeRegistrationUseCase: CompleteRegistrationUseCase,
     private val cancelRegistrationUseCase: CancelRegistrationUseCase,
-    private val requestPhoneOtpUseCase: RequestPhoneOtpUseCase,
-    private val verifyPhoneOtpUseCase: VerifyPhoneOtpUseCase,
+    private val requestRegistrationOtpUseCase: RequestRegistrationOtpUseCase,
     private val forgotPasswordUseCase: ForgotPasswordUseCase,
     private val resetPasswordUseCase: ResetPasswordUseCase,
     private val observeCurrentUserUseCase: ObserveCurrentUserUseCase,
@@ -126,6 +128,9 @@ class AuthFlowViewModel(
     }
 
     fun onPasswordChange(v: String) = _state.update { it.copy(password = v, error = null) }
+    fun onPasswordConfirmChange(v: String) =
+        _state.update { it.copy(passwordConfirm = v, error = null) }
+
     fun togglePasswordVisible() = _state.update { it.copy(passwordVisible = !it.passwordVisible) }
     fun toggleRememberMe() = _state.update { it.copy(rememberMe = !it.rememberMe) }
     fun onOtpChange(v: String) = _state.update {
@@ -177,16 +182,23 @@ class AuthFlowViewModel(
         it.copy(query = v, results = filterUniversities(allUniversities.value, v))
     }
 
-    fun onUniversitySelected(university: University) = _state.update {
-        it.copy(universityId = university.id, selectedUniversity = university)
+    /**
+     * Tanlangan OTM local katalogga ham yoziladi. Profilda faqat `universityId` saqlanadi
+     * (`emis-245`) va serverda universitetlar katalogi yo'q — nomni Home, Chat, Profil va
+     * "Universitetim" ekranlari shu local jadvaldan topadi. Yozilmasa prof-emis ro'yxati
+     * tortilmagunicha universitet nomsiz ko'rinardi.
+     */
+    fun onUniversitySelected(university: University) {
+        _state.update { it.copy(universityId = university.id, selectedUniversity = university) }
+        viewModelScope.launch { universityRepository.addUniversity(university) }
     }
 
     /** Ro'yxat uzun (butun O'zbekiston) — ko'rsatishni 200 taga cheklaymiz. */
     private fun filterUniversities(list: List<University>, query: String): List<University> =
+        // `matches` — rasmiy nom, qisqa nom, qisqartma va shahar bo'yicha: talaba "TATU"
+        // deb yozganda ham topilishi kerak.
         if (query.isBlank()) list.take(UNIVERSITY_RESULT_LIMIT)
-        else list.filter {
-            it.name.contains(query, ignoreCase = true) || it.city.contains(query, ignoreCase = true)
-        }.take(UNIVERSITY_RESULT_LIMIT)
+        else list.filter { it.matches(query) }.take(UNIVERSITY_RESULT_LIMIT)
 
     fun clearError() = _state.update { it.copy(error = null, info = null) }
 
@@ -243,11 +255,12 @@ class AuthFlowViewModel(
     // ------------------------------------------------------------------
 
     /**
-     * Hisob yaratadi (telefon + parol) va DARHOL SMS kod so'raydi.
+     * Ro'yxatdan o'tishning **birinchi** qadami — raqamga SMS kod so'raydi.
      *
-     * MUHIM: bu qadamda ilovaga kirish YO'Q va profil ham SAQLANMAYDI — sessiya
-     * "kutilmoqda" holatida turadi. Ikkalasi ham faqat [verifyPhone] muvaffaqiyatli
-     * bo'lgandan keyin bajariladi, ya'ni tasdiqlanmagan raqam bilan ilovaga kirib bo'lmaydi.
+     * ⚠️ Hisob bu yerda YARATILMAYDI. Ilgari teskari edi (avval `register`, keyin kod), va
+     * aynan shu zaiflik edi: `phoneNumber` bazada `@unique`, ya'ni begona raqam bilan
+     * ro'yxatdan o'tgan odam o'sha raqamning haqiqiy egasini butunlay tashqarida
+     * qoldirardi. Endi hisob kod tekshirilgandan keyin — [verifyPhone] da — ochiladi.
      */
     fun register() {
         val s = _state.value
@@ -260,26 +273,25 @@ class AuthFlowViewModel(
             _state.update { it.copy(error = "To‘liq 9 xonali raqam kiriting.") }
             return
         }
-        _state.update { it.copy(isLoading = true, error = null) }
-        viewModelScope.launch {
-            when (val result = registerUseCase(s.phoneE164, s.password)) {
-                is Resource.Error -> _state.update { it.copy(isLoading = false, error = result.message) }
-                Resource.Loading -> Unit
-                is Resource.Success -> {
-                    _state.update { it.copy(otp = "", otpPurpose = OtpPurpose.VERIFY_PHONE) }
-                    requestPhoneOtp(navigateToOtp = true)
-                }
-            }
-        }
+        // ⚠️ Parolga klient tomonida cheklov QO'YILMAYDI — qoidani server biladi va
+        // `422` ni o'z matni bilan qaytaradi (`error.fields.password`). Klientdagi nusxa
+        // qoida o'zgarganda jimgina eskirardi va foydalanuvchi serverda haqiqatan qabul
+        // qilinadigan parolni kirita olmay qolardi.
+        //
+        // Parolni TAKRORLASH ham tekshirilmaydi: ro'yxatdan o'tish ekranida ikkinchi
+        // maydon YO'Q (`SignUpScreen` da bitta parol maydoni bor), `passwordConfirm` esa
+        // faqat parolni tiklash oqimida to'ldiriladi.
+        _state.update { it.copy(isLoading = true, error = null, otp = "", otpPurpose = OtpPurpose.VERIFY_PHONE) }
+        viewModelScope.launch { requestRegistrationOtp(navigateToOtp = true) }
     }
 
     /**
-     * Raqamni tasdiqlash uchun SMS kod so'raydi. Kod ketmasa (SMS xizmati javob bermasa)
-     * ham foydalanuvchi tasdiqlash ekraniga o'tadi — u yerda xatoni ko'radi va "Kodni qayta
-     * yuborish" bilan urinib ko'radi. Tasdiqlamasdan ilovaga o'ta olmaydi.
+     * Ro'yxat uchun SMS kod so'raydi. Kod ketmasa (SMS xizmati javob bermasa) ham
+     * foydalanuvchi tasdiqlash ekraniga o'tadi — u yerda xatoni ko'radi va "Kodni qayta
+     * yuborish" bilan urinib ko'radi.
      */
-    private suspend fun requestPhoneOtp(navigateToOtp: Boolean) {
-        when (val sent = requestPhoneOtpUseCase(_state.value.phoneE164)) {
+    private suspend fun requestRegistrationOtp(navigateToOtp: Boolean) {
+        when (val sent = requestRegistrationOtpUseCase(_state.value.phoneE164)) {
             is Resource.Success -> {
                 _state.update { it.copy(isLoading = false) }
                 startResendTimer(sent.data.resendCooldownSeconds)
@@ -291,21 +303,25 @@ class AuthFlowViewModel(
     }
 
     /**
-     * Tasdiqlash ekrani — kodni tekshiradi va FAQAT shundan keyin ro'yxatni yakunlaydi:
-     * profil saqlanadi, so'ng local sessiya ochiladi. Kod noto'g'ri bo'lsa hech nima
-     * o'zgarmaydi — foydalanuvchi shu ekranda qoladi.
+     * Tasdiqlash ekrani — **hisob aynan shu yerda yaratiladi**: kod `register` so'roviga
+     * qo'shib yuboriladi va uni server tekshiradi.
+     *
+     * Kod noto'g'ri bo'lsa (`OTP_INVALID`) hech nima yaratilmaydi va foydalanuvchi shu
+     * ekranda qoladi — server xatosi matni ko'rsatiladi (`OTP_EXPIRED` — 410,
+     * `OTP_TOO_MANY_ATTEMPTS` — 429 va h.k.).
+     *
+     * Hisob ochilgach: avval profil (ism/universitet), keyin sessiya — shunda sessiya
+     * qatoriga to'ldirilgan profil bilan yoziladi.
      */
     fun verifyPhone() {
         val s = _state.value
         if (s.isLoading) return
         _state.update { it.copy(isLoading = true, error = null) }
         viewModelScope.launch {
-            when (val result = verifyPhoneOtpUseCase(s.phoneE164, s.otp)) {
+            when (val result = registerUseCase(s.phoneE164, s.password, s.otp)) {
                 is Resource.Error -> _state.update { it.copy(isLoading = false, error = result.message) }
                 Resource.Loading -> Unit
                 is Resource.Success -> {
-                    // Raqam tasdiqlandi: avval profil (ism/universitet), keyin sessiya —
-                    // shunda sessiya qatoriga to'ldirilgan profil bilan yoziladi.
                     runCatching { saveProfileUseCase(profileFromState(_state.value)) }
                     when (val done = completeRegistrationUseCase()) {
                         is Resource.Error ->
@@ -318,8 +334,11 @@ class AuthFlowViewModel(
     }
 
     /**
-     * Tasdiqlash ekranidan chiqish — tasdiqlanmagan ro'yxat bekor qilinadi (tokenlar
-     * o'chiriladi), shuning uchun yarim qolgan hisob bilan ilovaga kirib bo'lmaydi.
+     * Tasdiqlash ekranidan chiqish.
+     *
+     * Serverda tozalanadigan narsa odatda YO'Q — hisob kod tekshirilgunicha umuman
+     * yaratilmaydi. Bu chaqiruv `register` o'tib, lekin profil saqlash yoki sessiya ochish
+     * yiqilgan holat uchun: o'shanda qolgan tokenlar bekor qilinadi.
      */
     fun cancelRegistration() {
         viewModelScope.launch { cancelRegistrationUseCase() }
@@ -330,32 +349,34 @@ class AuthFlowViewModel(
     // ------------------------------------------------------------------
 
     /**
-     * 1-qadam — raqam va YANGI PAROL kiritilgach SMS kod so'raladi.
+     * 1-qadam — FAQAT raqam kiritiladi va SMS kod so'raladi.
      *
-     * Parol shu qadamda olinadi va holatda saqlanadi: `password/reset` raqam + kod + yangi
-     * parolni bitta so'rovda kutadi, u esa kod tasdiqlangan zahoti yuboriladi.
+     * Parol bu qadamda so'ralmaydi: foydalanuvchi avval raqamiga egaligini isbotlaydi
+     * (kod), yangi parolni esa undan keyingi ekranda kiritadi. Kirish ekranida yozilgan
+     * eski parol qolib ketmasligi uchun maydonlar tozalanadi.
      */
-    fun requestPasswordReset() {
+    fun requestPasswordReset(navigateToCode: Boolean = true) {
         val s = _state.value
         if (s.isLoading) return
         if (!s.phoneValid) {
             _state.update { it.copy(error = "To‘liq 9 xonali raqam kiriting.") }
             return
         }
-        if (s.password.length < MIN_PASSWORD_LENGTH) {
-            _state.update { it.copy(error = "Parol kamida $MIN_PASSWORD_LENGTH belgidan iborat bo‘lsin.") }
-            return
-        }
         _state.update { it.copy(isLoading = true, error = null, info = null) }
         viewModelScope.launch {
             when (val result = forgotPasswordUseCase(s.phoneE164)) {
                 is Resource.Success -> {
-                    // Parol TOZALANMAYDI — u keyingi qadamda kod bilan birga yuboriladi.
                     _state.update {
-                        it.copy(isLoading = false, otp = "", otpPurpose = OtpPurpose.RESET_PASSWORD)
+                        it.copy(
+                            isLoading = false,
+                            otp = "",
+                            password = "",
+                            passwordConfirm = "",
+                            otpPurpose = OtpPurpose.RESET_PASSWORD,
+                        )
                     }
                     startResendTimer(DEFAULT_RESEND_SECONDS)
-                    _events.send(AuthEvent.ResetCodeSent)
+                    if (navigateToCode) _events.send(AuthEvent.ResetCodeSent)
                 }
                 is Resource.Error -> _state.update { it.copy(isLoading = false, error = result.message) }
                 Resource.Loading -> Unit
@@ -363,17 +384,42 @@ class AuthFlowViewModel(
         }
     }
 
-    /** 2-qadam — kod tasdiqlanadi va parol shu yerda o'rnatiladi (`password/reset`). */
+    /**
+     * 2-qadam — kod kiritildi, yangi parol ekraniga o'tamiz.
+     *
+     * Backendda kodni ALOHIDA tekshiradigan endpoint yo'q: `password/reset` raqam + kod +
+     * yangi parolni bitta so'rovda kutadi. Shuning uchun bu qadam tarmoqqa bormaydi —
+     * kod holatda saqlanib turadi va parol bilan birga [resetPassword] da yuboriladi.
+     * Kod noto'g'ri bo'lsa xato o'sha yerda chiqadi va foydalanuvchi orqaga qaytib
+     * kodni tuzatishi mumkin.
+     */
+    fun confirmResetCode() {
+        val s = _state.value
+        if (s.isLoading || !s.otpValid) return
+        _state.update { it.copy(error = null) }
+        viewModelScope.launch { _events.send(AuthEvent.ResetCodeEntered) }
+    }
+
+    /** 3-qadam — yangi parol o'rnatiladi (`password/reset`: raqam + kod + parol). */
     fun resetPassword() {
         val s = _state.value
         if (s.isLoading) return
+        if (s.password.length < MIN_PASSWORD_LENGTH) {
+            _state.update { it.copy(error = "Parol kamida $MIN_PASSWORD_LENGTH belgidan iborat bo‘lsin.") }
+            return
+        }
+        if (s.password != s.passwordConfirm) {
+            _state.update { it.copy(error = "Parollar mos kelmadi.") }
+            return
+        }
         _state.update { it.copy(isLoading = true, error = null) }
         viewModelScope.launch {
             when (val result = resetPasswordUseCase(s.phoneE164, s.otp, s.password)) {
                 is Resource.Success -> {
                     _state.update {
-                        it.copy(isLoading = false, otp = "", password = "")
+                        it.copy(isLoading = false, otp = "", password = "", passwordConfirm = "")
                     }
+                    AppMessageBus.success("Parol yangilandi. Endi yangi parol bilan kiring.")
                     _events.send(AuthEvent.PasswordReset)
                 }
                 is Resource.Error -> _state.update { it.copy(isLoading = false, error = result.message) }
@@ -390,10 +436,11 @@ class AuthFlowViewModel(
         val s = _state.value
         if (s.isLoading || s.resendSeconds > 0) return
         when (s.otpPurpose) {
-            OtpPurpose.RESET_PASSWORD -> requestPasswordReset()
+            // Foydalanuvchi allaqachon kod ekranida — qayta navigatsiya qilinmaydi.
+            OtpPurpose.RESET_PASSWORD -> requestPasswordReset(navigateToCode = false)
             OtpPurpose.VERIFY_PHONE -> {
                 _state.update { it.copy(isLoading = true, error = null) }
-                viewModelScope.launch { requestPhoneOtp(navigateToOtp = false) }
+                viewModelScope.launch { requestRegistrationOtp(navigateToOtp = false) }
             }
         }
     }
@@ -435,6 +482,13 @@ class AuthFlowViewModel(
         firstName = s.firstName.ifBlank { null },
         lastName = s.lastName.ifBlank { null },
         phoneNumber = s.phoneE164.ifBlank { null },
+        // Raqam **bog'langan** talabalarga ko'rinadi. Server sukuti — `NOBODY`, ya'ni
+        // usiz hech kim hech kimning raqamini ko'rmasdi va profildagi qator hech qachon
+        // chizilmasdi. `EVERYONE` esa ataylab tanlanmadi: ochiq raqam spam qo'ng'iroqqa
+        // olib keladi, bog'lanish esa ikki tomonlama — ya'ni raqamni faqat foydalanuvchi
+        // o'zi qabul qilgan odam ko'radi. Sozlamalar → Maxfiylik'dan istalgan vaqt
+        // o'zgartiriladi.
+        phoneVisibility = PHONE_VISIBILITY_CONNECTIONS,
         role = ROLE_STUDENT,
         universityId = s.universityId,
         universityEmail = s.universityEmail.ifBlank { null },
@@ -463,6 +517,9 @@ class AuthFlowViewModel(
     private companion object {
         /** Backend profilidagi rol qiymati — bu ilovada boshqa rol yo'q. */
         const val ROLE_STUDENT = "STUDENT"
+
+        /** `UserProfile.phoneVisibility` qiymati — qarang `profileFromState`. */
+        const val PHONE_VISIBILITY_CONNECTIONS = "CONNECTIONS"
 
         const val UNIVERSITY_RESULT_LIMIT = 200
 

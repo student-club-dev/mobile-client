@@ -12,7 +12,6 @@ import dev.core.uikit.generated.resources.ic_ball
 import dev.core.uikit.generated.resources.ic_bell
 import dev.core.uikit.generated.resources.ic_book
 import dev.core.uikit.generated.resources.ic_briefcase
-import dev.core.uikit.generated.resources.ic_cafe
 import dev.core.uikit.generated.resources.ic_call
 import dev.core.uikit.generated.resources.ic_call_end
 import dev.core.uikit.generated.resources.ic_camera_switch
@@ -25,8 +24,8 @@ import dev.core.uikit.generated.resources.ic_close
 import dev.core.uikit.generated.resources.ic_copy
 import dev.core.uikit.generated.resources.ic_debate
 import dev.core.uikit.generated.resources.ic_emoji
+import dev.core.uikit.generated.resources.ic_empty
 import dev.core.uikit.generated.resources.ic_filter
-import dev.core.uikit.generated.resources.ic_gamepad
 import dev.core.uikit.generated.resources.ic_home
 import dev.core.uikit.generated.resources.ic_home_filled
 import dev.core.uikit.generated.resources.ic_home_filled_green
@@ -40,9 +39,9 @@ import dev.core.uikit.generated.resources.ic_pin
 import dev.core.uikit.generated.resources.ic_pizza
 import dev.core.uikit.generated.resources.ic_search
 import dev.core.uikit.generated.resources.ic_send_enter
+import dev.core.uikit.generated.resources.ic_service
 import dev.core.uikit.generated.resources.ic_speaker
 import dev.core.uikit.generated.resources.ic_tag
-import dev.core.uikit.generated.resources.ic_tools
 import dev.core.uikit.generated.resources.ic_trash
 import dev.core.uikit.generated.resources.ic_university
 import dev.core.uikit.generated.resources.ic_university_badge
@@ -108,11 +107,10 @@ object ScIcons {
     val Users: ImageVector @Composable get() = vectorResource(Res.drawable.ic_users)
     val MapPin: ImageVector @Composable get() = vectorResource(Res.drawable.ic_pin)
     val Laptop: ImageVector @Composable get() = vectorResource(Res.drawable.ic_laptop)
-    val Gamepad: ImageVector @Composable get() = vectorResource(Res.drawable.ic_gamepad)
-    val Coffee: ImageVector @Composable get() = vectorResource(Res.drawable.ic_cafe)
     val Cart: ImageVector @Composable get() = vectorResource(Res.drawable.ic_cart)
     val Medal: ImageVector @Composable get() = vectorResource(Res.drawable.ic_ball)
-    val Wrench: ImageVector @Composable get() = vectorResource(Res.drawable.ic_tools)
+    /** "Xizmat" bo'limi — to'ldirilgan kalit (eski, ingichka `ic_tools` o'rniga). */
+    val Wrench: ImageVector @Composable get() = vectorResource(Res.drawable.ic_service)
     val PhoneCall: ImageVector @Composable get() = vectorResource(Res.drawable.ic_call)
     val DotsVertical: ImageVector @Composable get() = vectorResource(Res.drawable.ic_more)
     val Paperclip: ImageVector @Composable get() = vectorResource(Res.drawable.ic_attach)
@@ -169,6 +167,9 @@ object ScIcons {
 
     /** Pitsa bo'lagi ("Ovqatlar") — ko'p rangli, [ScGlyph] bilan chiziladi. */
     val Pizza: ImageVector @Composable get() = vectorResource(Res.drawable.ic_pizza)
+
+    /** Bo'sh quti — [ScEmptyState] ning zaxira ikonasi ("mavjud emas"). */
+    val Empty: ImageVector @Composable get() = vectorResource(Res.drawable.ic_empty)
 
     // --- Ko'p rangli (ranglari XML da, [ScGlyph] bilan chiziladi) ----------
 

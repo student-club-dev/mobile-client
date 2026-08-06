@@ -43,9 +43,7 @@ import androidx.compose.ui.unit.sp
 import dev.core.uikit.theme.AppPalette
 import dev.core.uikit.theme.LocalScFontFamily
 import dev.core.uikit.theme.appPalette
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.ime
-import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.foundation.layout.imePadding
 
 /**
  * Ilovaning yagona shrift oilasi — Plus Jakarta Sans (dizayn spetsifikatsiyasi).
@@ -62,6 +60,13 @@ val AppFontFamily: FontFamily
 // Fon — gradient + dekorativ bloblar + ekran paddingi
 // ---------------------------------------------------------------------------
 
+/**
+ * Auth/forma ekranlarining karkasi.
+ *
+ * [bottomBar] — scroll maydonidan TASHQARIDA, ekranning pastiga mixlanadigan blok
+ * (asosiy tugma va uning xatosi). Klaviatura ochilganda ham ko'rinib turadi, ya'ni
+ * "tugmani klaviatura to'sib qo'ydi" holati bo'lishi mumkin emas.
+ */
 @Composable
 fun AppScreenScaffold(
     modifier: Modifier = Modifier,
@@ -70,6 +75,7 @@ fun AppScreenScaffold(
     // Status bar balandligi `statusBarsPadding()` dan olinadi; bu — undan keyingi bo'shliq.
     topPadding: Int = 14,
     palette: AppPalette = appPalette,
+    bottomBar: (@Composable ColumnScope.() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Box(modifier = modifier.fillMaxSize().background(palette.bgBrush)) {
@@ -96,17 +102,32 @@ fun AppScreenScaffold(
                     RoundedCornerShape(999.dp),
                 ),
         )
-        val col = Modifier
-            .fillMaxSize()
-            .statusBarsPadding()
-            .padding(
-                start = horizontalPadding.dp,
-                end = horizontalPadding.dp,
-                top = topPadding.dp,
-                bottom = 26.dp,
+        Column(
+            Modifier.fillMaxSize()
+                .statusBarsPadding()
+                // ⚠️ Klaviatura balandligi paddingdan OLDIN: shundan keyin ustun faqat
+                // klaviatura ustidagi bo'shliqni oladi.
+                .imePadding()
+                .padding(
+                    start = horizontalPadding.dp,
+                    end = horizontalPadding.dp,
+                    top = topPadding.dp,
+                    bottom = 26.dp,
+                ),
+        ) {
+            // ⚠️ Scroll FAQAT [scroll] bo'yicha yoqiladi, klaviatura holatiga qarab EMAS:
+            // scroll qilinadigan ustun ichida `weight(1f)` bergan bolalar (masalan
+            // universitet tanlash ekranidagi `LazyColumn`) cheksiz balandlikda o'lchanib,
+            // ilovani yiqitardi. Klaviaturani [bottomBar] hal qiladi — asosiy tugma
+            // scroll maydonidan tashqarida turadi.
+            Column(
+                modifier = Modifier.fillMaxWidth().weight(1f, fill = bottomBar == null)
+                    .then(if (scroll) Modifier.verticalScroll(rememberScrollState()) else Modifier),
+                content = content,
             )
-            .then(if (scroll) Modifier.verticalScroll(rememberScrollState()) else Modifier)
-        Column(modifier = col, content = content)
+            // Mixlangan blok — scroll maydonidan tashqarida, ya'ni doim ko'rinadi.
+            bottomBar?.invoke(this)
+        }
     }
 }
 

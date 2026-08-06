@@ -25,7 +25,7 @@ import org.koin.compose.viewmodel.koinViewModel
 /**
  * Profildagi «Postlar» / «Arxivlangan postlar» bo'limi — Telegram maketi.
  *
- * Post — o'sha lavhaning o'zi (`feature:stories`): 24 soat davomida bog'langanlarga
+ * Post — o'sha hikoyaning o'zi (`feature:stories`): 24 soat davomida bog'langanlarga
  * ko'rinadi, keyin **yo'qolmaydi**, faqat egasiga ko'rinadigan arxivga o'tadi. Shuning
  * uchun ikkala ro'yxat ham bitta manbadan keladi va bu yerda faqat qaysi biri
  * chizilishi ([archived]) hal qilinadi.
@@ -46,17 +46,11 @@ fun MyPostsSection(
     val stories = if (archived) state.archived else state.posts
 
     Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        if (stories.isEmpty()) {
-            EmptyPosts(
-                title = if (archived) "Arxiv bo'sh" else "Hozircha post yo'q",
-                subtitle = if (archived) {
-                    "24 soati tugagan postlar shu yerga tushadi va faqat sizga ko'rinadi"
-                } else {
-                    "Bosh ekrandagi «Sizning lavhangiz» katakchasidan post qo'shing"
-                },
-                loading = state.loading,
-            )
-        } else {
+        // Yuklanish yozuvi YO'Q: bo'sh joy jim turadi va to'r ma'lumot kelganda paydo
+        // bo'ladi. "Yuklanmoqda…" kartasi qo'yilsa, posti yo'q foydalanuvchida (odatiy
+        // hol) u bir soniyadan keyin ko'z oldida yo'qolar va ostidagi hamma narsa
+        // yuqoriga sakrardi.
+        if (stories.isNotEmpty()) {
             PostGrid(
                 stories = stories,
                 archived = archived,
@@ -83,6 +77,17 @@ fun MyPostsSection(
                     maxLines = 1,
                 )
             }
+        }
+
+        // Saqlash muddati — «arxivim qayoqqa ketdi?» degan savol tug'ilishidan oldin
+        // javob bo'lsin (`STORY_ARCHIVE_BACKEND.md` §3: server 365 kun saqlaydi).
+        if (archived && stories.isNotEmpty()) {
+            ScText(
+                "Rasm va videolar bir yil saqlanadi — keyin postning faqat yozuvi qoladi",
+                11.5f,
+                FontWeight.Medium,
+                Sc.MutedLight,
+            )
         }
 
         state.message?.let { ScText(it, 12.5f, FontWeight.SemiBold, Sc.Danger) }

@@ -401,7 +401,14 @@ private fun BranchesSection(listing: Listing) {
                 ) {
                     ScText("${index + 1}", 12f, FontWeight.ExtraBold, Sc.Brand, maxLines = 1)
                 }
-                ScText(branch.display(), 13f, FontWeight.Bold, Sc.Ink, Modifier.weight(1f))
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    ScText(branch.display(), 13f, FontWeight.Bold, Sc.Ink)
+                    // Mo'ljal (eng yaqin metro) — manzilning o'zi emas, shuning uchun
+                    // ikkinchi qator va o'chiqroq rangda.
+                    branch.landmark?.takeIf { it.isNotBlank() }?.let {
+                        ScText(it, 12f, FontWeight.Medium, Sc.InkSoft)
+                    }
+                }
             }
         }
     }

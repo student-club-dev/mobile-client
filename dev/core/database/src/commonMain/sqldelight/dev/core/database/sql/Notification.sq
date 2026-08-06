@@ -1,17 +1,32 @@
 -- Foydalanuvchi bildirishnomalari (Home qo'ng'iroq → Notifications ekrani).
--- Backend kelganda API'dan sinxronlanadi; tuzilma bir xil.
+--
+-- Bu jadval endi **server ro'yxatining keshi** (`GET /v1/notifications`,
+-- `NOTIFICATIONS_BACKEND.md`), namuna ma'lumot ombori emas. Egasi — server: har
+-- muvaffaqiyatli `refresh()` da to'liq almashtiriladi, ya'ni bu yerda faqat oxirgi
+-- javob turadi. Shu sabab oflaynda ekran darrov to'ladi va tarmoq xatosida bo'sh
+-- qolmaydi.
+--
+-- `targetType`/`targetId` — bildirishnoma ustiga bosilganda ochiladigan ekran
+-- (masalan `CHAT` + suhbat id'si). Ikkalasi ham `null` bo'lishi mumkin: SYSTEM
+-- bildirishnomasi hech qayerga olib bormaydi, faqat o'qilgan bo'ladi.
 CREATE TABLE NotificationEntity (
     id TEXT NOT NULL PRIMARY KEY,
     title TEXT NOT NULL,
     body TEXT NOT NULL,
-    type TEXT NOT NULL,          -- JOB | DISCOUNT | AD | CHAT | SYSTEM
-    timeLabel TEXT NOT NULL,     -- "2 soat oldin"
-    sortOrder INTEGER NOT NULL,  -- kichik = yangiroq (tepada)
+    type TEXT NOT NULL,          -- JOB | DISCOUNT | LISTING | CHAT | CONNECTION | SYSTEM
+    createdAt INTEGER NOT NULL,  -- epoch ms — vaqt yorlig'i ("2 soat oldin") shundan hisoblanadi
+    targetType TEXT,             -- CHAT | LISTING | CONNECTION_REQUESTS | MY_LISTINGS | PROFILE
+    targetId TEXT,
     read INTEGER NOT NULL        -- 0/1
 );
 
+-- Ro'yxat DOIM shu tartibda o'qiladi; indekssiz har ochilishda to'liq saralash bo'lardi.
+CREATE INDEX notification_created_at ON NotificationEntity(createdAt DESC);
+
 selectAll:
-SELECT * FROM NotificationEntity ORDER BY sortOrder ASC;
+-- `id` — ikkinchi mezon: bir soniyada tug'ilgan ikki bildirishnoma tartibi
+-- so'rovdan so'rovga o'zgarib, ro'yxat "sakramasligi" uchun.
+SELECT * FROM NotificationEntity ORDER BY createdAt DESC, id DESC;
 
 countUnread:
 SELECT COUNT(*) FROM NotificationEntity WHERE read = 0;
@@ -19,12 +34,15 @@ SELECT COUNT(*) FROM NotificationEntity WHERE read = 0;
 count:
 SELECT COUNT(*) FROM NotificationEntity;
 
-insert:
-INSERT OR REPLACE INTO NotificationEntity(id, title, body, type, timeLabel, sortOrder, read)
-VALUES (?, ?, ?, ?, ?, ?, ?);
+upsert:
+INSERT OR REPLACE INTO NotificationEntity(id, title, body, type, createdAt, targetType, targetId, read)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?);
 
 markRead:
 UPDATE NotificationEntity SET read = 1 WHERE id = ?;
 
 markAllRead:
 UPDATE NotificationEntity SET read = 1;
+
+clear:
+DELETE FROM NotificationEntity;

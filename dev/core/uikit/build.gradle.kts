@@ -21,7 +21,9 @@ kotlin {
             api(compose.material3)
             api(compose.ui)
             api(compose.components.resources)
-            implementation(compose.materialIconsExtended)
+            // DIQQAT: `compose.materialIconsExtended` ataylab qo'shilmagan — u ~12 000 ta
+            // ikonka klassini dex'ga olib kiradi (~25 MB). Loyihada barcha ikonkalar
+            // `AppIcons`/`ScIcons` (o'z `ImageVector`larimiz) orqali beriladi.
             // Foydalanuvchi avatarlari (`ScAvatar`) — serverdagi rasm havolasi bo'yicha.
             implementation(libs.coil.compose)
             // Tanlangan video keshdagi **fayl** bo'lib yuriladi (`media/MediaFiles`) —
@@ -41,6 +43,13 @@ kotlin {
             // Video siqish (`media/VideoCompressor`) — yuborishdan oldin 1080p H.264 ga.
             implementation(libs.androidx.media3.transformer)
             implementation(libs.androidx.media3.effect)
+            // Ilova ichidagi kamera ekrani (`media/CameraScreen`) — hikoya qo'yishda.
+            // `camera-view` `PreviewView` + `LifecycleCameraController` ni beradi,
+            // `camera-camera2` — haqiqiy qurilma implementatsiyasi, `camera-video` —
+            // yozish (`Recorder`).
+            implementation(libs.androidx.camera.view)
+            implementation(libs.androidx.camera.camera2)
+            implementation(libs.androidx.camera.video)
             // `LocalLifecycleOwner` — ekran fonga ketganda videoni to'xtatish uchun.
             // Compose'dan tranzitiv kelishiga tayanmaymiz: bu API lifecycle 2.8+ da,
             // `androidx.lifecycle.compose` paketiga ko'chgan.

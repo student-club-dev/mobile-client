@@ -258,6 +258,39 @@ class DiscountsViewModel(
     /** Birinchi `refresh()` tugaguncha `true` — feed skeletini shu boshqaradi. */
     private val refreshing = MutableStateFlow(true)
 
+    /**
+     * "Tepadan tortib yangilash" ketyapti.
+     *
+     * [refreshing] dan ALOHIDA oqim: u birinchi yuklanishning skeletini boshqaradi va
+     * `catalogState` ichida boshqa manbalar bilan qo'shilgan. Bu esa faqat indikator
+     * uchun va ekranga to'g'ridan-to'g'ri beriladi.
+     */
+    private val _pullRefreshing = MutableStateFlow(false)
+    val pullRefreshing: StateFlow<Boolean> = _pullRefreshing
+
+    /**
+     * Ekran pastga tortildi — katalog va e'lonlar feed'i serverdan qayta o'qiladi.
+     *
+     * `discountRepository.refresh()` katalogni ham, feed'ni ham yangilaydi. Ochiq bo'lim
+     * bo'lsa uning TO'LIQ ro'yxati ham qayta tortiladi (`refreshGroup`): umumiy feed har
+     * guruhdan atigi bir nechtasini oladi va usiz bo'limda e'lonlar kamayib qolardi.
+     */
+    fun refresh() {
+        if (_pullRefreshing.value) return
+        viewModelScope.launch {
+            _pullRefreshing.value = true
+            try {
+                runCatching { discountRepository.refresh() }
+                applied.value.groupKey?.let { key ->
+                    runCatching { discountRepository.refreshGroup(key) }
+                }
+            } finally {
+                _pullRefreshing.value = false
+                refreshing.value = false
+            }
+        }
+    }
+
     private val categoriesFlow = discountRepository.observeCategories()
 
     // Guruhlar + biznes turlari + yuklanish bayrog'i bitta oqimga yig'iladi: `state` va

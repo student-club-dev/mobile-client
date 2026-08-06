@@ -168,6 +168,7 @@ class ChatRemoteDataSource(
                 stickerId = payload.stickerId,
                 sticker = payload.sticker?.let { json.decodeFromJsonElement(stickerSerializer, it) },
                 albumId = payload.albumId,
+                albumSize = payload.albumSize,
                 clientMsgId = clientMsgId,
                 replyToMessageId = payload.replyToMessageId,
                 quote = payload.quote?.let { QuoteInputDto(text = it.text, offset = it.offset) },

@@ -276,6 +276,7 @@ fun RentalForm(state: PostListingUiState, palette: AppPalette, vm: PostListingVi
             subtitle = "Xaritadan aniq joyni belgilang",
         )
 
+        AudienceSection(state, vm)
         ValiditySection(state, vm)
     }
 }
