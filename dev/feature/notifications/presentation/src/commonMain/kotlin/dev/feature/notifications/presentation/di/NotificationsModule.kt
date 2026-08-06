@@ -5,7 +5,7 @@ import dev.core.network.NetworkConfig
 import dev.core.network.generated.api.NotificationsApi
 import dev.feature.notifications.data.push.PushRepositoryImpl
 import dev.feature.notifications.data.push.platformPushTokenSource
-import dev.feature.notifications.data.remote.KtorNotificationRemoteDataSource
+import dev.feature.notifications.data.remote.ApiNotificationRemoteDataSource
 import dev.feature.notifications.data.remote.NotificationRemoteDataSource
 import dev.feature.notifications.data.repository.NotificationRepositoryImpl
 import dev.feature.notifications.domain.push.PushRepository
@@ -30,10 +30,10 @@ import org.koin.dsl.module
  * faqat `:dev:core:common` dagi interfeysni ko'radi).
  */
 fun notificationsModule(useRemoteApi: Boolean) = module {
-    single<NotificationRemoteDataSource> { KtorNotificationRemoteDataSource(get(), get()) }
-    single<NotificationRepository> { NotificationRepositoryImpl(get(), get(), get(), useRemoteApi) }
-
     single { NotificationsApi(baseUrl = get<NetworkConfig>().baseUrl, httpClient = get<HttpClient>()) }
+
+    single<NotificationRemoteDataSource> { ApiNotificationRemoteDataSource(get(), get()) }
+    single<NotificationRepository> { NotificationRepositoryImpl(get(), get(), get(), useRemoteApi) }
     // Android: FCM, iOS: APNs ko'prigi.
     single<PushTokenSource> { platformPushTokenSource() }
     // Bitta nusxa, ikkita interfeys: `PushRepository` (feature ichida) va `PushRegistrar`

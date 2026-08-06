@@ -74,6 +74,7 @@ import dev.feature.listings.domain.model.Listing
 import dev.feature.listings.domain.model.formatSum
 import dev.feature.connections.domain.model.ConnectionView
 import dev.feature.connections.domain.model.SearchedStudent
+import dev.feature.connections.domain.model.StudentSummary
 import dev.feature.university.domain.model.University
 import org.koin.compose.viewmodel.koinViewModel
 import androidx.compose.runtime.ReadOnlyComposable
@@ -96,6 +97,11 @@ fun MyUniversityScreen(
     onOpenListing: (String) -> Unit = {},
     /** "Barchasi" — talaba e'lonlari ekrani, Yordam tab'i bilan. */
     onOpenTasks: () -> Unit = {},
+    /**
+     * Talaba bosildi — profil varag'ini karkas ochadi (`StudentShell`). Bo'limlar story va
+     * chat modullarida yashaydi, bu modul esa ularni ko'rmaydi.
+     */
+    onOpenStudent: (StudentSummary) -> Unit = {},
     vm: MyUniversityViewModel = koinViewModel(),
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
@@ -151,7 +157,11 @@ fun MyUniversityScreen(
                                     horizontalArrangement = Arrangement.spacedBy(13.dp),
                                 ) {
                                     itemsIndexed(state.mates, key = { _, s -> s.student.id }) { index, s ->
-                                        MateCard(s, index) { vm.connect(s) }
+                                        MateCard(
+                                            s, index,
+                                            onConnect = { vm.connect(s) },
+                                            onOpen = { onOpenStudent(s.student) },
+                                        )
                                     }
                                 }
                             }
@@ -179,6 +189,7 @@ fun MyUniversityScreen(
             StudentsOverlay(
                 students = state.mates,
                 onConnect = { vm.connect(it) },
+                onOpenStudent = onOpenStudent,
                 onClose = { showStudents = false },
             )
         }
@@ -315,11 +326,18 @@ private fun EmptyUniversity(loading: Boolean, modifier: Modifier = Modifier) {
 // ---------------------------------------------------------------------------
 
 @Composable
-private fun MateCard(item: SearchedStudent, index: Int, onConnect: () -> Unit) {
+private fun MateCard(
+    item: SearchedStudent,
+    index: Int,
+    onConnect: () -> Unit,
+    onOpen: () -> Unit,
+) {
     val (tint, accent) = tilePalette[index.mod(tilePalette.size)]
     val student = item.student
     Column(
-        Modifier.width(150.dp).scCard(radius = 26.dp).padding(horizontal = 16.dp, vertical = 18.dp),
+        // Kartaning O'ZI profilni ochadi; "Bog'lanish" tugmasi o'z bosishini yutadi.
+        Modifier.width(150.dp).scCard(radius = 26.dp).clickable(onClick = onOpen)
+            .padding(horizontal = 16.dp, vertical = 18.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         ScAvatar(
@@ -640,6 +658,7 @@ private fun UniversityPickRow(uni: University, index: Int, selected: Boolean, on
 private fun StudentsOverlay(
     students: List<SearchedStudent>,
     onConnect: (SearchedStudent) -> Unit,
+    onOpenStudent: (StudentSummary) -> Unit,
     onClose: () -> Unit,
 ) {
     var query by remember { mutableStateOf("") }
@@ -687,7 +706,7 @@ private fun StudentsOverlay(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             itemsIndexed(filtered, key = { _, s -> s.student.id }) { index, s ->
-                DetailedStudentCard(s, index, onConnect)
+                DetailedStudentCard(s, index, onConnect, onOpen = { onOpenStudent(s.student) })
             }
             if (filtered.isEmpty()) {
                 item {
@@ -721,10 +740,12 @@ private fun DetailedStudentCard(
     item: SearchedStudent,
     index: Int,
     onConnect: (SearchedStudent) -> Unit,
+    onOpen: () -> Unit,
 ) {
     val (tint, accent) = tilePalette[index.mod(tilePalette.size)]
     val student = item.student
-    Column(Modifier.fillMaxWidth().scCard(radius = 22.dp).padding(15.dp)) {
+    // Kartaning O'ZI profilni ochadi; "Bog'lanish" tugmasi o'z bosishini yutadi.
+    Column(Modifier.fillMaxWidth().scCard(radius = 22.dp).clickable(onClick = onOpen).padding(15.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(13.dp)) {
             ScAvatar(
                 name = student.displayName,

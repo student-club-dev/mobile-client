@@ -40,11 +40,9 @@ fun StudentPostsSection(
     LaunchedEffect(studentId) { vm.load(studentId) }
 
     val stories = state.group?.stories.orEmpty()
-    // Post yo'q bo'lsa hech nima chizilmaydi — bo'limning o'zi ro'yxatdan tushib qoladi
-    // (`rememberPeerProfileSections`), shuning uchun bu yerda faqat yuklanish qoladi.
-    if (stories.isEmpty()) {
-        if (state.loading) PostsLoadingNote()
-    } else {
+    // Yuklanish yozuvi YO'Q va bo'sh holat ham yo'q: bo'lim umuman ma'lumoti bor bo'lgandagina
+    // qo'shiladi (`rememberPeerProfileSections`). Ya'ni bu yerga faqat to'lgan ro'yxat keladi.
+    if (stories.isNotEmpty()) {
         PostGrid(
             stories = stories,
             // Boshqa odamning postida sana ham, ko'rishlar soni ham ko'rsatilmaydi:

@@ -14,6 +14,19 @@ data class UserProfile(
     val role: String? = null,          // "STUDENT" | "BUSINESS" | "EMPLOYER" | "UNIVERSITY"
     val universityId: String? = null,
     val universityEmail: String? = null,
+    /**
+     * Yashash manzili — e'lon geo katalogi bilan **bir xil id fazosida**
+     * ("TOSHKENT_SHAHRI" / "CHILONZOR").
+     *
+     * Nima uchun kerak: yangi ish e'lonlari digesti talabaga MOS bo'lsa yuboriladi, moslik
+     * esa "universiteti bir xil **YOKI** e'lon shu tumanda" degani
+     * (`02-PUSH_CATALOG_RESPONSE.md` §4). Manzilsiz talaba shartning geo yarmini oladi
+     * emas — faqat universiteti bo'yicha mos e'lonlarni ko'radi.
+     *
+     * `PATCH /v1/profile/me` yozadi, `GET /v1/profile/me` esa qaytaradi (2026-08-05 dan).
+     */
+    val regionId: String? = null,
+    val districtId: String? = null,
     val birthYear: Int? = null,
     val courseYear: String? = null,    // "1".."4" | "MASTER"
     /**

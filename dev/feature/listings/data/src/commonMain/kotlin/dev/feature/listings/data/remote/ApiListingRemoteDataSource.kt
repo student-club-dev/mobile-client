@@ -5,6 +5,10 @@ import dev.core.common.error.AppException
 import dev.core.common.map
 import dev.core.common.network.NetworkConnectivity
 import dev.core.network.generated.api.StudentListingsApi
+import dev.core.network.generated.model.ListingPageRequestDto
+import dev.core.network.generated.model.SearchListingsDto
+import dev.core.network.generated.model.StudentListingFilterDto
+import dev.core.network.generated.model.StudentListingGeoDto
 import dev.core.network.media.MediaPurpose
 import dev.core.network.media.MediaUploader
 import dev.core.network.media.MediaUrl
@@ -26,14 +30,12 @@ import dev.feature.listings.domain.model.ListingStatus
  * Talaba e'lonlarining real backend manbasi — generatsiya qilingan [StudentListingsApi]
  * ustida (`STUDENT_LISTINGS_BACKEND.md` + `STUDENT_LISTINGS_RESPONSE.md`).
  *
- * ⚠️ **Qidiruv `GET /v1/student-listings` bilan ketadi, `POST /search` bilan emas.**
- * Backend javobiga ko'ra ikkalasi bir xil kod yo'lidan o'tadi (§5.1), lekin spec'dagi
- * `POST /search` tanasi noto'g'ri: `filter` maydoni **biznes chegirmalarining**
- * `SearchFilterDto` siga (`groupKeys`, `businessIds`, `discount`…) qarab turibdi va unda
- * `gender`/`propertyType`/`shift` kabi turga xos filtrlarning birortasi ham yo'q; `page`
- * esa `{number, size}` — kursor umuman yo'q. `GET` variantida esa hammasi bor: turga xos
- * 15 ta filtr, `sort`, `size` va `cursor`. Spec tuzatilganda bu yerni `POST` ga o'tkazish
- * bir necha qatorlik ish.
+ * Qidiruv — **`POST /v1/student-listings/search`**. Ilgari `GET` ishlatilardi, chunki
+ * spec'dagi `POST` tanasi biznes chegirmalarining sxemalariga (`SearchFilterDto`,
+ * `SearchPageDto`) qarab turgan edi: turga xos 15 ta filtr ham, kursor ham yo'q edi.
+ * `05-STUDENT_LISTINGS_INTEGRATION_RESPONSE.md` bilan sxemalar ajratildi
+ * (`StudentListingFilterDto`, `ListingPageRequestDto`) va endi `POST` to'liq shartnomani
+ * ifodalaydi — ustiga `GET` da umuman yo'q `geo.bbox` (xarita ekrani) ham faqat shu yerda.
  */
 class ApiListingRemoteDataSource(
     private val api: StudentListingsApi,
@@ -50,77 +52,75 @@ class ApiListingRemoteDataSource(
 
         val filters = query.filters
         val geo = query.geo ?: ListingGeoFilter()
-        return safeCall(connectivity) {
-            api.studentListingSearchList(
-                kind = kind,
-                query = query.text.trim().takeIf { it.isNotBlank() },
-                lat = geo.lat,
-                lng = geo.lng,
-                // Radius **faqat aniq so'ralganda** yuboriladi. `lat`/`lng` ning o'zi
-                // masofa bo'yicha saralash uchun kerak; radiusni ham qo'shib yuborsak
-                // undan uzoqdagi e'lonlar ro'yxatdan butunlay tushib qolardi va
-                // foydalanuvchi buni hech qayerdan bilmasdi.
-                radiusMeters = geo.takeIf { it.hasPoint }
-                    ?.radiusMeters
-                    ?.coerceAtMost(ListingGeoFilter.MAX_RADIUS_METERS),
-                // Server vergul bilan ajratilgan ro'yxat kutadi ("TOSHKENT_SHAHRI,ANDIJON").
-                regionIds = geo.regionIds.joinToString(",").takeIf { it.isNotBlank() },
-                districtIds = geo.districtIds.joinToString(",").takeIf { it.isNotBlank() },
-                maxPrice = filters.maxPrice?.toInt(),
-
+        val body = SearchListingsDto(
+            kind = kind,
+            query = query.text.trim().takeIf { it.isNotBlank() },
+            geo = geo.takeIf { !it.isEmpty }?.let {
+                StudentListingGeoDto(
+                    lat = it.lat,
+                    lng = it.lng,
+                    // Radius **faqat aniq so'ralganda** yuboriladi. `lat`/`lng` ning o'zi
+                    // masofa bo'yicha saralash uchun kerak; radiusni ham qo'shib yuborsak
+                    // undan uzoqdagi e'lonlar ro'yxatdan butunlay tushib qolardi va
+                    // foydalanuvchi buni hech qayerdan bilmasdi. Backend buni tasdiqladi va
+                    // test bilan mahkamladi (`05-…_RESPONSE.md` §3).
+                    radiusMeters = it.takeIf { g -> g.hasPoint }
+                        ?.radiusMeters
+                        ?.coerceAtMost(ListingGeoFilter.MAX_RADIUS_METERS),
+                    regionIds = it.regionIds.takeIf { ids -> ids.isNotEmpty() },
+                    districtIds = it.districtIds.takeIf { ids -> ids.isNotEmpty() },
+                )
+            },
+            maxPrice = filters.maxPrice,
+            filter = StudentListingFilterDto(
                 // --- Ijara ---
                 gender = filters.gender?.let { g ->
-                    StudentListingsApi.GenderStudentListingSearchList.entries
-                        .firstOrNull { it.value == g.name }
+                    StudentListingFilterDto.Gender.entries.firstOrNull { it.value == g.name }
                 },
                 propertyType = filters.propertyType?.let { p ->
-                    StudentListingsApi.PropertyTypeStudentListingSearchList.entries
-                        .firstOrNull { it.value == p.name }
+                    StudentListingFilterDto.PropertyType.entries.firstOrNull { it.value == p.name }
                 },
                 minRooms = filters.minRooms,
                 onlyAvailable = filters.onlyAvailable.takeIf { it },
 
                 // --- Xizmat ---
                 serviceType = filters.serviceType?.let { s ->
-                    StudentListingsApi.ServiceTypeStudentListingSearchList.entries
-                        .firstOrNull { it.value == s.name }
+                    StudentListingFilterDto.ServiceType.entries.firstOrNull { it.value == s.name }
                 },
                 serviceFormat = filters.serviceFormat?.let { f ->
-                    StudentListingsApi.ServiceFormatStudentListingSearchList.entries
-                        .firstOrNull { it.value == f.name }
+                    StudentListingFilterDto.ServiceFormat.entries.firstOrNull { it.value == f.name }
                 },
                 onlyFreeTrial = filters.onlyFreeTrial.takeIf { it },
 
                 // --- Ish ---
                 employment = filters.employment?.let { e ->
-                    StudentListingsApi.EmploymentStudentListingSearchList.entries
-                        .firstOrNull { it.value == e.name }
+                    StudentListingFilterDto.Employment.entries.firstOrNull { it.value == e.name }
                 },
                 jobCategoryKey = filters.jobCategoryKey,
                 shift = filters.shift?.let { s ->
-                    StudentListingsApi.ShiftStudentListingSearchList.entries
-                        .firstOrNull { it.value == s.name }
+                    StudentListingFilterDto.Shift.entries.firstOrNull { it.value == s.name }
                 },
                 noExperienceOnly = filters.noExperienceOnly.takeIf { it },
 
                 // --- Fanlardan yordam ---
                 taskCategory = filters.taskCategory?.let { c ->
-                    StudentListingsApi.TaskCategoryStudentListingSearchList.entries
-                        .firstOrNull { it.value == c.name }
+                    StudentListingFilterDto.TaskCategory.entries.firstOrNull { it.value == c.name }
                 },
                 taskTypeKey = filters.taskTypeKey,
                 taskFormat = filters.taskFormat?.let { f ->
-                    StudentListingsApi.TaskFormatStudentListingSearchList.entries
-                        .firstOrNull { it.value == f.name }
+                    StudentListingFilterDto.TaskFormat.entries.firstOrNull { it.value == f.name }
                 },
                 onlyOpenDeadline = filters.onlyOpenDeadline.takeIf { it },
-
-                sort = query.sort.toApiSort(query.geo),
-                size = query.size.coerceIn(1, ListingQuery.MAX_PAGE_SIZE),
+            ),
+            sort = query.sort.toApiSort(query.geo),
+            page = ListingPageRequestDto(
+                propertySize = query.size.coerceIn(1, ListingQuery.MAX_PAGE_SIZE),
                 cursor = query.cursor,
-                page = query.page?.coerceAtLeast(1),
-            ).body()
-        }.map { it.toDomain(apiOrigin) }
+                number = query.page?.coerceAtLeast(1),
+            ),
+        )
+        return safeCall(connectivity) { api.studentListingSearch(body).body() }
+            .map { it.toDomain(apiOrigin) }
     }
 
     override suspend fun mine(page: Int, size: Int): Resource<ListingPage> =
@@ -204,17 +204,16 @@ class ApiListingRemoteDataSource(
      */
     private fun Listing.idempotencyKey(): String = "$id:$updatedAt"
 
-    private fun ListingKind.toSearchKind(): StudentListingsApi.KindStudentListingSearchList? =
-        StudentListingsApi.KindStudentListingSearchList.entries.firstOrNull { it.value == name }
+    private fun ListingKind.toSearchKind(): SearchListingsDto.Kind? =
+        SearchListingsDto.Kind.entries.firstOrNull { it.value == name }
 
     /**
      * Koordinatasiz `NEAREST` — serverda xato emas, u jimgina `NEWEST` ga tushadi. Buni
      * klientda ham aniq qilamiz: aks holda foydalanuvchi "eng yaqin" tanlab, tasodifiy
      * tartibdagi ro'yxatni ko'rardi va sababi hech qayerda ko'rinmasdi.
      */
-    private fun ListingSort.toApiSort(geo: ListingGeoFilter?): StudentListingsApi.SortStudentListingSearchList {
+    private fun ListingSort.toApiSort(geo: ListingGeoFilter?): SearchListingsDto.Sort {
         val effective = if (this == ListingSort.NEAREST && geo?.hasPoint != true) ListingSort.NEWEST else this
-        return StudentListingsApi.SortStudentListingSearchList.entries
-            .first { it.value == effective.name }
+        return SearchListingsDto.Sort.entries.first { it.value == effective.name }
     }
 }

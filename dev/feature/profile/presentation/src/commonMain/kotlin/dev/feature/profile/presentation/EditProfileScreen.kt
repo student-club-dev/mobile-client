@@ -106,8 +106,12 @@ fun EditProfileScreen(onBack: () -> Unit, vm: ProfileViewModel = koinViewModel()
     var courseYear by remember(profile) { mutableStateOf(profile?.courseYear) }
     var gender by remember(profile) { mutableStateOf(profile?.gender) }
     var bio by remember(profile) { mutableStateOf(profile?.bio.orEmpty()) }
+    var regionId by remember(profile) { mutableStateOf(profile?.regionId) }
+    var districtId by remember(profile) { mutableStateOf(profile?.districtId) }
 
     var uniExpanded by remember { mutableStateOf(false) }
+    var regionExpanded by remember { mutableStateOf(false) }
+    var districtExpanded by remember { mutableStateOf(false) }
     var uniQuery by remember { mutableStateOf("") }
     var saving by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -119,6 +123,11 @@ fun EditProfileScreen(onBack: () -> Unit, vm: ProfileViewModel = koinViewModel()
 
     // Ekran ochilganda ro'yxatni bir marta o'qiymiz — rasmlar local keshda saqlanmaydi.
     LaunchedEffect(Unit) { vm.loadPhotos() }
+
+    // Viloyat/tuman katalogi. Kalit — profildagi viloyat: profil keshdan kechroq kelsa
+    // (birinchi kadrda `null`) tumanlar ham o'sha paytda qayta so'raladi.
+    val addressCatalog by vm.addressCatalog.collectAsStateWithLifecycle()
+    LaunchedEffect(profile?.regionId) { vm.loadAddressCatalog(profile?.regionId) }
 
     /**
      * Rasm tanlangan — u **to'plamga** qo'shiladi va serverda **birinchi o'ringa** tushadi,
@@ -330,6 +339,64 @@ fun EditProfileScreen(onBack: () -> Unit, vm: ProfileViewModel = koinViewModel()
                 }
             }
 
+            // Yashash manzili — yangi ish e'lonlari haqidagi xabarnoma shunga tayanadi
+            // (`02-PUSH_CATALOG_RESPONSE.md` §4: universitet BIR XIL yoki e'lon shu
+            // tumanda). To'ldirilmasa hech narsa buzilmaydi — tavsiyalar faqat
+            // universitet bo'yicha keladi, shuning uchun maydon ixtiyoriy.
+            FieldLabel("Yashash joyi (ixtiyoriy)")
+            ScText(
+                "Yaqin atrofdagi ish e'lonlarini yuborishimiz uchun",
+                11.5f, FontWeight.Medium, Sc.MutedLight,
+            )
+            val selectedRegion = addressCatalog.regions.firstOrNull { it.id == regionId }
+            PickerField(
+                icon = ScIcons.MapPin,
+                text = selectedRegion?.name ?: "Viloyatni tanlang",
+                filled = selectedRegion != null,
+            ) {
+                regionExpanded = !regionExpanded
+                districtExpanded = false
+            }
+            if (regionExpanded) {
+                Column(Modifier.fillMaxWidth().scCard(radius = 20.dp).padding(9.dp)) {
+                    addressCatalog.regions.forEach { region ->
+                        NamedRow(region.name, selected = region.id == regionId) {
+                            // Viloyat almashsa tuman ham bekor qilinadi: eski tuman yangi
+                            // viloyatga tegishli emas va server uni juftlik sifatida o'qiydi.
+                            if (region.id != regionId) districtId = null
+                            regionId = region.id
+                            regionExpanded = false
+                            vm.selectRegion(region.id)
+                        }
+                    }
+                }
+            }
+            // Tuman faqat viloyat tanlangach ma'noli — tumanlar ro'yxati viloyatniki.
+            if (regionId != null) {
+                val selectedDistrict = addressCatalog.districts.firstOrNull { it.id == districtId }
+                PickerField(
+                    icon = ScIcons.MapPin,
+                    text = selectedDistrict?.name ?: "Tumanni tanlang",
+                    filled = selectedDistrict != null,
+                ) {
+                    districtExpanded = !districtExpanded
+                    regionExpanded = false
+                }
+                if (districtExpanded) {
+                    Column(Modifier.fillMaxWidth().scCard(radius = 20.dp).padding(9.dp)) {
+                        addressCatalog.districts.forEach { district ->
+                            NamedRow(district.name, selected = district.id == districtId) {
+                                districtId = district.id
+                                districtExpanded = false
+                            }
+                        }
+                        if (addressCatalog.districts.isEmpty()) {
+                            ScText("Topilmadi", 12.5f, FontWeight.Medium, Sc.Muted, Modifier.padding(8.dp))
+                        }
+                    }
+                }
+            }
+
             if (error != null) {
                 ScText(error!!, 12.5f, FontWeight.SemiBold, Sc.Danger)
             }
@@ -361,6 +428,8 @@ fun EditProfileScreen(onBack: () -> Unit, vm: ProfileViewModel = koinViewModel()
                         universityId = universityId,
                         courseYear = courseYear,
                         gender = gender,
+                        regionId = regionId,
+                        districtId = districtId,
                         // Bo'sh satr — serverda "tozalash" degani, `null` esa "tegilmasin".
                         bio = bio.trim(),
                     )
@@ -433,6 +502,52 @@ private fun ProfilePhotoStrip(
         FontWeight.Medium,
         Sc.MutedLight,
     )
+}
+
+/** Viloyat/tuman kabi "bosib ro'yxat ochadigan" maydon — universitet maydoni bilan bir xil. */
+@Composable
+private fun PickerField(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    text: String,
+    filled: Boolean,
+    onClick: () -> Unit,
+) {
+    Row(
+        Modifier.fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(Sc.FieldBg)
+            .border(1.dp, Sc.Border, RoundedCornerShape(16.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 13.dp, vertical = 15.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(icon, null, tint = Sc.Muted, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(9.dp))
+        ScText(
+            text, 14f, FontWeight.SemiBold,
+            if (filled) Sc.Ink else Sc.Muted,
+            Modifier.weight(1f),
+            maxLines = 1,
+        )
+        Icon(ScIcons.ChevronUpDown, null, tint = Sc.Muted, modifier = Modifier.size(17.dp))
+    }
+}
+
+/** Ochilgan ro'yxatdagi bitta nom (viloyat/tuman). */
+@Composable
+private fun NamedRow(name: String, selected: Boolean, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        ScText(name, 13.5f, FontWeight.SemiBold, Sc.Ink, Modifier.weight(1f), maxLines = 1)
+        if (selected) {
+            Icon(AppIcons.Check, null, tint = Sc.Brand, modifier = Modifier.size(17.dp))
+        }
+    }
 }
 
 @Composable

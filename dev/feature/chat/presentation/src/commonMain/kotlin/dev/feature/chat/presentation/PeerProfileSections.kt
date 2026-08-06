@@ -42,54 +42,42 @@ fun rememberPeerProfileSections(
     val postsState by postsVm.state.collectAsStateWithLifecycle()
     LaunchedEffect(studentId) { vm.load(studentId) }
 
-    // Bo'sh bo'lim umuman qo'shilmaydi — ya'ni tabi ham chiqmaydi. Yuklanish paytida
-    // bo'lim turadi ("Yuklanmoqda…"): hali kelmagan ro'yxatni "yo'q" deb tashlab yuborsak,
-    // ma'lumot kelganda tablar sakrab qo'shilardi.
+    // Bo'lim FAQAT ma'lumoti bor bo'lganda qo'shiladi — yuklanish paytida ham, bo'sh
+    // bo'lganda ham u yo'q.
+    //
+    // Ilgari yuklanish paytida bo'lim "Yuklanmoqda…" yozuvi bilan turardi. Natijada eng
+    // ko'p uchraydigan holat eng yomon ko'rinardi: odamda post yo'q bo'lsa (bu odatiy hol),
+    // foydalanuvchi avval "Postlar" tabini va bo'sh kartani ko'rar, bir soniyadan keyin
+    // esa ular **ko'z oldida yo'qolardi** — tablar suriladi, balandlik o'zgaradi, barmoq
+    // ostidagi element boshqasiga almashadi.
+    //
+    // Endi harakat bitta yo'nalishda: yo'qdan bor tomonga. Kechroq paydo bo'lgan bo'lim
+    // hech narsani olib ketmaydi, faqat qo'shiladi.
     return buildList {
-        if (postsState.loading || postsState.group?.stories.orEmpty().isNotEmpty()) {
+        if (postsState.group?.stories.orEmpty().isNotEmpty()) {
             add(ProfileSection("Postlar") { StudentPostsSection(studentId, vm = postsVm) })
         }
-        if (state.loading || state.media.isNotEmpty()) {
+        if (state.media.isNotEmpty()) {
             add(
                 ProfileSection("Media") {
-                    if (state.media.isEmpty()) {
-                        ChatSectionNote("Yuklanmoqda…")
-                    } else {
-                        ChatPhotoGrid(state.media, onOpen = { index -> vm.openViewer(index) })
-                        // Ko'rgich bo'limning ICHIDA: profil varag'i dialog bo'lib ochilgan va
-                        // ko'rgichni tashqarida chizsak u varaq ostida qolib ketardi.
-                        state.viewerIndex?.let { index ->
-                            ImageViewerDialog(
-                                images = state.media,
-                                startIndex = index,
-                                onDismiss = vm::closeViewer,
-                            )
-                        }
+                    ChatPhotoGrid(state.media, onOpen = { index -> vm.openViewer(index) })
+                    // Ko'rgich bo'limning ICHIDA: profil varag'i dialog bo'lib ochilgan va
+                    // ko'rgichni tashqarida chizsak u varaq ostida qolib ketardi.
+                    state.viewerIndex?.let { index ->
+                        ImageViewerDialog(
+                            images = state.media,
+                            startIndex = index,
+                            onDismiss = vm::closeViewer,
+                        )
                     }
                 },
             )
         }
-        if (state.loading || state.files.isNotEmpty()) {
-            add(
-                ProfileSection("Fayllar") {
-                    if (state.files.isEmpty()) {
-                        ChatSectionNote("Yuklanmoqda…")
-                    } else {
-                        ChatFileList(state.files, onOpen = onOpenFile)
-                    }
-                },
-            )
+        if (state.files.isNotEmpty()) {
+            add(ProfileSection("Fayllar") { ChatFileList(state.files, onOpen = onOpenFile) })
         }
-        if (state.loading || state.links.isNotEmpty()) {
-            add(
-                ProfileSection("Havolalar") {
-                    if (state.links.isEmpty()) {
-                        ChatSectionNote("Yuklanmoqda…")
-                    } else {
-                        ChatLinkList(state.links)
-                    }
-                },
-            )
+        if (state.links.isNotEmpty()) {
+            add(ProfileSection("Havolalar") { ChatLinkList(state.links) })
         }
     }
 }

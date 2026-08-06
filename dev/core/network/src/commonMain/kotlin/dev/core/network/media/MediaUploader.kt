@@ -335,7 +335,9 @@ class MediaUploader(
                 }
             }
         }
-        completeUpload(session.uploadId)
+        // Hajm va bo'laklar soni e'lon qilinadi — server yig'ilganini shunga solishtiradi
+        // (qarang [CompleteUploadBody]).
+        completeUpload(session.uploadId, totalBytes = sizeBytes, parts = totalParts)
     }
 
     /**
@@ -406,11 +408,17 @@ class MediaUploader(
     }
 
     /** Bo'laklarni birlashtiradi — `POST /v1/media/upload/{id}/complete`. */
-    private suspend fun completeUpload(uploadId: String): AttachmentDto =
+    private suspend fun completeUpload(
+        uploadId: String,
+        totalBytes: Long,
+        parts: Int,
+    ): AttachmentDto =
         client.post(config.baseUrl + uploadPath(uploadId) + "/complete") {
             // Birlashtirish va transkodlash serverda vaqt oladi — umumiy 15 soniyalik
             // chegara bu yerda ham yaramaydi.
             uploadTimeouts()
+            contentType(ContentType.Application.Json)
+            setBody(CompleteUploadBody(totalBytes = totalBytes, parts = parts))
         }.body()
 
     /**
@@ -578,8 +586,34 @@ private data class InitUploadBody(
     val conversationId: String? = null,
     val quality: String? = null,
     val fileName: String? = null,
-    /** Butun faylning **aniq** hajmi — kvota shu bo'yicha oldindan band qilinadi. */
+    /**
+     * Butun faylning hajmi — kvota shu bo'yicha oldindan band qilinadi.
+     *
+     * `null` bo'lishi mumkin (`03-VIDEO_UPLOAD_STREAMING_RESPONSE.md` §1): u holda sessiya
+     * **oqimli** bo'ladi — hajm hali noma'lum (video siqilayotgan paytda yuborila boshlaydi)
+     * va u [CompleteUploadBody] da e'lon qilinadi. Server bunday sessiyaga rezerv (sukut
+     * bo'yicha 2 GB) hisobidan joy ajratadi va kvotani `complete` da to'g'rilaydi.
+     *
+     * ⚠️ `explicitNulls = false` — `null` bo'lsa kalit UMUMAN yuborilmaydi, ya'ni server
+     * uni "berilmagan" deb ko'radi (`0` deb emas: nol — klient xatosi va `422` beradi).
+     */
+    val totalBytes: Long? = null,
+)
+
+/**
+ * `POST /v1/media/upload/{id}/complete` ning tanasi
+ * (`03-VIDEO_UPLOAD_STREAMING_RESPONSE.md` §2).
+ *
+ * Ikkala maydon ham oqimli sessiyada **majburiy**, hajmi ma'lum sessiyada esa ixtiyoriy —
+ * lekin biz ularni **doim** yuboramiz va bu ataylab: server yig'ilgan hajmni va bo'laklar
+ * sonini e'lon qilinganiga solishtiradi, ya'ni teshiksiz, lekin ERTA to'xtagan qator
+ * (`0,1,2` yetib bordi, `3,4,5` yo'q) endi "muvaffaqiyat" bo'lib qaytmaydi. Usiz server
+ * kesilgan videoni yig'ib, foydalanuvchiga tugagan yuborish sifatida ko'rsatardi.
+ */
+@Serializable
+private data class CompleteUploadBody(
     val totalBytes: Long,
+    val parts: Int,
 )
 
 /**

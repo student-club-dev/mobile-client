@@ -13,6 +13,10 @@ kotlin {
             // Sessiya (ObserveCurrentUserUseCase) va chiqish (LogoutUseCase).
             implementation(projects.dev.core.domain)
             implementation(projects.dev.feature.university.domain)
+            // Yashash manzili (viloyat/tuman) — geo katalogi e'lonlar feature'ida yashaydi
+            // va butun ilova uchun yagona manba (`GeoCatalogRepository`). Faqat DOMAIN
+            // moduli: implementatsiyani Koin `listingsModule` dan beradi.
+            implementation(projects.dev.feature.listings.domain)
             // Profildagi «Postlar» / «Arxivlangan postlar» bo'limi — post = lavha (story).
             implementation(projects.dev.feature.stories.presentation)
             implementation(projects.dev.core.network)

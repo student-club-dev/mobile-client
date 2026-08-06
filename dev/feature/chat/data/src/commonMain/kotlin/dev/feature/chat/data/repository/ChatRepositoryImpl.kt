@@ -593,7 +593,8 @@ class ChatRepositoryImpl(
         //
         // ⚠️ GIF albomga KIRMAYDI: u alohida tur (`type = GIF`) va server uni ovozsiz MP4
         // ga o'giradi, ya'ni rasmlar to'ri bilan bir katakda tursa maket buzilardi.
-        val albumId = if (images.count { !it.isGif } > 1) randomClientMsgId() else null
+        val albumImages = images.count { !it.isGif }
+        val albumId = if (albumImages > 1) randomClientMsgId() else null
 
         // 1-qadam: HAMMASI darhol ekranga chiqadi. Yuklash sekundlab davom etadi, foydalanuvchi
         // esa tanlagan rasmlarini shu zahoti ko'rishi kerak.
@@ -631,10 +632,25 @@ class ChatRepositoryImpl(
         // 2-qadam: KETMA-KET yuklaymiz. Parallel qilinsa mobil tarmoqda hammasi birdek
         // sekinlashadi va serverning yuklash kvotasi (daqiqasiga 20 fayl) tezroq tugaydi.
         var failure: Resource.Error? = null
+        // Albomning birinchi rasmi — `albumSize` faqat unga qo'shiladi (pastga qarang).
+        val firstOfAlbum = pending.firstOrNull { !it.image.isGif }
         for (item in pending) {
             // Videodagi bilan bir xil sabab ([withSendJob]): chatdan chiqib ketish
             // yarim ketgan albomni to'xtatmasin.
-            val result = withSendJob(item.localId) { uploadAndDeliver(conversationId, item, albumId) }
+            // `albumSize` FAQAT albomning birinchi rasmida ketadi — push aynan o'shanda
+            // yuboriladi va serverda sanaydigan narsa yo'q (qolgan rasmlar hali yo'lda).
+            // Server chegarasi — `2..10`; tanlagich ham 10 tadan oshirmaydi
+            // (`DEFAULT_MAX_IMAGES`), lekin chegara ikki joyda turgani uchun kesib qo'yamiz:
+            // oshib ketgan son butun albomni `422` qilardi.
+            val result = withSendJob(item.localId) {
+                uploadAndDeliver(
+                    conversationId = conversationId,
+                    item = item,
+                    albumId = albumId,
+                    albumSize = albumImages.coerceAtMost(MAX_ALBUM_SIZE)
+                        .takeIf { albumId != null && item === firstOfAlbum },
+                )
+            }
             if (result is Resource.Error) failure = result
         }
         // Bittasi yiqilsa ham qolganlari yuborilgan — xatoni qaytaramiz, lekin xabarlar
@@ -655,6 +671,7 @@ class ChatRepositoryImpl(
         conversationId: String,
         item: PendingImage,
         albumId: String?,
+        albumSize: Int? = null,
     ): Resource<Unit> {
         val upload = tracked(item.localId, item.image.fileName, item.image.bytes.size.toLong()) { onProgress ->
             remote.uploadAttachment(
@@ -685,6 +702,7 @@ class ChatRepositoryImpl(
                 body = item.caption,
                 mediaId = attachment.id,
                 albumId = if (item.image.isGif) null else albumId,
+                albumSize = albumSize,
             ),
             clientMsgId = item.clientMsgId,
             localId = item.localId,
@@ -1062,6 +1080,7 @@ class ChatRepositoryImpl(
             mediaId = payload.mediaId,
             stickerId = payload.stickerId,
             albumId = payload.albumId,
+            albumSize = payload.albumSize,
             gif = payload.gif,
             sticker = payload.sticker,
             replyToMessageId = payload.replyToMessageId,

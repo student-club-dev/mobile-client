@@ -153,24 +153,6 @@ private fun PostCell(
     }
 }
 
-/**
- * Postlar ro'yxati hali kelmagan.
- *
- * Bo'sh holat plitkasi bu yerda YO'Q: post yo'q bo'lsa bo'lim umuman chizilmaydi. Faqat
- * yuklanish ko'rsatiladi — "bo'sh" deb yozish ro'yxat kelmasidan oldin yolg'on bo'lardi.
- */
-@Composable
-internal fun PostsLoadingNote() {
-    Box(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(Sc.Card),
-        contentAlignment = Alignment.Center,
-    ) {
-        Box(Modifier.padding(horizontal = 20.dp, vertical = 30.dp)) {
-            ScText("Yuklanmoqda…", 16f, FontWeight.ExtraBold, Sc.Ink, maxLines = 1)
-        }
-    }
-}
-
 /** «12 iyul», o'tgan yildagi post uchun yil bilan: «12 iyul 2025». */
 private fun shortDate(story: Story): String {
     val date = story.createdAt.toLocalDateTime(TimeZone.currentSystemDefault()).date

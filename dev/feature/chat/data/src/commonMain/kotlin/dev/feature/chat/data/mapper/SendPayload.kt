@@ -19,6 +19,17 @@ internal data class SendPayload(
     val mediaId: String? = null,
     val stickerId: String? = null,
     val albumId: String? = null,
+    /**
+     * Albomda nechta rasm bo'lishi — **faqat birinchi xabarda** (`2..10`).
+     *
+     * Server buni push matni uchun ishlatadi: «📷 10 ta rasm». Usiz u faqat birinchi
+     * rasmni tasvirlay olardi, chunki push aynan birinchi rasm kelganda ketadi va o'sha
+     * paytda albomdan boshqa hech narsa yetib bormagan bo'ladi — ya'ni sanab bo'lmaydi,
+     * faqat **e'lon qilish** mumkin (`01-QOLGAN_ISHLAR_RESPONSE.md` §1).
+     *
+     * Ixtiyoriy: yuborilmasa eski xatti-harakat qoladi.
+     */
+    val albumSize: Int? = null,
     /** Qidiruvdan olingan GIF (`GifRefDto` shakli) — xom JSON, GIF moduliga bog'lanmaslik uchun. */
     val gif: JsonObject? = null,
     /**

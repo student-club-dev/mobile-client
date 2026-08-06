@@ -27,6 +27,7 @@ import dev.core.domain.usecase.LogoutUseCase
 import dev.core.domain.usecase.ObserveCurrentUserUseCase
 import dev.core.domain.usecase.RegisterUseCase
 import dev.core.domain.usecase.RequestPhoneOtpUseCase
+import dev.core.domain.usecase.RequestRegistrationOtpUseCase
 import dev.core.domain.usecase.ResetPasswordUseCase
 import dev.core.domain.usecase.RevokeDeviceSessionUseCase
 import dev.core.domain.usecase.SetPasswordUseCase
@@ -99,16 +100,16 @@ const val STUDENT_LISTINGS_REMOTE_ENABLED = true
 
 /**
  * Bildirishnomalar ro'yxati backenddan keladimi — `GET /v1/notifications` +
- * `POST /v1/notifications/read` (`NOTIFICATIONS_BACKEND.md`).
+ * `POST /v1/notifications/read` (`01-NOTIFICATIONS_BACKEND.md`).
  *
- * ⚠️ Bu endpoint spec'da (`student-club.json`) HALI YO'Q — klient tomoni tayyor, server
- * kutilmoqda. Shuning uchun bayroq hozircha `false`: yoqilsa ekran har ochilganda 404
- * oladi va "Ro'yxat yuklanmadi" holatida turardi. Endpoint joylangan kuni shu qiymatni
- * `true` qilish kifoya — boshqa hech narsani o'zgartirish kerak emas.
+ * 2026-08-05 dan boshlab ikkala endpoint ham serverda va spec'da bor, shuning uchun `true`.
+ *
+ * ⚠️ Ro'yxatga yozuvchi hodisalar `02-PUSH_CATALOG` bilan keladi: dastlab ro'yxat BO'SH
+ * ko'rinishi mumkin, lekin `404` bermaydi.
  *
  * Push (`POST /v1/devices`) bunga BOG'LIQ EMAS: u allaqachon serverda va doim ishlaydi.
  */
-const val NOTIFICATIONS_REMOTE_ENABLED = false
+const val NOTIFICATIONS_REMOTE_ENABLED = true
 
 /** Coil ishlatadigan rasm klientining Koin nomi. */
 const val IMAGE_CLIENT = "imageHttpClient"
@@ -179,6 +180,7 @@ val domainModule = module {
     factory { CancelRegistrationUseCase(get()) }
     factory { LogoutUseCase(get()) }
     factory { ObserveCurrentUserUseCase(get()) }
+    factory { RequestRegistrationOtpUseCase(get()) }
     factory { RequestPhoneOtpUseCase(get()) }
     factory { VerifyPhoneOtpUseCase(get()) }
     factory { ForgotPasswordUseCase(get()) }

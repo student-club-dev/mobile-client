@@ -41,6 +41,29 @@ sealed interface NotificationTarget {
      * Bunday bildirishnoma ham BOSILADI — faqat o'qilgan bo'ladi, ekran almashmaydi.
      */
     data object None : NotificationTarget
+
+    companion object {
+        /**
+         * Server bergan `targetType` + `targetId` juftligi → ma'no.
+         *
+         * Ro'yxat javobi (`target`) va push konverti (`data.targetType`/`data.targetId`)
+         * BIR XIL qiymatlarni yuboradi, shuning uchun o'girish ham bitta joyda: aks holda
+         * bitta bildirishnoma push'dan bosilganda bir ekranga, ro'yxatdan bosilganda
+         * boshqasiga olib borishi mumkin edi.
+         *
+         * Noma'lum tur ham, id kutgani holda id'siz kelgan tur ham [None] ga tushadi:
+         * bosilganda hech qayerga o'tmaydi, faqat o'qilgan bo'ladi. Bu ataylab — "id'siz
+         * suhbat" ni ochishga urinish bo'sh ekranga olib borardi.
+         */
+        fun of(type: String?, id: String?): NotificationTarget = when (type) {
+            "CHAT" -> id?.takeIf { it.isNotBlank() }?.let(::Chat) ?: None
+            "LISTING" -> id?.takeIf { it.isNotBlank() }?.let(::Listing) ?: None
+            "CONNECTION_REQUESTS" -> ConnectionRequests
+            "MY_LISTINGS" -> MyListings
+            "PROFILE" -> Profile
+            else -> None
+        }
+    }
 }
 
 /** Foydalanuvchi bildirishnomasi. */

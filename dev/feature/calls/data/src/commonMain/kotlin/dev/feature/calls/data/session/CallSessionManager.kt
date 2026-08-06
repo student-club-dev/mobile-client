@@ -112,6 +112,18 @@ class CallSessionManager(
             scope.launch { watchReconnect() },
             scope.launch { watchToken() },
         )
+
+        // Sovuq start: jarayon o'lgan, tizimdagi jiringlash oynasi esa qolib ketgan
+        // bo'lishi mumkin (u ilova jarayonidan uzoq yashaydi). Sessiya yo'q ekan, u
+        // oyna baribir foydasiz: javob berish uchun kerak bo'lgan SDP taklifi jarayon
+        // bilan birga yo'qolgan, ya'ni "Javob berish" ishlamasdi.
+        //
+        // ⚠️ Bu yerda serverdan SO'RALMAYDI. Bu metod ilova har ochilganda ishlaydi
+        // (`CallHost` ildizda, hatto kirish ekranida ham), ya'ni `GET /calls/active`
+        // qo'yilsa u har ishga tushishda bitta keraksiz so'rov bo'lardi — kirmagan
+        // foydalanuvchida esa `401`. Javob esa hech narsani o'zgartirmasdi: qo'ng'iroq
+        // serverda tirik bo'lsa ham biz unga qo'shila olmaymiz.
+        if (_session.value == null) presence.onCallEnded()
     }
 
     override fun stop() {
@@ -142,7 +154,49 @@ class CallSessionManager(
             // ulgurgan. UI shunda jimgina yopiladi.
             if (ack?.error?.code == CallErrorCode.CALL_NOT_FOUND) {
                 closeLocally(CallStatus.FAILED, CallEndReason.FAILED)
+            } else if (ack == null) {
+                // Ack umuman kelmadi — socket yana uzilgan yoki server jim. Bunda
+                // qo'ng'iroq tirikmi degan savolga REST javob beradi.
+                verifyActiveCall()
             }
+        }
+    }
+
+    /**
+     * `GET /v1/calls/active` bo'yicha **jonli sessiyani** serverga solishtiradi.
+     *
+     * ⚠️ Faqat [watchReconnect] dan, faqat sessiya BOR bo'lganda va faqat `call:connected`
+     * ack'i umuman kelmaganda chaqiriladi. Ya'ni bu so'rov ilova ochilganda emas, aynan
+     * "socket qaytdi, lekin qo'ng'iroq tirikmi — bilmayapmiz" holatida ketadi. Uni
+     * `start()` ga qo'yish har ishga tushishda bitta keraksiz so'rov degani bo'lardi
+     * (`CallHost` ildizda turadi, hatto kirish ekranida ham).
+     *
+     * Bu tekshiruv faqat **yopadi**, hech qachon ochmaydi: javob berish uchun SDP taklifi
+     * kerak, u esa faqat `call:incoming` bilan keladi.
+     *
+     * Poyga himoyasi: REST so'rovi ketayotganda haqiqiy `call:incoming` kelib qolishi
+     * mumkin. Shuning uchun javob qaytganda sessiya **o'zgarmaganligi** tekshiriladi —
+     * o'zgargan bo'lsa tegilmaydi.
+     */
+    private suspend fun verifyActiveCall() {
+        val before = _session.value ?: return
+        val result = repository.activeCall()
+        // Tarmoq xatosi — hech narsa qilinmaydi. "Bilmayman" hech qachon "tugadi" degani
+        // emas: aks holda bitta uzilgan so'rov jonli qo'ng'iroqni yopib qo'yardi.
+        val active = when (result) {
+            is Resource.Success -> result.data
+            else -> return
+        }
+        if (active != null && active.status.isLive && active.callId == before.callId) return
+
+        // Serverda bu qo'ng'iroq jonli emas.
+        val current = _session.value
+        if (current !== before) return
+        if (current.status.isLive) {
+            Napier.i("calls: server jonli qo'ng'iroqni bilmaydi — local sessiya yopiladi")
+            // Statistika YUBORILMAYDI: bu qo'ng'iroq bizning tomonimizda o'lchanmagan
+            // (jarayon o'lgan yoki media umuman oqmagan).
+            closeLocally(CallStatus.ENDED, CallEndReason.CANCELED, sendStats = false)
         }
     }
 

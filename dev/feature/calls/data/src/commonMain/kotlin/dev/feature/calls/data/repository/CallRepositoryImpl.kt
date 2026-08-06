@@ -3,6 +3,7 @@ package dev.feature.calls.data.repository
 import dev.core.common.Resource
 import dev.core.common.map
 import dev.feature.calls.data.remote.CallsRemoteDataSource
+import dev.feature.calls.domain.model.ActiveCall
 import dev.feature.calls.domain.model.Call
 import dev.feature.calls.domain.model.CallDirection
 import dev.feature.calls.domain.model.CallEndReason
@@ -14,6 +15,7 @@ import dev.feature.calls.domain.model.CallStatus
 import dev.feature.calls.domain.model.IceServer
 import dev.feature.calls.domain.model.IceServers
 import dev.feature.calls.domain.repository.CallRepository
+import dev.core.network.generated.model.ActiveCallDto
 import dev.core.network.generated.model.CallDto
 import dev.core.network.generated.model.IceServersDto
 import kotlinx.coroutines.sync.Mutex
@@ -81,6 +83,21 @@ class CallRepositoryImpl(
             )
         }
 
+    /**
+     * ⚠️ Kesh YO'Q va bo'lishi ham mumkin emas: bu so'rovning butun ma'nosi — "ayni SHU
+     * lahzada qo'ng'iroq bormi". Bir soniyalik eskirgan javob ham telefonni bo'sh joyga
+     * jiringlatib qo'yardi.
+     *
+     * Muddati o'tgan qo'ng'iroq `null` bilan bir xil ma'noda — server buni o'zi ham
+     * shunday hisoblaydi, lekin klient soati bilan tekshirish arzon va zararsiz.
+     */
+    override suspend fun activeCall(): Resource<ActiveCall?> =
+        remote.activeCall().map { response ->
+            response.call
+                ?.takeIf { it.expiresAt > clock.now() }
+                ?.toDomain()
+        }
+
     override suspend fun reportStats(callId: String, stats: CallStats): Resource<Unit> =
         remote.reportStats(callId, stats)
 
@@ -96,6 +113,19 @@ private fun IceServersDto.toDomain(): IceServers = IceServers(
     // tekshirish/filtrlash keyingi deploy'da qo'ng'iroqni o'chirib qo'yardi.
     servers = iceServers.map { IceServer(urls = it.urls, username = it.username, credential = it.credential) },
     ttlSeconds = ttlSeconds,
+)
+
+private fun ActiveCallDto.toDomain(): ActiveCall = ActiveCall(
+    callId = callId,
+    conversationId = conversationId,
+    // `state`/`media` — `String` (kengayadigan enum): noma'lum qiymat butun javobni
+    // yiqitmasligi kerak. Noma'lum holat "jonli emas" deb o'qiladi.
+    status = parseEnum(state, CallStatus.ENDED),
+    media = parseEnum(media, CallMedia.AUDIO),
+    incoming = incoming,
+    peerId = peer?.id,
+    peerName = peer?.fullName,
+    peerAvatarUrl = peer?.avatarUrl,
 )
 
 private fun CallDto.toDomain(): Call = Call(

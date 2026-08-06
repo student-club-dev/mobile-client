@@ -3,6 +3,7 @@ package dev.feature.calls.data.remote
 import dev.core.common.Resource
 import dev.core.common.network.NetworkConnectivity
 import dev.core.network.generated.api.CallsApi
+import dev.core.network.generated.model.ActiveCallResponseDto
 import dev.core.network.generated.model.CallListDto
 import dev.core.network.generated.model.IceServersDto
 import dev.core.network.generated.model.RecordCallStatsDto
@@ -27,6 +28,14 @@ class CallsRemoteDataSource(
     /** `GET /v1/calls/ice-servers` — parametrsiz, `studentId` faqat tokendan olinadi. */
     suspend fun iceServers(): Resource<IceServersDto> =
         safeCall(connectivity) { api.iceServers().body() }
+
+    /**
+     * `GET /v1/calls/active` — sovuq startdan keyin: serverda jonli qo'ng'iroq bormi.
+     *
+     * Ikkita Redis o'qish, bazaga yozuv yo'q — javob tez keladi. `call: null` **xato emas**.
+     */
+    suspend fun activeCall(): Resource<ActiveCallResponseDto> =
+        safeCall(connectivity) { api.active().body() }
 
     /** `GET /v1/calls?page=&size=` — eng yangisi birinchi. */
     suspend fun history(page: Int, size: Int): Resource<CallListDto> =

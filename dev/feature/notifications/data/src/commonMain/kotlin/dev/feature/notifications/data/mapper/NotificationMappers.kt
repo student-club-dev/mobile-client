@@ -1,7 +1,7 @@
 package dev.feature.notifications.data.mapper
 
 import dev.core.database.sql.NotificationEntity
-import dev.feature.notifications.data.dto.NotificationDto
+import dev.core.network.generated.model.NotificationDto
 import dev.feature.notifications.domain.model.AppNotification
 import dev.feature.notifications.domain.model.NotificationTarget
 import dev.feature.notifications.domain.model.NotificationType
@@ -14,7 +14,7 @@ internal fun NotificationEntity.toDomain(): AppNotification = AppNotification(
     body = body,
     type = parseEnum(type, NotificationType.SYSTEM),
     createdAt = Instant.fromEpochMilliseconds(createdAt),
-    target = targetOf(targetType, targetId),
+    target = NotificationTarget.of(targetType, targetId),
     read = read != 0L,
 )
 
@@ -28,38 +28,15 @@ internal fun NotificationEntity.toDomain(): AppNotification = AppNotification(
 internal fun NotificationDto.toEntity(): NotificationEntity = NotificationEntity(
     id = id,
     title = title,
-    body = body,
+    // Tanasi bo'sh qator sarlavhaning o'zi bilan chiziladi (§1, `body` nullable).
+    body = body.orEmpty(),
     type = parseEnum(type, NotificationType.SYSTEM).name,
-    createdAt = parseInstant(createdAt),
+    createdAt = createdAt.toEpochMilliseconds(),
     targetType = target?.type?.takeIf { it.isNotBlank() },
     targetId = target?.id?.takeIf { it.isNotBlank() },
-    // Server ikki shaklning birini yuborishi mumkin: `read` (bool) yoki `readAt` (vaqt).
-    // Ikkalasi ham yo'q bo'lsa — o'qilmagan (yangi bildirishnoma odatiy holat).
-    read = if (read ?: (readAt != null)) 1L else 0L,
+    // Server `readAt` yuboradi (`read: bool` EMAS — §1 dagi 4-talab): `null` — o'qilmagan.
+    read = if (readAt != null) 1L else 0L,
 )
-
-/**
- * `targetType` + `targetId` → domen [NotificationTarget].
- *
- * Noma'lum tur ham, id kutgani holda id'siz kelgan tur ham [NotificationTarget.None] ga
- * tushadi: bosilganda hech qayerga o'tmaydi, faqat o'qilgan bo'ladi. Bu ataylab —
- * "id'siz suhbat" ni ochishga urinish bo'sh ekranga olib borardi.
- */
-internal fun targetOf(type: String?, id: String?): NotificationTarget = when (type) {
-    "CHAT" -> id?.let { NotificationTarget.Chat(it) } ?: NotificationTarget.None
-    "LISTING" -> id?.let { NotificationTarget.Listing(it) } ?: NotificationTarget.None
-    "CONNECTION_REQUESTS" -> NotificationTarget.ConnectionRequests
-    "MY_LISTINGS" -> NotificationTarget.MyListings
-    "PROFILE" -> NotificationTarget.Profile
-    else -> NotificationTarget.None
-}
-
-/**
- * ISO-8601 → epoch ms. Parse xatosi butun ro'yxatni yiqitmasin — zaxira `0` (bildirishnoma
- * ko'rinadi, faqat eng oxirida va vaqtsiz).
- */
-private fun parseInstant(value: String?): Long =
-    value?.let { runCatching { Instant.parse(it).toEpochMilliseconds() }.getOrNull() } ?: 0L
 
 /**
  * Sim/server qiymati → domen enum'i. Noma'lum qiymat [default] ga tushadi.

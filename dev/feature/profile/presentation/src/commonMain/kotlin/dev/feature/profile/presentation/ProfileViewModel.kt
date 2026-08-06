@@ -17,6 +17,9 @@ import dev.feature.profile.domain.usecase.RefreshProfileUseCase
 import dev.feature.profile.domain.usecase.SaveProfileUseCase
 import dev.feature.profile.domain.usecase.SetMainProfilePhotoUseCase
 import dev.feature.profile.domain.usecase.UploadAvatarUseCase
+import dev.feature.listings.domain.model.District
+import dev.feature.listings.domain.model.Region
+import dev.feature.listings.domain.repository.GeoCatalogRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -37,6 +40,19 @@ data class ProfileUiState(
     val profile: UserProfile? = null,
     /** Universitet tanlash uchun ro'yxat. */
     val universities: List<University> = emptyList(),
+)
+
+/**
+ * Yashash manzilini tanlash uchun katalog (`02-PUSH_CATALOG_RESPONSE.md` §4).
+ *
+ * Xato holati YO'Q va bu ataylab: [GeoCatalogRepository] hech qachon yiqilmaydi — tarmoq
+ * bo'lmasa kesh, kesh ham bo'lmasa statik ro'yxat qaytaradi. "Viloyatlar yuklanmadi" degan
+ * holat foydalanuvchiga hech narsa bermaydi, faqat formani to'sib qo'yardi.
+ */
+data class AddressCatalogState(
+    val regions: List<Region> = emptyList(),
+    /** Tanlangan viloyatning tumanlari; viloyat tanlanmagan bo'lsa bo'sh. */
+    val districts: List<District> = emptyList(),
 )
 
 /**
@@ -65,6 +81,7 @@ class ProfileViewModel(
     observeCurrentUserUseCase: ObserveCurrentUserUseCase,
     observeProfileUseCase: ObserveProfileUseCase,
     universityRepository: UniversityRepository,
+    private val geoCatalog: GeoCatalogRepository,
     private val logoutUseCase: LogoutUseCase,
     private val saveProfileUseCase: SaveProfileUseCase,
     private val refreshProfileUseCase: RefreshProfileUseCase,
@@ -79,6 +96,11 @@ class ProfileViewModel(
 
     /** Profil rasmlari — tahrirlash ekrani uchun. */
     val photos: StateFlow<ProfilePhotosState> = _photos.asStateFlow()
+
+    private val _addressCatalog = MutableStateFlow(AddressCatalogState())
+
+    /** Viloyat/tuman katalogi — tahrirlash ekrani uchun. */
+    val addressCatalog: StateFlow<AddressCatalogState> = _addressCatalog.asStateFlow()
 
     /** "Tepadan tortib yangilash" ketyapti. */
     private val _refreshing = MutableStateFlow(false)
@@ -148,6 +170,31 @@ class ProfileViewModel(
                 is Resource.Error -> onResult(res.message)
                 else -> onResult(null)
             }
+        }
+    }
+
+    // --- Yashash manzili ------------------------------------------------------------------
+
+    /**
+     * Viloyatlar ro'yxatini (va tanlangani bo'lsa uning tumanlarini) yuklaydi.
+     *
+     * Tahrirlash ekrani ochilganda bir marta chaqiriladi. Tumanlar viloyat bilan BIRGA
+     * so'raladi: profil allaqachon to'ldirilgan bo'lsa foydalanuvchi ekranni ochishi bilan
+     * o'z tumanini ko'rishi kerak, avval viloyatni qayta bosishi emas.
+     */
+    fun loadAddressCatalog(regionId: String?) {
+        viewModelScope.launch {
+            val regions = geoCatalog.regions()
+            val districts = regionId?.takeIf { it.isNotBlank() }?.let { geoCatalog.districts(it) }
+            _addressCatalog.value = AddressCatalogState(regions, districts.orEmpty())
+        }
+    }
+
+    /** Viloyat almashtirildi — tumanlar qayta o'qiladi. */
+    fun selectRegion(regionId: String?) {
+        viewModelScope.launch {
+            val districts = regionId?.takeIf { it.isNotBlank() }?.let { geoCatalog.districts(it) }
+            _addressCatalog.update { it.copy(districts = districts.orEmpty()) }
         }
     }
 

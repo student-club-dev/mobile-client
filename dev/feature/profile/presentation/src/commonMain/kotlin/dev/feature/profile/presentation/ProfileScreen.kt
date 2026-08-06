@@ -113,16 +113,11 @@ fun ProfileScreen(
             expandable = photoUrls.isNotEmpty(),
         )
 
-        // Tepadan tortish — profil va rasmlar to'plami serverdan qayta o'qiladi.
-        //
-        // ⚠️ O'ram yig'iluvchi sarlavhaning `nestedScroll` idan TASHQARIDA: ikkalasi bir
-        // xil hodisalarni ushlaydi va tortish sarlavhani yoyish bilan aralashib ketardi.
-        ScPullRefresh(refreshing = refreshing, onRefresh = vm::refresh) {
-            Column(
-                Modifier.fillMaxSize()
-                    .nestedScroll(header.nestedScrollConnection)
-                    .verticalScroll(rememberScrollState()),
-            ) {
+        // Sarlavha aylanadigan qismning ICHIDA emas, USTIDA — Telegramdagidek **mixlangan**:
+        // u yig'ilib topbarga aylanadi, lekin hech qachon ekrandan surilib ketmaydi.
+        // Ilgari u ustunning birinchi bolasi edi, ya'ni topbargacha yig'ilgach kontent
+        // bilan birga yuqoriga chiqib ketardi.
+        Column(Modifier.fillMaxSize()) {
                 ScProfileHeader(
                     state = header,
                     name = state.name,
@@ -159,8 +154,21 @@ fun ProfileScreen(
                     },
                 )
 
+            // Tepadan tortish — profil va rasmlar to'plami serverdan qayta o'qiladi.
+            // O'ram sarlavhadan PASTDA: u sarlavha bilan bir xil hodisalarni ushlaydi va
+            // ustiga qo'yilsa tortish sarlavhani yoyish bilan aralashib ketardi.
+            ScPullRefresh(
+                refreshing = refreshing,
+                onRefresh = vm::refresh,
+                modifier = Modifier.weight(1f),
+            ) {
                 Column(
-                    Modifier.fillMaxWidth().padding(horizontal = Sc.ScreenPadding),
+                    Modifier.fillMaxWidth()
+                        // Aylanish shu yerda: sarlavha `nestedScroll` orqali avval o'zi
+                        // yig'iladi, kontent esa undan keyin suriladi.
+                        .nestedScroll(header.nestedScrollConnection)
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = Sc.ScreenPadding),
                     verticalArrangement = Arrangement.spacedBy(14.dp),
                 ) {
                     Spacer(Modifier.height(4.dp))
@@ -214,7 +222,7 @@ fun ProfileScreen(
                     LogoutRow { vm.logout(onLoggedOut) }
                     Spacer(Modifier.height(24.dp).navigationBarsPadding())
                 }
-            }
+                }
         }
     }
 }

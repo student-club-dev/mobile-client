@@ -26,13 +26,14 @@ class StudentClubMessagingService : FirebaseMessagingService() {
      * [PushNotifications] izohi.
      */
     override fun onMessageReceived(message: RemoteMessage) {
-        val conversationId = message.data[PushNotifications.EXTRA_CONVERSATION_ID]
         PushNotifications.showMessage(
             context = this,
             // `notification` bloki bo'lmasa sarlavha/matn `data` dan olinadi.
             title = message.notification?.title ?: message.data["title"],
             body = message.notification?.body ?: message.data["body"],
-            conversationId = conversationId,
+            // Konvert butunligicha uzatiladi — `notificationId`, `targetType`/`targetId` va
+            // eski `conversationId` shu yerdan intent'ga tushadi.
+            data = message.data,
         )
     }
 }

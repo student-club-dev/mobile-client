@@ -46,10 +46,11 @@ fun MyPostsSection(
     val stories = if (archived) state.archived else state.posts
 
     Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        // Ro'yxat bo'sh bo'lsa plitka umuman chizilmaydi — faqat yuklanish ko'rsatiladi.
-        if (stories.isEmpty()) {
-            if (state.loading) PostsLoadingNote()
-        } else {
+        // Yuklanish yozuvi YO'Q: bo'sh joy jim turadi va to'r ma'lumot kelganda paydo
+        // bo'ladi. "Yuklanmoqda…" kartasi qo'yilsa, posti yo'q foydalanuvchida (odatiy
+        // hol) u bir soniyadan keyin ko'z oldida yo'qolar va ostidagi hamma narsa
+        // yuqoriga sakrardi.
+        if (stories.isNotEmpty()) {
             PostGrid(
                 stories = stories,
                 archived = archived,

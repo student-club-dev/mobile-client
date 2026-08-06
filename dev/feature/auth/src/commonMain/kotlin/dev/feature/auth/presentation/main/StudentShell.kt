@@ -36,6 +36,8 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -43,6 +45,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
+import androidx.navigation.NavOptionsBuilder
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -74,14 +77,18 @@ import dev.feature.listings.presentation.MyListingsScreen
 import dev.feature.listings.presentation.PostListingScreen
 import dev.feature.listings.presentation.detail.ListingDetailScreen
 import dev.feature.listings.presentation.platform.rememberPhoneCaller
+import dev.feature.connections.domain.model.StudentSummary
 import dev.feature.connections.presentation.BlockedStudentsScreen
 import dev.feature.connections.presentation.ConnectionsScreen
 import dev.feature.connections.presentation.ConnectionsTab
+import dev.feature.connections.presentation.StudentProfileSheet
 import dev.feature.notifications.domain.model.NotificationTarget
+import dev.feature.notifications.domain.repository.NotificationRepository
 import dev.feature.notifications.presentation.NotificationsScreen
 import dev.feature.settings.presentation.SettingsScreen
 import dev.feature.university.presentation.MyUniversityScreen
 import dev.feature.chat.presentation.ChatScreen
+import dev.feature.chat.presentation.rememberPeerProfileSections
 import dev.feature.home.presentation.HomeScreen
 import dev.feature.profile.presentation.EditProfileScreen
 import dev.feature.profile.presentation.ProfileScreen
@@ -229,17 +236,31 @@ fun StudentShell(onLoggedOut: () -> Unit) {
     val pushRegistrar = koinInject<PushRegistrar>()
     LaunchedEffect(Unit) { runCatching { pushRegistrar.onSessionStarted() } }
 
-    // Bildirishnoma bosilgan bo'lsa — o'sha suhbatni ochamiz. Qiymat ilova ishga tushishidan
-    // oldin ham qo'yilgan bo'lishi mumkin, shuning uchun oqim sifatida kuzatiladi.
-    val pendingConversationId by PushRoute.pendingConversationId.collectAsState()
-    LaunchedEffect(pendingConversationId) {
-        val conversationId = pendingConversationId ?: return@LaunchedEffect
+    // Bildirishnoma bosilgan bo'lsa — konvertdagi ekranni ochamiz. Qiymat ilova ishga
+    // tushishidan oldin ham qo'yilgan bo'lishi mumkin, shuning uchun oqim sifatida kuzatiladi.
+    val notifications = koinInject<NotificationRepository>()
+    val pendingPush by PushRoute.pending.collectAsState()
+    LaunchedEffect(pendingPush) {
+        val payload = pendingPush ?: return@LaunchedEffect
         PushRoute.consume()
-        // Push'dan kelinganda suhbat Home ustiga qo'yiladi: orqaga bosilsa ilova yopilmay,
-        // bosh ekranga tushadi.
-        nav.navigateSafe("$CHAT?conversationId=${encodeArg(conversationId)}") {
-            popUpTo(StudentTab.HOME.route)
-        }
+
+        // §2.1 — bosilgan push ro'yxatdagi qatorni ham o'qilgan qiladi. Busiz foydalanuvchi
+        // bildirishnomani ko'rgan bo'lsa ham `unreadCount` uni sanashda davom etardi va
+        // qo'ng'iroq ikonkasidagi raqam hech qachon nolga tushmasdi.
+        payload.notificationId?.takeIf { it.isNotBlank() }?.let { notifications.markRead(it) }
+
+        // Konvertda `targetType` bo'lsa — o'sha; bo'lmasa eski chat push'i (`conversationId`).
+        val target = NotificationTarget.of(payload.targetType, payload.targetId)
+            .takeIf { it != NotificationTarget.None }
+            ?: payload.conversationId
+                ?.takeIf { it.isNotBlank() }
+                ?.let { NotificationTarget.Chat(it) }
+            ?: return@LaunchedEffect
+
+        // Push'dan kelinganda ekran Home ustiga qo'yiladi: orqaga bosilsa ilova yopilmay,
+        // bosh ekranga tushadi. (Ro'yxatdan bosilganda esa stack saqlanadi — qarang
+        // [openNotificationTarget].)
+        nav.openNotificationTarget(target) { popUpTo(StudentTab.HOME.route) }
     }
 
     /**
@@ -248,6 +269,16 @@ fun StudentShell(onLoggedOut: () -> Unit) {
      * qatlami uni qoraytirmasdi va tugmalari bosilaverardi (`ScOverlayHost` izohiga q.).
      */
     val overlay = remember { ScOverlayHostState() }
+
+    /**
+     * Ochilgan talaba profili — **butun karkas uchun bitta** varaq.
+     *
+     * Talaba ilovaning ko'p joyida ko'rinadi (bosh ekran, "Do'stlar", universitet, qidiruv),
+     * profil varag'ining bo'limlari esa story va chat modullarida yashaydi. Har ekran o'z
+     * varag'ini chizsa, o'sha ekranlar chat/story modullariga bog'lanardi — shuning uchun
+     * ular faqat "talaba bosildi" deb aytadi, varaqni esa shu yer ochadi.
+     */
+    var profileStudent by remember { mutableStateOf<StudentSummary?>(null) }
 
     CompositionLocalProvider(LocalScOverlayHost provides overlay) {
         Box(Modifier.fillMaxSize().background(Sc.Bg)) {
@@ -308,6 +339,7 @@ fun StudentShell(onLoggedOut: () -> Unit) {
                     MyUniversityScreen(
                         onOpenListing = { id -> nav.navigateSafe("$LISTING_DETAIL/${encodeArg(id)}") },
                         onOpenTasks = { openListingsKind(ListingKind.TASK) },
+                        onOpenStudent = { profileStudent = it },
                     )
                 }
                 composable(
@@ -401,6 +433,7 @@ fun StudentShell(onLoggedOut: () -> Unit) {
                 ) { entry ->
                     ConnectionsScreen(
                         onBack = { nav.popSafe() },
+                        onOpenStudent = { profileStudent = it },
                         // Chat tab'i suhbatni o'zi ochadi (`POST /v1/conversations` idempotent).
                         onOpenChat = { studentId, _ -> openChatWith(studentId) },
                         // Home'dagi tugmalar kerakli bo'limni darrov ochadi. Nomi noto'g'ri
@@ -454,6 +487,21 @@ fun StudentShell(onLoggedOut: () -> Unit) {
             // ularning TAGIDA qoladi.
             ScOverlayHost(overlay)
         }
+
+        profileStudent?.let { student ->
+            StudentProfileSheet(
+                studentId = student.id,
+                // Ro'yxatdagi qisqa profil darrov uzatiladi — varaq bo'sh holatda ochilmasin.
+                known = student,
+                onClose = { profileStudent = null },
+                // Bosh ekran va chatdagi profil bilan AYNAN bir xil bo'limlar.
+                sections = rememberPeerProfileSections(student.id),
+                onOpenChat = { id ->
+                    profileStudent = null
+                    openChatWith(id)
+                },
+            )
+        }
     }
 }
 
@@ -465,19 +513,24 @@ fun StudentShell(onLoggedOut: () -> Unit) {
  * ekanini emas. Shu sabab route nomlari o'zgarsa yoki ekran ko'chsa, tuzatish faqat shu
  * funksiyada bo'ladi.
  *
- * Hamma yo'nalish stack'ga QO'YILADI (`popUpTo` yo'q): orqaga bosilganda foydalanuvchi
- * bildirishnomalar ro'yxatiga qaytadi va qolganini ham ko'rib chiqa oladi.
+ * Ro'yxatdan bosilganda hamma yo'nalish stack'ga QO'YILADI (sukut bo'yicha [options] bo'sh):
+ * orqaga bosilganda foydalanuvchi bildirishnomalar ro'yxatiga qaytadi va qolganini ham ko'rib
+ * chiqa oladi. Push'dan kelinganda esa chaqiruvchi [options] orqali stack'ni Home'ga tushiradi —
+ * aks holda "Orqaga" bosilishi ilovani butunlay yopardi.
  */
-private fun NavController.openNotificationTarget(target: NotificationTarget) {
+private fun NavController.openNotificationTarget(
+    target: NotificationTarget,
+    options: NavOptionsBuilder.() -> Unit = {},
+) {
     when (target) {
         is NotificationTarget.Chat ->
-            navigateSafe("$CHAT?conversationId=${encodeArg(target.conversationId)}")
+            navigateSafe("$CHAT?conversationId=${encodeArg(target.conversationId)}", options)
         is NotificationTarget.Listing ->
-            navigateSafe("$LISTING_DETAIL/${encodeArg(target.listingId)}")
+            navigateSafe("$LISTING_DETAIL/${encodeArg(target.listingId)}", options)
         NotificationTarget.ConnectionRequests ->
-            navigateSafe("$CONNECTIONS?tab=${ConnectionsTab.REQUESTS.name}")
-        NotificationTarget.MyListings -> navigateSafe(MY_LISTINGS)
-        NotificationTarget.Profile -> navigateSafe(PROFILE)
+            navigateSafe("$CONNECTIONS?tab=${ConnectionsTab.REQUESTS.name}", options)
+        NotificationTarget.MyListings -> navigateSafe(MY_LISTINGS, options)
+        NotificationTarget.Profile -> navigateSafe(PROFILE, options)
         // Ekran almashmaydi — bildirishnoma faqat o'qilgan bo'ladi (ekran o'zi hal qiladi).
         NotificationTarget.None -> Unit
     }

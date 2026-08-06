@@ -25,24 +25,52 @@ interface AuthRepository {
     suspend fun login(identifier: AuthIdentifier, password: String): Resource<User>
 
     /**
-     * Yangi talaba hisobi (`POST /auth/student/register`).
+     * Ro'yxatdan o'tish uchun raqamga SMS kod (`POST /auth/student/register/otp`).
      *
-     * Sessiya **kutilmoqda** holatida ochiladi: tokenlar saqlanadi (ularsiz `otp/request` va
-     * `otp/verify` ishlamaydi — ular Bearer talab qiladi), lekin local foydalanuvchi qatori
-     * YOZILMAYDI. Ya'ni ilova hali kirgan deb hisoblamaydi va ilova o'chib qayta ochilsa
-     * kirish ekraniga tushadi. Raqam tasdiqlangach [completeRegistration] chaqiriladi.
+     * ⚠️ Bu [requestPhoneOtp] EMAS va ikkalasining kodi bir-biriga yaramaydi (server
+     * ularni Redis'da alohida fazoda saqlaydi):
+     *
+     * | | `otp/request` | `register/otp` |
+     * |---|---|---|
+     * | Token | kerak | **kerak emas** |
+     * | Qachon | hisob BOR, raqamni tasdiqlash | hisob YO'Q, ro'yxatdan oldin |
+     *
+     * Chaqiruv tartibi shu sabab teskari: avval kod, keyin [register]. Hisob kod
+     * tekshirilmaguncha UMUMAN yaratilmaydi.
      */
-    suspend fun register(identifier: AuthIdentifier, password: String): Resource<User>
+    suspend fun requestRegistrationOtp(phone: String): Resource<OtpChallenge>
 
     /**
-     * Ro'yxatni yakunlaydi — SMS kod muvaffaqiyatli tekshirilgandan KEYIN chaqiriladi:
-     * profil tortiladi va local sessiya qatori yoziladi (endi foydalanuvchi kirgan hisoblanadi).
+     * Yangi talaba hisobi (`POST /auth/student/register`).
+     *
+     * [otpCode] — [requestRegistrationOtp] bergan kod. **`phoneNumber` yuborilganda
+     * majburiy** (aks holda `422`): raqam bazada `@unique`, ya'ni uni tasdiqsiz band qilgan
+     * ro'yxat raqamning haqiqiy egasini butunlay tashqarida qoldirardi. Email bilan
+     * ro'yxatdan o'tishda kerak emas.
+     *
+     * Sessiya **kutilmoqda** holatida ochiladi: tokenlar saqlanadi, lekin local
+     * foydalanuvchi qatori YOZILMAYDI. Ya'ni ilova o'chib qayta ochilsa kirish ekraniga
+     * tushadi. Profil saqlangach [completeRegistration] chaqiriladi.
+     */
+    suspend fun register(
+        identifier: AuthIdentifier,
+        password: String,
+        otpCode: String? = null,
+    ): Resource<User>
+
+    /**
+     * Ro'yxatni yakunlaydi — [register] muvaffaqiyatli o'tgandan KEYIN chaqiriladi:
+     * local sessiya qatori yoziladi (endi foydalanuvchi kirgan hisoblanadi).
      */
     suspend fun completeRegistration(): Resource<User>
 
     /**
-     * Tasdiqlanmagan ro'yxatni bekor qiladi (foydalanuvchi kod ekranidan chiqib ketdi) —
-     * tokenlar bekor qilinadi va o'chiriladi, ilovaga kirish bo'lmaydi.
+     * Yarim qolgan ro'yxatni bekor qiladi (foydalanuvchi kod ekranidan chiqib ketdi) —
+     * tokenlar bekor qilinadi va o'chiriladi.
+     *
+     * Kod ekranidan chiqilganda serverda hech narsa qolmaydi: hisob endi kod
+     * tekshirilgandan KEYIN yaratiladi. Bu chaqiruv esa [register] o'tib, lekin profil
+     * saqlash yoki [completeRegistration] yiqilgan holat uchun kerak.
      */
     suspend fun cancelPendingRegistration()
 
@@ -65,9 +93,12 @@ interface AuthRepository {
      */
     fun observeCurrentUser(): Flow<User?>
 
-    // --- Telefon raqamini tasdiqlash (kirgan holatda) --------------------------------
+    // --- Telefon raqamini tasdiqlash (hisob ALLAQACHON bor) --------------------------
+    //
+    // Ro'yxatdan o'tish oqimi bu ikkisini ISHLATMAYDI — u `register/otp` dan foydalanadi.
+    // Bular email/Google bilan ochilgan hisobga keyinchalik raqam qo'shish uchun.
 
-    /** Raqamga SMS kod yuboradi (`POST /auth/student/otp/request`). */
+    /** Raqamga SMS kod yuboradi (`POST /auth/student/otp/request`, Bearer talab qiladi). */
     suspend fun requestPhoneOtp(phone: String): Resource<OtpChallenge>
 
     /** Kodni tekshiradi va raqamni tasdiqlangan deb belgilaydi. */

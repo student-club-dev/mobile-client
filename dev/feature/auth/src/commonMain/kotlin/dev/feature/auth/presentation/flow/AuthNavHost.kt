@@ -83,10 +83,24 @@ fun AuthNavHost(vm: AuthFlowViewModel = koinViewModel()) {
         return
     }
     // Chiqishdan keyin "0 dan" kirish ekrani: tanishtiruv faqat ilk ochilishda ko'rsatiladi.
-    val startDestination = when {
-        loggedIn == true -> Route.HOME
-        onboardingSeen == true -> Route.WELCOME
-        else -> Route.ONBOARDING
+    //
+    // ⚠️ **Bir marta** hisoblanadi va keyin o'zgarmaydi (`rememberSaveable`). Bu qiymat
+    // faqat "qayerdan boshlanamiz" degan savolga javob beradi; keyingi o'tishlarni
+    // navigatsiyaning o'zi bajaradi.
+    //
+    // Nega shunday: `NavHost` grafni `remember(startDestination)` bilan quradi, ya'ni bu
+    // qiymat o'zgarsa graf QAYTA quriladi va `navController.graph = …` butun back stack'ni
+    // boshidan tiklaydi. Kirish paytida esa qiymat ALBATTA o'zgaradi: `loggedIn` local
+    // sessiya bazasidan kelib, `false` dan `true` ga sakraydi. Natijada HOME ikki marta
+    // ochilardi — avval `AuthEvent.Authenticated` bilan, so'ng grafning qayta qurilishi
+    // bilan. Ikkinchisi `StudentShell` ni noldan quradi (ma'lumot qayta tortiladi, ekran
+    // bir lahza bo'shab qotadi).
+    val startDestination = rememberSaveable {
+        when {
+            loggedIn == true -> Route.HOME
+            onboardingSeen == true -> Route.WELCOME
+            else -> Route.ONBOARDING
+        }
     }
 
     val nav = rememberNavController()

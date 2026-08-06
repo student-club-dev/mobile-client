@@ -103,13 +103,19 @@ interface ConnectionsRepository {
     suspend fun blocked(page: Int = 1, size: Int = DEFAULT_PAGE_SIZE): Resource<Page<BlockedStudent>>
 
     /**
-     * Shikoyat. [targetStudentId] **yoki** [messageId] — aynan bittasi berilishi shart.
-     * Takroriy shikoyat eskisiga birlashtiriladi; foydalanuvchi uchun farqi yo'q.
+     * Shikoyat. [targetStudentId], [messageId] **yoki** [callId] — aynan bittasi berilishi
+     * shart. Takroriy shikoyat eskisiga birlashtiriladi; foydalanuvchi uchun farqi yo'q.
+     *
+     * ⚠️ [callId] — o'zingiz **qatnashgan** qo'ng'iroq bo'lishi shart, aks holda
+     * `422 CALL_NOT_FOUND` (`04-CALLS_RESPONSE.md` §5). Bu bir vaqtda ham ruxsat, ham
+     * mavjudlik tekshiruvi: javobdan "bunday qo'ng'iroq bor ekan" degan xulosa chiqarib
+     * bo'lmaydi.
      */
     suspend fun report(
         reason: ReportReason,
         targetStudentId: String? = null,
         messageId: String? = null,
+        callId: String? = null,
         note: String? = null,
     ): Resource<Unit>
 

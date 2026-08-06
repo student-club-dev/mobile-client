@@ -231,6 +231,7 @@ fun HomeScreen(
                         onSeeAll = onOpenStudentSearch,
                         onConnect = vm::connect,
                         onMessage = onOpenChatWith,
+                        onOpenStudent = { profileStudent = it },
                     )
                     StudentsSection(
                         title = "Barcha talabalar",
@@ -239,6 +240,7 @@ fun HomeScreen(
                         onSeeAll = onOpenStudentSearch,
                         onConnect = vm::connect,
                         onMessage = onOpenChatWith,
+                        onOpenStudent = { profileStudent = it },
                     )
                     // Pastki navigatsiya + FAB uchun joy.
                     Spacer(Modifier.height(96.dp))
@@ -864,6 +866,7 @@ private fun StudentsSection(
     onSeeAll: () -> Unit,
     onConnect: (String) -> Unit,
     onMessage: (String) -> Unit,
+    onOpenStudent: (StudentSummary) -> Unit,
 ) {
     if (students.isEmpty()) return
     Column(verticalArrangement = Arrangement.spacedBy(13.dp)) {
@@ -872,7 +875,10 @@ private fun StudentsSection(
             val student = result.student
             val (tint, accent) = studentVisuals[index.mod(studentVisuals.size)]
             Column(
+                // Kartaning O'ZI profilni ochadi; "Xabar"/"Bog'lanish" tugmasi o'z
+                // bosishini yutadi.
                 Modifier.width(150.dp).scCard(radius = 26.dp)
+                    .clickable { onOpenStudent(student) }
                     .padding(horizontal = 16.dp, vertical = 18.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {

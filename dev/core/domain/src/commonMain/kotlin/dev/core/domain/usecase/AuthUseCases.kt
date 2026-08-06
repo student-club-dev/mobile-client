@@ -34,15 +34,45 @@ class LoginWithGoogleUseCase(private val repository: AuthRepository) {
     }
 }
 
-/** Telefon yoki email + parol bilan yangi hisob yaratish. */
+/**
+ * Ro'yxatdan o'tishning **birinchi** qadami — raqamga SMS kod (`register/otp`).
+ *
+ * Hisob bu qadamda yaratilmaydi. Shuning uchun bu chaqiruv tokensiz ketadi va uni
+ * [RequestPhoneOtpUseCase] bilan aralashtirmaslik kerak — kodlar ham bir-biriga yaramaydi.
+ */
+class RequestRegistrationOtpUseCase(private val repository: AuthRepository) {
+    suspend operator fun invoke(phone: String): Resource<OtpChallenge> {
+        val identifier = AuthIdentifier.of(phone) as? AuthIdentifier.Phone
+            ?: return Resource.Error("To'liq 9 xonali raqam kiriting")
+        return repository.requestRegistrationOtp(identifier.value)
+    }
+}
+
+/**
+ * Telefon yoki email + parol bilan yangi hisob yaratish.
+ *
+ * [otpCode] — telefon bilan ro'yxatdan o'tishda **majburiy**
+ * ([RequestRegistrationOtpUseCase] dan olinadi). Uzunligi shu yerda tekshiriladi: chala
+ * kod bilan so'rov yuborish bekorga bitta urinishni yoqib yuborardi (server urinishlar
+ * sonini sanaydi).
+ *
+ * ⚠️ Parolga cheklov YO'Q va bu ataylab: qoidani server biladi va uni o'z matni bilan
+ * (`422`, `error.fields.password`) qaytaradi. Klientdagi nusxa qoida o'zgarganda jimgina
+ * eskirar va foydalanuvchini serverda haqiqatan qabul qilinadigan paroldan mahrum
+ * qilardi.
+ */
 class RegisterUseCase(private val repository: AuthRepository) {
-    suspend operator fun invoke(login: String, password: String): Resource<User> {
+    suspend operator fun invoke(
+        login: String,
+        password: String,
+        otpCode: String? = null,
+    ): Resource<User> {
         val identifier = AuthIdentifier.of(login)
             ?: return Resource.Error("Telefon raqami yoki email manzilini to'g'ri kiriting")
-        if (password.length < MIN_PASSWORD_LENGTH) {
-            return Resource.Error("Parol kamida $MIN_PASSWORD_LENGTH belgidan iborat bo'lsin")
+        if (identifier is AuthIdentifier.Phone && otpCode?.length != OTP_LENGTH) {
+            return Resource.Error("$OTP_LENGTH xonali kodni kiriting")
         }
-        return repository.register(identifier, password)
+        return repository.register(identifier, password, otpCode)
     }
 }
 
@@ -72,7 +102,10 @@ class ObserveCurrentUserUseCase(private val repository: AuthRepository) {
     operator fun invoke(): Flow<User?> = repository.observeCurrentUser()
 }
 
-/** Raqamni tasdiqlash uchun SMS kod so'raydi (hisob yaratilgandan keyin). */
+/**
+ * Raqamni tasdiqlash uchun SMS kod so'raydi — hisob **allaqachon bor** bo'lganda
+ * (`otp/request`, Bearer talab qiladi). Ro'yxatdan o'tish oqimi buni ISHLATMAYDI.
+ */
 class RequestPhoneOtpUseCase(private val repository: AuthRepository) {
     suspend operator fun invoke(phone: String): Resource<OtpChallenge> {
         val identifier = AuthIdentifier.of(phone) as? AuthIdentifier.Phone

@@ -77,6 +77,14 @@ fun ConnectionsScreen(
     onBack: () -> Unit = {},
     onOpenChat: (studentId: String, name: String) -> Unit = { _, _ -> },
     /**
+     * Talaba bosildi — profil varag'ini **karkas** ochadi (`StudentShell`).
+     *
+     * Nega bu yerda emas: varaqning bo'limlari (Postlar/Media/Fayllar/Havolalar) story va
+     * chat modullarida yashaydi, bu modul esa ularni ko'rmaydi — ko'rsa bog'lanish halqasi
+     * paydo bo'lardi (`StudentProfileSheet` izohiga q.).
+     */
+    onOpenStudent: (StudentSummary) -> Unit = {},
+    /**
      * Ekran qaysi bo'lim ochilgan holda kelsin (Home'dagi tugmalar). `null` — sukut
      * bo'yicha "Do'stlar". Faqat BIR MARTA qo'llaniladi: aks holda foydalanuvchi tab'ni
      * qo'lda almashtirgach, har rekompozitsiyada u orqaga tortilib turardi.
@@ -141,6 +149,7 @@ fun ConnectionsScreen(
                         onConnect = vm::connect,
                         onOpenChat = onOpenChat,
                         onMenu = { menuFor = it },
+                        onOpenStudent = onOpenStudent,
                         vm = vm,
                         modifier = Modifier.fillMaxSize(),
                     )
@@ -150,12 +159,14 @@ fun ConnectionsScreen(
                         onAccept = vm::accept,
                         onDecline = vm::decline,
                         onMenu = { menuFor = it },
+                        onOpenStudent = onOpenStudent,
                         modifier = Modifier.fillMaxSize(),
                     )
                     ConnectionsTab.CONNECTED -> ConnectedSection(
                         state = state,
                         onOpenChat = onOpenChat,
                         onMenu = { menuFor = it },
+                        onOpenStudent = onOpenStudent,
                         modifier = Modifier.fillMaxSize(),
                     )
                 }
@@ -267,6 +278,7 @@ private fun SearchSection(
     onConnect: (StudentSummary) -> Unit,
     onOpenChat: (String, String) -> Unit,
     onMenu: (StudentSummary) -> Unit,
+    onOpenStudent: (StudentSummary) -> Unit,
     vm: ConnectionsViewModel,
     modifier: Modifier = Modifier,
 ) {
@@ -301,6 +313,7 @@ private fun SearchSection(
                         student = result.student,
                         subtitle = state.subtitleOf(result.student),
                         onMenu = { onMenu(result.student) },
+                        onOpen = { onOpenStudent(result.student) },
                     ) {
                         val busy = result.student.id in state.busyIds
                         when (result.connectionStatus) {
@@ -386,6 +399,7 @@ private fun RequestsSection(
     onAccept: (ConnectionRequest) -> Unit,
     onDecline: (ConnectionRequest) -> Unit,
     onMenu: (StudentSummary) -> Unit,
+    onOpenStudent: (StudentSummary) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier.fillMaxWidth()) {
@@ -412,6 +426,7 @@ private fun RequestsSection(
                         student = request.student,
                         subtitle = state.subtitleOf(request.student),
                         onMenu = { onMenu(request.student) },
+                        onOpen = { onOpenStudent(request.student) },
                     ) {
                         if (state.requestsTab == RequestsTab.INCOMING) {
                             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -433,6 +448,7 @@ private fun ConnectedSection(
     state: ConnectionsUiState,
     onOpenChat: (String, String) -> Unit,
     onMenu: (StudentSummary) -> Unit,
+    onOpenStudent: (StudentSummary) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     if (state.connections.isEmpty()) {
@@ -452,6 +468,7 @@ private fun ConnectedSection(
                 student = connected.student,
                 subtitle = state.subtitleOf(connected.student),
                 onMenu = { onMenu(connected.student) },
+                onOpen = { onOpenStudent(connected.student) },
             ) {
                 PillButton("Xabar") { onOpenChat(connected.student.id, connected.student.displayName) }
             }
@@ -468,10 +485,15 @@ private fun PersonRow(
     student: StudentSummary,
     subtitle: String?,
     onMenu: () -> Unit,
+    onOpen: () -> Unit,
     action: @Composable () -> Unit,
 ) {
     Row(
-        Modifier.fillMaxWidth().scCard(radius = 18.dp, elevation = 5.dp).padding(12.dp),
+        // Qatorning O'ZI profilni ochadi. Amal tugmalari ("Xabar", "Qabul") va menyu
+        // o'z bosishlarini yutadi, ya'ni ular bilan to'qnashmaydi.
+        Modifier.fillMaxWidth().scCard(radius = 18.dp, elevation = 5.dp)
+            .clickable(onClick = onOpen)
+            .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(11.dp),
     ) {

@@ -34,6 +34,10 @@ kotlin {
             implementation(projects.dev.feature.ads.presentation)
             // Chat feature'i — StudentShell ChatScreen'ni ochadi.
             implementation(projects.dev.feature.chat.presentation)
+            // Talaba profili varag'ining «Postlar» bo'limi story modulida: karkas varaqni
+            // o'zi ochgani uchun (`rememberPeerProfileSections`) uning ViewModel'i ham
+            // shu modulning klasspatida bo'lishi kerak.
+            implementation(projects.dev.feature.stories.presentation)
             // Home agregator ekrani — StudentShell HomeScreen'ni ochadi.
             implementation(projects.dev.feature.home.presentation)
 

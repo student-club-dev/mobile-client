@@ -93,8 +93,13 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         didReceive response: UNNotificationResponse,
         withCompletionHandler completionHandler: @escaping () -> Void
     ) {
+        // Konvert — `02-PUSH_CATALOG_BACKEND.md` §2. Hamma qiymat `string`, qiymati yo'q
+        // kalit umuman kelmaydi. `conversationId` chat va qo'ng'iroqda saqlanib qolgan.
         let userInfo = response.notification.request.content.userInfo
-        IosPushBridge.shared.openConversation(
+        IosPushBridge.shared.openTarget(
+            notificationId: userInfo["notificationId"] as? String,
+            targetType: userInfo["targetType"] as? String,
+            targetId: userInfo["targetId"] as? String,
             conversationId: userInfo["conversationId"] as? String
         )
         completionHandler()

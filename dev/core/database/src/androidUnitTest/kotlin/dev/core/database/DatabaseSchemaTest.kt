@@ -187,8 +187,11 @@ class DatabaseSchemaTest {
         // `STUDENT_LISTINGS_BACKEND.md` §7.2.4): eski qatorlar 'ALL' bo'lib qoladi,
         // 30.sqm — bildirishnomalar `GET /v1/notifications` keshiga aylandi
         // (`NOTIFICATIONS_BACKEND.md`): `timeLabel`/`sortOrder` o'rniga `createdAt`,
-        // ustiga bosilganda ochiladigan ekran uchun `targetType`/`targetId`.
-        assertEquals(31L, StudentClubDatabase.Schema.version)
+        // ustiga bosilganda ochiladigan ekran uchun `targetType`/`targetId`,
+        // 31.sqm — profilga yashash manzili (`ProfileEntity.regionId`/`districtId`):
+        // yangi ish e'lonlari digesti universitet YOKI tuman bo'yicha mos keladi
+        // (`02-PUSH_CATALOG_RESPONSE.md` §4).
+        assertEquals(32L, StudentClubDatabase.Schema.version)
     }
 
     @Test
@@ -234,6 +237,9 @@ class DatabaseSchemaTest {
             bio = "5/5 · Dasturiy injiniring",
             // Sukut `NOBODY` — raqam ko'pchilikda yopiq (`handoff/08-PROFILE.md` §4).
             phoneVisibility = "NOBODY",
+            // Yashash manzili (31.sqm) — ish e'lonlari digestining geo yarmi.
+            regionId = "TOSHKENT_SHAHRI",
+            districtId = "CHILONZOR",
         )
         val profile = db.profileQueries.selectCurrent().executeAsOne()
         assertEquals("Quvonchbek", profile.firstName)
@@ -244,6 +250,8 @@ class DatabaseSchemaTest {
         assertEquals("https://cdn.studentclub.uz/avatars/uid-1.jpg", profile.avatarUrl)
         assertEquals("5/5 · Dasturiy injiniring", profile.bio)
         assertEquals("NOBODY", profile.phoneVisibility)
+        assertEquals("TOSHKENT_SHAHRI", profile.regionId)
+        assertEquals("CHILONZOR", profile.districtId)
 
         db.profileQueries.clear()
         assertNull(db.profileQueries.selectCurrent().executeAsOneOrNull())

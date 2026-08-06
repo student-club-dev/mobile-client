@@ -75,12 +75,21 @@ class MainActivity : FragmentActivity() {
     }
 
     /**
-     * `data.conversationId` — fonda kelgan bildirishnoma bosilganda tizim uni intent
-     * "extra"si qilib beradi; old planda esa uni [PushNotifications] o'zi qo'yadi.
-     * Suhbatni `StudentShell` ochadi (UI tayyor bo'lgach `PushRoute` ni o'qiydi).
+     * Push konverti — fonda kelgan bildirishnoma bosilganda tizim `data` ni intent
+     * "extra"lari qilib beradi; old planda esa ularni [PushNotifications] o'zi qo'yadi.
+     * Kerakli ekranni `StudentShell` ochadi va o'sha qatorni o'qilgan deb belgilaydi
+     * (UI tayyor bo'lgach `PushRoute` ni o'qiydi).
      */
     private fun routeFromPush(intent: Intent?) {
-        PushRoute.set(intent?.getStringExtra(PushNotifications.EXTRA_CONVERSATION_ID))
+        if (intent == null) return
+        PushRoute.set(
+            PushRoute.Payload(
+                notificationId = intent.getStringExtra(PushNotifications.EXTRA_NOTIFICATION_ID),
+                targetType = intent.getStringExtra(PushNotifications.EXTRA_TARGET_TYPE),
+                targetId = intent.getStringExtra(PushNotifications.EXTRA_TARGET_ID),
+                conversationId = intent.getStringExtra(PushNotifications.EXTRA_CONVERSATION_ID),
+            ),
+        )
     }
 
     /**

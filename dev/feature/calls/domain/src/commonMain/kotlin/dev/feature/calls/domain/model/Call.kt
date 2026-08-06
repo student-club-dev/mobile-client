@@ -176,3 +176,25 @@ data class CallStats(
     val bytesSent: Long? = null,
     val bytesReceived: Long? = null,
 )
+
+/**
+ * Serverdagi **jonli** qo'ng'iroqning qisqa tavsifi — `GET /v1/calls/active`
+ * (`04-CALLS_RESPONSE.md` §4).
+ *
+ * [CallSession] dan farqi: bu **media emas, faqat fakt**. Unda SDP taklifi yo'q, ya'ni
+ * bundan qo'ng'iroqqa javob berib bo'lmaydi — javob berish uchun kerak bo'lgan offer
+ * faqat WebSocket'dagi `call:incoming` bilan keladi. Shuning uchun bu model ikki narsaga
+ * ishlatiladi: jiringlashni **to'xtatish** (server "bunday qo'ng'iroq yo'q" desa) va
+ * qaysi qo'ng'iroq jonli ekanini tekshirish.
+ */
+data class ActiveCall(
+    val callId: String,
+    val conversationId: String,
+    val status: CallStatus,
+    val media: CallMedia,
+    /** `true` — chaquvchi qarshi tomon, ya'ni javob berish kerak bo'lgan qo'ng'iroq. */
+    val incoming: Boolean,
+    val peerId: String? = null,
+    val peerName: String? = null,
+    val peerAvatarUrl: String? = null,
+)
