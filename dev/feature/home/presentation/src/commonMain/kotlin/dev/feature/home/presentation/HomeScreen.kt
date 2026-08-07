@@ -51,7 +51,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.lerp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import dev.core.uikit.components.ScGlyph
 import dev.core.uikit.components.ScGradientButton
 import dev.core.uikit.components.ScHeader
 import dev.core.uikit.components.ScIconTile
@@ -812,23 +811,33 @@ private fun deadlineLabel(deadline: Long?): String? {
 @Composable
 private fun RentalsSection(rentals: List<Listing>, onSeeAll: () -> Unit, onOpen: (String) -> Unit) {
     if (rentals.isEmpty()) return
-    val house = ScIcons.HouseFilled
     Column(verticalArrangement = Arrangement.spacedBy(13.dp)) {
         PaddedHeader("Ijara kvartiralar", "Sherik izlayotgan uylar", onAction = onSeeAll)
         EdgeRow(rentals.take(6)) { _, listing ->
             Column(
-                Modifier.width(250.dp).scCard(radius = 26.dp, onClick = { onOpen(listing.id) })
-                    .padding(16.dp),
+                Modifier.width(260.dp).scCard(radius = 26.dp, onClick = { onOpen(listing.id) }),
             ) {
-                // Nom + narx + manzil; xonalar/sherik tavsifi tafsilotda qoladi.
-                ScIconTile(Sc.TintOrange, size = 50.dp, radius = 18.dp) { ScGlyph(house, 26.dp) }
-                Spacer(Modifier.height(14.dp))
-                ScText(listing.title, 16f, FontWeight.ExtraBold, Sc.Ink, maxLines = 1)
-                Spacer(Modifier.height(10.dp))
-                ScText(listing.rentLabel(), 15f, FontWeight.ExtraBold, Sc.Success, maxLines = 1)
-                listing.locationLabel()?.let { location ->
-                    Spacer(Modifier.height(4.dp))
-                    ScText("📍 $location", 11.5f, FontWeight.SemiBold, Sc.MutedLight, maxLines = 1)
+                Box(Modifier.fillMaxWidth().height(160.dp)) {
+                    ScNetworkImage(
+                        url = listing.images.firstOrNull(),
+                        modifier = Modifier.fillMaxSize(),
+                    ) {
+                        Box(
+                            Modifier.fillMaxSize().background(Sc.TintOrange),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(listing.emoji, style = TextStyle(fontSize = 48.sp))
+                        }
+                    }
+                }
+                Column(Modifier.padding(16.dp)) {
+                    ScText(listing.title, 16f, FontWeight.ExtraBold, Sc.Ink, maxLines = 1)
+                    Spacer(Modifier.height(8.dp))
+                    ScText(listing.rentLabel(), 15f, FontWeight.ExtraBold, Sc.Success, maxLines = 1)
+                    listing.locationLabel()?.let { location ->
+                        Spacer(Modifier.height(4.dp))
+                        ScText("📍 $location", 11.5f, FontWeight.SemiBold, Sc.MutedLight, maxLines = 1)
+                    }
                 }
             }
         }
