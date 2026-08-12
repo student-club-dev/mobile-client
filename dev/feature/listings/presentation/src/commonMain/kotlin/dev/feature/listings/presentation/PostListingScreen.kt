@@ -139,11 +139,11 @@ private fun ListingKindPicker(
                 horizontalArrangement = Arrangement.spacedBy(14.dp),
             ) {
                 // Dizaynda orqaga hamisha aylana `‹` — X emas.
-                ScCircleButton(ScIcons.ChevronLeft, onClose, size = 44.dp, contentDescription = "Orqaga")
-                ScHeaderTitle("Yangi e'lon")
+                ScCircleButton(ScIcons.ChevronLeft, onClose, size = 44.dp, contentDescription = lt("Orqaga"))
+                ScHeaderTitle(lt("Yangi e'lon"))
             }
             Spacer(Modifier.height(12.dp))
-            ScHeaderSubtitle("Nima e'lon qilmoqchisiz? Keyingi ekran shunga moslashadi.")
+            ScHeaderSubtitle(lt("Nima e'lon qilmoqchisiz? Keyingi ekran shunga moslashadi."))
         }
         Column(
             Modifier.fillMaxSize().verticalScroll(rememberScrollState())
@@ -210,13 +210,13 @@ private fun BusinessTypePicker(
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(11.dp)) {
             IconSquareButton(onBack, AppIcons.ArrowLeft, palette)
             Text(
-                "Chegirma e'loni",
+                lt("Chegirma e'loni"),
                 style = TextStyle(fontFamily = AppFontFamily, fontSize = 20.sp, fontWeight = FontWeight.Black, color = palette.ink),
             )
         }
         Spacer(Modifier.height(6.dp))
         Text(
-            "Biznesingiz turini tanlang — keyingi ekran shunga moslashadi.",
+            lt("Biznesingiz turini tanlang — keyingi ekran shunga moslashadi."),
             style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.5f.sp, color = palette.inkMuted),
         )
         Spacer(Modifier.height(16.dp))
@@ -276,8 +276,8 @@ fun BranchesSection(
     state: PostListingUiState,
     palette: AppPalette,
     vm: PostListingViewModel,
-    title: String = "Manzil",
-    subtitle: String = "Xaritadan aniq joyni belgilang",
+    title: String = lt("Manzil"),
+    subtitle: String = lt("Xaritadan aniq joyni belgilang"),
 ) {
     FormSection(
         title = title,
@@ -309,7 +309,7 @@ fun BranchesSection(
                     )
                     Icon(
                         AppIcons.Close,
-                        "Manzilni o'chirish",
+                        lt("Manzilni o'chirish"),
                         tint = palette.inkFaint,
                         modifier = Modifier.size(15.dp).clickable { vm.removeBranch(index) },
                     )
@@ -318,7 +318,7 @@ fun BranchesSection(
                 GlassTextField(
                     branch.name.orEmpty(),
                     { vm.onBranchName(index, it) },
-                    "Nomi (ixtiyoriy): Chilonzor filiali",
+                    lt("Nomi (ixtiyoriy): Chilonzor filiali"),
                     height = 44,
                 )
             }
@@ -326,7 +326,7 @@ fun BranchesSection(
 
         if (state.resolvingAddress) {
             Text(
-                "Manzil aniqlanmoqda...",
+                lt("Manzil aniqlanmoqda..."),
                 style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.5f.sp, fontWeight = FontWeight.Bold, color = palette.primary),
             )
         }
@@ -342,7 +342,7 @@ fun BranchesSection(
             Icon(AppIcons.Plus, null, tint = palette.primary, modifier = Modifier.size(17.dp))
             Spacer(Modifier.size(7.dp))
             Text(
-                if (state.branches.isEmpty()) "Xaritadan belgilash" else "Yana bitta manzil",
+                if (state.branches.isEmpty()) lt("Xaritadan belgilash") else lt("Yana bitta manzil"),
                 style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.5f.sp, fontWeight = FontWeight.ExtraBold, color = palette.primary),
             )
         }
@@ -378,11 +378,11 @@ private fun BranchMapScreen(state: PostListingUiState, palette: AppPalette, vm: 
             IconSquareButton(vm::closeMap, AppIcons.ArrowLeft, palette)
             Column(Modifier.weight(1f)) {
                 Text(
-                    "Joyni belgilash",
+                    lt("Joyni belgilash"),
                     style = TextStyle(fontFamily = AppFontFamily, fontSize = 18.sp, fontWeight = FontWeight.Black, color = palette.ink),
                 )
                 Text(
-                    if (state.resolvingAddress) "Manzil aniqlanmoqda..." else "Xaritani suring — belgi joyni ko'rsatadi",
+                    if (state.resolvingAddress) lt("Manzil aniqlanmoqda...") else lt("Xaritani suring — belgi joyni ko'rsatadi"),
                     style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.5f.sp, color = palette.inkFaint),
                 )
             }
@@ -392,7 +392,7 @@ private fun BranchMapScreen(state: PostListingUiState, palette: AppPalette, vm: 
             GlassTextField(
                 state.searchQuery,
                 vm::onSearchQuery,
-                "Qidirish: Mega Planet, Amir Temur ko'chasi...",
+                lt("Qidirish: Mega Planet, Amir Temur ko'chasi..."),
                 leading = AppIcons.Search,
                 height = 46,
             )
@@ -420,7 +420,7 @@ private fun BranchMapScreen(state: PostListingUiState, palette: AppPalette, vm: 
                 ) {
                     if (state.searching) {
                         Text(
-                            "Qidirilmoqda...",
+                            lt("Qidirilmoqda..."),
                             style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Sc.InkSoft),
                             modifier = Modifier.padding(12.dp),
                         )
@@ -471,7 +471,7 @@ private fun BranchMapScreen(state: PostListingUiState, palette: AppPalette, vm: 
                 ) {
                     Text("📍", style = TextStyle(fontSize = 13.sp))
                     Text(
-                        "Mening joylashuvim",
+                        lt("Mening joylashuvim"),
                         style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.sp, fontWeight = FontWeight.ExtraBold, color = Sc.Ink),
                     )
                 }
@@ -480,7 +480,7 @@ private fun BranchMapScreen(state: PostListingUiState, palette: AppPalette, vm: 
 
         Box(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp)) {
             PrimaryButton(
-                if (state.resolvingAddress) "Manzil aniqlanmoqda..." else "Shu yerni tanlash",
+                if (state.resolvingAddress) lt("Manzil aniqlanmoqda...") else lt("Shu yerni tanlash"),
                 onClick = { pickedPoint?.let { vm.addBranchFromMap(it.lat, it.lng) } },
                 enabled = pickedPoint != null && !state.resolvingAddress,
             )
@@ -504,6 +504,6 @@ fun MessageBar(message: String, palette: AppPalette, onDismiss: () -> Unit) {
             style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = palette.primary),
             modifier = Modifier.weight(1f),
         )
-        Icon(AppIcons.Close, "Yopish", tint = palette.primary, modifier = Modifier.size(14.dp))
+        Icon(AppIcons.Close, lt("Yopish"), tint = palette.primary, modifier = Modifier.size(14.dp))
     }
 }

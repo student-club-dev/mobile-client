@@ -40,12 +40,10 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.atStartOfDayIn
 import kotlinx.datetime.plus
 import kotlinx.datetime.toLocalDateTime
+import dev.feature.listings.presentation.lt
+import dev.core.uikit.locale.uiStringsNow
 
 /** Sana yorlig'i uchun oy nomlari — `kotlinx-datetime` da lokalizatsiya yo'q. */
-private val UZ_MONTHS = listOf(
-    "yanvar", "fevral", "mart", "aprel", "may", "iyun",
-    "iyul", "avgust", "sentabr", "oktabr", "noyabr", "dekabr",
-)
 
 /** Kunlik ish uchun ko'rsatiladigan sanalar soni — ikki haftadan narisiga odam yollanmaydi. */
 private const val DATE_CHIP_COUNT = 14
@@ -68,14 +66,14 @@ fun JobForm(state: PostListingUiState, palette: AppPalette, vm: PostListingViewM
         if (picked != null) vm.addImage(picked.bytes, picked.fileName)
     }
 
-    val title = if (job.isDaily) "Kunlik ish e'loni" else "Doimiy ish e'loni"
+    val title = if (job.isDaily) lt("Kunlik ish e'loni") else lt("Doimiy ish e'loni")
     val subtitle = job.employment.hint
 
     ListingFormShell(title = title, subtitle = subtitle, state = state, palette = palette, vm = vm) {
 
         FormSection(
-            title = "Ish turi",
-            subtitle = "Shartlar shunga qarab o'zgaradi",
+            title = lt("Ish turi"),
+            subtitle = lt("Shartlar shunga qarab o'zgaradi"),
             palette = palette,
         ) {
             Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
@@ -92,8 +90,8 @@ fun JobForm(state: PostListingUiState, palette: AppPalette, vm: PostListingViewM
         }
 
         FormSection(
-            title = "Qanday ish",
-            subtitle = "Talaba shu bo'yicha qidiradi",
+            title = lt("Qanday ish"),
+            subtitle = lt("Talaba shu bo'yicha qidiradi"),
             error = state.errorFor(ListingField.JOB_CATEGORY),
             palette = palette,
         ) {
@@ -111,28 +109,28 @@ fun JobForm(state: PostListingUiState, palette: AppPalette, vm: PostListingViewM
                 GlassTextField(
                     job.customCategoryName,
                     { value -> vm.updateJob { it.copy(customCategoryName = value) } },
-                    "Ish nomini yozing",
+                    lt("Ish nomini yozing"),
                     height = 48,
                 )
             }
         }
 
         FormSection(
-            title = "Ish beruvchi",
-            subtitle = "Tashkilot yoki shaxs nomi",
+            title = lt("Ish beruvchi"),
+            subtitle = lt("Tashkilot yoki shaxs nomi"),
             error = state.errorFor(ListingField.BUSINESS_NAME),
             palette = palette,
         ) {
             GlassTextField(
                 job.companyName,
                 { value -> vm.updateJob { it.copy(companyName = value) } },
-                "Masalan: Korzinka yoki Aziz aka",
+                lt("Masalan: Korzinka yoki Aziz aka"),
                 height = 48,
             )
         }
 
         FormSection(
-            title = "Qachon ishlanadi",
+            title = lt("Qachon ishlanadi"),
             error = state.errorFor(ListingField.JOB_SCHEDULE),
             palette = palette,
         ) {
@@ -164,7 +162,7 @@ fun JobForm(state: PostListingUiState, palette: AppPalette, vm: PostListingViewM
                     }
                 }
             } else {
-                MiniLabel("Ish kunlari", palette)
+                MiniLabel(lt("Ish kunlari"), palette)
                 WeekDayPicker(
                     selected = job.days,
                     onToggle = { day ->
@@ -178,8 +176,8 @@ fun JobForm(state: PostListingUiState, palette: AppPalette, vm: PostListingViewM
         }
 
         FormSection(
-            title = "Ish smenasi",
-            subtitle = job.shift?.hint ?: "Smenani tanlang",
+            title = lt("Ish smenasi"),
+            subtitle = job.shift?.hint ?: lt("Smenani tanlang"),
             error = state.errorFor(ListingField.JOB_SHIFT),
             palette = palette,
         ) {
@@ -197,7 +195,7 @@ fun JobForm(state: PostListingUiState, palette: AppPalette, vm: PostListingViewM
         }
 
         if (job.needsExactTime) {
-            FormSection(title = "Ish vaqti", palette = palette) {
+            FormSection(title = lt("Ish vaqti"), palette = palette) {
                 TimeRangeField(
                     startTime = job.startTime,
                     endTime = job.endTime,
@@ -207,7 +205,7 @@ fun JobForm(state: PostListingUiState, palette: AppPalette, vm: PostListingViewM
                     palette = palette,
                 )
                 NumberChipsField(
-                    label = "Kuniga necha soat",
+                    label = lt("Kuniga necha soat"),
                     value = job.hoursPerDay,
                     options = JobCatalog.HOURS_PER_DAY,
                     onSelect = { value -> vm.updateJob { it.copy(hoursPerDay = value) } },
@@ -218,12 +216,12 @@ fun JobForm(state: PostListingUiState, palette: AppPalette, vm: PostListingViewM
         }
 
         FormSection(
-            title = "Nechta odam kerak",
+            title = lt("Nechta odam kerak"),
             error = state.errorFor(ListingField.JOB_PAY),
             palette = palette,
         ) {
             NumberChipsField(
-                label = "Kerakli xodimlar",
+                label = lt("Kerakli xodimlar"),
                 value = job.vacancies,
                 options = JobCatalog.VACANCY_COUNTS,
                 onSelect = { value -> vm.updateJob { it.copy(vacancies = value) } },
@@ -233,8 +231,8 @@ fun JobForm(state: PostListingUiState, palette: AppPalette, vm: PostListingViewM
             )
         }
 
-        FormSection(title = "To'lov", palette = palette) {
-            MiniLabel("To'lov davri", palette)
+        FormSection(title = lt("To'lov"), palette = palette) {
+            MiniLabel(lt("To'lov davri"), palette)
             Row(
                 Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(7.dp),
@@ -254,31 +252,31 @@ fun JobForm(state: PostListingUiState, palette: AppPalette, vm: PostListingViewM
         PriceSection(
             state = state,
             vm = vm,
-            sectionTitle = "Maosh",
-            priceLabel = "Maosh",
+            sectionTitle = lt("Maosh"),
+            priceLabel = lt("Maosh"),
             hint = "300 000",
             showRange = true,
             allowNegotiable = true,
             palette = palette,
         )
 
-        FormSection(title = "To'lov shartlari", palette = palette) {
-            MiniLabel("To'lov qachon beriladi", palette)
+        FormSection(title = lt("To'lov shartlari"), palette = palette) {
+            MiniLabel(lt("To'lov qachon beriladi"), palette)
             GlassTextField(
                 job.payoutNote,
                 { value -> vm.updateJob { it.copy(payoutNote = value) } },
-                "Ish kuni oxirida / har oy 5-sanasida",
+                lt("Ish kuni oxirida / har oy 5-sanasida"),
                 height = 48,
             )
         }
 
         FormSection(
-            title = "Talablar",
-            subtitle = "Nomzoddan nima talab qilinadi",
+            title = lt("Talablar"),
+            subtitle = lt("Nomzoddan nima talab qilinadi"),
             error = state.errorFor(ListingField.ATTRIBUTES),
             palette = palette,
         ) {
-            MiniLabel("Tajriba", palette)
+            MiniLabel(lt("Tajriba"), palette)
             ChipFlow {
                 ExperienceLevel.entries.forEach { level ->
                     SelectChip(
@@ -290,7 +288,7 @@ fun JobForm(state: PostListingUiState, palette: AppPalette, vm: PostListingViewM
                 }
             }
 
-            MiniLabel("Kimlar uchun", palette)
+            MiniLabel(lt("Kimlar uchun"), palette)
             ChipFlow {
                 TenantGender.entries.forEach { gender ->
                     SelectChip(
@@ -305,13 +303,13 @@ fun JobForm(state: PostListingUiState, palette: AppPalette, vm: PostListingViewM
                 }
             }
 
-            MiniLabel("Yosh", palette)
+            MiniLabel(lt("Yosh"), palette)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
                 Box(Modifier.weight(1f)) {
                     GlassTextField(
                         job.ageFrom,
                         { value -> vm.updateJob { it.copy(ageFrom = value.filter { c -> c.isDigit() }) } },
-                        "18 dan",
+                        lt("18 dan"),
                         height = 48,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     )
@@ -320,7 +318,7 @@ fun JobForm(state: PostListingUiState, palette: AppPalette, vm: PostListingViewM
                     GlassTextField(
                         job.ageTo,
                         { value -> vm.updateJob { it.copy(ageTo = value.filter { c -> c.isDigit() }) } },
-                        "30 gacha",
+                        lt("30 gacha"),
                         height = 48,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     )
@@ -331,17 +329,17 @@ fun JobForm(state: PostListingUiState, palette: AppPalette, vm: PostListingViewM
                 values = job.requirements,
                 suggestions = JobCatalog.COMMON_REQUIREMENTS,
                 onChange = { values -> vm.updateJob { j -> j.copy(requirements = values) } },
-                hint = "Talab qo'shish",
+                hint = lt("Talab qo'shish"),
                 palette = palette,
             )
         }
 
-        FormSection(title = "Sharoit va imtiyozlar", palette = palette) {
+        FormSection(title = lt("Sharoit va imtiyozlar"), palette = palette) {
             TagListEditor(
                 values = job.benefits,
                 suggestions = JobCatalog.COMMON_BENEFITS,
                 onChange = { values -> vm.updateJob { j -> j.copy(benefits = values) } },
-                hint = "Sharoit qo'shish",
+                hint = lt("Sharoit qo'shish"),
                 palette = palette,
             )
         }
@@ -349,26 +347,26 @@ fun JobForm(state: PostListingUiState, palette: AppPalette, vm: PostListingViewM
         AboutSection(
             state = state,
             vm = vm,
-            sectionTitle = "E'lon matni",
-            titleHint = "Sarlavha: Kuryer kerak — kunlik to'lov",
-            descriptionHint = "Ish tafsiloti, kim mos keladi...",
+            sectionTitle = lt("E'lon matni"),
+            titleHint = lt("Sarlavha: Kuryer kerak — kunlik to'lov"),
+            descriptionHint = lt("Ish tafsiloti, kim mos keladi..."),
         )
 
         ImagesSection(
             state = state,
             vm = vm,
             onAdd = imagePicker::pick,
-            sectionTitle = "Rasmlar",
-            hint = "Ish joyi surati",
+            sectionTitle = lt("Rasmlar"),
+            hint = lt("Ish joyi surati"),
             optional = true,
         )
 
-        ContactSection(state, vm, subtitle = "Nomzodlar shu raqamga qo'ng'iroq qiladi")
+        ContactSection(state, vm, subtitle = lt("Nomzodlar shu raqamga qo'ng'iroq qiladi"))
 
         BranchesSection(
             state, palette, vm,
-            title = "Ish joyi",
-            subtitle = "Xaritadan aniq manzilni belgilang",
+            title = lt("Ish joyi"),
+            subtitle = lt("Xaritadan aniq manzilni belgilang"),
         )
 
         AudienceSection(state, vm)
@@ -381,10 +379,10 @@ fun JobForm(state: PostListingUiState, palette: AppPalette, vm: PostListingViewM
  * shu ikkisiga tegishli va "20-iyul" dan ko'ra "Bugun" tezroq o'qiladi.
  */
 private fun dateChipLabel(offset: Int, date: LocalDate): String = when (offset) {
-    0 -> "Bugun"
-    1 -> "Ertaga"
+    0 -> lt("Bugun")
+    1 -> lt("Ertaga")
     else -> {
         val weekDay = WeekDay.entries[date.dayOfWeek.ordinal]
-        "${date.dayOfMonth}-${UZ_MONTHS[date.monthNumber - 1]}, ${weekDay.label}"
+        "${date.dayOfMonth}-${uiStringsNow().months[date.monthNumber - 1]}, ${weekDay.label}"
     }
 }

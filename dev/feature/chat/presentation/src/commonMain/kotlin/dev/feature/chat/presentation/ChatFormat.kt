@@ -7,6 +7,7 @@ import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.minus
 import kotlinx.datetime.toLocalDateTime
+import dev.core.common.locale.AppLocale
 
 /**
  * Chat vaqt yorliqlari. `kotlinx-datetime` da matn formatlagichi yo'q (KMP), shuning uchun
@@ -27,15 +28,15 @@ internal object ChatFormat {
         if (instant == null) return ""
         return when (instant.date()) {
             today() -> time(instant)
-            yesterday() -> "Kecha"
+            yesterday() -> chatStringsNow().yesterday
             else -> instant.date().let { "${it.dayOfMonth.pad()}.${it.monthNumber.pad()}" }
         }
     }
 
     /** Xabarlar orasidagi ajratgich: "Bugun" / "Kecha" / "12.07.2026". */
     fun dayLabel(instant: Instant): String = when (val date = instant.date()) {
-        today() -> "Bugun"
-        yesterday() -> "Kecha"
+        today() -> chatStringsNow().today
+        yesterday() -> chatStringsNow().yesterday
         else -> "${date.dayOfMonth.pad()}.${date.monthNumber.pad()}.${date.year}"
     }
 
@@ -44,11 +45,12 @@ internal object ChatFormat {
 
     /** Sarlavhadagi "oxirgi marta ko'rilgan" matni. */
     fun lastSeen(instant: Instant?): String {
-        if (instant == null) return "oflayn"
+        val s = chatStringsNow()
+        if (instant == null) return AppLocale.pick(en = "offline", ru = "не в сети", uz = "oflayn")
         return when (val date = instant.date()) {
-            today() -> "oxirgi faollik ${time(instant)}"
-            yesterday() -> "kecha ${time(instant)}"
-            else -> "oxirgi faollik ${date.dayOfMonth.pad()}.${date.monthNumber.pad()}"
+            today() -> s.lastSeenAt(time(instant))
+            yesterday() -> s.lastSeenYesterday(time(instant))
+            else -> s.lastSeenAt("${date.dayOfMonth.pad()}.${date.monthNumber.pad()}")
         }
     }
 

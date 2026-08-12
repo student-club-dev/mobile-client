@@ -40,6 +40,7 @@ import dev.feature.listings.domain.model.AttributeKind
 import dev.feature.listings.domain.model.AttributeSpec
 import dev.feature.listings.domain.model.ListingCategory
 import dev.feature.listings.domain.model.WeekDay
+import dev.feature.listings.presentation.lt
 
 /**
  * Ijara, xizmat va ish formalarining umumiy g'ishtlari.
@@ -110,14 +111,14 @@ fun NumberChipsField(
                     },
                 )
             }
-            SelectChip(text = "Boshqa", selected = manual, onClick = { manual = true })
+            SelectChip(text = lt("Boshqa"), selected = manual, onClick = { manual = true })
         }
 
         if (manual) {
             GlassTextField(
                 value,
                 { onSelect(it.filter { c -> c.isDigit() }) },
-                hint ?: "Sonni kiriting",
+                hint ?: lt("Sonni kiriting"),
                 height = 46,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             )
@@ -160,7 +161,7 @@ fun WeekDayPicker(
             }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-            SelectChip("Har kuni", selected.size == WeekDay.entries.size, onSelectAll)
+            SelectChip(lt("Har kuni"), selected.size == WeekDay.entries.size, onSelectAll)
         }
     }
 }
@@ -183,7 +184,7 @@ fun TimeRangeField(
 
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            MiniLabel("Boshlanishi", palette)
+            MiniLabel(lt("Boshlanishi"), palette)
             FormDropdown(
                 value = startTime.ifBlank { null },
                 placeholder = "09:00",
@@ -192,7 +193,7 @@ fun TimeRangeField(
             )
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            MiniLabel("Tugashi", palette)
+            MiniLabel(lt("Tugashi"), palette)
             FormDropdown(
                 value = endTime.ifBlank { null },
                 placeholder = "18:00",
@@ -246,7 +247,7 @@ fun TagListEditor(
 
         val unused = suggestions.filter { it !in values }
         if (unused.isNotEmpty()) {
-            FieldHint("Tez tanlash:", palette)
+            FieldHint(lt("Tez tanlash:"), palette)
             ChipFlow {
                 unused.forEach { suggestion ->
                     SelectChip(suggestion, selected = false, onClick = { onChange(values + suggestion) })
@@ -272,7 +273,7 @@ private fun RemovableChip(text: String, onRemove: () -> Unit, palette: AppPalett
             text,
             style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.5f.sp, fontWeight = FontWeight.Bold, color = palette.primary),
         )
-        Icon(AppIcons.Close, "O'chirish", tint = palette.primary, modifier = Modifier.size(12.dp))
+        Icon(AppIcons.Close, lt("O'chirish"), tint = palette.primary, modifier = Modifier.size(12.dp))
     }
 }
 
@@ -288,7 +289,7 @@ private fun AddButton(enabled: Boolean, onClick: () -> Unit, palette: AppPalette
     ) {
         Icon(
             AppIcons.Plus,
-            "Qo'shish",
+            lt("Qo'shish"),
             tint = if (enabled) palette.onPrimary else palette.inkFaint,
             modifier = Modifier.size(17.dp),
         )
@@ -353,13 +354,13 @@ fun DynamicFields(
 
                 AttributeKind.BOOLEAN ->
                     Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                        SelectChip("Ha", value == "true", { onChange(spec.key, "true") })
-                        SelectChip("Yo'q", value == "false", { onChange(spec.key, "false") })
+                        SelectChip(lt("Ha"), value == "true", { onChange(spec.key, "true") })
+                        SelectChip(lt("Yo'q"), value == "false", { onChange(spec.key, "false") })
                     }
             }
 
             if (spec.kind == AttributeKind.TAGS) {
-                FieldHint("Vergul bilan ajrating", palette)
+                FieldHint(lt("Vergul bilan ajrating"), palette)
             }
         }
         Spacer(Modifier.height(2.dp))

@@ -254,9 +254,9 @@ class ConnectionsViewModel(
                 _state.update {
                     it.copy(
                         message = if (connected) {
-                            "${student.displayName} bilan bog'landingiz"
+                            connectionsStringsNow().connectedWith(student.displayName)
                         } else {
-                            "So'rov yuborildi"
+                            connectionsStringsNow().requestWasSent
                         },
                     )
                 }
@@ -278,7 +278,7 @@ class ConnectionsViewModel(
     fun accept(request: ConnectionRequest) = runBusy(request.student.id) {
         when (val res = repository.accept(request.connectionId)) {
             is Resource.Success -> {
-                _state.update { it.copy(message = "${request.student.displayName} bilan bog'landingiz") }
+                _state.update { it.copy(message = connectionsStringsNow().connectedWith(request.student.displayName)) }
                 updateSearchStatus(request.student.id, ConnectionView.CONNECTED)
                 loadRequests()
                 loadConnections()
@@ -302,7 +302,7 @@ class ConnectionsViewModel(
     fun decline(request: ConnectionRequest) = runBusy(request.student.id) {
         when (val res = repository.decline(request.connectionId)) {
             is Resource.Success -> {
-                _state.update { it.copy(message = "So'rov rad etildi") }
+                _state.update { it.copy(message = connectionsStringsNow().requestDeclined) }
                 loadRequests()
             }
             is Resource.Error -> {
@@ -316,7 +316,7 @@ class ConnectionsViewModel(
     fun disconnect(student: StudentSummary) = runBusy(student.id) {
         when (val res = repository.disconnect(student.id)) {
             is Resource.Success -> {
-                _state.update { it.copy(message = "Bog'lanish uzildi") }
+                _state.update { it.copy(message = connectionsStringsNow().connectionRemoved) }
                 updateSearchStatus(student.id, ConnectionView.NONE)
                 loadConnections()
             }
@@ -330,7 +330,7 @@ class ConnectionsViewModel(
             is Resource.Success -> {
                 _state.update {
                     it.copy(
-                        message = "${student.displayName} bloklandi",
+                        message = connectionsStringsNow().userBlocked(student.displayName),
                         // Bloklangan odam qidiruv natijasidan ham yo'qoladi.
                         results = it.results.filterNot { r -> r.student.id == student.id },
                     )
@@ -346,7 +346,7 @@ class ConnectionsViewModel(
     fun report(student: StudentSummary, reason: ReportReason, note: String?) = runBusy(student.id) {
         when (val res = repository.report(reason, targetStudentId = student.id, note = note)) {
             // Takroriy shikoyat eskisiga birlashadi — foydalanuvchi uchun farqi yo'q.
-            is Resource.Success -> _state.update { it.copy(message = "Shikoyatingiz qabul qilindi") }
+            is Resource.Success -> _state.update { it.copy(message = connectionsStringsNow().reportAccepted) }
             is Resource.Error -> _state.update { it.copy(message = res.message) }
             Resource.Loading -> Unit
         }

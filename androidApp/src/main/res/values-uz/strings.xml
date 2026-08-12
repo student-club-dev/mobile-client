@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="push_channel_chat">Xabarlar</string>
+    <string name="push_channel_chat_description">Yangi chat xabarlari haqida bildirishnoma</string>
+    <string name="push_default_title">Yangi xabar</string>
+</resources>

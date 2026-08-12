@@ -14,6 +14,7 @@ import dev.feature.profile.domain.repository.ProfileRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
+import dev.core.common.locale.AppLocale
 
 /**
  * Offline-first profil repository'si.
@@ -41,7 +42,7 @@ class ProfileRepositoryImpl(
             .map { it?.toDomain() }
 
     override suspend fun refresh(): Resource<Unit> {
-        val uid = currentUid ?: return Resource.Error("Sessiya topilmadi")
+        val uid = currentUid ?: return Resource.Error(AppLocale.pick(en = "No session found", ru = "Сессия не найдена", uz = "Sessiya topilmadi"))
         return when (val res = remote.fetch()) {
             is Resource.Success -> {
                 // Masofada profil yo'q bo'lsa keshni o'zgartirmaymiz (mavjud local
@@ -57,7 +58,7 @@ class ProfileRepositoryImpl(
     override suspend fun saveProfile(profile: UserProfile): Resource<Unit> {
         // Offline-first: avval local keshga yozamiz — UI (profil/universitet) darrov yangilanadi
         // va backend bo'lmasa ham saqlanadi. Uid sessiyadan yoki mavjud kesh qatoridan.
-        val uid = currentUid ?: cachedUid() ?: return Resource.Error("Sessiya topilmadi — avval kiring")
+        val uid = currentUid ?: cachedUid() ?: return Resource.Error(AppLocale.pick(en = "No session — please sign in first", ru = "Сессия не найдена — сначала войдите", uz = "Sessiya topilmadi — avval kiring"))
         cache(uid, profile)
         // Fon: masofaviy manbaga ham yozishga urinamiz; muvaffaqiyatli bo'lsa server qiymatini keshlaymiz.
         return when (val res = remote.save(profile)) {
@@ -68,12 +69,12 @@ class ProfileRepositoryImpl(
     }
 
     override suspend fun uploadAvatar(bytes: ByteArray, fileName: String): Resource<String> {
-        val uid = currentUid ?: return Resource.Error("Sessiya topilmadi — avval kiring")
+        val uid = currentUid ?: return Resource.Error(AppLocale.pick(en = "No session — please sign in first", ru = "Сессия не найдена — сначала войдите", uz = "Sessiya topilmadi — avval kiring"))
 
         val url = when (val uploaded = remote.uploadAvatar(bytes, fileName)) {
             is Resource.Success -> uploaded.data
             is Resource.Error -> return uploaded
-            Resource.Loading -> return Resource.Error("Rasmni yuklab bo'lmadi")
+            Resource.Loading -> return Resource.Error(AppLocale.pick(en = "Couldn't upload the image", ru = "Не удалось загрузить изображение", uz = "Rasmni yuklab bo'lmadi"))
         }
 
         // Rasm yuklandi — endi uning manzilini profilga yozamiz, aks holda URL yo'qoladi.

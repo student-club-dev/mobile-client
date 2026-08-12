@@ -52,6 +52,7 @@ import dev.core.uikit.theme.Sc
 import dev.feature.chat.domain.model.ConversationItem
 import dev.feature.chat.presentation.ChatFormat
 import dev.feature.clubs.domain.model.Club
+import dev.feature.chat.presentation.chatStrings
 
 /** Suhbat avatarlari navbat bilan uch tint ranggida. */
 private val avatarVisuals: List<Pair<Color, Color>>
@@ -257,11 +258,11 @@ internal fun ClubRow(club: Club, onClick: () -> Unit, onToggleJoin: () -> Unit) 
             ScText(club.name, 15.5f, FontWeight.ExtraBold, Sc.Ink, maxLines = 1)
             Spacer(Modifier.height(2.dp))
             ScText(
-                club.description.ifBlank { "${club.membersCount} a'zo" },
+                club.description.ifBlank { chatStrings().membersCount(club.membersCount) },
                 13.5f, FontWeight.Medium, Sc.Muted, maxLines = 1,
             )
             Spacer(Modifier.height(3.dp))
-            ScText("${club.membersCount} a'zo", 12f, FontWeight.Bold, accent, maxLines = 1)
+            ScText(chatStrings().membersCount(club.membersCount), 12f, FontWeight.Bold, accent, maxLines = 1)
         }
         JoinButton(club.joined, accent, onToggleJoin)
     }
@@ -294,7 +295,7 @@ private fun JoinButton(joined: Boolean, accent: Color, onClick: () -> Unit) {
         contentAlignment = Alignment.Center,
     ) {
         ScText(
-            if (joined) "A'zosiz" else "Qo'shilish",
+            if (joined) chatStrings().notMember else chatStrings().join,
             12f, FontWeight.ExtraBold,
             if (joined) Sc.ChipInk else Color.White,
             maxLines = 1,

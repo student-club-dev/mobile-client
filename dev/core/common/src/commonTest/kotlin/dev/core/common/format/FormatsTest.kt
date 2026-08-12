@@ -103,7 +103,10 @@ class FormatsTest {
 
     @Test
     fun `birligi bilan korsatish`() {
-        assertEquals("90 000 so'm", formatAmountWithUnit("90000"))
+        // Sukut birlik endi TILGA bog'langan (ilova ingliz tilida ochiladi), shuning uchun
+        // test uni aniq uzatadi — aks holda tekshiruv joriy tilga qarab o'zgarardi.
+        assertEquals("90 000 so'm", formatAmountWithUnit("90000", unit = "so'm"))
+        assertEquals("90 000 UZS", formatAmountWithUnit("90000"))
         assertEquals("", formatAmountWithUnit(""))
     }
 

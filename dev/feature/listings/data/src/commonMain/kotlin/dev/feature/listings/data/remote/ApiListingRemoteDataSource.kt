@@ -25,6 +25,7 @@ import dev.feature.listings.domain.model.ListingPage
 import dev.feature.listings.domain.model.ListingQuery
 import dev.feature.listings.domain.model.ListingSort
 import dev.feature.listings.domain.model.ListingStatus
+import dev.core.common.locale.AppLocale
 
 /**
  * Talaba e'lonlarining real backend manbasi — generatsiya qilingan [StudentListingsApi]
@@ -182,7 +183,7 @@ class ApiListingRemoteDataSource(
 
     override suspend fun setStatus(id: String, status: ListingStatus): Resource<Listing> {
         val body = status.toStatusDto()
-            ?: return Resource.Error("Bu holatga o'tkazib bo'lmaydi: ${status.label}")
+            ?: return Resource.Error(AppLocale.pick(en = "Can't move to this state: ${status.label}", ru = "Нельзя перевести в это состояние: ${status.label}", uz = "Bu holatga o'tkazib bo'lmaydi: ${status.label}"))
         return safeCall(connectivity) { api.setStatus(id, body).body() }.map { it.toDomain(apiOrigin) }
     }
 

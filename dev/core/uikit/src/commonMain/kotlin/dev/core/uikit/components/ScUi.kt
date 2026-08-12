@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.core.uikit.theme.Sc
+import dev.core.uikit.locale.uiStrings
 
 // ---------------------------------------------------------------------------
 // Matn
@@ -435,7 +436,7 @@ fun ScSheetClose(onClick: () -> Unit, modifier: Modifier = Modifier) {
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(ScIcons.Close, "Yopish", tint = Sc.InkSoft, modifier = Modifier.size(16.dp))
+        Icon(ScIcons.Close, uiStrings().close, tint = Sc.InkSoft, modifier = Modifier.size(16.dp))
     }
 }
 

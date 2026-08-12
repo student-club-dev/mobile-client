@@ -1,0 +1,175 @@
+package dev.feature.profile.presentation
+
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.ReadOnlyComposable
+import dev.core.common.locale.AppLocale
+import dev.core.uikit.locale.rememberStrings
+
+/** Profil va profilni tahrirlash ekranlarining matnlari. Sukut qiymatlar — inglizcha. */
+data class ProfileStrings(
+    // Profil ekrani
+    val settings: String = "Settings",
+    val edit: String = "Edit",
+    val posts: String = "Posts",
+    val archivedPosts: String = "Archived posts",
+    val setPhoto: String = "Set photo",
+    val uploadingPhoto: (String) -> String = { "uploading photo $it" },
+    val savingPhoto: String = "saving photo…",
+    val uploading: (String) -> String = { "Uploading $it" },
+    val saving: String = "Saving…",
+    val phoneLabel: String = "Mobile number",
+    val bioLabel: String = "Bio",
+    val emailLabel: String = "Email",
+    val universityLabel: String = "University",
+    val courseLabel: String = "Year",
+    val myBusiness: String = "My business",
+    val myBusinessSubtitle: String = "Post and manage discount offers",
+    val logout: String = "Log out",
+    val online: String = "online",
+
+    // Tahrirlash ekrani
+    val editTitle: String = "Edit profile",
+    val changePhoto: String = "Change photo",
+    val addPhoto: String = "Add a photo",
+    val maxPhotos: (Int) -> String = { "No more than $it photos" },
+    val firstName: String = "First name",
+    val lastName: String = "Last name",
+    val phone: String = "Phone",
+    val phoneIncomplete: (String) -> String = { "Enter the full number: $it 90 123 45 67" },
+    val phoneIncompleteShort: String = "Enter the full phone number",
+    val bioHint: String = "5/5 · Software engineering",
+    val selectUniversity: String = "Select a university",
+    val searchUniversity: String = "Search universities",
+    val notFound: String = "Not found",
+    val gender: String = "Gender (optional)",
+    val genderMale: String = "Male",
+    val genderFemale: String = "Female",
+    val residence: String = "Place of residence (optional)",
+    val residenceHint: String = "So we can send you nearby job listings",
+    val selectRegion: String = "Select a region",
+    val selectDistrict: String = "Select a district",
+    val mainPhoto: String = "Main photo",
+    val profilePhoto: String = "Profile photo",
+    val main: String = "Main",
+    val photoHint: String = "Tap to make it the main one, long-press to delete",
+
+    // Kurs variantlari
+    val year1: String = "Year 1",
+    val year2: String = "Year 2",
+    val year3: String = "Year 3",
+    val year4: String = "Year 4",
+    val master: String = "Master's",
+)
+
+private val ProfileEn = ProfileStrings()
+
+private val ProfileRu = ProfileStrings(
+    settings = "Настройки",
+    edit = "Изменить",
+    posts = "Посты",
+    archivedPosts = "Архив постов",
+    setPhoto = "Задать фото",
+    uploadingPhoto = { "фото загружается $it" },
+    savingPhoto = "фото сохраняется…",
+    uploading = { "Загрузка $it" },
+    saving = "Сохранение…",
+    phoneLabel = "Мобильный номер",
+    bioLabel = "О себе",
+    emailLabel = "Почта",
+    universityLabel = "Университет",
+    courseLabel = "Курс",
+    myBusiness = "Мой бизнес",
+    myBusinessSubtitle = "Размещение и управление акциями",
+    logout = "Выйти",
+    online = "в сети",
+
+    editTitle = "Редактировать профиль",
+    changePhoto = "Изменить фото",
+    addPhoto = "Добавить фото",
+    maxPhotos = { "Не более $it фото" },
+    firstName = "Имя",
+    lastName = "Фамилия",
+    phone = "Телефон",
+    phoneIncomplete = { "Введите номер полностью: $it 90 123 45 67" },
+    phoneIncompleteShort = "Введите номер телефона полностью",
+    bioHint = "5/5 · Программная инженерия",
+    selectUniversity = "Выберите университет",
+    searchUniversity = "Поиск университета",
+    notFound = "Не найдено",
+    gender = "Пол (необязательно)",
+    genderMale = "Мужской",
+    genderFemale = "Женский",
+    residence = "Место проживания (необязательно)",
+    residenceHint = "Чтобы присылать вакансии рядом с вами",
+    selectRegion = "Выберите регион",
+    selectDistrict = "Выберите район",
+    mainPhoto = "Главное фото",
+    profilePhoto = "Фото профиля",
+    main = "Главное",
+    photoHint = "Нажатие — сделать главным, долгое нажатие — удалить",
+
+    year1 = "1 курс",
+    year2 = "2 курс",
+    year3 = "3 курс",
+    year4 = "4 курс",
+    master = "Магистр",
+)
+
+private val ProfileUz = ProfileStrings(
+    settings = "Sozlamalar",
+    edit = "Tahrirlash",
+    posts = "Postlar",
+    archivedPosts = "Arxivlangan postlar",
+    setPhoto = "Rasm belgilash",
+    uploadingPhoto = { "rasm yuklanmoqda $it" },
+    savingPhoto = "rasm saqlanmoqda…",
+    uploading = { "Yuklanmoqda $it" },
+    saving = "Saqlanmoqda…",
+    phoneLabel = "Mobil raqam",
+    bioLabel = "Tarjimayi hol",
+    emailLabel = "Pochta",
+    universityLabel = "Universitet",
+    courseLabel = "Kurs",
+    myBusiness = "Mening biznesim",
+    myBusinessSubtitle = "Chegirma e'loni qo'yish va boshqarish",
+    logout = "Chiqish",
+    online = "onlayn",
+
+    editTitle = "Profilni tahrirlash",
+    changePhoto = "Rasmni o'zgartirish",
+    addPhoto = "Rasm qo'shish",
+    maxPhotos = { "$it tadan ko'p rasm bo'lmaydi" },
+    firstName = "Ism",
+    lastName = "Familiya",
+    phone = "Telefon",
+    phoneIncomplete = { "Raqamni to'liq kiriting: $it 90 123 45 67" },
+    phoneIncompleteShort = "Telefon raqamini to'liq kiriting",
+    bioHint = "5/5 · Dasturiy injiniring",
+    selectUniversity = "Universitetni tanlang",
+    searchUniversity = "Universitet qidiring",
+    notFound = "Topilmadi",
+    gender = "Jins (ixtiyoriy)",
+    genderMale = "Erkak",
+    genderFemale = "Ayol",
+    residence = "Yashash joyi (ixtiyoriy)",
+    residenceHint = "Yaqin atrofdagi ish e'lonlarini yuborishimiz uchun",
+    selectRegion = "Viloyatni tanlang",
+    selectDistrict = "Tumanni tanlang",
+    mainPhoto = "Asosiy rasm",
+    profilePhoto = "Profil rasmi",
+    main = "Asosiy",
+    photoHint = "Bosish — asosiy qilish, uzoq bosish — o'chirish",
+
+    year1 = "1-kurs",
+    year2 = "2-kurs",
+    year3 = "3-kurs",
+    year4 = "4-kurs",
+    master = "Magistr",
+)
+
+@Composable
+@ReadOnlyComposable
+internal fun profileStrings(): ProfileStrings = rememberStrings(ProfileEn, ProfileRu, ProfileUz)
+
+/** ViewModel uchun (Compose'dan tashqarida). */
+internal fun profileStringsNow(): ProfileStrings = AppLocale.pick(ProfileEn, ProfileRu, ProfileUz)

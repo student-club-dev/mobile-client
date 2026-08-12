@@ -40,16 +40,24 @@ import dev.core.uikit.theme.AppPalette
 import dev.core.uikit.theme.appPalette
 import dev.feature.ads.domain.model.AdType
 import org.koin.compose.viewmodel.koinViewModel
+import androidx.compose.runtime.ReadOnlyComposable
+import dev.core.uikit.locale.uiStrings
 
 private data class AdTypeInfo(val type: AdType, val title: String, val subtitle: String)
 
-private val adTypes = listOf(
-    AdTypeInfo(AdType.JOB, "Ish e'loni", "Xodim yoki part-time izlash"),
-    AdTypeInfo(AdType.RENTAL, "Ijara / Turar joy", "Kvartira, hostel, room-mate"),
-    AdTypeInfo(AdType.SALE, "Sotuv (bozor)", "Kitob, texnika, buyum sotish"),
-    AdTypeInfo(AdType.SERVICE, "Xizmat / Repetitor", "Dars berish, dizayn, tarjima"),
-    AdTypeInfo(AdType.OTHER, "Boshqa e'lon", "Tadbir, jamoa, yo'qoldi-topildi"),
-)
+/** E'lon turlari — nomlari joriy tilda. */
+@Composable
+@ReadOnlyComposable
+private fun adTypes(): List<AdTypeInfo> {
+    val s = adsStrings()
+    return listOf(
+        AdTypeInfo(AdType.JOB, s.typeJob, s.typeJobSubtitle),
+        AdTypeInfo(AdType.RENTAL, s.typeRental, s.typeRentalSubtitle),
+        AdTypeInfo(AdType.SALE, s.typeSale, s.typeSaleSubtitle),
+        AdTypeInfo(AdType.SERVICE, s.typeService, s.typeServiceSubtitle),
+        AdTypeInfo(AdType.OTHER, s.typeOther, s.typeOtherSubtitle),
+    )
+}
 
 /**
  * Ikona ro'yxatda emas, chizish paytida tanlanadi: ikonalar endi resurslardan
@@ -86,13 +94,13 @@ private fun AdTypePicker(palette: AppPalette, onClose: () -> Unit, onPick: (AdTy
     Column(Modifier.fillMaxSize().padding(horizontal = 16.dp).scTopInset()) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(11.dp)) {
             IconBtn(AppIcons.Close, palette, onClose)
-            Text("Elon berish", style = TextStyle(fontFamily = AppFontFamily, fontSize = 20.sp, fontWeight = FontWeight.Black, color = palette.ink))
+            Text(adsStrings().postAd, style = TextStyle(fontFamily = AppFontFamily, fontSize = 20.sp, fontWeight = FontWeight.Black, color = palette.ink))
         }
         Spacer(Modifier.height(6.dp))
-        Text("Qanday e'lon joylamoqchisiz?", style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.5f.sp, color = palette.inkMuted))
+        Text(adsStrings().whatKind, style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.5f.sp, color = palette.inkMuted))
         Spacer(Modifier.height(16.dp))
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            adTypes.forEach { info ->
+            adTypes().forEach { info ->
                 Row(
                     Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(palette.glass).border(1.dp, palette.border, RoundedCornerShape(16.dp))
                         .clickable { onPick(info.type) }.padding(14.dp),
@@ -116,7 +124,7 @@ private fun AdTypePicker(palette: AppPalette, onClose: () -> Unit, onPick: (AdTy
 // 1v — forma
 @Composable
 private fun AdForm(state: PostAdUiState, palette: AppPalette, onBack: () -> Unit, vm: PostAdViewModel) {
-    val info = adTypes.first { it.type == state.type }
+    val info = adTypes().first { it.type == state.type }
     Column(Modifier.fillMaxSize().imePadding()) {
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).scTopInset()) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(11.dp)) {
@@ -132,32 +140,32 @@ private fun AdForm(state: PostAdUiState, palette: AppPalette, onBack: () -> Unit
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Icon(AppIcons.ImageIcon, null, tint = palette.inkFaint, modifier = Modifier.size(26.dp))
-                    Text("Rasm qo'shish", style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = palette.inkFaint))
+                    Text(adsStrings().addPhoto, style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = palette.inkFaint))
                 }
             }
             Spacer(Modifier.height(14.dp))
 
-            FieldTitle("E'lon sarlavhasi", palette)
-            GlassTextField(state.title, vm::onTitle, "SMM menejer kerak", height = 48)
+            FieldTitle(adsStrings().fieldTitle, palette)
+            GlassTextField(state.title, vm::onTitle, adsStrings().fieldTitleHint, height = 48)
             Spacer(Modifier.height(12.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Column(Modifier.weight(1f)) {
-                    FieldTitle("Kategoriya", palette)
+                    FieldTitle(adsStrings().fieldCategory, palette)
                     GlassTextField(state.category, vm::onCategory, "IT", height = 48)
                 }
                 Column(Modifier.weight(1f)) {
-                    FieldTitle("Narx / Maosh", palette)
-                    GlassTextField(state.price, vm::onPrice, "3–5 mln", height = 48)
+                    FieldTitle(adsStrings().fieldPrice, palette)
+                    GlassTextField(state.price, vm::onPrice, adsStrings().fieldPriceHint, height = 48)
                 }
             }
             Spacer(Modifier.height(12.dp))
-            FieldTitle("Tavsif", palette)
-            GlassTextField(state.description, vm::onDescription, "Batafsil ma'lumot...", height = 96)
+            FieldTitle(adsStrings().fieldDescription, palette)
+            GlassTextField(state.description, vm::onDescription, adsStrings().fieldDescriptionHint, height = 96)
             Spacer(Modifier.height(16.dp))
         }
         // Sticky tugma
         Box(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
-            PrimaryButton("E'lonni joylash", vm::submit, enabled = state.canSubmit)
+            PrimaryButton(adsStrings().submit, vm::submit, enabled = state.canSubmit)
         }
     }
 }
@@ -173,5 +181,5 @@ private fun IconBtn(icon: ImageVector, palette: AppPalette, onClick: () -> Unit)
     Box(
         Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(palette.glass).border(1.dp, palette.border, RoundedCornerShape(12.dp)).clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
-    ) { Icon(icon, "Orqaga", tint = palette.ink, modifier = Modifier.size(18.dp)) }
+    ) { Icon(icon, uiStrings().back, tint = palette.ink, modifier = Modifier.size(18.dp)) }
 }

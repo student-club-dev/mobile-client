@@ -83,7 +83,7 @@ internal fun statusException(
  * yuborsa, muammoni topish uchun shuning o'zi yetadi.
  */
 private fun validationFallback(status: Int?): String =
-    if (status == null) "Noma'lum xatolik yuz berdi." else "So'rov qabul qilinmadi ($status)."
+    if (status == null) NetworkStrings.unknown else NetworkStrings.rejected(status)
 
 /**
  * Xato javobining **tanasidan** typed xato quradi — 2xx BO'LMAGAN har qanday javob uchun.

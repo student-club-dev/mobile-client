@@ -70,7 +70,7 @@ fun MyPostsSection(
                 contentAlignment = Alignment.Center,
             ) {
                 ScText(
-                    if (state.loadingMore) "Yuklanmoqda…" else "Yana",
+                    if (state.loadingMore) storiesStrings().loadingEllipsis else storiesStrings().more,
                     13.5f,
                     FontWeight.Bold,
                     if (state.loadingMore) Sc.Muted else Sc.Brand,
@@ -83,7 +83,7 @@ fun MyPostsSection(
         // javob bo'lsin (`STORY_ARCHIVE_BACKEND.md` §3: server 365 kun saqlaydi).
         if (archived && stories.isNotEmpty()) {
             ScText(
-                "Rasm va videolar bir yil saqlanadi — keyin postning faqat yozuvi qoladi",
+                storiesStrings().mediaRetention,
                 11.5f,
                 FontWeight.Medium,
                 Sc.MutedLight,

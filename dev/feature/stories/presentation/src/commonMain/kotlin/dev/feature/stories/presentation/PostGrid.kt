@@ -31,6 +31,7 @@ import dev.feature.stories.domain.model.StoryKind
 import kotlinx.datetime.Clock
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
+import dev.core.uikit.locale.uiStringsNow
 
 /**
  * Uch ustunli to'r. `LazyVerticalGrid` **ataylab ishlatilmadi**: bo'lim profilning
@@ -100,13 +101,13 @@ private fun PostCell(
                 else -> story.localUri ?: story.thumbUrl ?: story.url
             },
             modifier = Modifier.fillMaxSize(),
-            contentDescription = if (story.kind == StoryKind.VIDEO) "Video post" else "Post",
+            contentDescription = if (story.kind == StoryKind.VIDEO) storiesStrings().videoPost else storiesStrings().post,
             fallback = {
                 // Post o'chmaydi — sanasi va o'rni qoladi, faqat mediasi yo'q.
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Icon(
                         AppIcons.ImageIcon,
-                        contentDescription = "Media saqlanmagan",
+                        contentDescription = storiesStrings().mediaNotStored,
                         tint = Sc.MutedLight,
                         modifier = Modifier.size(20.dp),
                     )
@@ -143,7 +144,7 @@ private fun PostCell(
             } else {
                 Icon(
                     AppIcons.Eye,
-                    contentDescription = "Ko'rishlar",
+                    contentDescription = storiesStrings().views,
                     tint = Color.White,
                     modifier = Modifier.size(13.dp),
                 )
@@ -157,7 +158,7 @@ private fun PostCell(
 private fun shortDate(story: Story): String {
     val date = story.createdAt.toLocalDateTime(TimeZone.currentSystemDefault()).date
     val thisYear = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).year
-    val month = UZ_MONTHS.getOrNull(date.monthNumber - 1).orEmpty()
+    val month = uiStringsNow().months.getOrNull(date.monthNumber - 1).orEmpty()
     return if (date.year == thisYear) "${date.dayOfMonth} $month" else "${date.dayOfMonth} $month ${date.year}"
 }
 

@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -21,6 +22,8 @@ import coil3.map.Mapper
 import io.github.aakira.napier.Napier
 import coil3.network.ktor3.KtorNetworkFetcherFactory
 import coil3.request.Options
+import dev.core.common.locale.AppLanguage
+import dev.core.common.locale.AppLocale
 import dev.core.data.seed.LocalDataSeeder
 import dev.core.data.seed.SeedPurge
 import dev.core.di.IMAGE_CLIENT
@@ -28,6 +31,7 @@ import dev.core.network.NetworkConfig
 import dev.core.network.media.MediaUrl
 import dev.core.network.media.apiOrigin
 import dev.core.uikit.components.ScToastHost
+import dev.core.uikit.locale.LocalAppLanguage
 import dev.core.uikit.media.purgeLegacyGalleryMedia
 import dev.core.uikit.theme.AppTheme
 import dev.feature.settings.domain.model.ThemeMode
@@ -100,39 +104,55 @@ private fun AppScaffold(content: @Composable () -> Unit) {
     // Foydalanuvchi tanlagan mavzu (Sozlamalar). SYSTEM bo'lsa qurilma rejimiga ergashadi.
     val settings = koinInject<SettingsRepository>()
     val themeMode by settings.observeThemeMode().collectAsState(initial = ThemeMode.SYSTEM)
+
+    // Interfeys tili. Boshlang'ich qiymat — EN: DB'dan javob kelgunicha ham ilova ingliz
+    // tilida chiziladi, ya'ni birinchi kadr hech qachon boshqa tilda "chaqnab" ketmaydi.
+    val language by settings.observeLanguage().collectAsState(initial = AppLanguage.Default)
+    // Compose'dan tashqaridagi kod (validator, use-case, WebSocket mapper) shu global
+    // holatdan o'qiydi — CompositionLocal u yerga yetmaydi. Namuna qatorlar bazada
+    // yotadi, shuning uchun ular ham yangi tilda qayta yoziladi.
+    LaunchedEffect(language) {
+        AppLocale.set(language)
+        runCatching { seeder.resyncLanguage() }
+    }
+
     val isDark = when (themeMode) {
         ThemeMode.LIGHT -> false
         ThemeMode.DARK -> true
         ThemeMode.SYSTEM -> isSystemInDarkTheme()
     }
 
-    AppTheme(darkTheme = isDark) {
-        // Butun ilova pastki tizim navigatsiya paneli (3 tugma) / iOS home indikatori
-        // ortida qolmasligi uchun global inset. Fon gradienti panel ostida ham to'liq chiziladi.
-        //
-        // `union(ime)` — klaviatura ochilganda kontent uning USTIGA ko'tariladi, ya'ni matn
-        // maydonlari (qidiruv, forma, izoh...) klaviatura ostida qolib ketmaydi. `union` —
-        // ikkalasining KATTAsi olinadi, aks holda klaviatura ustiga yana navigatsiya paneli
-        // balandligi qo'shilib, ortiqcha bo'shliq paydo bo'lardi.
-        //
-        // Bu global: ichkarida `imePadding()` chaqirgan ekranlar (chat, e'lonlar) ikki marta
-        // surilib ketmaydi — Compose qo'llanilgan insetni "iste'mol qilingan" deb belgilaydi.
-        Box(Modifier.fillMaxSize().background(appPalette.bgBrush)) {
-            Box(
-                Modifier.fillMaxSize()
-                    .windowInsetsPadding(WindowInsets.navigationBars.union(WindowInsets.ime)),
-            ) {
-                content()
+    // Til BUTUN daraxtga shu yerdan tarqaladi — `AppTheme` ham ichida qoladi, chunki
+    // mavzu ichidagi komponentlar (toast, qo'ng'iroq oynasi) ham tarjimani o'qiydi.
+    CompositionLocalProvider(LocalAppLanguage provides language) {
+        AppTheme(darkTheme = isDark) {
+            // Butun ilova pastki tizim navigatsiya paneli (3 tugma) / iOS home indikatori
+            // ortida qolmasligi uchun global inset. Fon gradienti panel ostida ham to'liq chiziladi.
+            //
+            // `union(ime)` — klaviatura ochilganda kontent uning USTIGA ko'tariladi, ya'ni matn
+            // maydonlari (qidiruv, forma, izoh...) klaviatura ostida qolib ketmaydi. `union` —
+            // ikkalasining KATTAsi olinadi, aks holda klaviatura ustiga yana navigatsiya paneli
+            // balandligi qo'shilib, ortiqcha bo'shliq paydo bo'lardi.
+            //
+            // Bu global: ichkarida `imePadding()` chaqirgan ekranlar (chat, e'lonlar) ikki marta
+            // surilib ketmaydi — Compose qo'llanilgan insetni "iste'mol qilingan" deb belgilaydi.
+            Box(Modifier.fillMaxSize().background(appPalette.bgBrush)) {
+                Box(
+                    Modifier.fillMaxSize()
+                        .windowInsetsPadding(WindowInsets.navigationBars.union(WindowInsets.ime)),
+                ) {
+                    content()
+                }
+                // Qo'ng'iroq ekrani BUTUN ilova ustida turadi va inset o'ramidan tashqarida:
+                // u to'liq ekranni egallaydi (video kadr status bar ostiga ham chiqadi) va
+                // o'z insetlarini o'zi qo'yadi. Kiruvchi qo'ng'iroq foydalanuvchi qaysi
+                // ekranda turganidan qat'i nazar ko'rinishi kerak.
+                CallHost()
+                // Xato/xabar toastlari — HAMMA narsadan ustida va insetdan tashqarida: ular
+                // status bar ostidan tushadi va foydalanuvchi qaysi ekranda bo'lishidan
+                // qat'i nazar ko'rinishi kerak (`AppMessageBus`).
+                ScToastHost()
             }
-            // Qo'ng'iroq ekrani BUTUN ilova ustida turadi va inset o'ramidan tashqarida:
-            // u to'liq ekranni egallaydi (video kadr status bar ostiga ham chiqadi) va
-            // o'z insetlarini o'zi qo'yadi. Kiruvchi qo'ng'iroq foydalanuvchi qaysi
-            // ekranda turganidan qat'i nazar ko'rinishi kerak.
-            CallHost()
-            // Xato/xabar toastlari — HAMMA narsadan ustida va insetdan tashqarida: ular
-            // status bar ostidan tushadi va foydalanuvchi qaysi ekranda bo'lishidan
-            // qat'i nazar ko'rinishi kerak (`AppMessageBus`).
-            ScToastHost()
         }
     }
 }

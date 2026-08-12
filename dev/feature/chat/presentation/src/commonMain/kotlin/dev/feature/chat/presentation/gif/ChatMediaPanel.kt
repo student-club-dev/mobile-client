@@ -49,11 +49,21 @@ import dev.feature.chat.domain.model.stickerMessage
 import dev.feature.chat.presentation.StickerImage
 import kotlinx.coroutines.flow.distinctUntilChanged
 import org.koin.compose.viewmodel.koinViewModel
+import dev.feature.chat.presentation.chatStrings
+import dev.feature.chat.presentation.chatStringsNow
 
 /** Kompozitor ustidagi panelning ikki bo'limi. */
-enum class ChatMediaTab(val title: String) {
-    STICKERS("Stikerlar"),
-    GIF("GIF"),
+enum class ChatMediaTab {
+    STICKERS,
+    GIF,
+    ;
+
+    /** Yorliq joriy tilda — enum konstantasiga qotirib qo'yib bo'lmaydi. */
+    val title: String
+        get() = when (this) {
+            STICKERS -> chatStringsNow().stickers
+            GIF -> "GIF"
+        }
 }
 
 /**
@@ -155,7 +165,7 @@ fun RemoteStickerPanel(
             MediaSearchField(
                 query = state.query,
                 onQueryChange = vm::onQueryChange,
-                placeholder = "Stiker qidirish…",
+                placeholder = chatStrings().searchStickers,
                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
             )
         }
@@ -291,7 +301,7 @@ private fun StickerSearchResults(
             onRetry = vm::retry,
         )
 
-        state.emptyResults -> MediaSearchCenterText("«${state.query}» bo'yicha stiker topilmadi.")
+        state.emptyResults -> MediaSearchCenterText(chatStrings().noStickersFor(state.query))
 
         else -> LazyVerticalGrid(
             columns = GridCells.Fixed(SEARCH_GRID_COLUMNS),

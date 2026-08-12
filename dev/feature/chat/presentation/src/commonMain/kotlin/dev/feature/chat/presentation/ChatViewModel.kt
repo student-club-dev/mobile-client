@@ -47,6 +47,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
+import dev.core.uikit.locale.uiStringsNow
 
 /**
  * Albomdagi (yoki yakka) bitta media — **rasm ham, video ham**.
@@ -225,8 +226,8 @@ data class ChatMessageUi(
  * bilan tepa qatorda o'zi paydo bo'ladi ([ChatFolder.entries] bo'yicha chiziladi).
  */
 enum class ChatFolder(val label: String) {
-    PERSONAL("Shaxsiy"),
-    CLUBS("Klublar"),
+    PERSONAL(chatStringsNow().personal),
+    CLUBS(chatStringsNow().clubs),
 }
 
 /**
@@ -236,7 +237,7 @@ enum class ChatFolder(val label: String) {
  * o'zgarganda (masalan kurs yoki universitet) ro'yxat qayta chizilib turardi.
  */
 data class ChatMyProfile(
-    val name: String = "Talaba",
+    val name: String = uiStringsNow().student,
     val avatarUrl: String? = null,
 )
 
@@ -363,7 +364,7 @@ class ChatViewModel(
     private val myId: String? = tokenStore.userId()
 
     /**
-     * Klublar — "Klublar" papkasining ro'yxati.
+     * Klublar — chatStringsNow().clubs papkasining ro'yxati.
      *
      * Alohida klublar ekrani YO'Q: qo'shilish/chiqish ham shu yerda bo'ladi, chunki klub —
      * jamoaviy suhbat va uning o'rni xabarlar ichida.
@@ -390,7 +391,7 @@ class ChatViewModel(
     fun toggleJoin(club: Club) {
         viewModelScope.launch {
             clubRepository.setJoined(club.id, !club.joined)
-            showMessage(if (club.joined) "Klubdan chiqdingiz" else "Klubga qo'shildingiz")
+            showMessage(if (club.joined) chatStringsNow().leftClub else chatStringsNow().joinedClub)
         }
     }
 
@@ -404,7 +405,7 @@ class ChatViewModel(
     val myProfile: StateFlow<ChatMyProfile> = observeProfileUseCase()
         .map { profile ->
             ChatMyProfile(
-                name = profile?.displayName?.takeIf { it.isNotBlank() } ?: "Talaba",
+                name = profile?.displayName?.takeIf { it.isNotBlank() } ?: uiStringsNow().student,
                 avatarUrl = profile?.avatarUrl?.takeIf { it.isNotBlank() },
             )
         }
@@ -434,7 +435,7 @@ class ChatViewModel(
      * katta combine, papka esa unga umuman ta'sir qilmaydi (faqat qaysi ro'yxat chizilishi).
      *
      * ViewModel'da, ekranda emas: suhbat ochilib yopilganda ro'yxat kompozitsiyadan chiqadi
-     * va `remember` tanlovni unutardi — foydalanuvchi har safar "Shaxsiy" ga qaytib tushardi.
+     * va `remember` tanlovni unutardi — foydalanuvchi har safar chatStringsNow().personal ga qaytib tushardi.
      */
     val folder: StateFlow<ChatFolder> = _folder.asStateFlow()
 
@@ -1181,7 +1182,7 @@ class ChatViewModel(
     /** Bog'lanishni uzish — suhbat qoladi (tarix o'qiladi), lekin yozib bo'lmaydi. */
     fun disconnect(studentId: String) = viewModelScope.launch {
         when (val res = connectionsRepository.disconnect(studentId)) {
-            is Resource.Success -> extra.update { it.copy(message = "Bog'lanish uzildi") }
+            is Resource.Success -> extra.update { it.copy(message = chatStringsNow().connectionRemoved) }
             is Resource.Error -> extra.update { it.copy(message = res.message) }
             Resource.Loading -> Unit
         }
@@ -1190,7 +1191,7 @@ class ChatViewModel(
     fun block(studentId: String) = viewModelScope.launch {
         when (val res = connectionsRepository.block(studentId)) {
             is Resource.Success -> {
-                extra.update { it.copy(message = "Bloklandi") }
+                extra.update { it.copy(message = chatStringsNow().blocked) }
                 selectedId.value = null
                 chatRepository.refreshConversations()
             }
@@ -1213,7 +1214,7 @@ class ChatViewModel(
 
     private fun report(result: Resource<Unit>) {
         val text = when (result) {
-            is Resource.Success -> "Shikoyatingiz qabul qilindi"
+            is Resource.Success -> chatStringsNow().reportAccepted
             is Resource.Error -> result.message
             Resource.Loading -> return
         }
@@ -1256,6 +1257,6 @@ class ChatViewModel(
         const val ALBUM_WINDOW_SECONDS = 60L
 
         /** Tombstone matni — xabar tarixda qoladi, lekin tanasi yo'q. */
-        const val DELETED_TEXT = "Xabar o'chirildi"
+        val DELETED_TEXT: String get() = chatStringsNow().messageDeleted
     }
 }

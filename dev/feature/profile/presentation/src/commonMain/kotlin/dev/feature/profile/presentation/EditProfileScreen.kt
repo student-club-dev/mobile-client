@@ -71,22 +71,35 @@ import dev.feature.profile.domain.model.bioRejectionReason
 import dev.feature.profile.presentation.components.ProfileAvatar
 import dev.feature.university.domain.model.University
 import org.koin.compose.viewmodel.koinViewModel
+import androidx.compose.runtime.ReadOnlyComposable
+import dev.core.uikit.locale.uiStrings
 
 /** Tanlov tugmasining qiymati (backendga ketadigan) va ekrandagi yorlig'i. */
 private data class ChoiceOption(val value: String, val label: String)
 
-private val courseOptions = listOf(
-    ChoiceOption("1", "1-kurs"),
-    ChoiceOption("2", "2-kurs"),
-    ChoiceOption("3", "3-kurs"),
-    ChoiceOption("4", "4-kurs"),
-    ChoiceOption("MASTER", "Magistr"),
-)
+/** Kurs variantlari — yorliqlari joriy tilda, qiymatlari o'zgarmaydi (serverga ketadi). */
+@Composable
+@ReadOnlyComposable
+private fun courseOptions(): List<ChoiceOption> {
+    val s = profileStrings()
+    return listOf(
+        ChoiceOption("1", s.year1),
+        ChoiceOption("2", s.year2),
+        ChoiceOption("3", s.year3),
+        ChoiceOption("4", s.year4),
+        ChoiceOption("MASTER", s.master),
+    )
+}
 
-private val genderOptions = listOf(
-    ChoiceOption("MALE", "Erkak"),
-    ChoiceOption("FEMALE", "Ayol"),
-)
+@Composable
+@ReadOnlyComposable
+private fun genderOptions(): List<ChoiceOption> {
+    val s = profileStrings()
+    return listOf(
+        ChoiceOption("MALE", s.genderMale),
+        ChoiceOption("FEMALE", s.genderFemale),
+    )
+}
 
 /**
  * Profilni tahrirlash ekrani (A2/C2). Local keshdagi profilni prefill qiladi,
@@ -96,6 +109,9 @@ private val genderOptions = listOf(
 @Composable
 fun EditProfileScreen(onBack: () -> Unit, vm: ProfileViewModel = koinViewModel()) {
     val state by vm.state.collectAsStateWithLifecycle()
+    val s = profileStrings()
+    // Xato matni `onClick` lambda ichida kerak, u yerda Composable chaqirib bo'lmaydi.
+    val phoneIncompleteMessage = s.phoneIncompleteShort
     val profile = state.profile
 
     var firstName by remember(profile) { mutableStateOf(profile?.firstName.orEmpty()) }
@@ -150,8 +166,8 @@ fun EditProfileScreen(onBack: () -> Unit, vm: ProfileViewModel = koinViewModel()
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(13.dp),
             ) {
-                ScCircleButton(ScIcons.ChevronLeft, onBack, contentDescription = "Orqaga")
-                ScHeaderTitle("Profilni tahrirlash", size = 21f, modifier = Modifier.weight(1f))
+                ScCircleButton(ScIcons.ChevronLeft, onBack, contentDescription = uiStrings().back)
+                ScHeaderTitle(s.editTitle, size = 21f, modifier = Modifier.weight(1f))
             }
         }
         Spacer(Modifier.height(22.dp))
@@ -185,25 +201,25 @@ fun EditProfileScreen(onBack: () -> Unit, vm: ProfileViewModel = koinViewModel()
                         .clickable(enabled = photos.canAdd) { imagePicker.pick() },
                     contentAlignment = Alignment.Center,
                 ) {
-                    Icon(AppIcons.Camera, "Rasmni o'zgartirish", tint = Color.White, modifier = Modifier.size(15.dp))
+                    Icon(AppIcons.Camera, s.changePhoto, tint = Color.White, modifier = Modifier.size(15.dp))
                 }
             }
 
             when {
                 photos.uploading && photos.progress != null -> ScText(
-                    "Rasm yuklanmoqda ${scUploadPercent(photos.progress!!)}",
+                    s.uploading(scUploadPercent(photos.progress!!)),
                     12.5f, FontWeight.SemiBold, Sc.Muted,
                 )
                 // Fayl ketib bo'lgan — endi server rasmni saqlab, profilni yangilamoqda.
-                photos.uploading -> ScText("Rasm saqlanmoqda...", 12.5f, FontWeight.SemiBold, Sc.Muted)
+                photos.uploading -> ScText(s.saving, 12.5f, FontWeight.SemiBold, Sc.Muted)
                 photos.error != null -> ScText(photos.error!!, 12.5f, FontWeight.SemiBold, Sc.Danger)
                 photos.canAdd -> ScText(
-                    "Rasm qo'shish", 12.5f, FontWeight.Bold, Sc.Brand,
+                    s.addPhoto, 12.5f, FontWeight.Bold, Sc.Brand,
                     Modifier.clickable { imagePicker.pick() },
                 )
                 // Chegaraga yetildi — tugmani ko'rsatib turish faqat 422 ga olib borardi.
                 else -> ScText(
-                    "${ProfilePhoto.MAX_PHOTOS} tadan ko'p rasm bo'lmaydi",
+                    s.maxPhotos(ProfilePhoto.MAX_PHOTOS),
                     12.5f, FontWeight.SemiBold, Sc.Muted,
                 )
             }
@@ -223,13 +239,13 @@ fun EditProfileScreen(onBack: () -> Unit, vm: ProfileViewModel = koinViewModel()
             Modifier.fillMaxWidth().padding(horizontal = Sc.ScreenPadding),
             verticalArrangement = Arrangement.spacedBy(13.dp),
         ) {
-            FieldLabel("Ism")
-            GlassTextField(firstName, { firstName = it }, "Ism", leading = AppIcons.Pencil)
+            FieldLabel(s.firstName)
+            GlassTextField(firstName, { firstName = it }, s.firstName, leading = AppIcons.Pencil)
 
-            FieldLabel("Familiya")
-            GlassTextField(lastName, { lastName = it }, "Familiya", leading = AppIcons.Pencil)
+            FieldLabel(s.lastName)
+            GlassTextField(lastName, { lastName = it }, s.lastName, leading = AppIcons.Pencil)
 
-            FieldLabel("Telefon")
+            FieldLabel(s.phone)
             GlassTextField(
                 phone, { phone = it.toUzPhoneDigits() }, "90 123 45 67",
                 leadingContent = { PhonePrefix() },
@@ -239,7 +255,7 @@ fun EditProfileScreen(onBack: () -> Unit, vm: ProfileViewModel = koinViewModel()
             // Chala raqam saqlanmaydi — shu yerda ogohlantiramiz.
             if (phone.isNotEmpty() && !phone.isUzPhoneComplete()) {
                 ScText(
-                    "Raqamni to'liq kiriting: $UZ_PHONE_CODE 90 123 45 67",
+                    s.phoneIncomplete(UZ_PHONE_CODE),
                     11.5f,
                     FontWeight.Medium,
                     Sc.Danger,
@@ -247,11 +263,11 @@ fun EditProfileScreen(onBack: () -> Unit, vm: ProfileViewModel = koinViewModel()
             }
 
             // Tarjimayi hol — 140 belgi, havola/telefon TAQIQLANGAN.
-            FieldLabel("Tarjimayi hol")
+            FieldLabel(s.bioLabel)
             GlassTextField(
                 bio,
                 { if (it.length <= UserProfile.MAX_BIO) bio = it },
-                "5/5 · Dasturiy injiniring",
+                s.bioHint,
                 leading = AppIcons.Pencil,
             )
             /**
@@ -268,7 +284,7 @@ fun EditProfileScreen(onBack: () -> Unit, vm: ProfileViewModel = koinViewModel()
             )
 
             // Universitet tanlash
-            FieldLabel("Universitet")
+            FieldLabel(s.universityLabel)
             val selectedUni = state.universities.firstOrNull { it.id == universityId }
             Row(
                 Modifier.fillMaxWidth()
@@ -282,7 +298,7 @@ fun EditProfileScreen(onBack: () -> Unit, vm: ProfileViewModel = koinViewModel()
                 Icon(ScIcons.Cap, null, tint = Sc.Muted, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(9.dp))
                 ScText(
-                    selectedUni?.shortName ?: "Universitetni tanlang",
+                    selectedUni?.shortName ?: s.selectUniversity,
                     14f, FontWeight.SemiBold,
                     if (selectedUni != null) Sc.Ink else Sc.Muted,
                     Modifier.weight(1f),
@@ -292,7 +308,7 @@ fun EditProfileScreen(onBack: () -> Unit, vm: ProfileViewModel = koinViewModel()
             }
             if (uniExpanded) {
                 Column(Modifier.fillMaxWidth().scCard(radius = 20.dp).padding(9.dp)) {
-                    GlassTextField(uniQuery, { uniQuery = it }, "Universitet qidiring", leading = AppIcons.Search, height = 44)
+                    GlassTextField(uniQuery, { uniQuery = it }, s.searchUniversity, leading = AppIcons.Search, height = 44)
                     Spacer(Modifier.height(8.dp))
                     // Ro'yxat katta (prof-emis, ~10000) — qidiruv bo'yicha cheklab ko'rsatamiz.
                     val filtered = remember(state.universities, uniQuery) {
@@ -313,15 +329,15 @@ fun EditProfileScreen(onBack: () -> Unit, vm: ProfileViewModel = koinViewModel()
                         }
                     }
                     if (filtered.isEmpty()) {
-                        ScText("Topilmadi", 12.5f, FontWeight.Medium, Sc.Muted, Modifier.padding(8.dp))
+                        ScText(s.notFound, 12.5f, FontWeight.Medium, Sc.Muted, Modifier.padding(8.dp))
                     }
                 }
             }
 
             // Kurs tanlash
-            FieldLabel("Kurs")
+            FieldLabel(s.courseLabel)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                courseOptions.forEach { opt ->
+                courseOptions().forEach { opt ->
                     ChoiceBox(opt.label, opt.value == courseYear, Modifier.weight(1f)) {
                         courseYear = opt.value
                     }
@@ -330,9 +346,9 @@ fun EditProfileScreen(onBack: () -> Unit, vm: ProfileViewModel = koinViewModel()
 
             // Jins — talabalar qidiruvidagi filtr shu maydonga tayanadi. Ixtiyoriy:
             // tanlangan tugmani qayta bosish tanlovni bekor qiladi.
-            FieldLabel("Jins (ixtiyoriy)")
+            FieldLabel(s.gender)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                genderOptions.forEach { opt ->
+                genderOptions().forEach { opt ->
                     ChoiceBox(opt.label, opt.value == gender, Modifier.weight(1f)) {
                         gender = if (gender == opt.value) null else opt.value
                     }
@@ -343,15 +359,15 @@ fun EditProfileScreen(onBack: () -> Unit, vm: ProfileViewModel = koinViewModel()
             // (`02-PUSH_CATALOG_RESPONSE.md` §4: universitet BIR XIL yoki e'lon shu
             // tumanda). To'ldirilmasa hech narsa buzilmaydi — tavsiyalar faqat
             // universitet bo'yicha keladi, shuning uchun maydon ixtiyoriy.
-            FieldLabel("Yashash joyi (ixtiyoriy)")
+            FieldLabel(s.residence)
             ScText(
-                "Yaqin atrofdagi ish e'lonlarini yuborishimiz uchun",
+                s.residenceHint,
                 11.5f, FontWeight.Medium, Sc.MutedLight,
             )
             val selectedRegion = addressCatalog.regions.firstOrNull { it.id == regionId }
             PickerField(
                 icon = ScIcons.MapPin,
-                text = selectedRegion?.name ?: "Viloyatni tanlang",
+                text = selectedRegion?.name ?: s.selectRegion,
                 filled = selectedRegion != null,
             ) {
                 regionExpanded = !regionExpanded
@@ -376,7 +392,7 @@ fun EditProfileScreen(onBack: () -> Unit, vm: ProfileViewModel = koinViewModel()
                 val selectedDistrict = addressCatalog.districts.firstOrNull { it.id == districtId }
                 PickerField(
                     icon = ScIcons.MapPin,
-                    text = selectedDistrict?.name ?: "Tumanni tanlang",
+                    text = selectedDistrict?.name ?: s.selectDistrict,
                     filled = selectedDistrict != null,
                 ) {
                     districtExpanded = !districtExpanded
@@ -391,7 +407,7 @@ fun EditProfileScreen(onBack: () -> Unit, vm: ProfileViewModel = koinViewModel()
                             }
                         }
                         if (addressCatalog.districts.isEmpty()) {
-                            ScText("Topilmadi", 12.5f, FontWeight.Medium, Sc.Muted, Modifier.padding(8.dp))
+                            ScText(s.notFound, 12.5f, FontWeight.Medium, Sc.Muted, Modifier.padding(8.dp))
                         }
                     }
                 }
@@ -403,7 +419,7 @@ fun EditProfileScreen(onBack: () -> Unit, vm: ProfileViewModel = koinViewModel()
 
             Spacer(Modifier.height(4.dp))
             ScGradientButton(
-                text = if (saving) "Saqlanmoqda..." else "Saqlash",
+                text = if (saving) s.saving else uiStrings().save,
                 onClick = {
                     if (saving) return@ScGradientButton
                     error = null
@@ -417,7 +433,7 @@ fun EditProfileScreen(onBack: () -> Unit, vm: ProfileViewModel = koinViewModel()
                     // Chala raqam bilan saqlab bo'lmaydi: raqam yo to'liq, yo umuman yo'q.
                     if (phone.isNotEmpty() && !phone.isUzPhoneComplete()) {
                         saving = false
-                        error = "Telefon raqamini to'liq kiriting"
+                        error = phoneIncompleteMessage
                         return@ScGradientButton
                     }
                     val updated = (profile ?: UserProfile()).copy(
@@ -461,6 +477,7 @@ private fun ProfilePhotoStrip(
     onMakeMain: (String) -> Unit,
     onDelete: (String) -> Unit,
 ) {
+    val s = profileStrings()
     LazyRow(
         Modifier.fillMaxWidth(),
         contentPadding = PaddingValues(horizontal = Sc.ScreenPadding),
@@ -479,7 +496,7 @@ private fun ProfilePhotoStrip(
             ) {
                 AsyncImage(
                     model = photo.previewUrl,
-                    contentDescription = if (main) "Asosiy rasm" else "Profil rasmi",
+                    contentDescription = if (main) s.mainPhoto else s.profilePhoto,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize(),
                 )
@@ -490,14 +507,14 @@ private fun ProfilePhotoStrip(
                             .background(Color.Black.copy(alpha = 0.45f)),
                         contentAlignment = Alignment.Center,
                     ) {
-                        ScText("Asosiy", 9.5f, FontWeight.Bold, Color.White, maxLines = 1)
+                        ScText(s.main, 9.5f, FontWeight.Bold, Color.White, maxLines = 1)
                     }
                 }
             }
         }
     }
     ScText(
-        "Bosish — asosiy qilish, uzoq bosish — o'chirish",
+        s.photoHint,
         11.5f,
         FontWeight.Medium,
         Sc.MutedLight,

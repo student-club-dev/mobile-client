@@ -98,7 +98,7 @@ internal fun MessageMeta(message: ChatMessageUi, modifier: Modifier = Modifier, 
         }
         if (failed) {
             ScText(
-                "yuborilmadi · qayta urinish", 11f, FontWeight.SemiBold,
+                chatStrings().sendFailedRetry, 11f, FontWeight.SemiBold,
                 if (onDark) Color.White else Sc.Danger,
             )
         } else {
@@ -814,7 +814,7 @@ internal fun VoiceBubble(
                 // ma'nosidagi `Close` ko'rsatiladi.
                 Icon(
                     if (playing) ScIcons.Close else ScIcons.Mic,
-                    if (playing) "To'xtatish" else "Eshitish",
+                    if (playing) chatStrings().stop else chatStrings().play,
                     tint = Color.White,
                     modifier = Modifier.size(17.dp),
                 )
@@ -1102,8 +1102,8 @@ internal fun UploadingAttachmentBubble(message: ChatMessageUi, onTap: () -> Unit
             ScUploadRing(upload.progress, size = SMALL_RING, stroke = 2.5.dp)
             Column(Modifier.weight(1f)) {
                 val title = when (message.type) {
-                    MessageType.VOICE -> "Ovozli xabar"
-                    else -> upload.fileName ?: "Fayl"
+                    MessageType.VOICE -> chatStrings().voiceMessage
+                    else -> upload.fileName ?: chatStrings().file
                 }
                 ScText(title, 14f, FontWeight.Bold, Sc.Ink, maxLines = 1)
                 ScText(uploadCaption(upload), 11.5f, FontWeight.Medium, Sc.Muted, maxLines = 1)

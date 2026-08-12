@@ -44,6 +44,7 @@ import dev.core.uikit.theme.AppPalette
 import dev.core.uikit.theme.LocalScFontFamily
 import dev.core.uikit.theme.appPalette
 import androidx.compose.foundation.layout.imePadding
+import dev.core.uikit.locale.uiStrings
 
 /**
  * Ilovaning yagona shrift oilasi — Plus Jakarta Sans (dizayn spetsifikatsiyasi).
@@ -383,7 +384,7 @@ fun GlassTextField(
 // ---------------------------------------------------------------------------
 
 @Composable
-fun OrDivider(text: String = "yoki", modifier: Modifier = Modifier, palette: AppPalette = appPalette) {
+fun OrDivider(text: String = uiStrings().or, modifier: Modifier = Modifier, palette: AppPalette = appPalette) {
     Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         Box(Modifier.weight(1f).height(1.dp).background(palette.border))
         Text(text, style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.5f.sp, fontWeight = FontWeight.Medium, color = palette.inkFaint))

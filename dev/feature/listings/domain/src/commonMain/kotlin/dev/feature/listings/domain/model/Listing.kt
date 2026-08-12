@@ -174,7 +174,7 @@ data class NearestBranch(val branch: ListingBranch, val distanceMeters: Double?)
  * ro'yxat boshida ko'radi. [MY_UNIVERSITY] va [NEARBY_UNIVERSITIES] esa haqiqiy cheklov —
  * "yotoqxonamizga sherik" kabi e'lonlar uchun.
  */
-enum class ListingAudience(val label: String, val hint: String) {
+enum class ListingAudience(private val labelUz: String, private val hintUz: String) {
     ALL(
         "Hammaga",
         "Har qanday talaba ko'radi; o'z universitetingiznikilarga ro'yxat boshida chiqadi",
@@ -186,11 +186,17 @@ enum class ListingAudience(val label: String, val hint: String) {
     MY_UNIVERSITY(
         "Faqat universitetim",
         "Faqat o'z universitetingiz talabalari ko'radi",
-    ),
+    )
+
+    ;
+
+    val label: String get() = trListing(labelUz)
+
+    val hint: String get() = trListing(hintUz)
 }
 
 /** E'lon holati. Oqim: DRAFT → PENDING_REVIEW → ACTIVE ⇄ PAUSED. */
-enum class ListingStatus(val label: String) {
+enum class ListingStatus(private val labelUz: String) {
     DRAFT("Qoralama"),
     PENDING_REVIEW("Moderatsiyada"),
     REJECTED("Rad etilgan"),
@@ -204,10 +210,14 @@ enum class ListingStatus(val label: String) {
 
     /** Talabaga ko'rinadimi. */
     val isVisibleToStudents: Boolean get() = this == ACTIVE
+
+    ;
+
+    val label: String get() = trListing(labelUz)
 }
 
 /** Narx birligi — biznes turiga qarab odatiy qiymati bor ([BusinessType.defaultPriceUnit]). */
-enum class PriceUnit(val label: String, val suffix: String) {
+enum class PriceUnit(private val labelUz: String, private val suffixUz: String) {
     PER_ITEM("Dona", "dona"),
     PER_HOUR("Soat", "soat"),
     PER_KG("Kilogramm", "kg"),
@@ -219,30 +229,50 @@ enum class PriceUnit(val label: String, val suffix: String) {
     PER_PERSON("Kishi", "kishi"),
     PER_SESSION("Sessiya", "sessiya"),
     /** Chop etish xizmatlari uchun. */
-    PER_PAGE("Sahifa", "sahifa"),
+    PER_PAGE("Sahifa", "sahifa")
+
+    ;
+
+    val label: String get() = trListing(labelUz)
+
+    val suffix: String get() = trListing(suffixUz)
 }
 
 /** Chegirma turi — [ListingDetails.Discount.discountValue] maydonining ma'nosini belgilaydi. */
-enum class DiscountType(val label: String, val valueLabel: String, val hint: String) {
+enum class DiscountType(private val labelUz: String, private val valueLabelUz: String, private val hintUz: String) {
     /** Qiymat = foiz (1..90). */
     PERCENT("Foiz chegirma", "Foiz (%)", "20"),
 
     /** Qiymat = so'mda ayiriladigan summa. */
-    FIXED_AMOUNT("Summa chegirma", "Chegirma (so'm)", "10000"),
+    FIXED_AMOUNT("Summa chegirma", "Chegirma summasi", "10000"),
 
     /** Qiymat = talabaga beriladigan yangi narx. */
-    SPECIAL_PRICE("Talaba narxi", "Yangi narx (so'm)", "40000"),
+    SPECIAL_PRICE("Talaba narxi", "Yangi narx", "40000"),
 
     /** 1+1 kabi aksiya — narx o'zgarmaydi, shartlar matnda. */
-    FREE_ITEM("Sovg'a (1+1)", "—", ""),
+    FREE_ITEM("Sovg'a (1+1)", "—", "")
+
+    ;
+
+    val label: String get() = trListing(labelUz)
+
+    val valueLabel: String get() = trListing(valueLabelUz)
+
+    val hint: String get() = trListing(hintUz)
 }
 
 /** Talaba chegirmani qanday ishlatadi. */
-enum class RedemptionMethod(val label: String, val hint: String) {
+enum class RedemptionMethod(private val labelUz: String, private val hintUz: String) {
     QR("QR kod", "Ilovada QR chiqadi, kassir skanerlaydi"),
     PROMO_CODE("Promokod", "Talaba kodni kassirga aytadi"),
     STUDENT_ID("Talaba ID", "Profilini ko'rsatadi, kod kerak emas"),
-    ONLINE_LINK("Onlayn havola", "Tashqi saytda ishlatiladi"),
+    ONLINE_LINK("Onlayn havola", "Tashqi saytda ishlatiladi")
+
+    ;
+
+    val label: String get() = trListing(labelUz)
+
+    val hint: String get() = trListing(hintUz)
 }
 
 /** Chegirmani ishlatish shartlari va limitlari. */
@@ -311,9 +341,13 @@ object Geo {
 }
 
 /** Qo'shimcha tanlov turi. */
-enum class SelectionType(val label: String) {
+enum class SelectionType(private val labelUz: String) {
     SINGLE("Bittasini tanlaydi"),
-    MULTIPLE("Bir nechtasini tanlaydi"),
+    MULTIPLE("Bir nechtasini tanlaydi")
+
+    ;
+
+    val label: String get() = trListing(labelUz)
 }
 
 /** Qo'shimcha variant: "35 sm  +12 000". */

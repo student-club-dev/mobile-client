@@ -38,6 +38,8 @@ import dev.feature.stories.presentation.StoriesCell
 import dev.feature.stories.presentation.StoriesRow
 import dev.feature.stories.presentation.storiesCollapsedWidth
 import kotlin.math.roundToInt
+import dev.feature.chat.presentation.chatStrings
+import dev.core.uikit.locale.uiStrings
 
 /**
  * «Xabarlar» ekranining yig'iluvchi sarlavhasi.
@@ -230,7 +232,7 @@ private fun Toolbar(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (onBack != null) {
-            ScCircleButton(ScIcons.ChevronLeft, onBack, contentDescription = "Orqaga")
+            ScCircleButton(ScIcons.ChevronLeft, onBack, contentDescription = uiStrings().back)
             Spacer(Modifier.width(BackGap))
         }
         Spacer(
@@ -260,12 +262,12 @@ private fun Toolbar(
         ScCircleButton(
             ScIcons.Search,
             onOpenSearch,
-            contentDescription = "Qidirish",
+            contentDescription = chatStrings().search,
             badge = searchActive,
         )
         if (showArchive) {
             Spacer(Modifier.width(8.dp))
-            ScCircleButton(ScIcons.Archive, onArchive, contentDescription = "Arxiv")
+            ScCircleButton(ScIcons.Archive, onArchive, contentDescription = chatStrings().archive)
         }
     }
 }

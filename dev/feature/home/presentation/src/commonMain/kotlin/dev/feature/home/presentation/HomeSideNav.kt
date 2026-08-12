@@ -60,6 +60,7 @@ import dev.core.uikit.theme.Sc
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlin.math.abs
+import dev.core.uikit.locale.uiStrings
 
 /**
  * Bosh ekranning yon navigatsiyasi: chap chetdagi tutqichdan yoki **barmoq bilan chetdan
@@ -236,6 +237,7 @@ internal fun Modifier.sideNavEdgeDrag(nav: SideNavState): Modifier {
  */
 @Composable
 internal fun SideNavHandle(onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val s = homeStrings()
     val shape = RoundedCornerShape(12.dp)
     val chevron = ScIcons.ChevronRight
     Box(
@@ -251,7 +253,7 @@ internal fun SideNavHandle(onClick: () -> Unit, modifier: Modifier = Modifier) {
     ) {
         // `Arrangement.spacedBy` manfiy oraliqni qabul qilmaydi, shuning uchun ikkala
         // chevron markazdan teng masofaga suriladi — natijada zich `»` chiqadi.
-        Icon(chevron, "Yon menyu", tint = Sc.ChipInk, modifier = Modifier.size(14.dp).offset(x = (-3.5).dp))
+        Icon(chevron, s.sideMenu, tint = Sc.ChipInk, modifier = Modifier.size(14.dp).offset(x = (-3.5).dp))
         Icon(chevron, null, tint = Sc.ChipInk, modifier = Modifier.size(14.dp).offset(x = 3.5.dp))
     }
 }
@@ -317,6 +319,7 @@ internal fun HomeSideNav(
     onOpenSettings: () -> Unit,
 ) {
     if (!nav.visible) return
+    val s = homeStrings()
     val p = nav.progress.value
 
     // Tizim "orqaga" si — ekrandan chiqmasdan panelni yopadi.
@@ -381,31 +384,31 @@ internal fun HomeSideNav(
                 Modifier.fillMaxWidth().verticalScroll(rememberScrollState())
                     .padding(horizontal = 10.dp, vertical = 12.dp),
             ) {
-                SideNavLabel("Bo'limlar")
-                SideNavItem("Universitetim", ScIcons.Cap, Sc.TintViolet, Sc.Violet, go(onOpenUniversity))
-                SideNavItem("E'lonlar", ScIcons.FileText, Sc.TintAmber, Sc.Amber, go(onOpenListings))
-                SideNavItem("Takliflar", ScIcons.DiscountTag, Sc.TintPink, Sc.Pink, go(onOpenOffers))
-                SideNavItem("Ijara kvartiralar", ScIcons.Map, Sc.TintOrange, Sc.Orange, go(onOpenRentals))
+                SideNavLabel(s.navSections)
+                SideNavItem(s.navMyUniversity, ScIcons.Cap, Sc.TintViolet, Sc.Violet, go(onOpenUniversity))
+                SideNavItem(s.navListings, ScIcons.FileText, Sc.TintAmber, Sc.Amber, go(onOpenListings))
+                SideNavItem(s.navOffers, ScIcons.DiscountTag, Sc.TintPink, Sc.Pink, go(onOpenOffers))
+                SideNavItem(s.navRentals, ScIcons.Map, Sc.TintOrange, Sc.Orange, go(onOpenRentals))
 
-                SideNavLabel("Aloqa")
-                SideNavItem("Xabarlar", ScIcons.ChatRound, Sc.TintBlue, Sc.Brand, go(onOpenChat))
+                SideNavLabel(s.navContacts)
+                SideNavItem(s.messages, ScIcons.ChatRound, Sc.TintBlue, Sc.Brand, go(onOpenChat))
                 SideNavItem(
-                    "Bildirishnomalar", ScIcons.Bell, Sc.TintAmber, Sc.Amber,
+                    s.notifications, ScIcons.Bell, Sc.TintAmber, Sc.Amber,
                     go(onOpenNotifications), badge = state.hasUnreadNotifications,
                 )
-                SideNavItem("Do'stlar", ScIcons.Users, Sc.TintGreen, Sc.Success, go(onOpenStudents))
-                SideNavItem("So'rovlar", ScIcons.MessageLines, Sc.TintViolet, Sc.Violet, go(onOpenStudentRequests))
-                SideNavItem("Talaba qidirish", ScIcons.Search, Sc.TintBlue, Sc.Brand, go(onOpenStudentSearch))
+                SideNavItem(s.navConnections, ScIcons.Users, Sc.TintGreen, Sc.Success, go(onOpenStudents))
+                SideNavItem(s.navRequests, ScIcons.MessageLines, Sc.TintViolet, Sc.Violet, go(onOpenStudentRequests))
+                SideNavItem(s.navStudentSearch, ScIcons.Search, Sc.TintBlue, Sc.Brand, go(onOpenStudentSearch))
 
                 // "Profilim" qatori YO'Q — panel sarlavhasining o'zi profilga olib boradi.
-                SideNavLabel("Hisob")
+                SideNavLabel(s.navAccount)
                 // "E'lonlar" bo'limidan farqi: u YERDA hammaning e'lonlari, bu yerda faqat
                 // O'ZINIKI — tahrirlash, to'xtatish va o'chirish bilan. Shu sababli ikonasi
                 // ham boshqacha, aks holda panelda bir xil belgili ikki qator turardi.
-                SideNavItem("Mening e'lonlarim", ScIcons.Archive, Sc.TintBlue, Sc.Brand, go(onOpenMyListings))
+                SideNavItem(s.navMyListings, ScIcons.Archive, Sc.TintBlue, Sc.Brand, go(onOpenMyListings))
                 // Ikona profildagi "Sozlamalar" bilan AYNAN bir xil (`AppIcons.Settings`):
                 // bir bo'lim ikki joyda ikki xil belgi bilan turmasin.
-                SideNavItem("Sozlamalar", AppIcons.Settings, Sc.Chip, Sc.ChipInk, go(onOpenSettings))
+                SideNavItem(s.navSettings, AppIcons.Settings, Sc.Chip, Sc.ChipInk, go(onOpenSettings))
 
                 Spacer(Modifier.height(ListBottomGap))
             }
@@ -452,7 +455,7 @@ private fun SideNavHeader(state: HomeUiState, onClick: () -> Unit, onClose: () -
                     .clickable(onClick = onClose),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(ScIcons.Close, "Yopish", tint = Color.White, modifier = Modifier.size(15.dp))
+                Icon(ScIcons.Close, uiStrings().close, tint = Color.White, modifier = Modifier.size(15.dp))
             }
         }
         // Faqat universitet — kurs (nechanchi bosqich) ataylab ko'rsatilmaydi.

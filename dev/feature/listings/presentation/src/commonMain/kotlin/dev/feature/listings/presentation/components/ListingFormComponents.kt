@@ -47,6 +47,7 @@ import dev.core.uikit.theme.appPalette
 import dev.core.uikit.components.ScShimmerBox
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
+import dev.feature.listings.presentation.lt
 
 /** Bo'lim yon (horizontal) padding'i — flat dizaynda sarlavha/maydonlar shu qadar ichkarida. */
 val SectionHPad = 16.dp
@@ -288,7 +289,7 @@ fun AddImageTile(onClick: () -> Unit, loading: Boolean, palette: AppPalette = ap
         } else {
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Icon(AppIcons.ImageIcon, null, tint = palette.inkFaint, modifier = Modifier.size(20.dp))
-                Text("Rasm", style = TextStyle(fontFamily = AppFontFamily, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = palette.inkFaint))
+                Text(lt("Rasm"), style = TextStyle(fontFamily = AppFontFamily, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = palette.inkFaint))
             }
         }
     }
@@ -311,7 +312,7 @@ fun ImageThumb(source: String, onRemove: () -> Unit, palette: AppPalette = appPa
                 .clickable(onClick = onRemove),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(AppIcons.Close, "O'chirish", tint = Color.White, modifier = Modifier.size(11.dp))
+            Icon(AppIcons.Close, lt("O'chirish"), tint = Color.White, modifier = Modifier.size(11.dp))
         }
     }
 }

@@ -86,6 +86,7 @@ import kotlinx.coroutines.delay
 import org.koin.compose.viewmodel.koinViewModel
 import dev.core.common.format.formatAmountShort
 import dev.core.common.format.formatAmount
+import dev.core.uikit.locale.uiStrings
 
 /**
  * "Siz uchun" feed.
@@ -149,7 +150,7 @@ fun DiscountsScreen(
                 query = state.query,
                 onQuery = vm::onQuery,
                 onClose = { showSearch = false },
-                placeholder = "Do'kon yoki e'lon qidiring",
+                placeholder = discountsStrings().searchHint,
                 suggestions = suggestions.map { it.label },
                 onSuggestionPick = { label ->
                     suggestions.firstOrNull { it.label == label }?.let(vm::onSuggestionPicked)
@@ -218,14 +219,14 @@ private fun CatalogContent(
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 if (onBack != null) {
-                    ScCircleButton(ScIcons.ChevronLeft, onBack, contentDescription = "Orqaga")
+                    ScCircleButton(ScIcons.ChevronLeft, onBack, contentDescription = uiStrings().back)
                 }
                 Column(Modifier.weight(1f)) {
-                    ScHeaderTitle("Takliflar", size = 21f)
+                    ScHeaderTitle(discountsStrings().title, size = 21f)
                     Spacer(Modifier.height(3.dp))
-                    ScHeaderSubtitle("Yo'nalishni tanlang")
+                    ScHeaderSubtitle(discountsStrings().pickDirection)
                 }
-                ScCircleButton(ScIcons.Search, onClick = onOpenSearch, contentDescription = "Qidiruv")
+                ScCircleButton(ScIcons.Search, onClick = onOpenSearch, contentDescription = discountsStrings().search)
             }
         }
 
@@ -238,7 +239,7 @@ private fun CatalogContent(
                 horizontalArrangement = Arrangement.spacedBy(11.dp),
                 verticalArrangement = Arrangement.spacedBy(11.dp),
             ) {
-                // "Barchasi" — turlarsiz to'liq feed. Butun qatorni egallaydi.
+                // uiStrings().all — turlarsiz to'liq feed. Butun qatorni egallaydi.
                 item(span = { GridItemSpan(maxLineSpan) }) {
                     AllOffersCard(catalog.totalOffers, palette, onOpenAll)
                 }
@@ -256,7 +257,7 @@ private fun CatalogContent(
                     CatalogTypeCard(type, palette) { onOpenType(type) }
                 }
 
-                // Katalog bo'sh bo'lsa plitka chizilmaydi — tepadagi "Barchasi" kartasi
+                // Katalog bo'sh bo'lsa plitka chizilmaydi — tepadagi uiStrings().all kartasi
                 // baribir turadi, ya'ni ekran bo'm-bo'sh qolmaydi.
             }
         }
@@ -316,7 +317,7 @@ private fun CatalogSectionCard(
         // Sonni server beradi (turlarning `listingsCount` yig'indisi). `0` bo'lsa chizilmaydi.
         if (item.offerCount > 0) {
             Text(
-                "${item.offerCount} ta e'lon",
+                discountsStrings().offersCount(item.offerCount),
                 style = TextStyle(
                     fontFamily = AppFontFamily, fontSize = 11.5f.sp,
                     fontWeight = FontWeight.Bold, color = accent,
@@ -366,7 +367,7 @@ private fun CatalogTypeCard(
         // shuning uchun bu yerda hisoblanmaydi. `0` bo'lsa qator umuman chizilmaydi.
         if (type.offerCount > 0) {
             Text(
-                "${type.offerCount} ta e'lon",
+                discountsStrings().offersCount(type.offerCount),
                 style = TextStyle(
                     fontFamily = AppFontFamily, fontSize = 11.5f.sp,
                     fontWeight = FontWeight.Bold, color = accent,
@@ -377,7 +378,7 @@ private fun CatalogTypeCard(
     }
 }
 
-/** Katalog tepasidagi "Barchasi" kartasi — turlarsiz to'liq feed. */
+/** Katalog tepasidagi uiStrings().all kartasi — turlarsiz to'liq feed. */
 @Composable
 private fun AllOffersCard(totalOffers: Int, palette: AppPalette, onClick: () -> Unit) {
     Row(
@@ -391,15 +392,15 @@ private fun AllOffersCard(totalOffers: Int, palette: AppPalette, onClick: () -> 
     ) {
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(
-                "Barcha takliflar",
+                discountsStrings().allOffers,
                 style = TextStyle(
                     fontFamily = AppFontFamily, fontSize = 15.sp,
                     fontWeight = FontWeight.ExtraBold, color = palette.onPrimary,
                 ),
             )
             Text(
-                if (totalOffers > 0) "$totalOffers ta e'lon — barcha yo'nalishlar"
-                else "Barcha yo'nalishlar bo'yicha",
+                if (totalOffers > 0) discountsStrings().allDirectionsCount(totalOffers)
+                else discountsStrings().allDirections,
                 style = TextStyle(
                     fontFamily = AppFontFamily, fontSize = 11.5f.sp,
                     color = palette.onPrimary.copy(alpha = 0.85f),
@@ -438,7 +439,7 @@ private fun FeedContent(
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 if (onBack != null) {
-                    ScCircleButton(ScIcons.ChevronLeft, onBack, contentDescription = "Orqaga")
+                    ScCircleButton(ScIcons.ChevronLeft, onBack, contentDescription = uiStrings().back)
                 }
                 Column(Modifier.weight(1f)) {
                     // Chipdan tur tanlangan bo'lsa — sarlavha o'sha tur ("🥟 Somsa");
@@ -447,7 +448,7 @@ private fun FeedContent(
                     val section = state.section
                     val title = type?.let { "${it.emoji} ${it.name}".trim() }
                         ?: section?.let { "${it.emoji} ${it.name}".trim() }
-                        ?: "Barcha takliflar"
+                        ?: discountsStrings().allOffers
                     // 26f da "🍽 Ovqatlanish" ikkita tugma yonida sig'may kesilardi.
                     ScHeaderTitle(title, size = 21f)
                     Spacer(Modifier.height(3.dp))
@@ -455,9 +456,9 @@ private fun FeedContent(
                     // ikki qatorga tushib, topbarni cho'zib yuborardi.
                     ScHeaderSubtitle(
                         if (type == null && section == null) {
-                            "${state.totalCount} ta e'lon — chegirma va takliflar"
+                            discountsStrings().offersWithDiscounts(state.totalCount)
                         } else {
-                            "${state.totalCount} ta e'lon"
+                            discountsStrings().offersCount(state.totalCount)
                         },
                     )
                 }
@@ -466,7 +467,7 @@ private fun FeedContent(
                 ScCircleButton(
                     ScIcons.Search,
                     onClick = onOpenSearch,
-                    contentDescription = "Qidiruv",
+                    contentDescription = discountsStrings().search,
                     badge = state.query.isNotBlank(),
                     badgeColor = Sc.Brand,
                 )
@@ -474,7 +475,7 @@ private fun FeedContent(
                 ScCircleButton(
                     ScIcons.Filter,
                     onClick = onOpenFilter,
-                    contentDescription = "Filter",
+                    contentDescription = discountsStrings().filter,
                     badge = state.activeFilterCount > 0,
                     badgeColor = Sc.Brand,
                 )
@@ -522,7 +523,7 @@ private fun FeedContent(
                             ScEmptyState(
                                 Modifier.padding(top = 24.dp),
                                 title = ScNotFoundTitle,
-                                message = "Bu filtr bo'yicha e'lon topilmadi. Shartlarni yumshating.",
+                                message = discountsStrings().noOffersForFilter,
                                 icon = ScIcons.Search,
                                 tint = palette.glass,
                                 iconColor = palette.inkFaint,
@@ -557,7 +558,7 @@ private fun TypeChips(
         contentPadding = PaddingValues(horizontal = 16.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        item { TypeChip("Hammasi", selected == null, palette) { onSelect(null) } }
+        item { TypeChip(discountsStrings().all, selected == null, palette) { onSelect(null) } }
         items(types, key = { it.id }) { type ->
             val label = "${type.emoji} ${type.name}".trim().withCount(type.offerCount.takeIf { it > 0 })
             TypeChip(label, type.id == selected, palette) {
@@ -599,7 +600,7 @@ private fun FilterButton(activeCount: Int, palette: AppPalette, onClick: () -> U
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        Text("Filter", style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = if (active) Color.White else palette.ink))
+        Text(discountsStrings().filter, style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = if (active) Color.White else palette.ink))
         if (active) {
             Box(Modifier.size(19.dp).clip(RoundedCornerShape(10.dp)).background(Color.White.copy(alpha = 0.28f)), contentAlignment = Alignment.Center) {
                 Text("$activeCount", style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.sp, fontWeight = FontWeight.Black, color = Color.White))
@@ -635,7 +636,7 @@ private fun MapOverlay(
             // ro'yxat shu orqali guruhni topadi.
             id = first.id,
             lat = first.lat, lng = first.lng,
-            label = if (group.size > 1) first.merchant else "${first.effectivePrice.formatAmountShort()} so'm",
+            label = if (group.size > 1) first.merchant else "${first.effectivePrice.formatAmountShort()} ${uiStrings().currency}",
             colorHex = hexRgb(first.bannerAccent),
             highlight = group.any { it.isDiscount },
             count = group.size,
@@ -660,7 +661,7 @@ private fun MapOverlay(
         onMarkerTap = { ids -> selectedIds = ids.split(",").filter { it.isNotBlank() } },
         topBarExtras = {
             Box(Modifier.weight(1f)) {
-                GlassTextField(state.query, vm::onQuery, "Do'kon yoki e'lon qidiring", leading = AppIcons.Search, height = 46)
+                GlassTextField(state.query, vm::onQuery, discountsStrings().searchHint, leading = AppIcons.Search, height = 46)
             }
             FilterButton(state.activeFilterCount, palette, onOpenFilter)
         },
@@ -727,12 +728,12 @@ private fun MapOffersSheet(
                 OfferThumb(first, Color(first.bannerAccent), size = 42.dp)
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text(
-                        if (merchants.size == 1) first.merchant else "${merchants.size} ta do'kon",
+                        if (merchants.size == 1) first.merchant else discountsStrings().shopsCount(merchants.size),
                         style = TextStyle(fontFamily = AppFontFamily, fontSize = 16.sp, fontWeight = FontWeight.ExtraBold, color = palette.ink),
                         maxLines = 1, overflow = TextOverflow.Ellipsis,
                     )
                     Text(
-                        listOfNotNull("${offers.size} ta e'lon", first.location.takeIf { merchants.size == 1 })
+                        listOfNotNull(discountsStrings().offersCount(offers.size), first.location.takeIf { merchants.size == 1 })
                             .joinToString(" · "),
                         style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.sp, color = palette.inkFaint),
                         maxLines = 1,
@@ -793,7 +794,7 @@ private fun MapCategoryChips(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         item {
-            MapChip("Hammasi", selected == null, palette) { onSelect(null) }
+            MapChip(discountsStrings().all, selected == null, palette) { onSelect(null) }
         }
         items(categories, key = { it }) { category ->
             MapChip(category.withCount(counts[category]), category == selected, palette) {
@@ -851,18 +852,18 @@ private fun FilterScreen(
             Box(
                 Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(palette.glass).border(1.dp, palette.border, RoundedCornerShape(12.dp)).clickable(onClick = onClose),
                 contentAlignment = Alignment.Center,
-            ) { Icon(AppIcons.ArrowLeft, "Yopish", tint = palette.ink, modifier = Modifier.size(18.dp)) }
+            ) { Icon(AppIcons.ArrowLeft, uiStrings().close, tint = palette.ink, modifier = Modifier.size(18.dp)) }
             Spacer(Modifier.size(12.dp))
-            Text("Filter", style = TextStyle(fontFamily = AppFontFamily, fontSize = 20.sp, fontWeight = FontWeight.Black, color = palette.ink), modifier = Modifier.weight(1f))
-            Text("Tozalash", style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = palette.primary), modifier = Modifier.clickable { vm.resetDraft() })
+            Text(discountsStrings().filter, style = TextStyle(fontFamily = AppFontFamily, fontSize = 20.sp, fontWeight = FontWeight.Black, color = palette.ink), modifier = Modifier.weight(1f))
+            Text(discountsStrings().clear, style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = palette.primary), modifier = Modifier.clickable { vm.resetDraft() })
         }
 
         Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
             // Chegirma holati — sonlar server sxemasidan (`filter-schema`), bo'lsa.
-            FilterSection("Chegirma holati", palette) {
-                FilterPill("Hammasi".withCount(fs.kindCounts["ALL"]), d.discountFilter == DiscountFilter.ALL, palette) { vm.onDraftDiscountFilter(DiscountFilter.ALL) }
-                FilterPill("Chegirmali".withCount(fs.kindCounts["DISCOUNT"]), d.discountFilter == DiscountFilter.DISCOUNT, palette) { vm.onDraftDiscountFilter(DiscountFilter.DISCOUNT) }
-                FilterPill("Chegirmasiz".withCount(fs.kindCounts["REGULAR"]), d.discountFilter == DiscountFilter.REGULAR, palette) { vm.onDraftDiscountFilter(DiscountFilter.REGULAR) }
+            FilterSection(discountsStrings().discountState, palette) {
+                FilterPill(discountsStrings().all.withCount(fs.kindCounts["ALL"]), d.discountFilter == DiscountFilter.ALL, palette) { vm.onDraftDiscountFilter(DiscountFilter.ALL) }
+                FilterPill(discountsStrings().discounted.withCount(fs.kindCounts["DISCOUNT"]), d.discountFilter == DiscountFilter.DISCOUNT, palette) { vm.onDraftDiscountFilter(DiscountFilter.DISCOUNT) }
+                FilterPill(discountsStrings().notDiscounted.withCount(fs.kindCounts["REGULAR"]), d.discountFilter == DiscountFilter.REGULAR, palette) { vm.onDraftDiscountFilter(DiscountFilter.REGULAR) }
             }
 
             // Joylashuv — boshqa filtrlardan farqli: tanlangan zahoti so'rovga ketadi
@@ -870,11 +871,11 @@ private fun FilterScreen(
             RegionSelect(vm, palette)
 
             // Katalog bo'limi — katalog ekranidagi kataklar bilan bir xil ro'yxat
-            // ("Ovqatlanish", "Sport", "Savdo", "Xizmatlar"). Home'dan "Barchasi" bilan
+            // ("Ovqatlanish", "Sport", "Savdo", "Xizmatlar"). Home'dan uiStrings().all bilan
             // kelinganda shu yerda tanlangan bo'lib turadi.
             if (fs.sections.isNotEmpty()) {
-                FilterSection("Katalog bo'limi", palette) {
-                    CategoryPill("Barchasi", null, d.groupKey == null, palette) { vm.onDraftSection(null) }
+                FilterSection(discountsStrings().catalogSection, palette) {
+                    CategoryPill(uiStrings().all, null, d.groupKey == null, palette) { vm.onDraftSection(null) }
                     fs.sections.forEach { s ->
                         // Bo'lingan guruhda (Savdo/Xizmatlar) turlar to'plami ham mos kelishi shart.
                         val selected = d.groupKey == s.groupKey &&
@@ -887,8 +888,8 @@ private fun FilterScreen(
             }
 
             // Biznes turi
-            FilterSection("Biznes turi", palette) {
-                CategoryPill("Barchasi", null, d.categoryId == null, palette) { vm.onDraftCategory(null) }
+            FilterSection(discountsStrings().businessType, palette) {
+                CategoryPill(uiStrings().all, null, d.categoryId == null, palette) { vm.onDraftCategory(null) }
                 fs.categories.forEach { cat ->
                     val label = "${cat.emoji} ${cat.name}".withCount(fs.typeCounts[cat.id])
                     CategoryPill(label, cat.accent, d.categoryId == cat.id, palette) { vm.onDraftCategory(cat.id) }
@@ -897,16 +898,16 @@ private fun FilterScreen(
 
             // Jins (faqat tanlangan turda jins bo'lsa — masalan kiyim)
             if (fs.genderApplicable) {
-                FilterSection("Jins", palette) {
-                    FilterPill("Hammasi", d.gender == null, palette) { vm.onDraftGender(null) }
-                    FilterPill("Erkak", d.gender == "MALE", palette) { vm.onDraftGender("MALE") }
-                    FilterPill("Ayol", d.gender == "FEMALE", palette) { vm.onDraftGender("FEMALE") }
+                FilterSection(discountsStrings().gender, palette) {
+                    FilterPill(discountsStrings().all, d.gender == null, palette) { vm.onDraftGender(null) }
+                    FilterPill(discountsStrings().male, d.gender == "MALE", palette) { vm.onDraftGender("MALE") }
+                    FilterPill(discountsStrings().female, d.gender == "FEMALE", palette) { vm.onDraftGender("FEMALE") }
                 }
             }
 
             // Bo'lim — server sxemasi kelgan bo'lsa undan (sonlari bilan), aks holda keshdan.
             if (fs.availableSubcategories.isNotEmpty()) {
-                FilterSection("Bo'lim", palette) {
+                FilterSection(discountsStrings().section, palette) {
                     fs.availableSubcategories.forEach { sub ->
                         FilterPill(sub.withCount(fs.subcategoryCounts[sub]), sub in d.subcategories, palette) {
                             vm.toggleDraftSubcategory(sub)
@@ -916,17 +917,17 @@ private fun FilterScreen(
             }
 
             // Saralash
-            FilterSection("Saralash", palette) {
-                FilterPill("Mos", d.sort == OfferSort.RELEVANCE, palette) { vm.onDraftSort(OfferSort.RELEVANCE) }
-                FilterPill("Chegirma %", d.sort == OfferSort.DISCOUNT_DESC, palette) { vm.onDraftSort(OfferSort.DISCOUNT_DESC) }
-                FilterPill("Arzon", d.sort == OfferSort.PRICE_ASC, palette) { vm.onDraftSort(OfferSort.PRICE_ASC) }
-                FilterPill("Qimmat", d.sort == OfferSort.PRICE_DESC, palette) { vm.onDraftSort(OfferSort.PRICE_DESC) }
+            FilterSection(discountsStrings().sort, palette) {
+                FilterPill(discountsStrings().sortRelevant, d.sort == OfferSort.RELEVANCE, palette) { vm.onDraftSort(OfferSort.RELEVANCE) }
+                FilterPill(discountsStrings().sortDiscount, d.sort == OfferSort.DISCOUNT_DESC, palette) { vm.onDraftSort(OfferSort.DISCOUNT_DESC) }
+                FilterPill(discountsStrings().sortCheap, d.sort == OfferSort.PRICE_ASC, palette) { vm.onDraftSort(OfferSort.PRICE_ASC) }
+                FilterPill(discountsStrings().sortExpensive, d.sort == OfferSort.PRICE_DESC, palette) { vm.onDraftSort(OfferSort.PRICE_DESC) }
             }
 
             // Sxemadagi ma'lumot — serverda nechta e'lon bor va narxlar oralig'i qanday.
             val schemaInfo = listOfNotNull(
-                fs.schemaTotal?.let { "Serverda $it ta e'lon" },
-                fs.priceRange?.let { "${it.first.formatAmount()} – ${it.last.formatAmount()} so'm" },
+                fs.schemaTotal?.let { discountsStrings().serverCount(it) },
+                fs.priceRange?.let { "${it.first.formatAmount()} – ${it.last.formatAmount()} ${uiStrings().currency}" },
             ).joinToString(" · ")
             if (schemaInfo.isNotBlank()) {
                 Spacer(Modifier.height(12.dp))
@@ -943,14 +944,14 @@ private fun FilterScreen(
                 Modifier.fillMaxWidth().height(50.dp).clip(RoundedCornerShape(14.dp)).background(palette.primary).clickable(onClick = onApply),
                 contentAlignment = Alignment.Center,
             ) {
-                Text("Qo'llash · ${fs.previewCount} ta e'lon", style = TextStyle(fontFamily = AppFontFamily, fontSize = 14.sp, fontWeight = FontWeight.Black, color = Color.White))
+                Text(discountsStrings().apply(fs.previewCount), style = TextStyle(fontFamily = AppFontFamily, fontSize = 14.sp, fontWeight = FontWeight.Black, color = Color.White))
             }
         }
     }
 }
 
 /**
- * "Joylashuv" — bosilganda viloyatlar ro'yxatini ochib beradigan select.
+ * discountsStrings().location — bosilganda viloyatlar ro'yxatini ochib beradigan select.
  * Ro'yxat shu yerda, filtrning ichida ochiladi (alohida oyna emas) — filtr o'zi to'liq
  * ekranli qoplama bo'lgani uchun ustiga yana bir oyna qo'yish shart emas.
  */
@@ -964,7 +965,7 @@ private fun RegionSelect(vm: DiscountsViewModel, palette: AppPalette) {
 
     Column(Modifier.fillMaxWidth().padding(top = 14.dp)) {
         Text(
-            "Joylashuv",
+            discountsStrings().location,
             style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = palette.ink),
         )
         Spacer(Modifier.size(9.dp))
@@ -979,7 +980,7 @@ private fun RegionSelect(vm: DiscountsViewModel, palette: AppPalette) {
         ) {
             Icon(ScIcons.MapPin, null, tint = palette.primary, modifier = Modifier.size(17.dp))
             Text(
-                selected?.name ?: "Butun O‘zbekiston",
+                selected?.name ?: discountsStrings().allUzbekistan,
                 style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.5f.sp, fontWeight = FontWeight.Bold, color = palette.ink),
                 modifier = Modifier.weight(1f),
                 maxLines = 1,
@@ -999,7 +1000,7 @@ private fun RegionSelect(vm: DiscountsViewModel, palette: AppPalette) {
                 )
 
                 else -> Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    RegionOption("Butun O‘zbekiston", selected == null, palette) {
+                    RegionOption(discountsStrings().allUzbekistan, selected == null, palette) {
                         vm.selectRegion(null)
                         expanded = false
                     }
@@ -1127,7 +1128,7 @@ private fun OfferBanner(offer: DiscountOffer, accent: Color, saved: Boolean, onT
 
         // Saqlash — rasmning o'ng-tepasida (pastda endi matn turadi).
         Icon(
-            AppIcons.Bookmark, "Saqlash",
+            AppIcons.Bookmark, discountsStrings().save,
             tint = if (saved) accent else Color.White,
             modifier = Modifier.align(Alignment.TopEnd).padding(12.dp).size(22.dp)
                 .clickable(onClick = onToggleSaved),
@@ -1149,7 +1150,7 @@ private fun OfferBanner(offer: DiscountOffer, accent: Color, saved: Boolean, onT
             }
             if (offer.originalPrice > 0) {
                 Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                    Text("${offer.finalPrice.formatAmount()} so'm", style = TextStyle(fontFamily = AppFontFamily, fontSize = 16.sp, fontWeight = FontWeight.Black, color = Color.White))
+                    Text("${offer.finalPrice.formatAmount()} ${uiStrings().currency}", style = TextStyle(fontFamily = AppFontFamily, fontSize = 16.sp, fontWeight = FontWeight.Black, color = Color.White))
                     Text("${offer.originalPrice.formatAmount()}", style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.5f.sp, color = Color.White.copy(alpha = 0.7f), textDecoration = TextDecoration.LineThrough))
                     Text("/ ${offer.priceUnit}", style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.sp, color = Color.White.copy(alpha = 0.7f)))
                 }
@@ -1237,11 +1238,11 @@ private fun RegularOfferCard(
                 offer.location?.let { Text(it, style = TextStyle(fontFamily = AppFontFamily, fontSize = 10.5f.sp, color = palette.inkFaint), maxLines = 1) }
             }
             if (offer.originalPrice > 0) {
-                Text("${offer.originalPrice.formatAmount()} so'm / ${offer.priceUnit}", style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.sp, fontWeight = FontWeight.Black, color = palette.ink))
+                Text("${offer.originalPrice.formatAmount()} ${uiStrings().currency} / ${offer.priceUnit}", style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.sp, fontWeight = FontWeight.Black, color = palette.ink))
             }
         }
         Icon(
-            AppIcons.Bookmark, "Saqlash",
+            AppIcons.Bookmark, discountsStrings().save,
             tint = if (saved) palette.primary else palette.inkFaint,
             modifier = Modifier.size(20.dp).clickable { onToggleSaved(offer, saved) },
         )
@@ -1262,7 +1263,7 @@ private fun OfferTagRow(
     onToggleSaved: (DiscountOffer, Boolean) -> Unit,
 ) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        val tagText = if (offer.tag == DiscountTag.STUDENT_ID) "Talaba ID" else "Promokod"
+        val tagText = if (offer.tag == DiscountTag.STUDENT_ID) discountsStrings().studentId else discountsStrings().promoCode
         Box(Modifier.clip(RoundedCornerShape(8.dp)).background(palette.primary.copy(alpha = 0.10f)).padding(horizontal = 9.dp, vertical = 4.dp)) {
             Text(tagText, style = TextStyle(fontFamily = AppFontFamily, fontSize = 10.5f.sp, fontWeight = FontWeight.Bold, color = palette.primary))
         }
@@ -1276,13 +1277,13 @@ private fun OfferTagRow(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                Text(if (copied) "Nusxalandi ✓" else promo, style = TextStyle(fontFamily = AppFontFamily, fontSize = 10.5f.sp, fontWeight = FontWeight.ExtraBold, color = palette.primary))
+                Text(if (copied) discountsStrings().copied else promo, style = TextStyle(fontFamily = AppFontFamily, fontSize = 10.5f.sp, fontWeight = FontWeight.ExtraBold, color = palette.primary))
                 if (!copied) Icon(AppIcons.FileText, "Nusxalash", tint = palette.primary, modifier = Modifier.size(11.dp))
             }
         }
         Spacer(Modifier.weight(1f))
         Icon(
-            AppIcons.Bookmark, "Saqlash",
+            AppIcons.Bookmark, discountsStrings().save,
             tint = if (saved) palette.primary else palette.inkFaint,
             modifier = Modifier.size(20.dp).clickable { onToggleSaved(offer, saved) },
         )

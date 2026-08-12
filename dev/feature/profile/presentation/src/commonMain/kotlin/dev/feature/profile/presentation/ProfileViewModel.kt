@@ -29,10 +29,11 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import dev.core.uikit.locale.uiStringsNow
 
 /** Profil (1z) ekranining holati. */
 data class ProfileUiState(
-    val name: String = "Talaba",
+    val name: String = uiStringsNow().student,
     val universityMonogram: String? = null,
     val courseLabel: String? = null,
     val contact: String = "",
@@ -141,7 +142,7 @@ class ProfileViewModel(
             // Ism profildan olinadi; profil hali to'ldirilmagan bo'lsa — sessiya nomidan.
             name = profile?.displayName
                 ?: user?.fullName?.takeIf { it.isNotBlank() }
-                ?: "Talaba",
+                ?: uiStringsNow().student,
             universityMonogram = uni?.monogram,
             courseLabel = profile?.courseYear?.let(::courseLabel),
             contact = user?.phoneNumber ?: user?.email.orEmpty(),
@@ -316,11 +317,14 @@ class ProfileViewModel(
     }
 }
 
-private fun courseLabel(courseYear: String): String = when (courseYear) {
-    "1", "ONE" -> "1-kurs"
-    "2", "TWO" -> "2-kurs"
-    "3", "THREE" -> "3-kurs"
-    "4", "FOUR" -> "4-kurs"
-    "MASTER" -> "Magistr"
-    else -> courseYear
+private fun courseLabel(courseYear: String): String {
+    val s = profileStringsNow()
+    return when (courseYear) {
+        "1", "ONE" -> s.year1
+        "2", "TWO" -> s.year2
+        "3", "THREE" -> s.year3
+        "4", "FOUR" -> s.year4
+        "MASTER" -> s.master
+        else -> courseYear
+    }
 }

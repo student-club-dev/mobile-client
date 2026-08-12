@@ -117,7 +117,7 @@ internal fun StoryViewersSheet(
                 ScText(
                     // Umumiy son serverdan keladi: ro'yxat sahifalanadi, ya'ni yuklangan
                     // qatorlar soni «nechta ko'rgan» degan savolga javob bermaydi.
-                    if (state.total > 0) "${state.total} ta ko'rish" else "Ko'rganlar",
+                    if (state.total > 0) storiesStrings().viewersCount(state.total) else storiesStrings().viewers,
                     16f,
                     FontWeight.ExtraBold,
                     Sc.Ink,
@@ -126,25 +126,25 @@ internal fun StoryViewersSheet(
                 )
                 Icon(
                     ScIcons.Close,
-                    "Yopish",
+                    storiesStrings().close,
                     tint = Sc.Muted,
                     modifier = Modifier.size(20.dp).clickable(onClick = onClose),
                 )
             }
 
             when {
-                state.loading && state.items.isEmpty() -> SheetNote("Yuklanmoqda…")
+                state.loading && state.items.isEmpty() -> SheetNote(storiesStrings().loadingEllipsis)
 
                 state.message != null -> SheetNote(state.message.orEmpty())
 
                 state.items.isEmpty() -> SheetNote(
-                    "Hozircha hech kim ko'rmagan. Post bog'langanlaringizga ko'rinadi.",
+                    storiesStrings().noViewersYet,
                 )
 
                 else -> LazyColumn(Modifier.fillMaxWidth(), state = listState) {
                     items(state.items, key = { it.id }) { student -> ViewerRow(student) }
                     if (state.hasNext) {
-                        item { SheetNote("Yuklanmoqda…") }
+                        item { SheetNote(storiesStrings().loadingEllipsis) }
                     }
                 }
             }

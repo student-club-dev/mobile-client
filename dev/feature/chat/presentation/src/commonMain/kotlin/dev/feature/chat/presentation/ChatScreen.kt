@@ -121,6 +121,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
+import dev.core.uikit.locale.uiStrings
+import androidx.compose.runtime.ReadOnlyComposable
 
 /**
  * Suhbatlar. Ikki rejimda ishlaydi:
@@ -128,7 +130,7 @@ import org.koin.compose.viewmodel.koinViewModel
  * - **Tab** (`onBack == null`) — pastki navigatsiyaning "Xabarlar" tab'i.
  * - **Ochilgan ekran** (`onBack != null`) — stack'ka qo'yilganda, sarlavhada orqaga tugmasi.
  *
- * [openStudentId] berilsa (Do'stlar ekranidan "Xabar" bosilganda) suhbat darhol ochiladi:
+ * [openStudentId] berilsa (Do'stlar ekranidan chatStrings().message bosilganda) suhbat darhol ochiladi:
  * `POST /v1/conversations` idempotent, shuning uchun mavjudini qidirish shart emas.
  * [openConversationId] — push bosilganda keladi (`data.conversationId`, `03-WEBSOCKET.md` §10).
  */
@@ -161,11 +163,11 @@ fun ChatScreen(
     LaunchedEffect(threadOpen) { onThreadOpenChange(threadOpen) }
 
     /**
-     * Ekran KONKRET suhbat bilan ochilganmi ("Xabar" tugmasi yoki push).
+     * Ekran KONKRET suhbat bilan ochilganmi (chatStrings().message tugmasi yoki push).
      *
      * Bunda suhbatlar ro'yxati umuman chizilmaydi: suhbat id'si serverdan kelguncha
      * (`POST /v1/conversations`) ro'yxat bir lahzaga ko'rinib, foydalanuvchi "Xabarlar →
-     * suhbat" degan ortiqcha o'tishni ko'rardi. Endi "Xabar" to'g'ridan-to'g'ri chatga
+     * suhbat" degan ortiqcha o'tishni ko'rardi. Endi chatStrings().message to'g'ridan-to'g'ri chatga
      * olib boradi, orqaga bosilsa esa kelingan ekranga qaytadi.
      */
     val direct = openStudentId != null || openConversationId != null
@@ -229,7 +231,7 @@ fun ChatScreen(
                 typing = typing,
                 myProfile = myProfile,
                 onToggleJoin = vm::toggleJoin,
-                onClubSoon = { vm.showMessage("Klub suhbati tez orada ochiladi") },
+                onClubSoon = { vm.showMessage(chatStringsNow().clubChatSoon) },
                 onBack = onBack,
                 onNewChat = onNewChat,
                 refreshing = state.refreshing,
@@ -316,7 +318,7 @@ private fun OpeningThread(onBack: (() -> Unit)?) {
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 if (onBack != null) {
-                    ScCircleButton(ScIcons.ChevronLeft, onBack, contentDescription = "Orqaga")
+                    ScCircleButton(ScIcons.ChevronLeft, onBack, contentDescription = uiStrings().back)
                 }
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     // Ism hali noma'lum (suhbat qatori kelmagan) — o'rniga skelet qatorlar.
@@ -521,7 +523,7 @@ private fun ChatThread(
         // Tushib qolganlar jimgina yo'qolmasin: sabab deyarli doim bitta — server
         // chegarasi (3 daqiqa), undan uzunini siqib ham sig'dirib bo'lmaydi.
         if (picked.skipped > 0) {
-            onSoon("${picked.skipped} ta fayl yuborilmadi — video 3 daqiqadan uzun yoki format qo'llab-quvvatlanmaydi.")
+            onSoon(chatStringsNow().skippedFiles(picked.skipped))
         }
     }
 
@@ -693,11 +695,11 @@ private fun ChatThread(
                         .filter { it.isNotBlank() }
                         .joinToString("\n")
                     if (text.isBlank()) {
-                        onSoon("Bu xabarlarda nusxa olinadigan matn yo'q")
+                        onSoon(chatStringsNow().nothingToCopy)
                     } else {
                         clipboard.setText(AnnotatedString(text))
                         selectedIds = emptySet()
-                        onSoon("Nusxa olindi")
+                        onSoon(chatStringsNow().copied)
                     }
                 },
                 onDelete = { confirmDelete = true },
@@ -722,7 +724,7 @@ private fun ChatThread(
             DottedBackground()
             if (messages.isEmpty()) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    ScText("Xabar yozib, suhbatni boshlang", 13.5f, FontWeight.Medium, Sc.Muted)
+                    ScText(chatStrings().startConversation, 13.5f, FontWeight.Medium, Sc.Muted)
                 }
             }
             LazyColumn(
@@ -793,7 +795,7 @@ private fun ChatThread(
                                             media == null -> Unit
                                             // Transkodlanmagan videoning fayli hali yo'q —
                                             // pleyer uni ocholmaydi.
-                                            media.processing -> onSoon("Video hali tayyorlanmoqda")
+                                            media.processing -> onSoon(chatStringsNow().videoProcessing)
                                             // Dumaloq xabar ham to'liq ekranda ochiladi:
                                             // 208 dp doirada ba'zan hech narsa ko'rinmaydi.
                                             message.type == MessageType.VIDEO ||
@@ -801,7 +803,7 @@ private fun ChatThread(
                                                 videoViewer = media
                                             // Faylni ilova ichida ochadigan komponent yo'q — uni tizim
                                             // brauzeriga uzatib bo'lmaydi ham (havola token talab qiladi).
-                                            else -> onSoon("Faylni yuklab olish tez orada")
+                                            else -> onSoon(chatStringsNow().downloadSoon)
                                         }
                                     },
                                     onToggleVoice = { message ->
@@ -923,7 +925,7 @@ private fun ChatThread(
                     Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(14.dp)
                         .clickable { videoViewer = null },
                 ) {
-                    Icon(ScIcons.Close, "Yopish", tint = Color.White, modifier = Modifier.size(22.dp))
+                    Icon(ScIcons.Close, chatStrings().close, tint = Color.White, modifier = Modifier.size(22.dp))
                 }
             }
         }
@@ -944,14 +946,14 @@ private fun ChatThread(
                 studentId = peer.id,
                 onOpenFile = {
                     profileOpen = false
-                    onSoon("Faylni yuklab olish tez orada")
+                    onSoon(chatStringsNow().downloadSoon)
                 },
             ),
             // Suhbat konteksti — profilning o'zi «yozmoqda…» ni bilmaydi.
             statusOverride = when {
-                state.peerTyping -> "yozmoqda…"
+                state.peerTyping -> chatStrings().typing
                 peer.online -> "onlayn"
-                !state.realtime -> "ulanmoqda…"
+                !state.realtime -> chatStrings().connecting
                 else -> ChatFormat.lastSeen(peer.lastSeenAt)
             },
             onSoon = onSoon,
@@ -999,11 +1001,11 @@ private fun ChatThread(
     if (menuMessage != null) {
         AlertDialog(
             onDismissRequest = { singleMenu = null },
-            title = { Text("Xabar", style = scStyle(17f, FontWeight.ExtraBold)) },
+            title = { Text(chatStrings().message, style = scStyle(17f, FontWeight.ExtraBold)) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     if (menuMessage.status == MessageStatus.FAILED) {
-                        ActionRow(ScIcons.Return, "Qayta yuborish") {
+                        ActionRow(ScIcons.Return, chatStrings().resend) {
                             onRetry(menuMessage.messageIds)
                             singleMenu = null
                             selectedIds = emptySet()
@@ -1012,13 +1014,13 @@ private fun ChatThread(
                     // Gapni belgilab nusxa olish — pufakning o'zida matn tanlab bo'lmaydi:
                     // u yerda uzun bosish belgilash rejimini ochadi.
                     if (!menuMessage.deleted && menuMessage.text.isNotBlank()) {
-                        ActionRow(ScIcons.FileText, "Matnni belgilash") {
+                        ActionRow(ScIcons.FileText, chatStrings().selectText) {
                             selectTextFor = menuMessage
                             singleMenu = null
                         }
                     }
                     if (!menuMessage.outgoing && !menuMessage.deleted) {
-                        ActionRow(ScIcons.Bell, "Shikoyat qilish", danger = true) {
+                        ActionRow(ScIcons.Bell, chatStrings().report, danger = true) {
                             reportMessageFor = menuMessage.id
                             singleMenu = null
                             selectedIds = emptySet()
@@ -1029,7 +1031,7 @@ private fun ChatThread(
             confirmButton = {},
             dismissButton = {
                 TextButton(onClick = { singleMenu = null }) {
-                    Text("Yopish", style = scStyle(14f, FontWeight.Bold, Sc.InkSoft))
+                    Text(chatStrings().close, style = scStyle(14f, FontWeight.Bold, Sc.InkSoft))
                 }
             },
         )
@@ -1060,7 +1062,7 @@ private fun ChatThread(
                 clipboard.setText(AnnotatedString(textMessage.text))
                 selectTextFor = null
                 selectedIds = emptySet()
-                onSoon("Nusxa olindi")
+                onSoon(chatStringsNow().copied)
             },
             onDismiss = { selectTextFor = null },
         )
@@ -1072,15 +1074,15 @@ private fun ChatThread(
             title = { Text(conversation.other.displayName, style = scStyle(17f, FontWeight.ExtraBold)) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    ActionRow(ScIcons.Close, "Bog'lanishni uzish") {
+                    ActionRow(ScIcons.Close, chatStrings().disconnect) {
                         showMenu = false
                         confirmDisconnect = true
                     }
-                    ActionRow(ScIcons.Users, "Bloklash", danger = true) {
+                    ActionRow(ScIcons.Users, chatStrings().block, danger = true) {
                         showMenu = false
                         confirmBlock = true
                     }
-                    ActionRow(ScIcons.Bell, "Shikoyat qilish", danger = true) {
+                    ActionRow(ScIcons.Bell, chatStrings().report, danger = true) {
                         showMenu = false
                         reportStudent = true
                     }
@@ -1089,7 +1091,7 @@ private fun ChatThread(
             confirmButton = {},
             dismissButton = {
                 TextButton(onClick = { showMenu = false }) {
-                    Text("Bekor", style = scStyle(14f, FontWeight.Bold, Sc.InkSoft))
+                    Text(chatStrings().cancel, style = scStyle(14f, FontWeight.Bold, Sc.InkSoft))
                 }
             },
         )
@@ -1097,10 +1099,10 @@ private fun ChatThread(
 
     if (confirmDisconnect) {
         ConfirmDialog(
-            title = "Bog'lanishni uzish",
+            title = chatStrings().disconnect,
             // Suhbat qoladi — tarix o'qiladi, lekin yangi xabar yozib bo'lmaydi (403).
-            message = "Bog'lanish uzilgach bu suhbatga yozolmaysiz, lekin eski xabarlar qoladi.",
-            confirmLabel = "Uzish",
+            message = chatStrings().disconnectBody,
+            confirmLabel = chatStrings().disconnectConfirm,
             onConfirm = { onDisconnect(conversation.other.id); confirmDisconnect = false },
             onDismiss = { confirmDisconnect = false },
         )
@@ -1108,10 +1110,9 @@ private fun ChatThread(
 
     if (confirmBlock) {
         ConfirmDialog(
-            title = "Bloklash",
-            message = "${conversation.other.displayName} bloklanadi: bog'lanish o'chadi va " +
-                "ikkalangiz bir-biringizga yozolmaysiz.",
-            confirmLabel = "Bloklash",
+            title = chatStrings().block,
+            message = chatStrings().blockBody(conversation.other.displayName),
+            confirmLabel = chatStrings().block,
             onConfirm = { onBlock(conversation.other.id); confirmBlock = false },
             onDismiss = { confirmBlock = false },
         )
@@ -1119,7 +1120,7 @@ private fun ChatThread(
 
     if (reportStudent) {
         ReportDialog(
-            title = "Shikoyat: ${conversation.other.displayName}",
+            title = chatStrings().reportTitle(conversation.other.displayName),
             onSend = { reason, note ->
                 onReportStudent(conversation.other.id, reason, note)
                 reportStudent = false
@@ -1131,7 +1132,7 @@ private fun ChatThread(
     val reportedMessage = reportMessageFor
     if (reportedMessage != null) {
         ReportDialog(
-            title = "Xabar ustidan shikoyat",
+            title = chatStrings().reportMessage,
             onSend = { reason, note ->
                 onReportMessage(reportedMessage, reason, note)
                 reportMessageFor = null
@@ -1163,7 +1164,7 @@ private fun ChatThreadHeader(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            HeaderGlassButton(ScIcons.ChevronLeft, "Orqaga", onBack)
+            HeaderGlassButton(ScIcons.ChevronLeft, uiStrings().back, onBack)
             // Avatar va ism — Telegram'dagidek profilni ochadi. Orqaga va menyu tugmalari
             // shu sohadan TASHQARIDA qoladi, aks holda ular ham profilni ochib yuborardi.
             Row(
@@ -1200,17 +1201,17 @@ private fun ChatThreadHeader(
                     letterSpacing = -0.2f, maxLines = 1,
                 )
                 val status = when {
-                    typing -> "yozmoqda…"
+                    typing -> chatStrings().typing
                     conversation.other.online -> "onlayn"
                     // Real-time kanal yopiq bo'lsa onlayn holati eskirgan bo'lishi mumkin.
-                    !realtime -> "ulanmoqda…"
+                    !realtime -> chatStrings().connecting
                     else -> ChatFormat.lastSeen(conversation.other.lastSeenAt)
                 }
                 ScText(status, 13f, FontWeight.Medium, Color.White.copy(alpha = 0.9f), maxLines = 1)
             }
             }
             ChatCallButtons(peer = conversation.other)
-            HeaderGlassButton(ScIcons.DotsVertical, "Menyu", onMenu)
+            HeaderGlassButton(ScIcons.DotsVertical, chatStrings().menu, onMenu)
         }
     }
 }
@@ -1245,8 +1246,8 @@ private fun ChatCallButtons(peer: StudentSummary) {
         permissions.request(video = media == CallMedia.VIDEO)
     }
 
-    HeaderGlassButton(ScIcons.PhoneCall, "Ovozli qo'ng'iroq") { start(CallMedia.AUDIO) }
-    HeaderGlassButton(ScIcons.Video, "Video qo'ng'iroq") { start(CallMedia.VIDEO) }
+    HeaderGlassButton(ScIcons.PhoneCall, chatStrings().voiceCall) { start(CallMedia.AUDIO) }
+    HeaderGlassButton(ScIcons.Video, chatStrings().videoCall) { start(CallMedia.VIDEO) }
 }
 
 /**
@@ -1275,14 +1276,14 @@ private fun SelectionHeader(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        HeaderGlassButton(ScIcons.Close, "Belgilashni bekor qilish", onClose)
+        HeaderGlassButton(ScIcons.Close, chatStrings().cancelSelection, onClose)
         ScText(
-            "$count ta tanlandi", 17f, FontWeight.ExtraBold, Color.White,
+            chatStrings().selectedCount(count), 17f, FontWeight.ExtraBold, Color.White,
             letterSpacing = -0.2f, maxLines = 1, modifier = Modifier.weight(1f),
         )
-        HeaderGlassButton(ScIcons.Copy, "Nusxa olish", onCopy)
-        if (showMore) HeaderGlassButton(ScIcons.DotsVertical, "Yana", onMore)
-        HeaderGlassButton(ScIcons.Trash, "O'chirish", onDelete)
+        HeaderGlassButton(ScIcons.Copy, chatStrings().copy, onCopy)
+        if (showMore) HeaderGlassButton(ScIcons.DotsVertical, chatStrings().more, onMore)
+        HeaderGlassButton(ScIcons.Trash, chatStrings().delete, onDelete)
     }
 }
 
@@ -1393,11 +1394,11 @@ private fun DeleteMessagesDialog(
     var forEveryone by remember { mutableStateOf(false) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("$count ta xabarni o'chirish", style = scStyle(17f, FontWeight.ExtraBold)) },
+        title = { Text(chatStrings().deleteCount(count), style = scStyle(17f, FontWeight.ExtraBold)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 Text(
-                    "Haqiqatan ham bu xabarlarni o'chirmoqchimisiz?",
+                    chatStrings().deleteConfirm,
                     style = scStyle(14f, FontWeight.Medium, Sc.InkSoft, lineHeight = 20f),
                 )
                 if (canDeleteForPeer) {
@@ -1424,12 +1425,12 @@ private fun DeleteMessagesDialog(
                                 Icon(AppIcons.Check, null, tint = Color.White, modifier = Modifier.size(13.dp))
                             }
                         }
-                        ScText("$peerName uchun ham o'chirilsin", 14f, FontWeight.SemiBold, Sc.Ink)
+                        ScText(chatStrings().deleteForPeer(peerName), 14f, FontWeight.SemiBold, Sc.Ink)
                     }
                 } else {
                     // Sabab aytilmasa foydalanuvchi katakni "yo'qolib qolgan" deb o'ylardi.
                     Text(
-                        "Suhbatdoshning xabarlarini faqat o'zingizda o'chira olasiz.",
+                        chatStrings().deleteForPeerNote,
                         style = scStyle(12.5f, FontWeight.Medium, Sc.Muted, lineHeight = 18f),
                     )
                 }
@@ -1437,12 +1438,12 @@ private fun DeleteMessagesDialog(
         },
         confirmButton = {
             TextButton(onClick = { onConfirm(forEveryone) }) {
-                Text("O'chirish", style = scStyle(14f, FontWeight.ExtraBold, Sc.Danger))
+                Text(chatStrings().delete, style = scStyle(14f, FontWeight.ExtraBold, Sc.Danger))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Bekor qilish", style = scStyle(14f, FontWeight.Bold, Sc.InkSoft))
+                Text(uiStrings().cancel, style = scStyle(14f, FontWeight.Bold, Sc.InkSoft))
             }
         },
     )
@@ -1459,11 +1460,11 @@ private fun DeleteMessagesDialog(
 private fun SelectTextDialog(text: String, onCopyAll: () -> Unit, onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Matnni belgilash", style = scStyle(17f, FontWeight.ExtraBold)) },
+        title = { Text(chatStrings().selectText, style = scStyle(17f, FontWeight.ExtraBold)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(
-                    "Kerakli gapni bosib turib belgilang, so'ng chiqqan «Copy» tugmasini bosing.",
+                    chatStrings().selectTextHint,
                     style = scStyle(12.5f, FontWeight.Medium, Sc.Muted, lineHeight = 18f),
                 )
                 Box(
@@ -1480,12 +1481,12 @@ private fun SelectTextDialog(text: String, onCopyAll: () -> Unit, onDismiss: () 
         },
         confirmButton = {
             TextButton(onClick = onCopyAll) {
-                Text("Hammasini nusxalash", style = scStyle(14f, FontWeight.ExtraBold, Sc.Brand))
+                Text(chatStrings().copyAll, style = scStyle(14f, FontWeight.ExtraBold, Sc.Brand))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Yopish", style = scStyle(14f, FontWeight.Bold, Sc.InkSoft))
+                Text(chatStrings().close, style = scStyle(14f, FontWeight.Bold, Sc.InkSoft))
             }
         },
     )
@@ -1678,11 +1679,11 @@ private fun CallBubble(message: ChatMessageUi, call: MessageCall, onTap: () -> U
  * davomiyliksiz, qolgani davomiyligi bilan.
  */
 private fun callTitle(call: MessageCall): String = when {
-    call.missed -> "Javobsiz qo'ng'iroq"
-    call.status == CallStatus.DECLINED -> "Rad etilgan qo'ng'iroq"
-    call.status == CallStatus.CANCELED -> "Bekor qilingan qo'ng'iroq"
-    call.durationMs == 0 -> "Qo'ng'iroq"
-    else -> "Qo'ng'iroq · ${formatDuration(call.durationMs.toLong())}"
+    call.missed -> chatStringsNow().missedCall
+    call.status == CallStatus.DECLINED -> chatStringsNow().declinedCall
+    call.status == CallStatus.CANCELED -> chatStringsNow().canceledCall
+    call.durationMs == 0 -> chatStringsNow().call
+    else -> chatStringsNow().callWithDuration(formatDuration(call.durationMs.toLong()))
 }
 
 /** Suhbatlar ro'yxatidagi qisqa ko'rinish — [callTitle] bilan bir xil qoida. */
@@ -1765,13 +1766,13 @@ private fun Composer(
             ) {
                 Icon(
                     ScIcons.Paperclip,
-                    "Rasm yoki video biriktirish",
+                    chatStrings().attachMedia,
                     tint = Sc.Muted,
                     modifier = Modifier.size(21.dp).clickable(onClick = onPickImages),
                 )
                 Box(Modifier.weight(1f)) {
                     if (draft.isEmpty()) {
-                        ScText("Xabar yozing…", 15f, FontWeight.Medium, Sc.NavIdle, maxLines = 1)
+                        ScText(chatStrings().messageHint, 15f, FontWeight.Medium, Sc.NavIdle, maxLines = 1)
                     }
                     BasicTextField(
                         value = draft,
@@ -1783,7 +1784,7 @@ private fun Composer(
                 }
                 Icon(
                     ScIcons.Smile,
-                    "Stikerlar",
+                    chatStrings().stickers,
                     tint = if (stickersOpen) Sc.Brand else Sc.Muted,
                     modifier = Modifier.size(21.dp).clickable(onClick = onToggleStickers),
                 )
@@ -1804,7 +1805,7 @@ private fun Composer(
                         recording -> ScIcons.Close
                         else -> ScIcons.Mic
                     },
-                    if (draft.isNotBlank()) "Yuborish" else if (recording) "To'xtatish" else "Ovoz yozish",
+                    if (draft.isNotBlank()) chatStrings().send else if (recording) chatStrings().stop else chatStrings().recordVoice,
                     tint = Color.White,
                     modifier = Modifier.size(22.dp),
                 )
@@ -1864,7 +1865,7 @@ internal fun ConfirmDialog(
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Bekor", style = scStyle(14f, FontWeight.Bold, Sc.InkSoft))
+                Text(chatStrings().cancel, style = scStyle(14f, FontWeight.Bold, Sc.InkSoft))
             }
         },
     )
@@ -1909,7 +1910,7 @@ internal fun ReportDialog(
                         .border(1.dp, Sc.Border, RoundedCornerShape(12.dp))
                         .padding(horizontal = 12.dp, vertical = 11.dp),
                 ) {
-                    if (note.isEmpty()) ScText("Izoh (ixtiyoriy)", 13.5f, FontWeight.Medium, Sc.NavIdle)
+                    if (note.isEmpty()) ScText(chatStrings().reportNote, 13.5f, FontWeight.Medium, Sc.NavIdle)
                     BasicTextField(
                         value = note,
                         onValueChange = { if (it.length <= 1000) note = it },
@@ -1922,22 +1923,22 @@ internal fun ReportDialog(
         },
         confirmButton = {
             TextButton(onClick = { onSend(reason, note.takeIf { it.isNotBlank() }) }) {
-                Text("Yuborish", style = scStyle(14f, FontWeight.ExtraBold, Sc.Danger))
+                Text(chatStrings().send, style = scStyle(14f, FontWeight.ExtraBold, Sc.Danger))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Bekor", style = scStyle(14f, FontWeight.Bold, Sc.InkSoft))
+                Text(chatStrings().cancel, style = scStyle(14f, FontWeight.Bold, Sc.InkSoft))
             }
         },
     )
 }
 
 private val ReportReason.label: String
-    get() = when (this) {
-        ReportReason.SPAM -> "Spam"
-        ReportReason.SCAM -> "Firibgarlik"
-        ReportReason.HARASSMENT -> "Haqorat"
-        ReportReason.INAPPROPRIATE -> "Nomaqbul"
-        ReportReason.OTHER -> "Boshqa"
+    @Composable @ReadOnlyComposable get() = when (this) {
+        ReportReason.SPAM -> chatStrings().reasonSpam
+        ReportReason.SCAM -> chatStrings().reasonFraud
+        ReportReason.HARASSMENT -> chatStrings().reasonHarassment
+        ReportReason.INAPPROPRIATE -> chatStrings().reasonInappropriate
+        ReportReason.OTHER -> chatStrings().reasonOther
     }

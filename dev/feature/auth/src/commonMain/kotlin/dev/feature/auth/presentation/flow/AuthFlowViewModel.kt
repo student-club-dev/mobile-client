@@ -34,6 +34,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import dev.core.common.format.toUzPhoneDigits
+import dev.feature.auth.presentation.screens.authStringsNow
 
 /** UI navigatsiyasini boshqaradigan bir martalik hodisalar. */
 sealed interface AuthEvent {
@@ -215,7 +216,7 @@ class AuthFlowViewModel(
         if (s.isLoading) return
         val identifier = s.phoneE164
         if (identifier.isBlank()) {
-            _state.update { it.copy(error = "To‘liq 9 xonali raqam kiriting.") }
+            _state.update { it.copy(error = authStringsNow().phoneIncomplete) }
             return
         }
         _state.update { it.copy(isLoading = true, error = null) }
@@ -266,11 +267,11 @@ class AuthFlowViewModel(
         val s = _state.value
         if (s.isLoading) return
         if (!s.termsAccepted) {
-            _state.update { it.copy(error = "Shartlarga rozilik bering.") }
+            _state.update { it.copy(error = authStringsNow().acceptTerms) }
             return
         }
         if (!s.phoneValid) {
-            _state.update { it.copy(error = "To‘liq 9 xonali raqam kiriting.") }
+            _state.update { it.copy(error = authStringsNow().phoneIncomplete) }
             return
         }
         // ⚠️ Parolga klient tomonida cheklov QO'YILMAYDI — qoidani server biladi va
@@ -359,7 +360,7 @@ class AuthFlowViewModel(
         val s = _state.value
         if (s.isLoading) return
         if (!s.phoneValid) {
-            _state.update { it.copy(error = "To‘liq 9 xonali raqam kiriting.") }
+            _state.update { it.copy(error = authStringsNow().phoneIncomplete) }
             return
         }
         _state.update { it.copy(isLoading = true, error = null, info = null) }
@@ -405,11 +406,11 @@ class AuthFlowViewModel(
         val s = _state.value
         if (s.isLoading) return
         if (s.password.length < MIN_PASSWORD_LENGTH) {
-            _state.update { it.copy(error = "Parol kamida $MIN_PASSWORD_LENGTH belgidan iborat bo‘lsin.") }
+            _state.update { it.copy(error = authStringsNow().passwordTooShort(MIN_PASSWORD_LENGTH)) }
             return
         }
         if (s.password != s.passwordConfirm) {
-            _state.update { it.copy(error = "Parollar mos kelmadi.") }
+            _state.update { it.copy(error = authStringsNow().passwordsDontMatch) }
             return
         }
         _state.update { it.copy(isLoading = true, error = null) }
@@ -419,7 +420,7 @@ class AuthFlowViewModel(
                     _state.update {
                         it.copy(isLoading = false, otp = "", password = "", passwordConfirm = "")
                     }
-                    AppMessageBus.success("Parol yangilandi. Endi yangi parol bilan kiring.")
+                    AppMessageBus.success(authStringsNow().passwordUpdated)
                     _events.send(AuthEvent.PasswordReset)
                 }
                 is Resource.Error -> _state.update { it.copy(isLoading = false, error = result.message) }

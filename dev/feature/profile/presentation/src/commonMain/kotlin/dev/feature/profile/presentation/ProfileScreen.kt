@@ -50,6 +50,8 @@ import dev.core.uikit.media.rememberImagePicker
 import dev.core.uikit.theme.Sc
 import dev.feature.stories.presentation.MyPostsSection
 import org.koin.compose.viewmodel.koinViewModel
+import androidx.compose.runtime.ReadOnlyComposable
+import dev.core.uikit.locale.uiStrings
 
 /**
  * Profil bo'limlari — Telegramdagi kabi **postlar**.
@@ -57,9 +59,19 @@ import org.koin.compose.viewmodel.koinViewModel
  * Post = hikoya (`feature:stories`): 24 soat bog'langanlarga ko'rinadi, keyin yo'qolmaydi —
  * faqat egasiga ko'rinadigan [ARCHIVE] ga o'tadi (`STORY_ARCHIVE_BACKEND.md`).
  */
-private enum class ProfileTab(val label: String) {
-    POSTS("Postlar"),
-    ARCHIVE("Arxivlangan postlar"),
+private enum class ProfileTab {
+    POSTS,
+    ARCHIVE,
+    ;
+
+    /** Yorliq joriy tilda — enum konstantasi til bilan birga o'zgara olmaydi. */
+    val label: String
+        @Composable @ReadOnlyComposable get() = profileStrings().let {
+            when (this) {
+                POSTS -> it.posts
+                ARCHIVE -> it.archivedPosts
+            }
+        }
 }
 
 /**
@@ -83,6 +95,7 @@ fun ProfileScreen(
     vm: ProfileViewModel = koinViewModel(),
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
+    val s = profileStrings()
     val photos by vm.photos.collectAsStateWithLifecycle()
     val refreshing by vm.refreshing.collectAsStateWithLifecycle()
     var tab by remember { mutableStateOf(ProfileTab.POSTS) }
@@ -124,9 +137,9 @@ fun ProfileScreen(
                     // Bu **mening** profilim — ilovani ochib turgan odamning o'zi.
                     status = when {
                         photos.uploading && photos.progress != null ->
-                            "rasm yuklanmoqda ${scUploadPercent(photos.progress!!)}"
-                        photos.uploading -> "rasm saqlanmoqda…"
-                        else -> "onlayn"
+                            s.uploadingPhoto(scUploadPercent(photos.progress!!))
+                        photos.uploading -> s.savingPhoto
+                        else -> s.online
                     },
                     photoUrls = photoUrls,
                     photoIndex = photoIndex,
@@ -144,8 +157,8 @@ fun ProfileScreen(
                                 photoUrls.size
                         }
                     },
-                    topBar = { ScGlassButton(ScIcons.ChevronLeft, "Orqaga", onBack) },
-                    trailing = { ScGlassButton(AppIcons.Settings, "Sozlamalar", onOpenSettings) },
+                    topBar = { ScGlassButton(ScIcons.ChevronLeft, uiStrings().back, onBack) },
+                    trailing = { ScGlassButton(AppIcons.Settings, s.settings, onOpenSettings) },
                     avatarOverlay = {
                         // Foiz avatar ustida: eski rasm ko'rinib turadi, yangisi esa ketmoqda.
                         if (photos.uploading) {
@@ -179,15 +192,15 @@ fun ProfileScreen(
                             AppIcons.Camera,
                             when {
                                 photos.uploading && photos.progress != null ->
-                                    "Yuklanmoqda ${scUploadPercent(photos.progress!!)}"
-                                photos.uploading -> "Saqlanmoqda…"
-                                else -> "Rasm belgilash"
+                                    s.uploading(scUploadPercent(photos.progress!!))
+                                photos.uploading -> s.saving
+                                else -> s.setPhoto
                             },
                             Modifier.weight(1f),
                             enabled = photos.canAdd,
                         ) { imagePicker.pick() }
-                        ActionTile(AppIcons.Pencil, "Tahrirlash", Modifier.weight(1f), onClick = onEditProfile)
-                        ActionTile(AppIcons.Settings, "Sozlamalar", Modifier.weight(1f), onClick = onOpenSettings)
+                        ActionTile(AppIcons.Pencil, s.edit, Modifier.weight(1f), onClick = onEditProfile)
+                        ActionTile(AppIcons.Settings, s.settings, Modifier.weight(1f), onClick = onOpenSettings)
                     }
 
                     photos.error?.let { ScText(it, 12.5f, FontWeight.SemiBold, Sc.Danger) }
@@ -199,11 +212,11 @@ fun ProfileScreen(
                         .firstOrNull { it.id == state.profile?.universityId }?.shortName
                     val phone = state.profile?.phoneNumber ?: state.contact.takeIf { it.isNotBlank() }
                     InfoCard {
-                        phone?.let { InfoRow(formatUzPhoneFull(it), "Mobil raqam") }
-                        state.profile?.bio?.takeIf { it.isNotBlank() }?.let { InfoRow(it, "Tarjimayi hol") }
-                        state.profile?.email?.takeIf { it.isNotBlank() }?.let { InfoRow(it, "Pochta") }
-                        university?.let { InfoRow(it, "Universitet") }
-                        state.courseLabel?.let { InfoRow(it, "Kurs") }
+                        phone?.let { InfoRow(formatUzPhoneFull(it), s.phoneLabel) }
+                        state.profile?.bio?.takeIf { it.isNotBlank() }?.let { InfoRow(it, s.bioLabel) }
+                        state.profile?.email?.takeIf { it.isNotBlank() }?.let { InfoRow(it, s.emailLabel) }
+                        university?.let { InfoRow(it, s.universityLabel) }
+                        state.courseLabel?.let { InfoRow(it, s.courseLabel) }
                     }
 
                     if (showMyBusiness) {
@@ -314,9 +327,9 @@ private fun MyBusinessCard(onClick: () -> Unit) {
             Icon(AppIcons.Store, null, tint = Sc.Brand, modifier = Modifier.size(21.dp))
         }
         Column(Modifier.weight(1f)) {
-            ScText("Mening biznesim", 15f, FontWeight.ExtraBold, Sc.Ink, maxLines = 1)
+            ScText(profileStrings().myBusiness, 15f, FontWeight.ExtraBold, Sc.Ink, maxLines = 1)
             Spacer(Modifier.height(2.dp))
-            ScText("Chegirma e'loni qo'yish va boshqarish", 12.5f, FontWeight.Medium, Sc.InkSoft, maxLines = 1)
+            ScText(profileStrings().myBusinessSubtitle, 12.5f, FontWeight.Medium, Sc.InkSoft, maxLines = 1)
         }
         Icon(ScIcons.ChevronRight, null, tint = Sc.Brand, modifier = Modifier.size(16.dp))
     }
@@ -334,7 +347,7 @@ private fun LogoutRow(onClick: () -> Unit) {
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Icon(AppIcons.LogOut, null, tint = Sc.Danger, modifier = Modifier.size(18.dp))
-        ScText("Chiqish", 14f, FontWeight.ExtraBold, Sc.Danger, maxLines = 1)
+        ScText(profileStrings().logout, 14f, FontWeight.ExtraBold, Sc.Danger, maxLines = 1)
     }
 }
 

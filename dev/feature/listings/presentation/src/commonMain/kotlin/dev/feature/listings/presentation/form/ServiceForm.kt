@@ -24,6 +24,9 @@ import dev.feature.listings.presentation.components.FormSection
 import dev.feature.listings.presentation.components.FormSwitch
 import dev.feature.listings.presentation.components.MiniLabel
 import dev.feature.listings.presentation.components.SelectChip
+import dev.feature.listings.presentation.lt
+import dev.feature.listings.presentation.currency
+import dev.feature.listings.presentation.Lt
 
 /**
  * Xizmat e'loni formasi.
@@ -42,15 +45,15 @@ fun ServiceForm(state: PostListingUiState, palette: AppPalette, vm: PostListingV
     }
 
     ListingFormShell(
-        title = if (type != null) "${type.label} xizmati" else "Xizmat e'loni",
-        subtitle = if (type != null) "Tafsilotlarni to'ldiring — mijoz shunga qarab tanlaydi" else "Qanday xizmat ko'rsatasiz",
+        title = if (type != null) Lt.serviceOf(type.label) else lt("Xizmat e'loni"),
+        subtitle = if (type != null) lt("Tafsilotlarni to'ldiring — mijoz shunga qarab tanlaydi") else lt("Qanday xizmat ko'rsatasiz"),
         state = state,
         palette = palette,
         vm = vm,
     ) {
         FormSection(
-            title = "Xizmat sohasi",
-            subtitle = "Nima bilan shug'ullanasiz",
+            title = lt("Xizmat sohasi"),
+            subtitle = lt("Nima bilan shug'ullanasiz"),
             error = state.errorFor(ListingField.SERVICE_TYPE),
         ) {
             ChipFlow {
@@ -70,7 +73,7 @@ fun ServiceForm(state: PostListingUiState, palette: AppPalette, vm: PostListingV
             if (type.hasSubjects) {
                 FormSection(
                     title = ServiceCatalog.subjectLabel(type),
-                    subtitle = "Aniq yo'nalishni tanlang — qidiruvda shunga qarab topiladi",
+                    subtitle = lt("Aniq yo'nalishni tanlang — qidiruvda shunga qarab topiladi"),
                     error = state.errorFor(ListingField.SERVICE_SUBJECT),
                 ) {
                     ChipFlow {
@@ -86,7 +89,7 @@ fun ServiceForm(state: PostListingUiState, palette: AppPalette, vm: PostListingV
                         GlassTextField(
                             service.customSubject,
                             { value -> vm.updateService { s -> s.copy(customSubject = value) } },
-                            "Yo'nalish nomini yozing",
+                            lt("Yo'nalish nomini yozing"),
                             height = 46,
                         )
                     }
@@ -94,15 +97,15 @@ fun ServiceForm(state: PostListingUiState, palette: AppPalette, vm: PostListingV
             }
 
             FormSection(
-                title = "Tafsilotlar",
-                subtitle = "Sohaga xos ma'lumotlar",
+                title = lt("Tafsilotlar"),
+                subtitle = lt("Sohaga xos ma'lumotlar"),
                 error = state.errorFor(ListingField.ATTRIBUTES),
             ) {
                 // specs() soha maydonlari va yo'nalish maydonlarini o'zi birlashtiradi.
                 DynamicFields(service.specs(), service.fields, vm::onServiceField)
             }
 
-            FormSection(title = "Xizmat qanday ko'rsatiladi") {
+            FormSection(title = lt("Xizmat qanday ko'rsatiladi")) {
                 ChipFlow {
                     ServiceFormat.entries.forEach { format ->
                         SelectChip(
@@ -114,18 +117,18 @@ fun ServiceForm(state: PostListingUiState, palette: AppPalette, vm: PostListingV
                 }
 
                 FormSwitch(
-                    "Mijoz joyiga borib bajaraman",
+                    lt("Mijoz joyiga borib bajaraman"),
                     service.hasHomeVisit,
                     onChange = { checked -> vm.updateService { s -> s.copy(hasHomeVisit = checked) } },
                 )
                 FormSwitch(
-                    "Birinchi dars / sinov bepul",
+                    lt("Birinchi dars / sinov bepul"),
                     service.hasFreeTrial,
                     onChange = { checked -> vm.updateService { s -> s.copy(hasFreeTrial = checked) } },
                 )
 
                 Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                    MiniLabel("Qabul qilish vaqti", palette)
+                    MiniLabel(lt("Qabul qilish vaqti"), palette)
                     GlassTextField(
                         service.workingHours,
                         { value -> vm.updateService { s -> s.copy(workingHours = value) } },
@@ -135,7 +138,7 @@ fun ServiceForm(state: PostListingUiState, palette: AppPalette, vm: PostListingV
                 }
 
                 Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                    MiniLabel("Tajriba (yil)", palette)
+                    MiniLabel(lt("Tajriba (yil)"), palette)
                     GlassTextField(
                         service.experienceYears,
                         { value -> vm.updateService { s -> s.copy(experienceYears = value) } },
@@ -149,8 +152,8 @@ fun ServiceForm(state: PostListingUiState, palette: AppPalette, vm: PostListingV
             // Xizmatda aniq narx kamdan-kam bo'ladi — ko'pincha "50 000 dan 150 000 gacha".
             PriceSection(
                 state, vm,
-                sectionTitle = "Xizmat narxi",
-                priceLabel = "Narx",
+                sectionTitle = lt("Xizmat narxi"),
+                priceLabel = lt("Narx"),
                 hint = "50 000",
                 showRange = true,
                 allowNegotiable = true,
@@ -160,23 +163,23 @@ fun ServiceForm(state: PostListingUiState, palette: AppPalette, vm: PostListingV
 
         AboutSection(
             state, vm,
-            sectionTitle = "E'lon matni",
-            titleHint = "Sarlavha: IELTS repetitor — 7.5 ball",
-            descriptionHint = "Tajriba, natijalar, dars uslubi...",
+            sectionTitle = lt("E'lon matni"),
+            titleHint = lt("Sarlavha: IELTS repetitor — 7.5 ball"),
+            descriptionHint = lt("Tajriba, natijalar, dars uslubi..."),
         )
 
         ImagesSection(
             state, vm, imagePicker::pick,
-            sectionTitle = "Rasmlar",
-            hint = "Ish namunalari, sertifikatlar",
+            sectionTitle = lt("Rasmlar"),
+            hint = lt("Ish namunalari, sertifikatlar"),
         )
 
-        ContactSection(state, vm, subtitle = "Mijozlar shu raqamga bog'lanadi")
+        ContactSection(state, vm, subtitle = lt("Mijozlar shu raqamga bog'lanadi"))
 
         BranchesSection(
             state, palette, vm,
-            title = "Qayerda xizmat ko'rsatasiz",
-            subtitle = "Xaritadan joyni belgilang",
+            title = lt("Qayerda xizmat ko'rsatasiz"),
+            subtitle = lt("Xaritadan joyni belgilang"),
         )
 
         AudienceSection(state, vm)

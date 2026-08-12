@@ -3,6 +3,7 @@ package dev.feature.university.data.dto
 import dev.feature.university.domain.model.University
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import dev.core.common.locale.AppLocale
 
 /** `prof-emis.edu.uz` — OTM ro'yxati elementi. Ortiqcha maydonlar e'tiborsiz qoldiriladi. */
 @Serializable
@@ -22,7 +23,7 @@ data class ProfEmisUniversityDto(
  * yaxshilanganda saqlangan qatorlarni qayta yuklash kerak bo'lmasin.
  */
 fun ProfEmisUniversityDto.toUniversity(): University {
-    val name = nameUz.ifBlank { nameRu }.ifBlank { nameEn }.ifBlank { "Universitet #$id" }
+    val name = nameUz.ifBlank { nameRu }.ifBlank { nameEn }.ifBlank { AppLocale.pick(en = "University #$id", ru = "Университет №$id", uz = "Universitet #$id") }
     return University(
         id = "emis-$id",
         name = name,

@@ -32,6 +32,7 @@ import dev.feature.chat.data.mapper.parseEnum
 import dev.feature.chat.domain.model.DeleteScope
 import dev.feature.chat.domain.model.MessageType
 import kotlinx.serialization.json.Json
+import dev.feature.chat.domain.model.ChatDomainStrings
 
 /**
  * Chat REST qatlami — generatsiya qilingan [ChatApi] ustida (`handoff/03-WEBSOCKET.md`).
@@ -261,5 +262,4 @@ private fun DeleteScope.dto(): DeleteScopeDto = when (this) {
     DeleteScope.EVERYONE -> DeleteScopeDto.EVERYONE
 }
 
-internal const val MEDIA_SERVER_MESSAGE =
-    "Biriktirmani yuborib bo'lmadi — serverdagi media xizmati javob bermayapti. Birozdan so'ng qayta urining."
+internal val MEDIA_SERVER_MESSAGE: String get() = ChatDomainStrings.mediaServiceDown

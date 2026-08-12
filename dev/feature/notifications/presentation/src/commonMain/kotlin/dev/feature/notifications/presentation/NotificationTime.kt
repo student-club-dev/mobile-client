@@ -4,6 +4,7 @@ import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
+import dev.core.uikit.locale.uiStringsNow
 
 /**
  * Bildirishnoma vaqti yorlig'i — "hozir", "12 daqiqa oldin", "3 soat oldin", "kecha",
@@ -21,18 +22,19 @@ internal object NotificationTime {
 
         val seconds = (now - createdAt).inWholeSeconds
         // Qurilma soati serverdan orqada bo'lishi mumkin — kelajakdagi sana "hozir".
-        if (seconds < MINUTE) return "hozir"
+        val ui = uiStringsNow()
+        if (seconds < MINUTE) return ui.justNow
 
         val minutes = seconds / MINUTE
-        if (minutes < 60) return "$minutes daqiqa oldin"
+        if (minutes < 60) return notificationsStringsNow().minutesAgo(minutes.toInt())
 
         val hours = minutes / 60
-        if (hours < 24) return "$hours soat oldin"
+        if (hours < 24) return ui.hoursAgo(hours.toInt())
 
         val days = hours / 24
         return when {
-            days == 1L -> "kecha"
-            days < 7 -> "$days kun oldin"
+            days == 1L -> ui.yesterday
+            days < 7 -> ui.daysAgo(days.toInt())
             else -> createdAt.dateLabel()
         }
     }

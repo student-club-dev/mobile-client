@@ -367,7 +367,7 @@ class PostListingViewModel(
 
     fun addImage(bytes: ByteArray, fileName: String) {
         if (_state.value.images.size >= ListingValidator.MAX_IMAGES) {
-            _state.update { it.copy(message = "Maksimal ${ListingValidator.MAX_IMAGES} ta rasm") }
+            _state.update { it.copy(message = Lt.maxImages(ListingValidator.MAX_IMAGES)) }
             return
         }
         viewModelScope.launch {
@@ -412,7 +412,7 @@ class PostListingViewModel(
                 is Resource.Success -> {
                     editingId = res.data.id
                     editingCreatedAt = res.data.createdAt
-                    _state.update { it.copy(message = "Qoralama saqlandi") }
+                    _state.update { it.copy(message = lt("Qoralama saqlandi")) }
                 }
                 is Resource.Error -> _state.update { it.copy(message = res.message) }
                 Resource.Loading -> Unit

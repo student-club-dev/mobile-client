@@ -1,6 +1,7 @@
 package dev.feature.connections.domain.model
 
 import kotlinx.datetime.Instant
+import dev.core.common.locale.AppLocale
 
 /**
  * **Qisqa profil** — odam ko'rsatiladigan hamma joyda bir xil shakl (`StudentSummary`).
@@ -55,7 +56,7 @@ data class StudentSummary(
     val displayName: String
         get() = fullName?.takeIf { it.isNotBlank() }
             ?: username?.takeIf { it.isNotBlank() }?.let { "@$it" }
-            ?: "Talaba"
+            ?: AppLocale.pick(en = "Student", ru = "Студент", uz = "Talaba")
 
     /** Avatar o'rnidagi harf. */
     val initial: String

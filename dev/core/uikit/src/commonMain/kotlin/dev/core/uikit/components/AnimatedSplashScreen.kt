@@ -57,6 +57,7 @@ import kotlinx.coroutines.delay
 import kotlin.math.min
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
+import dev.core.uikit.locale.uiStrings
 
 /**
  * Splash ko'rinib turadigan vaqt. Ilova tez ochilishi uchun qisqartirilgan: butun kirish
@@ -261,7 +262,7 @@ fun AnimatedSplashScreen(
             )
             Spacer(Modifier.height(14.dp))
             Text(
-                text = "TALABALAR HAMJAMIYATI",
+                text = uiStrings().splashTagline,
                 color = Color.White.copy(alpha = 0.8f),
                 fontSize = 11.sp,
                 fontWeight = FontWeight.SemiBold,

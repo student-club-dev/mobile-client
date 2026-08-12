@@ -3,6 +3,7 @@ package dev.feature.chat.data.mapper
 import dev.feature.chat.domain.model.MessageType
 import dev.feature.chat.domain.model.Quote
 import kotlinx.serialization.json.JsonObject
+import dev.feature.chat.domain.model.ChatDomainStrings
 
 /**
  * Yuboriladigan xabarning tanasi — WS `message:send` va REST `SendMessageDto` uchun **bitta**
@@ -88,29 +89,29 @@ internal data class SendPayload(
         quoteError()?.let { return it }
         return when (type) {
             MessageType.TEXT -> when {
-                text.isEmpty() -> "Xabar bo'sh."
-                text.length > MAX_BODY -> "Xabar $MAX_BODY belgidan uzun bo'lmasin."
+                text.isEmpty() -> ChatDomainStrings.emptyMessage
+                text.length > MAX_BODY -> ChatDomainStrings.bodyTooLong(MAX_BODY)
                 mediaId != null || stickerId != null || gif != null || sticker != null ->
-                    "Matnli xabarga biriktirma qo'shib bo'lmaydi."
+                    ChatDomainStrings.textCantHaveAttachment
                 else -> null
             }
 
             MessageType.IMAGE, MessageType.VIDEO, MessageType.FILE -> when {
-                mediaId.isNullOrBlank() -> "Fayl yuklanmadi."
-                text.length > MAX_CAPTION -> "Izoh $MAX_CAPTION belgidan uzun bo'lmasin."
+                mediaId.isNullOrBlank() -> ChatDomainStrings.fileNotUploaded
+                text.length > MAX_CAPTION -> ChatDomainStrings.captionTooLong(MAX_CAPTION)
                 else -> null
             }
 
             // Ikkalasi ham bo'lishi ham, ikkalasi ham bo'lmasligi ham xato.
             MessageType.GIF -> when {
                 mediaId.isNullOrBlank() == (gif == null) ->
-                    "GIF uchun yo yuklangan fayl, yo qidiruv natijasi kerak."
+                    ChatDomainStrings.gifNeedsSource
                 text.isNotEmpty() -> CAPTION_FORBIDDEN
                 else -> null
             }
 
             MessageType.VOICE -> when {
-                mediaId.isNullOrBlank() -> "Ovozli xabar yuklanmadi."
+                mediaId.isNullOrBlank() -> ChatDomainStrings.voiceNotUploaded
                 text.isNotEmpty() -> CAPTION_FORBIDDEN
                 else -> null
             }
@@ -120,7 +121,7 @@ internal data class SendPayload(
             // `422 STICKER_SOURCE_AMBIGUOUS`, ikkalasi ham yo'q — `422 VALIDATION_ERROR`.
             MessageType.STICKER -> when {
                 stickerId.isNullOrBlank() == (sticker == null) ->
-                    if (sticker != null) STICKER_SOURCE_AMBIGUOUS else "Stiker topilmadi."
+                    if (sticker != null) STICKER_SOURCE_AMBIGUOUS else ChatDomainStrings.stickerNotFound
                 text.isNotEmpty() -> CAPTION_FORBIDDEN
                 else -> null
             }
@@ -129,7 +130,7 @@ internal data class SendPayload(
             // fayl kvadrat bo'lishi shart — kvadratlikni yuklashdan oldin kesuvchi
             // ta'minlaydi, aks holda server `422 MEDIA_NOT_SQUARE` beradi.
             MessageType.VIDEO_NOTE -> when {
-                mediaId.isNullOrBlank() -> "Video xabar yuklanmadi."
+                mediaId.isNullOrBlank() -> ChatDomainStrings.videoNoteNotUploaded
                 text.isNotEmpty() -> CAPTION_FORBIDDEN
                 else -> null
             }
@@ -137,7 +138,7 @@ internal data class SendPayload(
             // `SYSTEM` va `CALL` qatorini FAQAT server yozadi — klient yuborsa WS'da ham,
             // REST'da ham `422 VALIDATION_ERROR` (`handoff/09-CALLS-REST.md` §4). Aks holda
             // har kim soxta "javobsiz qo'ng'iroq" push'i yuborardi.
-            MessageType.SYSTEM, MessageType.CALL -> "Bu turdagi xabarni yuborib bo'lmaydi."
+            MessageType.SYSTEM, MessageType.CALL -> ChatDomainStrings.unsupportedKind
         }
     }
 
@@ -150,11 +151,11 @@ internal data class SendPayload(
     private fun quoteError(): String? {
         val fragment = quote ?: return null
         return when {
-            replyToMessageId == null -> "Sitata javob xabarisiz yuborilmaydi."
-            fragment.text.isBlank() -> "Sitata bo'sh."
+            replyToMessageId == null -> ChatDomainStrings.quoteNeedsReply
+            fragment.text.isBlank() -> ChatDomainStrings.quoteEmpty
             fragment.text.length > Quote.MAX_LENGTH ->
-                "Sitata ${Quote.MAX_LENGTH} belgidan uzun bo'lmasin."
-            fragment.offset < 0 -> "Sitataning o'rni noto'g'ri."
+                ChatDomainStrings.quoteTooLong(Quote.MAX_LENGTH)
+            fragment.offset < 0 -> ChatDomainStrings.quoteBadRange
             else -> null
         }
     }
@@ -173,13 +174,13 @@ internal data class SendPayload(
          * `GIF`/`VOICE`/`STICKER` da izoh **ataylab** rad etiladi: uni chizadigan joy yo'q,
          * ya'ni qabul qilsak foydalanuvchining matni jimgina yo'qolardi.
          */
-        const val CAPTION_FORBIDDEN = "Bu turdagi xabarga izoh qo'shib bo'lmaydi."
+        val CAPTION_FORBIDDEN: String get() = ChatDomainStrings.captionNotAllowed
 
         /**
          * Ikkala stiker manbasi birga berilgan — bu **klient xatosi**, foydalanuvchi
          * tuzatadigan narsa emas. Matn baribir ko'rsatiladi (jimgina yutilsa xabar
          * sababsiz yo'qolardi), lekin uni ko'rish — koddagi nuqson belgisi.
          */
-        const val STICKER_SOURCE_AMBIGUOUS = "Stiker manbasi noaniq."
+        val STICKER_SOURCE_AMBIGUOUS: String get() = ChatDomainStrings.stickerSourceUnclear
     }
 }

@@ -4,18 +4,28 @@ import dev.core.common.format.isUzPhoneComplete
 import dev.core.common.format.toUzPhoneDigits
 import dev.core.common.format.toUzPhoneE164
 import dev.feature.university.domain.model.University
+import dev.feature.auth.presentation.screens.authStringsNow
 
 /**
  * Kurs bosqichi. [apiValue] — backend kutadigan qiymat (`"1".."4"`, `"MASTER"`); enum
  * nomini yuborib bo'lmaydi, server uni rad etadi va kurs saqlanmay qolardi.
  */
-enum class CourseYear(val label: String, val apiValue: String) {
-    ONE("1", "1"), TWO("2", "2"), THREE("3", "3"), FOUR("4", "4"), MASTER("Mag", "MASTER")
+enum class CourseYear(val apiValue: String) {
+    ONE("1"), TWO("2"), THREE("3"), FOUR("4"), MASTER("MASTER"),
+    ;
+
+    /** Tugmadagi yozuv — magistratura qisqartmasi tilga qarab o'zgaradi. */
+    val label: String
+        get() = if (this == MASTER) authStringsNow().master else apiValue
 }
 
 /** Jins — profilda ixtiyoriy, `GET /v1/students?gender=` filtri shunga tayanadi. */
-enum class ProfileGender(val label: String, val apiValue: String) {
-    MALE("Erkak", "MALE"), FEMALE("Ayol", "FEMALE")
+enum class ProfileGender(val apiValue: String) {
+    MALE("MALE"), FEMALE("FEMALE"),
+    ;
+
+    val label: String
+        get() = if (this == MALE) authStringsNow().genderMale else authStringsNow().genderFemale
 }
 
 /**

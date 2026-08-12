@@ -33,6 +33,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
+import dev.feature.calls.domain.model.CallStrings
 
 /**
  * Qo'ng'iroqning **holat mashinasi** — signalizatsiya (`/calls`) va media qatlamini
@@ -233,15 +234,15 @@ class CallSessionManager(
     // -------------------------------------------------------------------------------------
 
     override suspend fun call(peer: StudentSummary, media: CallMedia): String? = mutex.withLock {
-        if (_session.value != null) return "Siz allaqachon qo'ng'iroqdasiz."
+        if (_session.value != null) return CallStrings.alreadyInCall
 
         // 1. TURN hisobi. 503 — «qo'ng'iroq hozircha mavjud emas», server yiqilgani emas.
         val ice = when (val result = repository.iceServers()) {
             is Resource.Success -> result.data
             is Resource.Error -> return result.error?.takeIf(AppException::callsUnavailable)
-                ?.let { "Qo'ng'iroq hozircha mavjud emas." }
+                ?.let { CallStrings.notAvailable }
                 ?: result.message
-            Resource.Loading -> return "Qo'ng'iroqni boshlab bo'lmadi."
+            Resource.Loading -> return CallStrings.cantStart
         }
 
         // 2. Media qatlami. `relayOnly` hali noma'lum (u juftlikka bog'liq va `invite`
@@ -260,7 +261,7 @@ class CallSessionManager(
         val offer = newEngine.createOffer(media, relayOnly = relayOnly, iceServers = ice.servers)
         if (offer == null) {
             newEngine.close()
-            return "Mikrofonga ruxsat berilmagan yoki qurilma band."
+            return CallStrings.micUnavailable
         }
 
         // ⚠️ Sessiya `attach` dan OLDIN quriladi: `attach` tizim ilmog'ini chaqiradi
@@ -350,11 +351,11 @@ class CallSessionManager(
     private var pendingOffer: String? = null
 
     override suspend fun accept(): String? = mutex.withLock {
-        val current = _session.value ?: return "Qo'ng'iroq tugadi."
+        val current = _session.value ?: return CallStrings.callEnded
         if (current.direction != CallDirection.INCOMING || current.status != CallStatus.RINGING) {
-            return "Qo'ng'iroqqa javob berib bo'lmaydi."
+            return CallStrings.cantAnswer
         }
-        val offer = pendingOffer ?: return "Qo'ng'iroq tugadi."
+        val offer = pendingOffer ?: return CallStrings.callEnded
 
         val ice = when (val result = repository.iceServers()) {
             is Resource.Success -> result.data
@@ -374,7 +375,7 @@ class CallSessionManager(
         )
         if (answer == null) {
             newEngine.close()
-            return "Mikrofonga ruxsat berilmagan yoki qurilma band."
+            return CallStrings.micUnavailable
         }
         attach(newEngine)
 

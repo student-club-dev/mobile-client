@@ -3,6 +3,7 @@ package dev.feature.settings.presentation
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.core.common.Resource
+import dev.core.common.locale.AppLanguage
 import dev.core.domain.model.Region
 import dev.core.domain.repository.DiscountRepository
 import dev.core.domain.repository.RegionRepository
@@ -19,6 +20,8 @@ import kotlinx.coroutines.launch
 
 data class SettingsUiState(
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
+    /** Interfeys tili — sukut bo'yicha ingliz tili. */
+    val language: AppLanguage = AppLanguage.Default,
     val pushEnabled: Boolean = true,
     val emailEnabled: Boolean = false,
     /** Feed qaysi viloyat bo'yicha filtrlanadi; `null` — butun O'zbekiston. */
@@ -39,17 +42,30 @@ class SettingsViewModel(
 ) : ViewModel() {
     val state: StateFlow<SettingsUiState> = combine(
         settings.observeThemeMode(),
+        settings.observeLanguage(),
         settings.observeFlag(SettingsRepository.KEY_NOTIF_PUSH, default = true),
         settings.observeFlag(SettingsRepository.KEY_NOTIF_EMAIL, default = false),
         regionRepository.observeSelected(),
-    ) { theme, push, email, region ->
-        SettingsUiState(themeMode = theme, pushEnabled = push, emailEnabled = email, region = region)
+    ) { theme, language, push, email, region ->
+        SettingsUiState(
+            themeMode = theme,
+            language = language,
+            pushEnabled = push,
+            emailEnabled = email,
+            region = region,
+        )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), SettingsUiState())
 
     private val _regionPicker = MutableStateFlow(RegionPickerUiState())
     val regionPicker: StateFlow<RegionPickerUiState> = _regionPicker.asStateFlow()
 
     fun setThemeMode(mode: ThemeMode) { viewModelScope.launch { settings.setThemeMode(mode) } }
+
+    /**
+     * Tilni saqlaydi. Ilova ildizi (`App`) shu oqimni kuzatadi, shuning uchun butun
+     * interfeys darhol yangi tilda qayta chiziladi — qayta ishga tushirish shart emas.
+     */
+    fun setLanguage(language: AppLanguage) { viewModelScope.launch { settings.setLanguage(language) } }
     fun setPush(enabled: Boolean) { viewModelScope.launch { settings.setFlag(SettingsRepository.KEY_NOTIF_PUSH, enabled) } }
     fun setEmail(enabled: Boolean) { viewModelScope.launch { settings.setFlag(SettingsRepository.KEY_NOTIF_EMAIL, enabled) } }
 

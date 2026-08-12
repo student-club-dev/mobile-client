@@ -93,9 +93,9 @@ object ListingValidator {
 
     private fun validateCommon(listing: Listing): List<ListingError> = buildList {
         when {
-            listing.title.isBlank() -> add(ListingError(ListingField.TITLE, "Sarlavhani kiriting"))
-            listing.title.length < 3 -> add(ListingError(ListingField.TITLE, "Sarlavha juda qisqa"))
-            listing.title.length > 120 -> add(ListingError(ListingField.TITLE, "Sarlavha 120 belgidan oshmasin"))
+            listing.title.isBlank() -> add(ListingError(ListingField.TITLE, ValidationStrings.titleRequired))
+            listing.title.length < 3 -> add(ListingError(ListingField.TITLE, ValidationStrings.titleTooShort))
+            listing.title.length > 120 -> add(ListingError(ListingField.TITLE, ValidationStrings.titleTooLong))
         }
 
         // Ish e'loni va topshiriqda rasm shart emas: ish o'rnining surati odatda bo'lmaydi,
@@ -103,33 +103,33 @@ object ListingValidator {
         // Majburiy qilish e'lon qo'yishga to'siq bo'lardi.
         if (listing.kind !in KINDS_WITHOUT_REQUIRED_IMAGE) {
             if (listing.images.isEmpty()) {
-                add(ListingError(ListingField.IMAGES, "Kamida 1 ta rasm qo'shing"))
+                add(ListingError(ListingField.IMAGES, ValidationStrings.imageRequired))
             }
         }
         if (listing.images.size > MAX_IMAGES) {
-            add(ListingError(ListingField.IMAGES, "Maksimal $MAX_IMAGES ta rasm"))
+            add(ListingError(ListingField.IMAGES, ValidationStrings.tooManyImages(MAX_IMAGES)))
         }
 
         if (listing.price <= 0 && !listing.isNegotiable) {
-            add(ListingError(ListingField.PRICE, "Narxni kiriting yoki \"kelishilgan\" ni belgilang"))
+            add(ListingError(ListingField.PRICE, ValidationStrings.priceRequired))
         }
         val max = listing.priceMax
         if (max != null && max <= listing.price) {
-            add(ListingError(ListingField.PRICE, "Yuqori chegara quyi chegaradan katta bo'lsin"))
+            add(ListingError(ListingField.PRICE, ValidationStrings.priceRangeInvalid))
         }
 
         // Raqam qolipi butun ilovada bitta: "+998" + 9 xona. Chala raqam serverga ketmasligi
         // kerak — aks holda e'londagi yagona aloqa kanali ishlamaydi.
         if (listing.contactPhone.isNullOrBlank()) {
-            add(ListingError(ListingField.CONTACT, "Telefon raqamini kiriting"))
+            add(ListingError(ListingField.CONTACT, ValidationStrings.phoneRequired))
         } else if (!listing.contactPhone.isUzPhoneComplete()) {
-            add(ListingError(ListingField.CONTACT, "Raqamni to'liq kiriting: +998 90 123 45 67"))
+            add(ListingError(ListingField.CONTACT, ValidationStrings.phoneIncomplete))
         }
 
         addAll(validateBranches(listing))
 
         if (listing.validTo <= listing.validFrom) {
-            add(ListingError(ListingField.VALIDITY, "Tugash sanasi boshlanishdan keyin bo'lsin"))
+            add(ListingError(ListingField.VALIDITY, ValidationStrings.endBeforeStart))
         }
 
         addAll(validateOptions(listing))
@@ -149,15 +149,15 @@ object ListingValidator {
             return@buildList
         }
         if (listing.branches.size > MAX_BRANCHES) {
-            add(ListingError(ListingField.LOCATION, "Maksimal $MAX_BRANCHES ta manzil"))
+            add(ListingError(ListingField.LOCATION, ValidationStrings.tooManyBranches(MAX_BRANCHES)))
         }
 
         listing.branches.forEach { branch ->
             if (!branch.hasValidCoordinates) {
-                add(ListingError(ListingField.LOCATION, "Nuqta O'zbekiston hududidan tashqarida"))
+                add(ListingError(ListingField.LOCATION, ValidationStrings.pointOutsideCountry))
             }
             if (branch.address.isBlank()) {
-                add(ListingError(ListingField.LOCATION, "Manzil bo'sh"))
+                add(ListingError(ListingField.LOCATION, ValidationStrings.addressEmpty))
             }
         }
 
@@ -165,34 +165,34 @@ object ListingValidator {
         listing.branches.forEachIndexed { i, a ->
             listing.branches.drop(i + 1).forEach { b ->
                 if (Geo.distanceMeters(a.lat, a.lng, b.lat, b.lng) < MIN_BRANCH_DISTANCE_METERS) {
-                    add(ListingError(ListingField.LOCATION, "Ikkita manzil bir joyda belgilangan"))
+                    add(ListingError(ListingField.LOCATION, ValidationStrings.duplicateAddress))
                 }
             }
         }
     }
 
     private fun locationRequiredMessage(kind: ListingKind): String = when (kind) {
-        ListingKind.DISCOUNT -> "Kamida 1 ta filialni xaritadan belgilang"
-        ListingKind.RENTAL -> "Uy joyini xaritadan belgilang"
-        ListingKind.SERVICE -> "Xizmat ko'rsatiladigan joyni xaritadan belgilang"
-        ListingKind.JOB -> "Ish joyini xaritadan belgilang"
+        ListingKind.DISCOUNT -> ValidationStrings.markBranchOnMap
+        ListingKind.RENTAL -> ValidationStrings.markHomeOnMap
+        ListingKind.SERVICE -> ValidationStrings.markServiceOnMap
+        ListingKind.JOB -> ValidationStrings.markJobOnMap
         // Topshiriq odatda onlayn bajariladi — manzil faqat yuzma-yuz formatda so'raladi.
-        ListingKind.TASK -> "Ish topshiriladigan joyni xaritadan belgilang"
+        ListingKind.TASK -> ValidationStrings.markTaskOnMap
     }
 
     private fun validateOptions(listing: Listing): List<ListingError> = buildList {
         if (listing.optionGroups.size > MAX_OPTION_GROUPS) {
-            add(ListingError(ListingField.OPTIONS, "Maksimal $MAX_OPTION_GROUPS ta qo'shimcha guruhi"))
+            add(ListingError(ListingField.OPTIONS, ValidationStrings.tooManyOptionGroups(MAX_OPTION_GROUPS)))
         }
         listing.optionGroups.forEach { group ->
             if (group.name.isBlank()) {
-                add(ListingError(ListingField.OPTIONS, "Qo'shimcha guruhining nomini kiriting"))
+                add(ListingError(ListingField.OPTIONS, ValidationStrings.optionGroupNameRequired))
             }
             if (group.options.isEmpty()) {
-                add(ListingError(ListingField.OPTIONS, "\"${group.name}\" guruhida kamida 1 ta variant bo'lsin"))
+                add(ListingError(ListingField.OPTIONS, ValidationStrings.optionGroupEmpty(group.name)))
             }
             if (group.options.size > MAX_OPTIONS_PER_GROUP) {
-                add(ListingError(ListingField.OPTIONS, "\"${group.name}\" da $MAX_OPTIONS_PER_GROUP tadan ko'p variant"))
+                add(ListingError(ListingField.OPTIONS, ValidationStrings.optionGroupTooBig(group.name, MAX_OPTIONS_PER_GROUP)))
             }
         }
     }
@@ -206,7 +206,7 @@ object ListingValidator {
         details: ListingDetails.Discount,
     ): List<ListingError> = buildList {
         if (details.categoryKey == ListingCatalog.OTHER_KEY && details.customCategoryName.isNullOrBlank()) {
-            add(ListingError(ListingField.CATEGORY, "\"Boshqa\" tanlandi — bo'lim nomini yozing"))
+            add(ListingError(ListingField.CATEGORY, ValidationStrings.otherCategoryNeedsName))
         }
 
         // Oddiy (chegirmasiz) e'londa chegirma maydonlari tekshirilmaydi.
@@ -214,30 +214,30 @@ object ListingValidator {
             when (details.discountType) {
                 DiscountType.PERCENT -> when {
                     details.discountValue <= 0 ->
-                        add(ListingError(ListingField.DISCOUNT, "Chegirma foizini kiriting"))
+                        add(ListingError(ListingField.DISCOUNT, ValidationStrings.discountPercentRequired))
                     details.discountValue > MAX_PERCENT ->
                         // Firibgarlikdan himoya: narxni sun'iy ko'tarib "95% chegirma" berish.
-                        add(ListingError(ListingField.DISCOUNT, "Chegirma $MAX_PERCENT% dan oshmasin"))
+                        add(ListingError(ListingField.DISCOUNT, ValidationStrings.discountPercentTooBig(MAX_PERCENT)))
                 }
 
                 DiscountType.FIXED_AMOUNT -> when {
                     details.discountValue <= 0 ->
-                        add(ListingError(ListingField.DISCOUNT, "Chegirma summasini kiriting"))
+                        add(ListingError(ListingField.DISCOUNT, ValidationStrings.discountAmountRequired))
                     details.discountValue >= listing.price ->
-                        add(ListingError(ListingField.DISCOUNT, "Chegirma narxdan kam bo'lsin"))
+                        add(ListingError(ListingField.DISCOUNT, ValidationStrings.discountBelowPrice))
                 }
 
                 DiscountType.SPECIAL_PRICE -> when {
                     details.discountValue <= 0 ->
-                        add(ListingError(ListingField.DISCOUNT, "Talaba narxini kiriting"))
+                        add(ListingError(ListingField.DISCOUNT, ValidationStrings.studentPriceRequired))
                     details.discountValue >= listing.price ->
-                        add(ListingError(ListingField.DISCOUNT, "Talaba narxi asl narxdan past bo'lsin"))
+                        add(ListingError(ListingField.DISCOUNT, ValidationStrings.studentPriceBelowOriginal))
                 }
 
                 // 1+1 — narx o'zgarmaydi, lekin talaba nima olishini bilishi kerak.
                 DiscountType.FREE_ITEM ->
                     if (details.conditions.isNullOrBlank()) {
-                        add(ListingError(ListingField.DISCOUNT, "Aksiya shartini yozing (masalan: ikkinchi kofe bepul)"))
+                        add(ListingError(ListingField.DISCOUNT, ValidationStrings.giftConditionRequired))
                     }
             }
         }
@@ -245,7 +245,7 @@ object ListingValidator {
         if (details.redemption.method == RedemptionMethod.PROMO_CODE &&
             details.redemption.promoCode.isNullOrBlank()
         ) {
-            add(ListingError(ListingField.PROMO_CODE, "Promokodni kiriting"))
+            add(ListingError(ListingField.PROMO_CODE, ValidationStrings.promoCodeRequired))
         }
     }
 
@@ -255,13 +255,13 @@ object ListingValidator {
 
     private fun validateRental(details: ListingDetails.Rental): List<ListingError> = buildList {
         if (details.propertyType == null) {
-            add(ListingError(ListingField.PROPERTY_TYPE, "Turarjoy turini tanlang"))
+            add(ListingError(ListingField.PROPERTY_TYPE, ValidationStrings.propertyTypeRequired))
         }
 
         when (val rooms = details.roomCount) {
-            null -> add(ListingError(ListingField.ROOMS, "Nechi xonaligini kiriting"))
+            null -> add(ListingError(ListingField.ROOMS, ValidationStrings.roomCountRequired))
             else -> if (rooms !in 1..MAX_ROOMS) {
-                add(ListingError(ListingField.ROOMS, "Xonalar soni 1 dan $MAX_ROOMS gacha bo'lsin"))
+                add(ListingError(ListingField.ROOMS, ValidationStrings.roomCountRange(MAX_ROOMS)))
             }
         }
 
@@ -269,15 +269,15 @@ object ListingValidator {
         val needed = details.neededTenants
 
         if (current == null) {
-            add(ListingError(ListingField.TENANTS, "Hozir nechi kishi yashashini kiriting"))
+            add(ListingError(ListingField.TENANTS, ValidationStrings.currentTenantsRequired))
         } else if (current !in 0..MAX_TENANTS) {
-            add(ListingError(ListingField.TENANTS, "Hozirgi kishilar soni noto'g'ri"))
+            add(ListingError(ListingField.TENANTS, ValidationStrings.currentTenantsInvalid))
         }
 
         when (needed) {
-            null -> add(ListingError(ListingField.TENANTS, "Nechi kishi kerakligini kiriting"))
+            null -> add(ListingError(ListingField.TENANTS, ValidationStrings.neededTenantsRequired))
             else -> if (needed !in 1..MAX_TENANTS) {
-                add(ListingError(ListingField.TENANTS, "Kamida 1 kishi kerak bo'lsin"))
+                add(ListingError(ListingField.TENANTS, ValidationStrings.neededTenantsMin))
             }
         }
 
@@ -289,20 +289,20 @@ object ListingValidator {
             add(
                 ListingError(
                     ListingField.TENANTS,
-                    "$rooms xonaga $total kishi ko'p — sonlarni tekshiring",
+                    ValidationStrings.tooManyTenants(rooms, total),
                 ),
             )
         }
 
         // MAJBURIY: talaba uchun bu birinchi filtr.
         if (details.gender == null) {
-            add(ListingError(ListingField.GENDER, "Kim uchun ekanini tanlang — qiz yoki o'g'il"))
+            add(ListingError(ListingField.GENDER, ValidationStrings.tenantGenderRequired))
         }
 
         val floor = details.floor
         val totalFloors = details.totalFloors
         if (floor != null && totalFloors != null && floor > totalFloors) {
-            add(ListingError(ListingField.ATTRIBUTES, "Qavat binoning qavatlar sonidan katta"))
+            add(ListingError(ListingField.ATTRIBUTES, ValidationStrings.floorAboveTotal))
         }
     }
 
@@ -316,7 +316,7 @@ object ListingValidator {
     private fun validateService(details: ListingDetails.Service): List<ListingError> = buildList {
         val type = details.serviceType
         if (type == null) {
-            add(ListingError(ListingField.SERVICE_TYPE, "Xizmat sohasini tanlang"))
+            add(ListingError(ListingField.SERVICE_TYPE, ValidationStrings.serviceTypeRequired))
             // Soha tanlanmagan bo'lsa maydonlarni tekshirishning ma'nosi yo'q —
             // qaysi maydonlar kerakligi aynan sohaga bog'liq.
             return@buildList
@@ -325,11 +325,11 @@ object ListingValidator {
         val subjectKey = details.fields[ServiceCatalog.SUBJECT_KEY].orEmpty()
         if (type.hasSubjects) {
             if (subjectKey.isBlank()) {
-                add(ListingError(ListingField.SERVICE_SUBJECT, "${ServiceCatalog.subjectLabel(type)}ni tanlang"))
+                add(ListingError(ListingField.SERVICE_SUBJECT, ValidationStrings.subjectRequired(ServiceCatalog.subjectLabel(type))))
             } else if (subjectKey == ServiceCatalog.OTHER_SUBJECT_KEY &&
                 details.fields[ServiceCatalog.CUSTOM_SUBJECT_KEY].isNullOrBlank()
             ) {
-                add(ListingError(ListingField.SERVICE_SUBJECT, "\"Boshqa\" tanlandi — nomini yozing"))
+                add(ListingError(ListingField.SERVICE_SUBJECT, ValidationStrings.otherSubjectNeedsName))
             }
         }
 
@@ -337,13 +337,13 @@ object ListingValidator {
         val specs = ServiceCatalog.fields(type) + ServiceCatalog.subjectFields(type, subjectKey)
         specs.filter { it.required }.forEach { spec ->
             if (details.fields[spec.key].isNullOrBlank()) {
-                add(ListingError(ListingField.ATTRIBUTES, "\"${spec.label}\" to'ldirilmagan"))
+                add(ListingError(ListingField.ATTRIBUTES, ValidationStrings.attributeEmpty(spec.label)))
             }
         }
 
         val years = details.experienceYears
         if (years != null && years !in 0..60) {
-            add(ListingError(ListingField.ATTRIBUTES, "Tajriba yillari noto'g'ri"))
+            add(ListingError(ListingField.ATTRIBUTES, ValidationStrings.experienceInvalid))
         }
     }
 
@@ -357,39 +357,39 @@ object ListingValidator {
      */
     private fun validateTask(listing: Listing, details: ListingDetails.Task): List<ListingError> = buildList {
         if (details.category == null) {
-            add(ListingError(ListingField.TASK_SUBJECT, "Ish yo'nalishini tanlang"))
+            add(ListingError(ListingField.TASK_SUBJECT, ValidationStrings.taskSubjectRequired))
         } else if (details.typeKey.isBlank()) {
-            add(ListingError(ListingField.TASK_SUBJECT, "Ish turini tanlang"))
+            add(ListingError(ListingField.TASK_SUBJECT, ValidationStrings.taskTypeRequired))
         }
         if (details.typeKey == TaskCatalog.OTHER_KEY && details.customTypeName.isNullOrBlank()) {
-            add(ListingError(ListingField.TASK_SUBJECT, "Ish turini yozing"))
+            add(ListingError(ListingField.TASK_SUBJECT, ValidationStrings.taskTypeNameRequired))
         }
 
         // "Masala sharti" — topshiriqning o'zagi, shuning uchun bu yerda MAJBURIY
         // (boshqa turlarda tavsif ixtiyoriy).
         if (listing.description.isNullOrBlank()) {
-            add(ListingError(ListingField.TASK_BRIEF, "Topshiriq shartini yozing"))
+            add(ListingError(ListingField.TASK_BRIEF, ValidationStrings.taskBriefRequired))
         }
 
         when {
             details.deadline == null ->
-                add(ListingError(ListingField.TASK_DEADLINE, "Topshirish muddatini belgilang"))
+                add(ListingError(ListingField.TASK_DEADLINE, ValidationStrings.taskDeadlineRequired))
 
             details.deadline <= listing.createdAt ->
-                add(ListingError(ListingField.TASK_DEADLINE, "Muddat hozirgi vaqtdan keyin bo'lsin"))
+                add(ListingError(ListingField.TASK_DEADLINE, ValidationStrings.taskDeadlineInFuture))
         }
     }
 
     private fun validateJob(details: ListingDetails.Job): List<ListingError> = buildList {
         if (details.categoryKey.isBlank()) {
-            add(ListingError(ListingField.JOB_CATEGORY, "Ish turini tanlang"))
+            add(ListingError(ListingField.JOB_CATEGORY, ValidationStrings.taskTypeRequired))
         }
         if (details.companyName.isBlank()) {
-            add(ListingError(ListingField.BUSINESS_NAME, "Tashkilot yoki ish beruvchi nomini kiriting"))
+            add(ListingError(ListingField.BUSINESS_NAME, ValidationStrings.businessNameRequired))
         }
 
         if (details.shift == null) {
-            add(ListingError(ListingField.JOB_SHIFT, "Ish smenasini tanlang"))
+            add(ListingError(ListingField.JOB_SHIFT, ValidationStrings.shiftRequired))
         }
 
         val schedule = details.schedule
@@ -399,7 +399,7 @@ object ListingValidator {
         // Erkin grafikda aniq vaqt so'ralmaydi — uning butun mohiyati shu.
         if (details.shift != WorkShift.FLEXIBLE) {
             if (start.isNullOrBlank() || end.isNullOrBlank()) {
-                add(ListingError(ListingField.JOB_SCHEDULE, "Ish vaqti oralig'ini kiriting"))
+                add(ListingError(ListingField.JOB_SCHEDULE, ValidationStrings.scheduleRequired))
             }
         }
 
@@ -407,7 +407,7 @@ object ListingValidator {
             // Kunlik ish — qaysi kuni ekani aytilmasa e'lon foydasiz.
             EmploymentType.DAILY ->
                 if (details.workDate == null) {
-                    add(ListingError(ListingField.JOB_SCHEDULE, "Ish qaysi kuni ekanini belgilang"))
+                    add(ListingError(ListingField.JOB_SCHEDULE, ValidationStrings.workDateRequired))
                 }
 
             // Doimiy ish — haftaning qaysi kunlari ishlanishi kerak.
@@ -415,26 +415,26 @@ object ListingValidator {
                 if (schedule.days.isEmpty() && details.shift != WorkShift.SHIFT_2_2 &&
                     details.shift != WorkShift.SHIFT_1_2 && details.shift != WorkShift.FLEXIBLE
                 ) {
-                    add(ListingError(ListingField.JOB_SCHEDULE, "Ish kunlarini tanlang"))
+                    add(ListingError(ListingField.JOB_SCHEDULE, ValidationStrings.workDaysRequired))
                 }
         }
 
         val hours = schedule.hoursPerDay
         if (hours != null && hours !in 1..24) {
-            add(ListingError(ListingField.JOB_SCHEDULE, "Kunlik soat 1 dan 24 gacha bo'lsin"))
+            add(ListingError(ListingField.JOB_SCHEDULE, ValidationStrings.hoursPerDayRange))
         }
 
         when (val vacancies = details.vacancies) {
-            null -> add(ListingError(ListingField.JOB_PAY, "Nechta odam kerakligini kiriting"))
+            null -> add(ListingError(ListingField.JOB_PAY, ValidationStrings.vacanciesRequired))
             else -> if (vacancies !in 1..MAX_VACANCIES) {
-                add(ListingError(ListingField.JOB_PAY, "Kerakli odamlar soni 1 dan $MAX_VACANCIES gacha"))
+                add(ListingError(ListingField.JOB_PAY, ValidationStrings.vacanciesRange(MAX_VACANCIES)))
             }
         }
 
         val ageFrom = details.ageFrom
         val ageTo = details.ageTo
         if (ageFrom != null && ageTo != null && ageFrom > ageTo) {
-            add(ListingError(ListingField.ATTRIBUTES, "Yosh oralig'i noto'g'ri"))
+            add(ListingError(ListingField.ATTRIBUTES, ValidationStrings.ageRangeInvalid))
         }
     }
 }

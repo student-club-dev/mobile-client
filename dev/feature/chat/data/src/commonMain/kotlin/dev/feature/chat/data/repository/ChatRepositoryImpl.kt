@@ -55,6 +55,7 @@ import kotlinx.datetime.Clock
 import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
 import kotlin.random.Random
+import dev.feature.chat.domain.model.ChatDomainStrings
 
 /**
  * Chat repository'si — REST + WebSocket ustidagi **offline-first** qatlam.
@@ -580,11 +581,11 @@ class ChatRepositoryImpl(
     ): Resource<Unit> {
         if (images.isEmpty()) return Resource.Success(Unit)
         if (images.size > MAX_ALBUM_SIZE) {
-            return errorOf(AppException.Validation("Bir martada $MAX_ALBUM_SIZE tagacha rasm yuboriladi."))
+            return errorOf(AppException.Validation(ChatDomainStrings.albumTooLarge(MAX_ALBUM_SIZE)))
         }
         val text = caption?.trim()?.takeIf { it.isNotEmpty() }
         if (text != null && text.length > SendPayload.MAX_CAPTION) {
-            return errorOf(AppException.Validation("Izoh ${SendPayload.MAX_CAPTION} belgidan uzun bo'lmasin."))
+            return errorOf(AppException.Validation(ChatDomainStrings.captionTooLong(SendPayload.MAX_CAPTION)))
         }
         val me = currentUserId ?: return errorOf(AppException.Unauthorized())
 
@@ -739,7 +740,7 @@ class ChatRepositoryImpl(
         // qolardi va foydalanuvchi sababini bilmasdi.
         if (caption != null && caption.length > SendPayload.MAX_CAPTION) {
             deleteLocalFile(video.path)
-            return errorOf(AppException.Validation("Izoh ${SendPayload.MAX_CAPTION} belgidan uzun bo'lmasin."))
+            return errorOf(AppException.Validation(ChatDomainStrings.captionTooLong(SendPayload.MAX_CAPTION)))
         }
         val messageType = if (video.videoNote) MessageType.VIDEO_NOTE else MessageType.VIDEO
 
@@ -891,7 +892,7 @@ class ChatRepositoryImpl(
             )
         } ?: return fail(
             localId,
-            "Videoni yuborib bo'lmadi — u juda katta yoki formati qo'llab-quvvatlanmaydi.",
+            ChatDomainStrings.videoUnsupported,
         )
 
         val attachment = when (upload) {
@@ -1012,7 +1013,7 @@ class ChatRepositoryImpl(
         } ?: return errorOf(AppException.NotFound())
         // Qayta urinish AYNAN o'sha kalit bilan ketadi — server takror xabar yaratmaydi.
         val clientMsgId = message.clientMsgId
-            ?: return errorOf(AppException.Unknown("Bu xabarni qayta yuborib bo'lmaydi."))
+            ?: return errorOf(AppException.Unknown(ChatDomainStrings.cantResend))
 
         withContext(dispatchers.io) { q.setMessageStatus(MessageStatus.SENDING.name, message.id) }
 
@@ -1020,7 +1021,7 @@ class ChatRepositoryImpl(
         // Fayl yuklanmay qolgan bo'lsa `attachmentId` bo'sh — avval yuklashni takrorlaymiz.
         if (type == MessageType.IMAGE && message.attachmentId == null) {
             val bytes = localImages.value[message.id]
-                ?: return fail(message.id, "Rasm topilmadi — uni qaytadan tanlang")
+                ?: return fail(message.id, ChatDomainStrings.imageMissing)
             return uploadAndDeliver(
                 conversationId = message.conversationId,
                 item = PendingImage(
@@ -1036,7 +1037,7 @@ class ChatRepositoryImpl(
         // urinishning ma'nosi yo'q — foydalanuvchi videoni qaytadan tanlashi kerak.
         if (type == MessageType.VIDEO && message.attachmentId == null) {
             val video = localVideos.value[message.id]
-                ?: return fail(message.id, "Video topilmadi — uni qaytadan tanlang")
+                ?: return fail(message.id, ChatDomainStrings.videoMissing)
             return uploadAndDeliverVideo(
                 conversationId = message.conversationId,
                 video = video,
@@ -1098,7 +1099,7 @@ class ChatRepositoryImpl(
             }
             // WS xatosi konvertsiz keladi (`{ code, message }`) — matnni to'g'ridan-to'g'ri
             // ko'rsatamiz; `NOT_CONNECTED` uchun server tushunarli matn beradi.
-            return fail(localId, ack.error?.text ?: "Xabar yuborilmadi")
+            return fail(localId, ack.error?.text ?: ChatDomainStrings.sendFailed)
         }
 
         // WS ulanmagan / ack kelmadi → zaxira yo'l.

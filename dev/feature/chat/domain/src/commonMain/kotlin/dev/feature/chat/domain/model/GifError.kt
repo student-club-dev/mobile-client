@@ -19,7 +19,7 @@ enum class GifErrorKind(val userMessage: String, val retriable: Boolean) {
      * yo'l yo'q — shuning uchun uni "sekinroq harakat qiling" deb ayblamaymiz.
      */
     PROVIDER_RATE_LIMITED(
-        "GIF xizmati hozir band. Bir-ikki daqiqadan so'ng qayta urining.",
+        ChatDomainStrings.gifBusy,
         retriable = true,
     ),
 
@@ -28,7 +28,7 @@ enum class GifErrorKind(val userMessage: String, val retriable: Boolean) {
      * foydalanuvchiga bog'liq: yozishni sekinlashtirsa o'tib ketadi.
      */
     RATE_LIMITED(
-        "Juda tez qidiryapsiz. Biroz sekinroq urinib ko'ring.",
+        ChatDomainStrings.searchTooFast,
         retriable = true,
     ),
 
@@ -38,7 +38,7 @@ enum class GifErrorKind(val userMessage: String, val retriable: Boolean) {
      * foydalanuvchi buni tushunarli ko'rishi kerak — bo'sh ekran emas.
      */
     PROVIDER_UNAVAILABLE(
-        "GIF qidiruvi hozir ishlamayapti. Keyinroq urinib ko'ring.",
+        ChatDomainStrings.gifUnavailable,
         retriable = true,
     ),
 
@@ -51,19 +51,19 @@ enum class GifErrorKind(val userMessage: String, val retriable: Boolean) {
      * shuning uchun u xato matnini ko'rsatadi.
      */
     PROVIDER_NOT_CONFIGURED(
-        "GIF qidiruvi bu ilovada sozlanmagan.",
+        ChatDomainStrings.gifNotConfigured,
         retriable = false,
     ),
 
     /** Internet yo'q / so'rov uzildi. */
     NETWORK(
-        "Internet aloqasi yo'q. Ulanishni tekshirib, qayta urining.",
+        ChatDomainStrings.noInternet,
         retriable = true,
     ),
 
     /** Qolgan hammasi (401 ham shu yerga tushmaydi — u umumiy oqimda hal bo'ladi). */
     UNKNOWN(
-        "GIF qidiruvida xatolik. Qayta urining.",
+        ChatDomainStrings.gifError,
         retriable = true,
     ),
 }

@@ -52,7 +52,7 @@ data class ListingFilters(
             ListingKind.RENTAL -> {
                 gender?.let { add(it.label) }
                 propertyType?.let { add(it.label) }
-                minRooms?.let { add("$it+ xona") }
+                minRooms?.let { add(ListingText.roomsPlus(it)) }
                 if (onlyAvailable) add("Joyi bor")
             }
 
@@ -80,7 +80,7 @@ data class ListingFilters(
 
             ListingKind.DISCOUNT -> Unit
         }
-        maxPrice?.let { add("${it.formatSum()} gacha") }
+        maxPrice?.let { add(ListingText.upTo(it.formatSum())) }
     }
 
     /**

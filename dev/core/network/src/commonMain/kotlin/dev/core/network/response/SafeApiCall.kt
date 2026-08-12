@@ -119,10 +119,10 @@ fun HttpStatusCode.toAppException(cause: Throwable? = null): AppException {
         in 500..599 -> AppException.Server(
             code = value,
             cause = cause,
-            reason = "Serverda xatolik — $label ($value). Birozdan so'ng qayta urining.",
+            reason = NetworkStrings.serverError(label, value),
         )
         else -> AppException.Validation(
-            reason = "So'rov qabul qilinmadi — $label ($value).",
+            reason = NetworkStrings.rejectedWithLabel(label, value),
             cause = cause,
         )
     }

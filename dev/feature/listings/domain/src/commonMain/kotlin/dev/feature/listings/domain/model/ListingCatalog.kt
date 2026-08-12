@@ -6,7 +6,7 @@ package dev.feature.listings.domain.model
  * ([ListingCatalog.attributes]) aynan shunga bog'liq.
  */
 enum class BusinessType(
-    val label: String,
+    private val labelUz: String,
     val emoji: String,
     val accent: Long,
     val defaultPriceUnit: PriceUnit,
@@ -18,10 +18,16 @@ enum class BusinessType(
     EDUCATION_CENTER("O'quv markaz", "📚", 0xFF3B82F6, PriceUnit.PER_MONTH),
     ENTERTAINMENT("Kino va ko'ngilochar", "🎬", 0xFFEF4444, PriceUnit.PER_TICKET),
     ELECTRONICS("Texnikalar", "💻", 0xFF06B6D4, PriceUnit.PER_ITEM),
+    ;
+
+    val label: String get() = trListing(labelUz)
 }
 
 /** Biznes turi ichidagi bo'lim: "Pitsa", "PS5", "IELTS kurslari". */
-data class ListingCategory(val key: String, val label: String)
+data class ListingCategory(val key: String, private val labelUz: String) {
+    /** Ko'rsatiladigan nom — joriy tilda ([trListing]). */
+    val label: String get() = trListing(labelUz)
+}
 
 /** Turga xos maydonning kiritish usuli. */
 enum class AttributeKind {
@@ -43,14 +49,19 @@ enum class AttributeKind {
  */
 data class AttributeSpec(
     val key: String,
-    val label: String,
+    private val labelUz: String,
     val kind: AttributeKind,
-    val hint: String = "",
-    val options: List<String> = emptyList(),
+    private val hintUz: String = "",
+    private val optionsUz: List<String> = emptyList(),
     val required: Boolean = false,
     /** Raqamli maydon uchun o'lchov birligi ("gramm", "oy", "daqiqa"). */
-    val suffix: String? = null,
-)
+    private val suffixUz: String? = null,
+) {
+    val label: String get() = trListing(labelUz)
+    val hint: String get() = if (hintUz.isEmpty()) "" else trListing(hintUz)
+    val options: List<String> get() = optionsUz.map(::trListing)
+    val suffix: String? get() = suffixUz?.let(::trListing)
+}
 
 /**
  * Biznes turlarining kategoriyalari va maydonlari — `DISCOUNTS_BUSINESS_API.md` §4 dan.
@@ -98,36 +109,36 @@ object ListingCatalog {
 
     private val gameClubCategoryAttributes: Map<String, List<AttributeSpec>> = mapOf(
         "PLAYSTATION" to listOf(
-            AttributeSpec("model", "Model", AttributeKind.SELECT, options = listOf("PS5", "PS4 Pro", "PS4", "PS3"), required = true),
-            AttributeSpec("joysticks", "Joystiklar", AttributeKind.SELECT, options = listOf("2 ta", "4 ta")),
-            AttributeSpec("sessionMinutes", "Sessiya davomiyligi", AttributeKind.NUMBER, hint = "60", suffix = "daqiqa"),
-            AttributeSpec("games", "Mashhur o'yinlar", AttributeKind.TAGS, hint = "FIFA 25, Mortal Kombat, UFC"),
+            AttributeSpec("model", "Model", AttributeKind.SELECT, optionsUz = listOf("PS5", "PS4 Pro", "PS4", "PS3"), required = true),
+            AttributeSpec("joysticks", "Joystiklar", AttributeKind.SELECT, optionsUz = listOf("2 ta", "4 ta")),
+            AttributeSpec("sessionMinutes", "Sessiya davomiyligi", AttributeKind.NUMBER, hintUz = "60", suffixUz = "daqiqa"),
+            AttributeSpec("games", "Mashhur o'yinlar", AttributeKind.TAGS, hintUz = "FIFA 25, Mortal Kombat, UFC"),
         ),
         "TABLE_TENNIS" to listOf(
-            AttributeSpec("tables", "Stollar soni", AttributeKind.NUMBER, hint = "2", suffix = "ta"),
-            AttributeSpec("sessionMinutes", "Sessiya davomiyligi", AttributeKind.NUMBER, hint = "60", suffix = "daqiqa"),
+            AttributeSpec("tables", "Stollar soni", AttributeKind.NUMBER, hintUz = "2", suffixUz = "ta"),
+            AttributeSpec("sessionMinutes", "Sessiya davomiyligi", AttributeKind.NUMBER, hintUz = "60", suffixUz = "daqiqa"),
             AttributeSpec("racketsIncluded", "Raketka va koptok beriladi", AttributeKind.BOOLEAN),
         ),
         "TENNIS" to listOf(
-            AttributeSpec("courtType", "Kort turi", AttributeKind.SELECT, options = listOf("Ochiq", "Yopiq"), required = true),
-            AttributeSpec("surface", "Qoplama", AttributeKind.SELECT, options = listOf("Gruntli", "Sun'iy o't", "Qattiq (hard)")),
-            AttributeSpec("sessionMinutes", "Sessiya davomiyligi", AttributeKind.NUMBER, hint = "60", suffix = "daqiqa"),
+            AttributeSpec("courtType", "Kort turi", AttributeKind.SELECT, optionsUz = listOf("Ochiq", "Yopiq"), required = true),
+            AttributeSpec("surface", "Qoplama", AttributeKind.SELECT, optionsUz = listOf("Gruntli", "Sun'iy o't", "Qattiq (hard)")),
+            AttributeSpec("sessionMinutes", "Sessiya davomiyligi", AttributeKind.NUMBER, hintUz = "60", suffixUz = "daqiqa"),
             AttributeSpec("gearIncluded", "Raketka beriladi", AttributeKind.BOOLEAN),
         ),
         "PC_GAMING" to listOf(
-            AttributeSpec("pcTier", "Kompyuter quvvati", AttributeKind.SELECT, options = listOf("Standart", "Gaming", "Pro / e-sport"), required = true),
-            AttributeSpec("sessionMinutes", "Sessiya davomiyligi", AttributeKind.NUMBER, hint = "60", suffix = "daqiqa"),
-            AttributeSpec("games", "O'yinlar", AttributeKind.TAGS, hint = "CS2, Dota 2, Valorant"),
+            AttributeSpec("pcTier", "Kompyuter quvvati", AttributeKind.SELECT, optionsUz = listOf("Standart", "Gaming", "Pro / e-sport"), required = true),
+            AttributeSpec("sessionMinutes", "Sessiya davomiyligi", AttributeKind.NUMBER, hintUz = "60", suffixUz = "daqiqa"),
+            AttributeSpec("games", "O'yinlar", AttributeKind.TAGS, hintUz = "CS2, Dota 2, Valorant"),
         ),
         "BILLIARDS" to listOf(
-            AttributeSpec("tableType", "Stol turi", AttributeKind.SELECT, options = listOf("Pul (Amerika)", "Rus", "Snuker"), required = true),
-            AttributeSpec("tables", "Stollar soni", AttributeKind.NUMBER, hint = "3", suffix = "ta"),
-            AttributeSpec("sessionMinutes", "Sessiya davomiyligi", AttributeKind.NUMBER, hint = "60", suffix = "daqiqa"),
+            AttributeSpec("tableType", "Stol turi", AttributeKind.SELECT, optionsUz = listOf("Pul (Amerika)", "Rus", "Snuker"), required = true),
+            AttributeSpec("tables", "Stollar soni", AttributeKind.NUMBER, hintUz = "3", suffixUz = "ta"),
+            AttributeSpec("sessionMinutes", "Sessiya davomiyligi", AttributeKind.NUMBER, hintUz = "60", suffixUz = "daqiqa"),
         ),
         "POLYA" to listOf(
-            AttributeSpec("fieldType", "Maydon turi", AttributeKind.SELECT, options = listOf("Mini-futbol", "Basketbol", "Voleybol", "Boshqa")),
-            AttributeSpec("fields", "Maydonlar soni", AttributeKind.NUMBER, hint = "2", suffix = "ta"),
-            AttributeSpec("sessionMinutes", "Sessiya davomiyligi", AttributeKind.NUMBER, hint = "60", suffix = "daqiqa"),
+            AttributeSpec("fieldType", "Maydon turi", AttributeKind.SELECT, optionsUz = listOf("Mini-futbol", "Basketbol", "Voleybol", "Boshqa")),
+            AttributeSpec("fields", "Maydonlar soni", AttributeKind.NUMBER, hintUz = "2", suffixUz = "ta"),
+            AttributeSpec("sessionMinutes", "Sessiya davomiyligi", AttributeKind.NUMBER, hintUz = "60", suffixUz = "daqiqa"),
         ),
     )
 
@@ -250,51 +261,51 @@ object ListingCatalog {
      */
     private val attributeMap: Map<BusinessType, List<AttributeSpec>> = mapOf(
         BusinessType.GAME_CLUB to listOf(
-            AttributeSpec("hallType", "Zal turi", AttributeKind.SELECT, options = listOf("Standart", "VIP", "Alohida xona")),
-            AttributeSpec("deviceModel", "Qurilma", AttributeKind.TEXT, hint = "PlayStation 5 Slim"),
-            AttributeSpec("seatsCount", "Nechta o'yinchi", AttributeKind.NUMBER, hint = "4", suffix = "kishi"),
-            AttributeSpec("sessionMinutes", "Sessiya davomiyligi", AttributeKind.NUMBER, hint = "60", suffix = "daqiqa"),
-            AttributeSpec("gamesList", "O'yinlar", AttributeKind.TAGS, hint = "FIFA 25, Mortal Kombat"),
+            AttributeSpec("hallType", "Zal turi", AttributeKind.SELECT, optionsUz = listOf("Standart", "VIP", "Alohida xona")),
+            AttributeSpec("deviceModel", "Qurilma", AttributeKind.TEXT, hintUz = "PlayStation 5 Slim"),
+            AttributeSpec("seatsCount", "Nechta o'yinchi", AttributeKind.NUMBER, hintUz = "4", suffixUz = "kishi"),
+            AttributeSpec("sessionMinutes", "Sessiya davomiyligi", AttributeKind.NUMBER, hintUz = "60", suffixUz = "daqiqa"),
+            AttributeSpec("gamesList", "O'yinlar", AttributeKind.TAGS, hintUz = "FIFA 25, Mortal Kombat"),
         ),
         BusinessType.GROCERY to listOf(
-            AttributeSpec("brand", "Brend", AttributeKind.TEXT, hint = "Nestlé"),
-            AttributeSpec("weightGrams", "Og'irlik / hajm", AttributeKind.NUMBER, hint = "500", suffix = "gramm"),
-            AttributeSpec("expiryDate", "Yaroqlilik muddati", AttributeKind.TEXT, hint = "2026-12-01"),
+            AttributeSpec("brand", "Brend", AttributeKind.TEXT, hintUz = "Nestlé"),
+            AttributeSpec("weightGrams", "Og'irlik / hajm", AttributeKind.NUMBER, hintUz = "500", suffixUz = "gramm"),
+            AttributeSpec("expiryDate", "Yaroqlilik muddati", AttributeKind.TEXT, hintUz = "2026-12-01"),
             AttributeSpec("isHalal", "Halol", AttributeKind.BOOLEAN),
-            AttributeSpec("stockCount", "Qoldiq", AttributeKind.NUMBER, hint = "40", suffix = "dona"),
+            AttributeSpec("stockCount", "Qoldiq", AttributeKind.NUMBER, hintUz = "40", suffixUz = "dona"),
         ),
         BusinessType.CLOTHING to listOf(
-            AttributeSpec("brand", "Brend", AttributeKind.TEXT, hint = "Zara"),
-            AttributeSpec("gender", "Kimlar uchun", AttributeKind.SELECT, options = listOf("Erkaklar", "Ayollar", "Uniseks", "Bolalar")),
-            AttributeSpec("material", "Material", AttributeKind.TEXT, hint = "100% paxta"),
-            AttributeSpec("season", "Mavsum", AttributeKind.SELECT, options = listOf("Qish", "Bahor", "Yoz", "Kuz", "Barcha mavsum")),
+            AttributeSpec("brand", "Brend", AttributeKind.TEXT, hintUz = "Zara"),
+            AttributeSpec("gender", "Kimlar uchun", AttributeKind.SELECT, optionsUz = listOf("Erkaklar", "Ayollar", "Uniseks", "Bolalar")),
+            AttributeSpec("material", "Material", AttributeKind.TEXT, hintUz = "100% paxta"),
+            AttributeSpec("season", "Mavsum", AttributeKind.SELECT, optionsUz = listOf("Qish", "Bahor", "Yoz", "Kuz", "Barcha mavsum")),
         ),
         BusinessType.CAFE_RESTAURANT to listOf(
-            AttributeSpec("portionGrams", "Porsiya", AttributeKind.NUMBER, hint = "550", suffix = "gramm"),
-            AttributeSpec("ingredients", "Tarkibi", AttributeKind.TAGS, hint = "Mozzarella, Pepperoni, Tomat sousi"),
-            AttributeSpec("spicyLevel", "O'tkirlik", AttributeKind.SELECT, options = listOf("Yo'q", "Yengil", "O'rtacha", "O'tkir")),
+            AttributeSpec("portionGrams", "Porsiya", AttributeKind.NUMBER, hintUz = "550", suffixUz = "gramm"),
+            AttributeSpec("ingredients", "Tarkibi", AttributeKind.TAGS, hintUz = "Mozzarella, Pepperoni, Tomat sousi"),
+            AttributeSpec("spicyLevel", "O'tkirlik", AttributeKind.SELECT, optionsUz = listOf("Yo'q", "Yengil", "O'rtacha", "O'tkir")),
             AttributeSpec("isHalal", "Halol", AttributeKind.BOOLEAN),
             AttributeSpec("hasDelivery", "Yetkazib berish bor", AttributeKind.BOOLEAN),
         ),
         BusinessType.EDUCATION_CENTER to listOf(
-            AttributeSpec("subject", "Yo'nalish", AttributeKind.TEXT, hint = "Ingliz tili — IELTS 6.5+"),
-            AttributeSpec("level", "Daraja", AttributeKind.SELECT, options = listOf("Boshlang'ich", "O'rta", "Yuqori")),
-            AttributeSpec("format", "Format", AttributeKind.SELECT, options = listOf("Offline", "Online", "Aralash")),
-            AttributeSpec("durationMonths", "Davomiyligi", AttributeKind.NUMBER, hint = "3", suffix = "oy"),
-            AttributeSpec("lessonsPerWeek", "Haftada", AttributeKind.NUMBER, hint = "3", suffix = "marta"),
+            AttributeSpec("subject", "Yo'nalish", AttributeKind.TEXT, hintUz = "Ingliz tili — IELTS 6.5+"),
+            AttributeSpec("level", "Daraja", AttributeKind.SELECT, optionsUz = listOf("Boshlang'ich", "O'rta", "Yuqori")),
+            AttributeSpec("format", "Format", AttributeKind.SELECT, optionsUz = listOf("Offline", "Online", "Aralash")),
+            AttributeSpec("durationMonths", "Davomiyligi", AttributeKind.NUMBER, hintUz = "3", suffixUz = "oy"),
+            AttributeSpec("lessonsPerWeek", "Haftada", AttributeKind.NUMBER, hintUz = "3", suffixUz = "marta"),
             AttributeSpec("hasFreeTrialLesson", "Birinchi dars bepul", AttributeKind.BOOLEAN),
         ),
         BusinessType.ENTERTAINMENT to listOf(
-            AttributeSpec("eventTitle", "Film / tadbir nomi", AttributeKind.TEXT, hint = "Dune: Part Three"),
-            AttributeSpec("format", "Format", AttributeKind.SELECT, options = listOf("2D", "3D", "IMAX", "4DX", "VR")),
-            AttributeSpec("language", "Til", AttributeKind.SELECT, options = listOf("O'zbek", "Rus", "Ingliz", "Original (subtitr)")),
-            AttributeSpec("ageLimit", "Yosh chegarasi", AttributeKind.SELECT, options = listOf("0+", "6+", "12+", "16+", "18+")),
-            AttributeSpec("sessionTimes", "Seans vaqtlari", AttributeKind.TAGS, hint = "12:30, 16:00, 19:40"),
+            AttributeSpec("eventTitle", "Film / tadbir nomi", AttributeKind.TEXT, hintUz = "Dune: Part Three"),
+            AttributeSpec("format", "Format", AttributeKind.SELECT, optionsUz = listOf("2D", "3D", "IMAX", "4DX", "VR")),
+            AttributeSpec("language", "Til", AttributeKind.SELECT, optionsUz = listOf("O'zbek", "Rus", "Ingliz", "Original (subtitr)")),
+            AttributeSpec("ageLimit", "Yosh chegarasi", AttributeKind.SELECT, optionsUz = listOf("0+", "6+", "12+", "16+", "18+")),
+            AttributeSpec("sessionTimes", "Seans vaqtlari", AttributeKind.TAGS, hintUz = "12:30, 16:00, 19:40"),
         ),
         BusinessType.ELECTRONICS to listOf(
-            AttributeSpec("brand", "Brend", AttributeKind.TEXT, hint = "Apple"),
-            AttributeSpec("condition", "Holati", AttributeKind.SELECT, options = listOf("Yangi", "Qayta tiklangan", "Ishlatilgan")),
-            AttributeSpec("warrantyMonths", "Kafolat", AttributeKind.NUMBER, hint = "12", suffix = "oy"),
+            AttributeSpec("brand", "Brend", AttributeKind.TEXT, hintUz = "Apple"),
+            AttributeSpec("condition", "Holati", AttributeKind.SELECT, optionsUz = listOf("Yangi", "Qayta tiklangan", "Ishlatilgan")),
+            AttributeSpec("warrantyMonths", "Kafolat", AttributeKind.NUMBER, hintUz = "12", suffixUz = "oy"),
             AttributeSpec("hasInstallment", "Muddatli to'lov bor", AttributeKind.BOOLEAN),
         ),
     )

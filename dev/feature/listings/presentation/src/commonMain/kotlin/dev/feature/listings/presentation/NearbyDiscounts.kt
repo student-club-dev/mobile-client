@@ -86,13 +86,13 @@ fun NearbyDiscountsSection(
     Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(9.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text(
-                "Yaqin atrofdagi chegirmalar",
+                lt("Yaqin atrofdagi chegirmalar"),
                 style = TextStyle(fontFamily = AppFontFamily, fontSize = 14.sp, fontWeight = FontWeight.ExtraBold, color = palette.ink),
                 modifier = Modifier.weight(1f),
             )
             if (userLocation == null) {
                 Text(
-                    "joylashuv o'chiq",
+                    lt("joylashuv o'chiq"),
                     style = TextStyle(fontFamily = AppFontFamily, fontSize = 10.5f.sp, color = palette.inkFaint),
                 )
             }
@@ -140,7 +140,7 @@ private fun NearbyDiscountCard(
 
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(
-                    "${listing.finalPrice.formatSum()} so'm",
+                    "${listing.finalPrice.formatSum()} ${currency()}",
                     style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.5f.sp, fontWeight = FontWeight.Black, color = palette.successDeep),
                 )
                 // Chizilgan asl narx faqat chegirma bo'lganda ma'noli — aks holda bir xil

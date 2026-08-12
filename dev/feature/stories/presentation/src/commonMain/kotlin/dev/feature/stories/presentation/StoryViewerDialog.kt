@@ -136,7 +136,7 @@ internal fun StoryViewerDialog(
                 // qolib, foydalanuvchi sababini bilmasdi.
                 Box(Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
                     ScText(
-                        "Bu hikoyaning fayli saqlanmagan — arxivda faqat yozuvi qoldi.",
+                        storiesStrings().mediaMissing,
                         14f,
                         FontWeight.Medium,
                         Color.White,
@@ -234,7 +234,7 @@ internal fun StoryViewerDialog(
                                 ScText(
                                     // Nol — "0 marta ko'rilgan" emas: son sifatida u
                                     // ma'nosiz va sovuq ko'rinardi.
-                                    if (views == 0) "Hali hech kim ko'rmagan" else "$views marta ko'rilgan",
+                                    if (views == 0) storiesStrings().noViewsYet else storiesStrings().viewCount(views),
                                     11f,
                                     FontWeight.Medium,
                                     Color.White.copy(alpha = 0.75f),
@@ -248,7 +248,7 @@ internal fun StoryViewerDialog(
                         // Loyihada alohida "trash" ikonkasi yo'q — chatda ham o'chirish
                         // `Close` bilan ko'rsatiladi (`ChatScreen`dagi ActionRow).
                         ScText(
-                            "O'chirish",
+                            storiesStrings().delete,
                             12f,
                             FontWeight.Bold,
                             Color.White,
@@ -259,7 +259,7 @@ internal fun StoryViewerDialog(
                     }
                     Icon(
                         ScIcons.Close,
-                        "Yopish",
+                        storiesStrings().close,
                         tint = Color.White,
                         modifier = Modifier.size(20.dp).clickable(onClick = onClose),
                     )
@@ -412,21 +412,21 @@ private fun DeleteConfirm(onCancel: () -> Unit, onConfirm: () -> Unit) {
             Modifier.clip(RoundedCornerShape(20.dp)).background(Sc.Card).padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            ScText("Hikoyani o'chirasizmi?", 16f, FontWeight.ExtraBold, Sc.Ink)
+            ScText(storiesStrings().deleteTitle, 16f, FontWeight.ExtraBold, Sc.Ink)
             // Story TAHRIRLANMAYDI — o'chirib, qaytadan qo'yiladi (§7).
             ScText(
-                "Hikoya darhol yo'qoladi. Tahrirlash imkoni yo'q — o'chirib, qaytadan qo'yish kerak.",
+                storiesStrings().deleteBody,
                 13f,
                 FontWeight.Medium,
                 Sc.Muted,
             )
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 ScText(
-                    "Bekor qilish", 14f, FontWeight.Bold, Sc.Muted,
+                    storiesStrings().cancel, 14f, FontWeight.Bold, Sc.Muted,
                     Modifier.weight(1f).clickable(onClick = onCancel).padding(vertical = 8.dp),
                 )
                 ScText(
-                    "O'chirish", 14f, FontWeight.ExtraBold, Sc.Danger,
+                    storiesStrings().delete, 14f, FontWeight.ExtraBold, Sc.Danger,
                     Modifier.weight(1f).clickable(onClick = onConfirm).padding(vertical = 8.dp),
                 )
             }

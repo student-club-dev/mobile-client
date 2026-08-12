@@ -35,6 +35,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import dev.core.uikit.theme.Sc
+import dev.core.uikit.locale.uiStrings
 
 /**
  * Klaviatura USTIDA suzuvchi qidiruv qatlami — ilovadagi barcha ekranlar uchun yagona
@@ -118,7 +119,7 @@ fun ScSearchOverlay(
             ScCircleButton(
                 ScIcons.Close, { keyboard?.hide(); onClose() },
                 size = 48.dp, background = Sc.Card.copy(alpha = 0.92f),
-                tint = Sc.InkSoft, contentDescription = "Yopish",
+                tint = Sc.InkSoft, contentDescription = uiStrings().close,
             )
         }
 

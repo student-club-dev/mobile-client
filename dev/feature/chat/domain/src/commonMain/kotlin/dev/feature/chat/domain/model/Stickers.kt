@@ -89,7 +89,7 @@ object StickerCatalog {
     val packs: List<StickerPack> by lazy {
         val student = StickerPack(
             id = "student",
-            name = "Talaba",
+            name = ChatDomainStrings.student,
             cover = "🎓",
             coverUrl = FluentEmoji.urlFor("🎓"),
             stickers = STUDENT_EMOJIS.map { emoji ->
@@ -116,7 +116,7 @@ object StickerCatalog {
     fun findByEmoji(emoji: String): Sticker? = byEmoji[emoji.trim()]
 
     private val byEmoji: Map<String, Sticker> by lazy {
-        // Bir xil emoji "Talaba" paketida ham, guruh paketida ham bor — birinchisi qoladi
+        // Bir xil emoji ChatDomainStrings.student paketida ham, guruh paketida ham bor — birinchisi qoladi
         // (`associateBy` teskarisini qilardi: oxirgisi g'olib chiqardi).
         buildMap {
             all.forEach { sticker -> if (!containsKey(sticker.emoji)) put(sticker.emoji, sticker) }

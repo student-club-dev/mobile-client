@@ -1,4 +1,5 @@
 package dev.core.common.format
+import dev.core.common.locale.AppLocale
 
 /**
  * Telefon raqami va summaning YAGONA qolipi. Butun ilova shu yerdagi qoidalarga tayanadi:
@@ -92,8 +93,11 @@ fun formatAmount(digits: String): String {
 /** "55000" → "55 000". Narxni o'qish uchun. */
 fun Long.formatAmount(): String = formatAmount(toString())
 
-/** Summani birligi bilan: "90 000 so'm". Summa bo'sh bo'lsa — bo'sh satr. */
-fun formatAmountWithUnit(digits: String, unit: String = "so'm"): String {
+/** Pul birligi — joriy tilda ("UZS" / "сум" / "so'm"). */
+fun currencyUnit(): String = AppLocale.pick(en = "UZS", ru = "сум", uz = "so'm")
+
+/** Summani birligi bilan: "90 000 UZS". Summa bo'sh bo'lsa — bo'sh satr. */
+fun formatAmountWithUnit(digits: String, unit: String = currencyUnit()): String {
     val formatted = formatAmount(digits)
     return if (formatted.isEmpty()) "" else "$formatted $unit"
 }

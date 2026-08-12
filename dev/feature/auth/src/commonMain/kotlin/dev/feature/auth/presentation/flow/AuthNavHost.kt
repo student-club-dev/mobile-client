@@ -30,6 +30,8 @@ import dev.feature.auth.presentation.main.StudentShell
 import dev.feature.auth.presentation.screens.WelcomeScreen
 import kotlinx.coroutines.launch
 import org.koin.compose.viewmodel.koinViewModel
+import dev.feature.auth.presentation.screens.authStringsNow
+import dev.feature.auth.presentation.screens.authStrings
 
 private object Route {
     const val ONBOARDING = "onboarding"
@@ -117,7 +119,7 @@ fun AuthNavHost(vm: AuthFlowViewModel = koinViewModel()) {
                 is GoogleSignInResult.Success -> vm.signInWithGoogle(result.idToken)
                 is GoogleSignInResult.Failed -> vm.showAuthError(result.message)
                 GoogleSignInResult.Unavailable ->
-                    vm.showAuthError("Bu qurilmada Google bilan kirish sozlanmagan.")
+                    vm.showAuthError(authStringsNow().googleNotConfigured)
                 // Foydalanuvchi o'zi bekor qildi — xato ko'rsatilmaydi.
                 GoogleSignInResult.Cancelled -> vm.cancelExternalAuth()
             }
@@ -216,8 +218,8 @@ fun AuthNavHost(vm: AuthFlowViewModel = koinViewModel()) {
             OtpScreen(
                 state = state, vm = vm,
                 onBack = { nav.popBackStack() },
-                title = "Tiklash kodi",
-                confirmLabel = "Davom etish",
+                title = authStrings().resetCode,
+                confirmLabel = authStrings().proceed,
                 onVerify = vm::confirmResetCode,
                 onResend = vm::resendCode,
             )

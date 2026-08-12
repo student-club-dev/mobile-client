@@ -15,6 +15,7 @@ import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import io.github.aakira.napier.Napier
+import dev.feature.calls.domain.model.CallStrings
 
 /**
  * Jonli qo'ng'iroq davomida ishlaydigan old plan xizmati.
@@ -96,8 +97,8 @@ class CallForegroundService : Service() {
             )
         }
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle(peerName.ifBlank { "Qo'ng'iroq" })
-            .setContentText("Qo'ng'iroq davom etmoqda")
+            .setContentTitle(peerName.ifBlank { CallStrings.ongoingCall })
+            .setContentText(CallStrings.ongoingCallBody)
             .setSmallIcon(android.R.drawable.stat_sys_phone_call)
             .setCategory(NotificationCompat.CATEGORY_CALL)
             .setOngoing(true)
@@ -112,7 +113,7 @@ class CallForegroundService : Service() {
         manager.createNotificationChannel(
             NotificationChannel(
                 CHANNEL_ID,
-                "Qo'ng'iroqlar",
+                CallStrings.callsChannel,
                 // `LOW` — ovoz va tebranish kerak emas: qo'ng'iroqning o'zi allaqachon
                 // jiringlab turibdi, bildirishnoma faqat holatni ko'rsatadi.
                 NotificationManager.IMPORTANCE_LOW,

@@ -8,7 +8,7 @@ package dev.feature.listings.domain.model
  * ro'yxatda ularni topib bo'lmaydi. Kategoriya esa talaba o'ylaydigan tabiiy bo'linish:
  * "menga yozma ish kerak" yoki "menga masala yechib berish kerak".
  */
-enum class TaskCategory(val label: String, val emoji: String) {
+enum class TaskCategory(private val labelUz: String, val emoji: String) {
     WRITTEN("Yozma ishlar", "📝"),
     PRESENTATION("Prezentatsiya va taqdimot", "🖥️"),
     EXACT("Aniq fanlardan masalalar", "📐"),
@@ -16,7 +16,11 @@ enum class TaskCategory(val label: String, val emoji: String) {
     DRAWING("Chizmachilik va texnik ishlar", "📏"),
     HANDWRITING("Qo'lyozma ishlar", "✍️"),
     TRANSLATION("Tarjima va til", "🌐"),
-    CALC("Hisob-kitob va formatlash", "📊"),
+    CALC("Hisob-kitob va formatlash", "📊")
+
+    ;
+
+    val label: String get() = trListing(labelUz)
 }
 
 /**

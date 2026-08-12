@@ -15,6 +15,7 @@ import io.ktor.client.request.get
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
+import dev.core.common.locale.AppLocale
 
 class ClubRepositoryImpl(
     private val client: HttpClient,
@@ -35,7 +36,7 @@ class ClubRepositoryImpl(
         }
         Resource.Success(dtos.map { it.toDomain() })
     } catch (e: Exception) {
-        Resource.Error(e.message ?: "Klublarni yuklab bo'lmadi", e)
+        Resource.Error(e.message ?: AppLocale.pick(en = "Couldn't load clubs", ru = "Не удалось загрузить клубы", uz = "Klublarni yuklab bo'lmadi"), e)
     }
 
     override suspend fun setJoined(id: Long, joined: Boolean) = withContext(dispatchers.io) {

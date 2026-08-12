@@ -47,6 +47,7 @@ import dev.feature.auth.presentation.flow.AuthFlowState
 import dev.feature.auth.presentation.flow.AuthFlowViewModel
 import dev.core.uikit.theme.AppPalette
 import dev.core.uikit.theme.appPalette
+import dev.feature.auth.presentation.screens.authStrings
 
 // ===========================================================================
 // 1d — ONBOARDING
@@ -61,7 +62,7 @@ fun OnboardingScreen(
     AppScreenScaffold(topPadding = 52) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
             Text(
-                "O‘tkazib yuborish",
+                authStrings().skip,
                 modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickableNoRipple(onSkip)
                     .padding(4.dp),
                 style = TextStyle(
@@ -100,13 +101,13 @@ fun OnboardingScreen(
             }
             FloatingChip(
                 "🍕",
-                "Buyurtma",
+                authStrings().order,
                 Modifier.align(Alignment.TopStart).offset(x = 4.dp, y = 40.dp),
                 palette
             )
             FloatingChip(
                 "📚",
-                "AI Muallim",
+                authStrings().aiTutor,
                 Modifier.align(Alignment.CenterEnd).offset(x = (-4).dp, y = 30.dp),
                 palette
             )
@@ -127,7 +128,7 @@ fun OnboardingScreen(
             horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()
         ) {
             Text(
-                "Hamma xizmat bitta ilovada",
+                authStrings().onboardingTitle,
                 style = TextStyle(
                     fontFamily = AppFontFamily,
                     fontSize = 24.sp,
@@ -140,7 +141,7 @@ fun OnboardingScreen(
             )
             Spacer(Modifier.height(8.dp))
             Text(
-                "7-10 ta ilova o‘rniga bitta hisob. Ovqatdan darsgacha, ishdan turar joygacha.",
+                authStrings().onboardingBody,
                 style = TextStyle(
                     fontFamily = AppFontFamily,
                     fontSize = 13.sp,
@@ -155,7 +156,7 @@ fun OnboardingScreen(
                 Dot(false, palette); Dot(true, palette); Dot(false, palette)
             }
             Spacer(Modifier.height(20.dp))
-            PrimaryButton("Keyingi", onNext, trailingIcon = AppIcons.ArrowRight)
+            PrimaryButton(authStrings().next, onNext, trailingIcon = AppIcons.ArrowRight)
         }
     }
 }
@@ -216,12 +217,12 @@ fun WelcomeScreen(
     AppScreenScaffold(scroll = true, topPadding = 60) {
         LogoTile()
         Spacer(Modifier.height(18.dp))
-        ScreenTitle("Xush kelibsiz 👋", size = 25)
+        ScreenTitle(authStrings().welcome, size = 25)
         Spacer(Modifier.height(6.dp))
-        ScreenSubtitle("Hisobingizga kiring yoki bir daqiqada ro‘yxatdan o‘ting.")
+        ScreenSubtitle(authStrings().welcomeSubtitle)
         Spacer(Modifier.height(18.dp))
 
-        FieldLabel("Telefon raqamingiz")
+        FieldLabel(authStrings().phoneLabel)
         Spacer(Modifier.height(7.dp))
         GlassTextField(
             value = state.phone,
@@ -234,7 +235,7 @@ fun WelcomeScreen(
         )
 
         Spacer(Modifier.height(13.dp))
-        FieldLabel("Parol")
+        FieldLabel(authStrings().passwordLabel)
         Spacer(Modifier.height(7.dp))
         GlassTextField(
             value = state.password,
@@ -258,7 +259,7 @@ fun WelcomeScreen(
         Spacer(Modifier.height(12.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
             Text(
-                "Parolni unutdingizmi?",
+                authStrings().forgotPassword,
                 style = TextStyle(
                     fontFamily = AppFontFamily,
                     fontSize = 12.5f.sp,
@@ -271,7 +272,7 @@ fun WelcomeScreen(
 
         Spacer(Modifier.height(14.dp))
         PrimaryButton(
-            "Kirish",
+            authStrings().signIn,
             onLogin,
             enabled = state.loginReady && !state.isLoading,
             trailingIcon = AppIcons.ArrowRight,
@@ -295,7 +296,7 @@ fun WelcomeScreen(
         SocialRow(onGoogle)
 
         Spacer(Modifier.height(20.dp))
-        FooterLink("Hisobingiz yo‘qmi?", "Ro‘yxatdan o‘tish", onSignUp)
+        FooterLink(authStrings().noAccount, authStrings().signUp, onSignUp)
     }
 }
 

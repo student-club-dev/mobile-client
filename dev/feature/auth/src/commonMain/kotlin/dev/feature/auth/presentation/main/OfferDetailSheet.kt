@@ -48,6 +48,7 @@ import dev.core.uikit.components.ScShimmerLine
 import dev.core.uikit.theme.AppPalette
 import kotlinx.coroutines.delay
 import dev.core.common.format.formatAmount
+import dev.core.uikit.locale.uiStrings
 
 /**
  * E'lon tafsiloti — `POST /v1/discounts/detail` javobi. Feed kartasi ko'rsatolmaydigan hamma
@@ -74,17 +75,17 @@ fun OfferDetailSheet(
                 Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(palette.glass)
                     .border(1.dp, palette.border, RoundedCornerShape(12.dp)).clickable(onClick = onClose),
                 contentAlignment = Alignment.Center,
-            ) { Icon(AppIcons.ArrowLeft, "Yopish", tint = palette.ink, modifier = Modifier.size(18.dp)) }
+            ) { Icon(AppIcons.ArrowLeft, uiStrings().close, tint = palette.ink, modifier = Modifier.size(18.dp)) }
             Spacer(Modifier.size(12.dp))
             Text(
-                "E'lon",
+                discountsStrings().listing,
                 style = TextStyle(fontFamily = AppFontFamily, fontSize = 20.sp, fontWeight = FontWeight.Black, color = palette.ink),
                 modifier = Modifier.weight(1f),
             )
             val d = state.detail
             if (d != null) {
                 Icon(
-                    AppIcons.Bookmark, "Saqlash",
+                    AppIcons.Bookmark, discountsStrings().save,
                     tint = if (saved) palette.primary else palette.inkFaint,
                     modifier = Modifier.size(22.dp).clickable { onToggleSaved(d.id, saved) },
                 )
@@ -107,7 +108,7 @@ fun OfferDetailSheet(
             state.detail != null -> DetailBody(state.detail, palette)
             else -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(
-                    state.error ?: "E'lonni yuklab bo'lmadi.",
+                    state.error ?: discountsStrings().loadFailed,
                     style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.sp, color = palette.inkFaint),
                 )
             }
@@ -155,13 +156,13 @@ private fun DetailBody(d: OfferDetail, palette: AppPalette) {
         )
 
         if (!d.fromNetwork) {
-            InfoBanner("Tarmoq yo'q — keshdagi ma'lumot ko'rsatilmoqda.", palette)
+            InfoBanner(discountsStrings().offlineCache, palette)
         }
 
         // Narx
         Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(
-                "${(if (d.isDiscount) d.finalPrice else d.originalPrice).formatAmount()} so'm",
+                "${(if (d.isDiscount) d.finalPrice else d.originalPrice).formatAmount()} ${uiStrings().currency}",
                 style = TextStyle(fontFamily = AppFontFamily, fontSize = 22.sp, fontWeight = FontWeight.Black, color = if (d.isDiscount) accent else palette.ink),
             )
             if (d.isDiscount && d.originalPrice > d.finalPrice) {
@@ -180,14 +181,14 @@ private fun DetailBody(d: OfferDetail, palette: AppPalette) {
         }
         if (d.isDiscount && d.savedAmount > 0) {
             Text(
-                "${d.savedAmount.formatAmount()} so'm tejaysiz",
+                discountsStrings().youSave("${d.savedAmount.formatAmount()} ${uiStrings().currency}"),
                 style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = palette.primary),
             )
         }
 
         // Olish usuli — promo-kod aynan shu javobda keladi.
-        DetailSection("Qanday olinadi", palette) {
-            val tagText = if (d.tag == DiscountTag.PROMO_CODE) "Promokod bilan" else "Talaba ID bilan"
+        DetailSection(discountsStrings().howToGet, palette) {
+            val tagText = if (d.tag == DiscountTag.PROMO_CODE) discountsStrings().withPromoCode else discountsStrings().withStudentId
             Text(tagText, style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = palette.ink))
             val promo = d.promoCode
             if (promo != null) {
@@ -199,29 +200,29 @@ private fun DetailBody(d: OfferDetail, palette: AppPalette) {
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
                     Text(
-                        if (copied) "Nusxalandi ✓" else promo,
+                        if (copied) discountsStrings().copied else promo,
                         style = TextStyle(fontFamily = AppFontFamily, fontSize = 14.sp, fontWeight = FontWeight.Black, color = palette.primary),
                     )
-                    if (!copied) Icon(AppIcons.FileText, "Nusxalash", tint = palette.primary, modifier = Modifier.size(13.dp))
+                    if (!copied) Icon(AppIcons.FileText, discountsStrings().copy, tint = palette.primary, modifier = Modifier.size(13.dp))
                 }
             }
             d.conditions?.let { Caption(it, palette) }
-            d.redemptionUrl?.let { Caption("Havola: $it", palette) }
+            d.redemptionUrl?.let { Caption(discountsStrings().link(it), palette) }
             val limits = listOfNotNull(
-                d.perUserLimit?.let { "Har talabaga $it marta" },
-                d.remainingForUser?.let { "Sizda $it marta qoldi" },
+                d.perUserLimit?.let { discountsStrings().perStudent(it.toString()) },
+                d.remainingForUser?.let { discountsStrings().youHaveLeft(it.toString()) },
             ).joinToString(" · ")
             if (limits.isNotBlank()) Caption(limits, palette)
         }
 
         d.description?.takeIf { it.isNotBlank() }?.let {
-            DetailSection("Tavsif", palette) {
+            DetailSection(discountsStrings().description, palette) {
                 Text(it, style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.sp, color = palette.inkMuted))
             }
         }
 
         if (d.attributes.isNotEmpty()) {
-            DetailSection("Xususiyatlar", palette) {
+            DetailSection(discountsStrings().attributes, palette) {
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     d.attributes.forEach { attr ->
                         Box(
@@ -240,25 +241,25 @@ private fun DetailBody(d: OfferDetail, palette: AppPalette) {
         }
 
         if (d.branches.isNotEmpty()) {
-            DetailSection("Filiallar (${d.branches.size})", palette) {
+            DetailSection(discountsStrings().branches(d.branches.size), palette) {
                 d.branches.forEach { BranchRow(it, palette) }
             }
         }
 
         val validity = listOfNotNull(d.validFrom, d.validTo).joinToString(" — ")
-        DetailSection("Amal qilish muddati", palette) {
+        DetailSection(discountsStrings().validUntil, palette) {
             Text(
-                validity.ifBlank { "Ko'rsatilmagan" },
+                validity.ifBlank { discountsStrings().notSpecified },
                 style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.sp, color = palette.inkMuted),
             )
             val contacts = listOfNotNull(
                 d.businessPhone?.let { "☎ $it" },
-                d.telegram?.let { "Telegram: $it" },
-                d.instagram?.let { "Instagram: $it" },
+                d.telegram?.let { discountsStrings().telegram(it) },
+                d.instagram?.let { discountsStrings().instagram(it) },
                 d.website,
             )
             contacts.forEach { Caption(it, palette) }
-            if (d.viewsCount > 0) Caption("${d.viewsCount} marta ko'rilgan", palette)
+            if (d.viewsCount > 0) Caption(discountsStrings().viewsCount(d.viewsCount), palette)
         }
     }
 }

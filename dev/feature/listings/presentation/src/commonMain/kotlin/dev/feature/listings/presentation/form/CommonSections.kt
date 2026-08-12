@@ -41,6 +41,9 @@ import dev.feature.listings.presentation.components.FormSection
 import dev.feature.listings.presentation.components.ImageThumb
 import dev.feature.listings.presentation.components.MiniLabel
 import dev.feature.listings.presentation.components.SelectChip
+import dev.feature.listings.presentation.lt
+import dev.feature.listings.presentation.currency
+import dev.feature.listings.presentation.Lt
 
 /**
  * Hamma e'lon turida bir xil ishlaydigan bloklar: nomi, rasmlar, narx, aloqa, muddat.
@@ -58,7 +61,7 @@ fun AboutSection(
     sectionTitle: String,
     titleHint: String,
     descriptionHint: String,
-    subtitle: String = "Tafsilotlarni shu yerga erkin yozing",
+    subtitle: String = lt("Tafsilotlarni shu yerga erkin yozing"),
 ) {
     FormSection(
         title = sectionTitle,
@@ -124,7 +127,7 @@ fun PriceSection(
         error = state.errorFor(ListingField.PRICE),
     ) {
         if (priceUnits.size > 1) {
-            MiniLabel("Narx nimaga nisbatan", palette)
+            MiniLabel(lt("Narx nimaga nisbatan"), palette)
             Row(
                 Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(7.dp),
@@ -136,23 +139,23 @@ fun PriceSection(
         }
 
         if (!state.isNegotiable) {
-            MiniLabel(if (showRange) "$priceLabel — dan" else priceLabel, palette)
+            MiniLabel(if (showRange) Lt.priceFrom(priceLabel) else priceLabel, palette)
             GlassTextField(
                 state.price, vm::onPrice, hint,
                 height = 48,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 visualTransformation = AmountVisualTransformation(),
-                trailing = { Suffix("so'm", palette) },
+                trailing = { Suffix(currency(), palette) },
             )
 
             if (showRange) {
-                MiniLabel("$priceLabel — gacha (ixtiyoriy)", palette)
+                MiniLabel(Lt.priceTo(priceLabel), palette)
                 GlassTextField(
-                    state.priceMax, vm::onPriceMax, "Yuqori chegara",
+                    state.priceMax, vm::onPriceMax, lt("Yuqori chegara"),
                     height = 48,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     visualTransformation = AmountVisualTransformation(),
-                    trailing = { Suffix("so'm", palette) },
+                    trailing = { Suffix(currency(), palette) },
                 )
             }
 
@@ -161,8 +164,8 @@ fun PriceSection(
 
         if (allowNegotiable) {
             Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                SelectChip("Aniq narx", !state.isNegotiable, { vm.onNegotiable(false) })
-                SelectChip("Kelishilgan holda", state.isNegotiable, { vm.onNegotiable(true) })
+                SelectChip(lt("Aniq narx"), !state.isNegotiable, { vm.onNegotiable(false) })
+                SelectChip(lt("Kelishilgan holda"), state.isNegotiable, { vm.onNegotiable(true) })
             }
         }
     }
@@ -176,9 +179,9 @@ private fun PriceEcho(state: PostListingUiState, palette: AppPalette) {
     val to = state.priceMax.toLongOrNull()
 
     val text = if (to != null && to > from) {
-        "${from.formatSum()} — ${to.formatSum()} so'm / ${state.priceUnit.suffix}"
+        "${from.formatSum()} — ${to.formatSum()} ${currency()} / ${state.priceUnit.suffix}"
     } else {
-        "${from.formatSum()} so'm / ${state.priceUnit.suffix}"
+        "${from.formatSum()} ${currency()} / ${state.priceUnit.suffix}"
     }
 
     Row(
@@ -202,7 +205,7 @@ fun ContactSection(
     palette: AppPalette = appPalette,
 ) {
     FormSection(
-        title = "Telefon raqami",
+        title = lt("Telefon raqami"),
         subtitle = subtitle,
         error = state.errorFor(ListingField.CONTACT),
     ) {
@@ -223,8 +226,8 @@ private val durationOptions = listOf(7, 14, 30, 60, 90)
 @Composable
 fun ValiditySection(state: PostListingUiState, vm: PostListingViewModel) {
     FormSection(
-        title = "E'lon qancha turadi",
-        subtitle = "Bugundan boshlab ${state.durationDays} kun",
+        title = lt("E'lon qancha turadi"),
+        subtitle = Lt.daysFromToday(state.durationDays),
         error = state.errorFor(ListingField.VALIDITY),
     ) {
         Row(
@@ -232,7 +235,7 @@ fun ValiditySection(state: PostListingUiState, vm: PostListingViewModel) {
             horizontalArrangement = Arrangement.spacedBy(7.dp),
         ) {
             durationOptions.forEach { days ->
-                SelectChip("$days kun", state.durationDays == days, { vm.onDuration(days) })
+                SelectChip(Lt.days(days), state.durationDays == days, { vm.onDuration(days) })
             }
         }
     }
@@ -250,7 +253,7 @@ fun ValiditySection(state: PostListingUiState, vm: PostListingViewModel) {
 fun AudienceSection(state: PostListingUiState, vm: PostListingViewModel) {
     if (!state.hasUniversity) return
     FormSection(
-        title = "Kim ko'radi",
+        title = lt("Kim ko'radi"),
         subtitle = state.audience.hint,
     ) {
         Row(
@@ -264,7 +267,7 @@ fun AudienceSection(state: PostListingUiState, vm: PostListingViewModel) {
     }
 }
 
-/** Maydon oxiridagi o'lchov birligi ("so'm"). */
+/** Maydon oxiridagi o'lchov birligi (currency()). */
 @Composable
 fun Suffix(text: String, palette: AppPalette) {
     Text(

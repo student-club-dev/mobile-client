@@ -42,6 +42,7 @@ import dev.core.uikit.media.ScVideoPlayer
 import dev.core.uikit.media.playbackUrl
 import dev.core.uikit.theme.Sc
 import dev.feature.chat.domain.model.OutgoingVideo
+import dev.core.uikit.locale.uiStrings
 
 /**
  * Yuborishdan **oldingi** ekran: video o'ynab turadi, ostida izoh maydoni va yuborish tugmasi.
@@ -128,12 +129,12 @@ private fun PreviewTopBar(
     ) {
         Icon(
             ScIcons.Close,
-            "Bekor qilish",
+            uiStrings().cancel,
             tint = Color.White,
             modifier = Modifier.size(22.dp).clickable(onClick = onCancel),
         )
         Column {
-            ScText("Video", 15f, FontWeight.SemiBold, Color.White, maxLines = 1)
+            ScText(chatStrings().video, 15f, FontWeight.SemiBold, Color.White, maxLines = 1)
             // Hajm ataylab ko'rsatiladi: siqishdan keyin fayl necha MB bo'lganini bilish
             // mobil internetdagi foydalanuvchi uchun muhim.
             ScText(
@@ -176,7 +177,7 @@ private fun CaptionComposer(
         ) {
             Box(Modifier.weight(1f)) {
                 if (caption.isEmpty()) {
-                    ScText("Izoh qo'shing…", 15f, FontWeight.Medium, Color.White.copy(alpha = 0.55f), maxLines = 1)
+                    ScText(chatStrings().addCaption, 15f, FontWeight.Medium, Color.White.copy(alpha = 0.55f), maxLines = 1)
                 }
                 BasicTextField(
                     value = caption,
@@ -194,7 +195,7 @@ private fun CaptionComposer(
                 .clickable(onClick = onSend),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(ScIcons.Return, "Yuborish", tint = Color.White, modifier = Modifier.size(22.dp))
+            Icon(ScIcons.Return, chatStrings().send, tint = Color.White, modifier = Modifier.size(22.dp))
         }
     }
 }
@@ -211,7 +212,7 @@ private const val MAX_CAPTION = 1024
  * Tanlangan videoni yuboriladigan ko'rinishga o'giradi.
  *
  * Siqish **shu yerda bajarilmaydi** — u faqat lambda bo'lib biriktiriladi va repozitoriy
- * uni yuklashning oldida, xabarning o'z halqasi ichida chaqiradi. Shuning uchun "Yuborish"
+ * uni yuklashning oldida, xabarning o'z halqasi ichida chaqiradi. Shuning uchun chatStrings().send
  * bosilishi bilan xabar ro'yxatda paydo bo'ladi va foydalanuvchi hech narsa kutmaydi.
  */
 internal fun PickedVideo.toOutgoing(caption: String, preparer: VideoPreparer): OutgoingVideo =

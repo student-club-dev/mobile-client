@@ -83,12 +83,12 @@ data class StickerSearchPage(
 val GifErrorKind.stickerMessage: String
     get() = when (this) {
         GifErrorKind.PROVIDER_RATE_LIMITED ->
-            "Stiker xizmati hozir band. Bir-ikki daqiqadan so'ng qayta urining."
-        GifErrorKind.RATE_LIMITED -> "Juda tez qidiryapsiz. Biroz sekinroq urinib ko'ring."
+            ChatDomainStrings.stickerBusy
+        GifErrorKind.RATE_LIMITED -> ChatDomainStrings.searchTooFast
         GifErrorKind.PROVIDER_UNAVAILABLE ->
-            "Stiker qidiruvi hozir ishlamayapti. Pastdagi paketlardan tanlashingiz mumkin."
+            ChatDomainStrings.stickerUnavailable
         // Amalda ko'rinmaydi: panel bu holatda qidiruvni umuman yashiradi.
-        GifErrorKind.PROVIDER_NOT_CONFIGURED -> "Stiker qidiruvi bu ilovada sozlanmagan."
-        GifErrorKind.NETWORK -> "Internet aloqasi yo'q. Ulanishni tekshirib, qayta urining."
-        GifErrorKind.UNKNOWN -> "Stiker qidiruvida xatolik. Qayta urining."
+        GifErrorKind.PROVIDER_NOT_CONFIGURED -> ChatDomainStrings.stickerNotConfigured
+        GifErrorKind.NETWORK -> ChatDomainStrings.noInternet
+        GifErrorKind.UNKNOWN -> ChatDomainStrings.stickerError
     }

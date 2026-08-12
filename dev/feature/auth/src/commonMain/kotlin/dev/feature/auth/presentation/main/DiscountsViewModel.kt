@@ -714,7 +714,7 @@ private fun sectionsOf(
                     accent = g.accent, groupKey = g.key, types = goods, partial = true,
                 ),
                 CatalogSection(
-                    key = g.key + CatalogRules.SERVICES_SUFFIX, name = CatalogRules.SERVICES_NAME,
+                    key = g.key + CatalogRules.SERVICES_SUFFIX, name = CatalogRules.servicesName,
                     emoji = CatalogRules.SERVICES_EMOJI, accent = g.accent, groupKey = g.key,
                     types = services, partial = true,
                 ),

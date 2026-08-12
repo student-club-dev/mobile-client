@@ -15,6 +15,7 @@ import dev.feature.listings.domain.repository.GeoRepository
 import dev.feature.listings.domain.repository.PlaceSuggestion
 import dev.feature.listings.domain.repository.ListingRepository
 import kotlinx.coroutines.flow.Flow
+import dev.core.common.locale.AppLocale
 
 /** Biznes egasining e'lonlari (barcha statuslar) — "Mening e'lonlarim" ekrani. */
 class ObserveMyListingsUseCase(private val repository: ListingRepository) {
@@ -113,7 +114,7 @@ class PublishListingUseCase(private val repository: ListingRepository) {
         return when (val res = repository.submit(listing)) {
             is Resource.Success -> Result.Success(res.data)
             is Resource.Error -> res.toResult()
-            Resource.Loading -> Result.Failed("E'lonni yuborib bo'lmadi")
+            Resource.Loading -> Result.Failed(AppLocale.pick(en = "Couldn't submit the listing", ru = "Не удалось отправить объявление", uz = "E'lonni yuborib bo'lmadi"))
         }
     }
 
@@ -136,7 +137,7 @@ class ToggleListingPausedUseCase(private val repository: ListingRepository) {
         val next = when (listing.status) {
             ListingStatus.ACTIVE -> ListingStatus.PAUSED
             ListingStatus.PAUSED -> ListingStatus.ACTIVE
-            else -> return Resource.Error("Bu holatda to'xtatib bo'lmaydi: ${listing.status.label}")
+            else -> return Resource.Error(AppLocale.pick(en = "Can't pause from this state: ${listing.status.label}", ru = "Нельзя приостановить из этого состояния: ${listing.status.label}", uz = "Bu holatda to'xtatib bo'lmaydi: ${listing.status.label}"))
         }
         return repository.updateStatus(listing.id, next)
     }
@@ -153,8 +154,8 @@ class DeleteListingUseCase(private val repository: ListingRepository) {
 class UploadListingImageUseCase(private val repository: ListingRepository) {
 
     suspend operator fun invoke(bytes: ByteArray, fileName: String): Resource<String> {
-        if (bytes.isEmpty()) return Resource.Error("Rasm bo'sh")
-        if (bytes.size > MAX_IMAGE_BYTES) return Resource.Error("Rasm juda katta (maks. 5 MB)")
+        if (bytes.isEmpty()) return Resource.Error(AppLocale.pick(en = "The image is empty", ru = "Изображение пустое", uz = "Rasm bo'sh"))
+        if (bytes.size > MAX_IMAGE_BYTES) return Resource.Error(AppLocale.pick(en = "The image is too large (max 5 MB)", ru = "Изображение слишком большое (макс. 5 МБ)", uz = "Rasm juda katta (maks. 5 MB)"))
         return repository.uploadImage(bytes, fileName)
     }
 

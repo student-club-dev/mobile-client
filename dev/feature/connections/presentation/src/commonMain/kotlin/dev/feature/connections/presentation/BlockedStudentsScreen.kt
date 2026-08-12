@@ -54,6 +54,7 @@ import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import org.koin.compose.viewmodel.koinViewModel
+import dev.core.uikit.locale.uiStrings
 
 /**
  * **Bloklanganlar** — `GET /v1/blocks` ro'yxati (Sozlamalar → Maxfiylik → "Bloklangan talabalar").
@@ -72,6 +73,7 @@ fun BlockedStudentsScreen(
     vm: BlockedStudentsViewModel = koinViewModel(),
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
+    val s = connectionsStrings()
     var unblockFor by remember { mutableStateOf<BlockedStudent?>(null) }
 
     val listState = rememberLazyListState()
@@ -93,12 +95,12 @@ fun BlockedStudentsScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(13.dp),
                 ) {
-                    ScCircleButton(ScIcons.ChevronLeft, onBack, contentDescription = "Orqaga")
-                    ScHeaderTitle("Bloklanganlar", modifier = Modifier.weight(1f))
+                    ScCircleButton(ScIcons.ChevronLeft, onBack, contentDescription = uiStrings().back)
+                    ScHeaderTitle(s.blockedTitle, modifier = Modifier.weight(1f))
                 }
                 Spacer(Modifier.height(8.dp))
                 ScHeaderSubtitle(
-                    "Bu yerda faqat siz bloklagan talabalar. Sizni kim bloklagani ko'rsatilmaydi.",
+                    s.blockedSubtitle,
                 )
             }
 
@@ -131,7 +133,7 @@ fun BlockedStudentsScreen(
                         if (state.total > 0) {
                             item(key = "total") {
                                 ScText(
-                                    "${state.total} ta talaba", 12.5f, FontWeight.Bold, Sc.Muted,
+                                    s.blockedCount(state.total), 12.5f, FontWeight.Bold, Sc.Muted,
                                     Modifier.padding(start = 4.dp, bottom = 2.dp), maxLines = 1,
                                 )
                             }
@@ -175,23 +177,21 @@ fun BlockedStudentsScreen(
     if (target != null) {
         AlertDialog(
             onDismissRequest = { unblockFor = null },
-            title = { Text("Blokdan chiqarish", style = scStyle(17f, FontWeight.ExtraBold)) },
+            title = { Text(s.unblock, style = scStyle(17f, FontWeight.ExtraBold)) },
             text = {
                 Text(
-                    "${target.student.displayName} blokdan chiqariladi va sizni qidiruvda " +
-                        "yana ko'radi. Avvalgi bog'lanish tiklanmaydi — kerak bo'lsa qaytadan " +
-                        "so'rov yuborasiz.",
+                    s.unblockBody(target.student.displayName),
                     style = scStyle(14f, FontWeight.Medium, Sc.InkSoft, lineHeight = 20f),
                 )
             },
             confirmButton = {
                 TextButton(onClick = { vm.unblock(target); unblockFor = null }) {
-                    Text("Chiqarish", style = scStyle(14f, FontWeight.ExtraBold, Sc.Brand))
+                    Text(s.unblockConfirm, style = scStyle(14f, FontWeight.ExtraBold, Sc.Brand))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { unblockFor = null }) {
-                    Text("Bekor", style = scStyle(14f, FontWeight.Bold, Sc.InkSoft))
+                    Text(s.cancel, style = scStyle(14f, FontWeight.Bold, Sc.InkSoft))
                 }
             },
         )
@@ -214,7 +214,7 @@ private fun BlockedRow(blocked: BlockedStudent, busy: Boolean, onUnblock: () -> 
             ScText(
                 listOfNotNull(
                     student.username?.let { "@$it" },
-                    "${formatDate(blocked.blockedAt)} dan beri bloklangan",
+                    connectionsStringsNow().blockedSince(formatDate(blocked.blockedAt)),
                 ).joinToString(" · "),
                 12f, FontWeight.Medium, Sc.MutedLight, maxLines = 1,
             )
@@ -233,7 +233,7 @@ private fun UnblockButton(enabled: Boolean, onClick: () -> Unit) {
         contentAlignment = Alignment.Center,
     ) {
         ScText(
-            "Blokdan chiqarish", 11.5f, FontWeight.ExtraBold,
+            connectionsStrings().unblock, 11.5f, FontWeight.ExtraBold,
             if (enabled) Sc.Brand else Sc.MutedLight, maxLines = 1,
         )
     }
@@ -253,7 +253,7 @@ private fun ErrorBlock(message: String, onRetry: () -> Unit) {
                 .background(Sc.Brand)
                 .clickable(onClick = onRetry)
                 .padding(horizontal = 20.dp, vertical = 11.dp),
-        ) { ScText("Qayta urinish", 12.5f, FontWeight.ExtraBold, Color.White, maxLines = 1) }
+        ) { ScText(uiStrings().retry, 12.5f, FontWeight.ExtraBold, Color.White, maxLines = 1) }
     }
 }
 

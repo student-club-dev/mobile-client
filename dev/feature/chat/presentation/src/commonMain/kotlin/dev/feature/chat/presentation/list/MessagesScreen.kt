@@ -77,6 +77,9 @@ import dev.feature.connections.domain.model.ReportReason
 import dev.feature.connections.domain.model.StudentSummary
 import dev.feature.connections.presentation.StudentProfileSheet
 import kotlinx.coroutines.launch
+import dev.feature.chat.presentation.chatStrings
+import androidx.compose.runtime.ReadOnlyComposable
+import dev.core.common.locale.AppLocale
 
 /**
  * «Xabarlar» — suhbatlar ro'yxati.
@@ -240,12 +243,16 @@ internal fun MessagesScreen(
     val foundArchived = remember(archivedConversations, query) {
         archivedConversations.matchingConversations(query)
     }
+    val s = chatStrings()
+    // Bo'sh ro'yxatdagi maslahat "Do'stlar" bo'limiga yo'naltiradi — nomi shu yerda
+    // tarjima qilinadi, aks holda inglizcha jumlada o'zbekcha bo'lim nomi qolib ketardi.
+    val connectionsSectionName = connectionsSectionLabel()
 
     Box(modifier.fillMaxSize().background(Sc.Bg)) {
         Column(Modifier.fillMaxSize().nestedScroll(nested)) {
             MessagesHeader(
                 collapse = collapse,
-                title = if (showArchived) "Arxiv" else "Xabarlar",
+                title = if (showArchived) s.archive else s.messages,
                 onBack = when {
                     showArchived -> ({ showArchived = false })
                     else -> onBack
@@ -303,7 +310,7 @@ internal fun MessagesScreen(
                 top = if (showArchived) 16.dp else 4.dp,
                 bottom = if (onNewChat != null) 96.dp else 24.dp,
             )
-            val notFound = "«${query.trim()}» bo'yicha hech nima topilmadi"
+            val notFound = s.nothingFoundFor(query.trim())
 
             // Tepadan tortish — suhbatlar ro'yxati va o'qilmaganlar soni serverdan qayta
             // o'qiladi (WS uzilib qolgan bo'lsa yagona qo'lda tuzatish yo'li).
@@ -319,7 +326,7 @@ internal fun MessagesScreen(
                         typing = typing,
                         contentPadding = listPadding,
                         empty = if (query.isBlank()) {
-                            "Arxivga ko'chirilgan suhbat yo'q."
+                            s.noArchivedChats
                         } else {
                             notFound
                         },
@@ -354,7 +361,7 @@ internal fun MessagesScreen(
                                         typing = typing,
                                         contentPadding = listPadding,
                                         empty = if (query.isNotBlank()) notFound else {
-                                            "\"Do'stlar\" bo'limidan yozishni boshlang."
+                                            s.startFromSection("\"${connectionsSectionName}\"")
                                         },
                                         emptyTitle = if (query.isNotBlank()) ScNotFoundTitle else ScEmptyTitle,
                                         onOpen = onOpen,
@@ -366,7 +373,7 @@ internal fun MessagesScreen(
                                         state = clubsState,
                                         contentPadding = listPadding,
                                         empty = if (query.isNotBlank()) notFound else {
-                                            "Klublar tez orada qo'shiladi."
+                                            s.clubsSoon
                                         },
                                         emptyTitle = if (query.isNotBlank()) ScNotFoundTitle else ScEmptyTitle,
                                         onToggleJoin = onToggleJoin,
@@ -397,7 +404,7 @@ internal fun MessagesScreen(
                 query = query,
                 onQuery = onQuery,
                 onClose = { searchOpen = false },
-                placeholder = "Suhbat yoki klub qidiring",
+                placeholder = s.searchHint,
                 // Takliflar — topilgan ismlar: bir bosishda so'rov to'liq yoziladi.
                 suggestions = remember(foundChats) { foundChats.map { it.other.displayName } },
             )
@@ -424,16 +431,16 @@ internal fun MessagesScreen(
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     ActionRow(
                         if (action.archived) ScIcons.ChevronRight else ScIcons.Archive,
-                        if (action.archived) "Arxivdan chiqarish" else "Arxivlash",
+                        if (action.archived) s.unarchive else s.archiveAction,
                     ) {
                         if (action.archived) onUnarchive(action) else onArchive(action)
                         actionFor = null
                     }
-                    ActionRow(ScIcons.Users, "Bloklash", danger = true) {
+                    ActionRow(ScIcons.Users, s.block, danger = true) {
                         blockFor = action
                         actionFor = null
                     }
-                    ActionRow(ScIcons.Bell, "Shikoyat qilish", danger = true) {
+                    ActionRow(ScIcons.Bell, s.report, danger = true) {
                         reportFor = action
                         actionFor = null
                     }
@@ -442,7 +449,7 @@ internal fun MessagesScreen(
             confirmButton = {},
             dismissButton = {
                 TextButton(onClick = { actionFor = null }) {
-                    Text("Bekor", style = scStyle(14f, FontWeight.Bold, Sc.InkSoft))
+                    Text(s.cancel, style = scStyle(14f, FontWeight.Bold, Sc.InkSoft))
                 }
             },
         )
@@ -451,11 +458,10 @@ internal fun MessagesScreen(
     val blockTarget = blockFor
     if (blockTarget != null) {
         ConfirmDialog(
-            title = "Bloklash",
+            title = s.block,
             // Suhbatni o'chirish endpointi yo'q — blok esa bog'lanishni server tomonda uzadi.
-            message = "${blockTarget.other.displayName} bloklanadi: bog'lanish o'chadi va " +
-                "ikkalangiz bir-biringizga yozolmaysiz.",
-            confirmLabel = "Bloklash",
+            message = s.blockBody(blockTarget.other.displayName),
+            confirmLabel = s.block,
             onConfirm = { onBlock(blockTarget); blockFor = null },
             onDismiss = { blockFor = null },
         )
@@ -464,7 +470,7 @@ internal fun MessagesScreen(
     val reportTarget = reportFor
     if (reportTarget != null) {
         ReportDialog(
-            title = "Shikoyat: ${reportTarget.other.displayName}",
+            title = s.reportTitle(reportTarget.other.displayName),
             onSend = { reason, note -> onReport(reportTarget, reason, note); reportFor = null },
             onDismiss = { reportFor = null },
         )
@@ -602,9 +608,15 @@ private fun NewChatFab(compact: Boolean, onClick: () -> Unit, modifier: Modifier
             },
         contentAlignment = Alignment.Center,
     ) {
-        Icon(ScIcons.Message, "Yangi suhbat", tint = Color.White, modifier = Modifier.size(24.dp))
+        Icon(ScIcons.Message, chatStrings().newChat, tint = Color.White, modifier = Modifier.size(24.dp))
     }
 }
+
+/** «Do'stlar» — Connections bo'limining nomi; bu modul unga bog'lanmaydi, faqat nomini yozadi. */
+@Composable
+@ReadOnlyComposable
+private fun connectionsSectionLabel(): String =
+    AppLocale.pick(en = "Connections", ru = "Друзья", uz = "Do'stlar")
 
 /** Panelning birinchi o'lchashgacha ishlatiladigan taxminiy yig'ilish masofasi. */
 private val DefaultCollapseRange = 152.dp

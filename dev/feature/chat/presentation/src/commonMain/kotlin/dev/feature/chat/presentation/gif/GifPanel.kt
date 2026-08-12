@@ -49,6 +49,7 @@ import dev.feature.chat.domain.model.GifItem
 import dev.feature.chat.domain.model.GifProvider
 import kotlinx.coroutines.flow.distinctUntilChanged
 import org.koin.compose.viewmodel.koinViewModel
+import dev.feature.chat.presentation.chatStrings
 
 /** Panel balandligi — stiker paneli bilan bir xil his, klaviatura o'rnini egallaydi. */
 private val PANEL_HEIGHT = 320.dp
@@ -100,7 +101,7 @@ fun GifPanel(
         MediaSearchField(
             query = state.query,
             onQueryChange = vm::onQueryChange,
-            placeholder = "GIF qidirish…",
+            placeholder = chatStrings().searchGifs,
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
         )
 
@@ -123,7 +124,7 @@ fun GifPanel(
                 )
 
                 state.empty -> MediaSearchCenterText(
-                    if (state.query.isBlank()) "GIF topilmadi." else "«${state.query}» bo'yicha GIF topilmadi.",
+                    if (state.query.isBlank()) chatStrings().noGifs else chatStrings().noGifsFor(state.query),
                 )
 
                 else -> LazyVerticalGrid(
@@ -261,7 +262,7 @@ internal fun MediaSearchErrorView(message: String, retriable: Boolean, onRetry: 
         ScText(message, 13.5f, FontWeight.Medium, Sc.InkSoft)
         if (retriable) {
             ScSoftButton(
-                text = "Qayta urinish",
+                text = chatStrings().retry,
                 onClick = onRetry,
                 modifier = Modifier.padding(top = 12.dp, start = 24.dp, end = 24.dp),
                 verticalPadding = 10.dp,

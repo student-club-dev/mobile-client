@@ -59,6 +59,9 @@ import dev.core.uikit.theme.appPalette
 import dev.feature.listings.domain.model.Listing
 import dev.feature.listings.domain.model.ListingKind
 import org.koin.compose.viewmodel.koinViewModel
+import dev.feature.listings.presentation.lt
+import dev.feature.listings.presentation.currency
+import dev.feature.listings.presentation.Lt
 
 /**
  * Talabaga ko'rinadigan e'lonlar: Yordam, Ijara, Xizmat va Ish.
@@ -188,7 +191,7 @@ fun ListingsBrowseScreen(
                 query = state.query,
                 onQuery = vm::onQuery,
                 onClose = { showSearch = false },
-                placeholder = "Chilonzor, kuryer, IELTS…",
+                placeholder = lt("Chilonzor, kuryer, IELTS…"),
                 suggestions = searchSuggestions,
             )
         }
@@ -227,17 +230,17 @@ private fun BrowseHeader(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             if (onBack != null) {
-                ScCircleButton(ScIcons.ChevronLeft, onBack, contentDescription = "Orqaga")
+                ScCircleButton(ScIcons.ChevronLeft, onBack, contentDescription = lt("Orqaga"))
             }
             Column(Modifier.weight(1f)) {
-                ScHeaderTitle("E'lonlar", size = 26f)
+                ScHeaderTitle(lt("E'lonlar"), size = 26f)
                 Spacer(Modifier.height(3.dp))
                 ScHeaderSubtitle(subtitle)
             }
-            ScCircleButton(ScIcons.Search, onSearch, size = 46.dp, contentDescription = "Qidirish")
+            ScCircleButton(ScIcons.Search, onSearch, size = 46.dp, contentDescription = lt("Qidirish"))
             ScCircleButton(
                 ScIcons.Filter, onFilter, size = 46.dp,
-                contentDescription = "Filtr",
+                contentDescription = lt("Filtr"),
                 // Faol filtr belgisi — brend rangida. Qizil "xato/shoshilinch" degani,
                 // bu yerda esa shunchaki holat.
                 badge = activeFilterCount > 0, badgeColor = Sc.Brand,
@@ -253,10 +256,10 @@ private fun BrowseHeader(
  * o'shanda u yuklanganlar soniga teng bo'ladi va matn ham shunga moslashadi.
  */
 private fun countLabel(state: ListingsBrowseUiState): String = when {
-    !state.loaded -> "Yuklanmoqda…"
-    state.totalCount == 0 -> "Hozircha e'lon yo'q"
-    state.listings.size >= state.totalCount -> "${state.listings.size} ta faol e'lon"
-    else -> "${state.totalCount} tadan ${state.listings.size} tasi"
+    !state.loaded -> lt("Yuklanmoqda…")
+    state.totalCount == 0 -> lt("Hozircha e'lon yo'q")
+    state.listings.size >= state.totalCount -> Lt.activeListings(state.listings.size)
+    else -> Lt.shownOfTotal(state.listings.size, state.totalCount)
 }
 
 // ---------------------------------------------------------------------------
@@ -341,11 +344,11 @@ private fun ListingKind.accentColor(): Color = when (this) {
 
 /** Segmentga sig'adigan qisqa yozuv (to'liq nomi "Ijara — turarjoy"). */
 private fun tabLabel(kind: ListingKind): String = when (kind) {
-    ListingKind.RENTAL -> "Ijara"
-    ListingKind.SERVICE -> "Xizmat"
-    ListingKind.JOB -> "Ish"
-    ListingKind.DISCOUNT -> "Chegirma"
-    ListingKind.TASK -> "Yordam"
+    ListingKind.RENTAL -> lt("Ijara")
+    ListingKind.SERVICE -> lt("Xizmat")
+    ListingKind.JOB -> lt("Ish")
+    ListingKind.DISCOUNT -> lt("Chegirma")
+    ListingKind.TASK -> lt("Yordam")
 }
 
 // ---------------------------------------------------------------------------
@@ -362,7 +365,7 @@ private fun MapBar(onClick: () -> Unit) {
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Icon(ScIcons.Map, null, tint = Sc.Brand, modifier = Modifier.size(22.dp))
-        ScText("Xaritada ko'rish", 15f, FontWeight.Bold, Sc.Ink, Modifier.weight(1f), maxLines = 1)
+        ScText(lt("Xaritada ko'rish"), 15f, FontWeight.Bold, Sc.Ink, Modifier.weight(1f), maxLines = 1)
         Icon(ScIcons.ChevronRight, null, tint = Sc.NavIdle, modifier = Modifier.size(16.dp))
     }
 }
@@ -396,7 +399,7 @@ private fun BrowseMoreError(message: String, onRetry: () -> Unit) {
     ) {
         ScText(message, 13f, FontWeight.Medium, Sc.Muted, maxLines = 2)
         Spacer(Modifier.height(10.dp))
-        ScSoftButton("Yana yuklash", onRetry, Modifier.width(190.dp))
+        ScSoftButton(lt("Yana yuklash"), onRetry, Modifier.width(190.dp))
     }
 }
 
@@ -414,14 +417,14 @@ private fun BrowseErrorState(message: String, onRetry: () -> Unit) {
             Icon(ScIcons.Map, null, tint = Sc.Amber, modifier = Modifier.size(40.dp))
         }
         Spacer(Modifier.height(18.dp))
-        ScText("Yuklab bo'lmadi", 19f, FontWeight.ExtraBold, Sc.Ink)
+        ScText(lt("Yuklab bo'lmadi"), 19f, FontWeight.ExtraBold, Sc.Ink)
         Spacer(Modifier.height(6.dp))
         Text(
             message,
             style = scStyle(14f, FontWeight.Medium, Sc.Muted, lineHeight = 21f).copy(textAlign = TextAlign.Center),
         )
         Spacer(Modifier.height(18.dp))
-        ScSoftButton("Qayta urinish", onRetry, Modifier.width(200.dp))
+        ScSoftButton(lt("Qayta urinish"), onRetry, Modifier.width(200.dp))
     }
 }
 
@@ -437,7 +440,7 @@ private fun BrowseNotFoundState(kind: ListingKind) {
     ScEmptyState(
         Modifier.padding(top = 26.dp),
         title = ScNotFoundTitle,
-        message = "Bu shartlarga mos e'lon topilmadi. Filtrni yumshating yoki qidiruvni o'zgartiring.",
+        message = lt("Bu shartlarga mos e'lon topilmadi. Filtrni yumshating yoki qidiruvni o'zgartiring."),
         tint = kind.tint(),
         glyph = { KindGlyph(kind, onGradient = false, size = 46.dp) },
     )
@@ -473,10 +476,10 @@ private fun Listing.toMarker(userLat: Double?, userLng: Double?): OfferMarker? {
 
 /** Marker pufagiga sig'adigan qisqa narx: "2.5 mln", "300k", "Kelishilgan". */
 private fun Listing.markerPrice(): String = when {
-    isNegotiable -> "Kelishilgan"
-    price >= 1_000_000 -> "${(price / 100_000) / 10.0} mln"
+    isNegotiable -> lt("Kelishilgan")
+    price >= 1_000_000 -> Lt.millions((price / 100_000) / 10.0)
     price >= 1_000 -> "${price / 1_000}k"
-    else -> "$price so'm"
+    else -> "$price ${currency()}"
 }
 
 /** `0xFF7C5CFF` → `"#7C5CFF"` — JS/CSS shu ko'rinishni kutadi. */

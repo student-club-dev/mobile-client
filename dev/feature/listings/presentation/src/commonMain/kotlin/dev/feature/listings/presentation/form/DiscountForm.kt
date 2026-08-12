@@ -47,6 +47,9 @@ import dev.feature.listings.presentation.components.MiniLabel
 import dev.feature.listings.presentation.components.SectionHPad
 import dev.feature.listings.presentation.components.SectionHeader
 import dev.feature.listings.presentation.components.SelectChip
+import dev.feature.listings.presentation.lt
+import dev.feature.listings.presentation.currency
+import dev.feature.listings.presentation.Lt
 
 /**
  * Chegirma / sotuv e'loni formasi — biznes uchun.
@@ -86,11 +89,11 @@ fun DiscountForm(state: PostListingUiState, palette: AppPalette, vm: PostListing
         )
         PriceAndDiscountSection(state, vm)
         if (state.discount.isDiscounted) RedemptionSection(state, vm)
-        ContactSection(state, vm, subtitle = "Talaba shu raqamga bog'lanadi")
+        ContactSection(state, vm, subtitle = lt("Talaba shu raqamga bog'lanadi"))
         BranchesSection(
             state, palette, vm,
-            title = "Filiallar",
-            subtitle = "Talabaga eng yaqini masofasi bilan ko'rsatiladi",
+            title = lt("Filiallar"),
+            subtitle = lt("Talabaga eng yaqini masofasi bilan ko'rsatiladi"),
         )
         ValiditySection(state, vm)
     }
@@ -104,7 +107,7 @@ fun DiscountForm(state: PostListingUiState, palette: AppPalette, vm: PostListing
 fun ListingModeSection(state: PostListingUiState, vm: PostListingViewModel) {
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Column(Modifier.padding(horizontal = SectionHPad)) {
-            SectionHeader("E'lon turi", "Chegirmali yoki oddiy e'lon")
+            SectionHeader(lt("E'lon turi"), lt("Chegirmali yoki oddiy e'lon"))
         }
         LazyRow(
             Modifier.fillMaxWidth(),
@@ -113,14 +116,14 @@ fun ListingModeSection(state: PostListingUiState, vm: PostListingViewModel) {
         ) {
             item {
                 SelectChip(
-                    "Chegirma e'loni",
+                    lt("Chegirma e'loni"),
                     state.discount.isDiscounted,
                     onClick = { vm.updateDiscount { it.copy(isDiscounted = true) } },
                 )
             }
             item {
                 SelectChip(
-                    "Oddiy e'lon",
+                    lt("Oddiy e'lon"),
                     !state.discount.isDiscounted,
                     onClick = { vm.updateDiscount { it.copy(isDiscounted = false) } },
                 )
@@ -137,7 +140,7 @@ fun ListingModeSection(state: PostListingUiState, vm: PostListingViewModel) {
 fun CategorySection(state: PostListingUiState, copy: ListingFormCopy, vm: PostListingViewModel) {
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Column(Modifier.padding(horizontal = SectionHPad)) {
-            SectionHeader("Turi", copy.categoryHint)
+            SectionHeader(lt("Turi"), copy.categoryHint)
             state.errorFor(ListingField.CATEGORY)?.let {
                 Text(
                     it,
@@ -168,7 +171,7 @@ fun CategorySection(state: PostListingUiState, copy: ListingFormCopy, vm: PostLi
                 GlassTextField(
                     state.discount.customCategoryName,
                     { value -> vm.updateDiscount { it.copy(customCategoryName = value) } },
-                    "Nimaga amal qiladi?",
+                    lt("Nimaga amal qiladi?"),
                     height = 46,
                 )
             }
@@ -186,8 +189,8 @@ fun CategoryAttributesSection(state: PostListingUiState, vm: PostListingViewMode
     if (specs.isEmpty()) return
 
     FormSection(
-        title = "Tafsilotlar",
-        subtitle = "Tanlangan bo'limga mos ma'lumotlar",
+        title = lt("Tafsilotlar"),
+        subtitle = lt("Tanlangan bo'limga mos ma'lumotlar"),
         error = state.errorFor(ListingField.ATTRIBUTES),
     ) {
         DynamicFields(
@@ -220,29 +223,29 @@ fun PriceAndDiscountSection(state: PostListingUiState, vm: PostListingViewModel)
     val discounted = state.discount.isDiscounted
 
     FormSection(
-        title = "Narx",
-        subtitle = if (discounted) "Oldingi va hozirgi (chegirmali) narx" else "E'lon narxi",
+        title = lt("Narx"),
+        subtitle = if (discounted) lt("Oldingi va hozirgi (chegirmali) narx") else lt("E'lon narxi"),
         error = state.errorForAny(ListingField.PRICE, ListingField.DISCOUNT),
     ) {
-        MiniLabel(if (discounted) "Oldingi narx" else "Narx", palette)
+        MiniLabel(if (discounted) lt("Oldingi narx") else lt("Narx"), palette)
         GlassTextField(
-            state.price, vm::onPrice, "Masalan: 50 000",
+            state.price, vm::onPrice, lt("Masalan: 50 000"),
             height = 48,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             visualTransformation = AmountVisualTransformation(),
-            trailing = { Suffix("so'm", palette) },
+            trailing = { Suffix(currency(), palette) },
         )
 
         if (discounted) {
-            MiniLabel("Hozirgi narx (chegirmali)", palette)
+            MiniLabel(lt("Hozirgi narx (chegirmali)"), palette)
             GlassTextField(
                 state.discount.discountValue,
                 { value -> vm.updateDiscount { it.copy(discountValue = value.toAmountDigits()) } },
-                "Masalan: 35 000",
+                lt("Masalan: 35 000"),
                 height = 48,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 visualTransformation = AmountVisualTransformation(),
-                trailing = { Suffix("so'm", palette) },
+                trailing = { Suffix(currency(), palette) },
             )
 
             val old = state.price.toLongOrNull() ?: 0
@@ -256,7 +259,7 @@ fun PriceAndDiscountSection(state: PostListingUiState, vm: PostListingViewModel)
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     Text(
-                        "Talaba to'laydi: ${new.formatSum()} so'm",
+                        Lt.studentPays(new.formatSum()),
                         style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.sp, fontWeight = FontWeight.Black, color = palette.successDeep),
                     )
                     Spacer(Modifier.weight(1f))
@@ -274,7 +277,7 @@ fun PriceAndDiscountSection(state: PostListingUiState, vm: PostListingViewModel)
 @Composable
 fun RedemptionSection(state: PostListingUiState, vm: PostListingViewModel) {
     FormSection(
-        title = "Talaba qanday oladi",
+        title = lt("Talaba qanday oladi"),
         subtitle = state.discount.redemptionMethod.hint,
         error = state.errorFor(ListingField.PROMO_CODE),
     ) {
@@ -303,7 +306,7 @@ fun RedemptionSection(state: PostListingUiState, vm: PostListingViewModel) {
 fun BusinessNameSection(state: PostListingUiState, copy: ListingFormCopy, vm: PostListingViewModel) {
     FormSection(
         title = copy.businessSection,
-        subtitle = "Talaba e'lonni shu nom ostida ko'radi",
+        subtitle = lt("Talaba e'lonni shu nom ostida ko'radi"),
         error = state.errorFor(ListingField.BUSINESS_NAME),
     ) {
         GlassTextField(

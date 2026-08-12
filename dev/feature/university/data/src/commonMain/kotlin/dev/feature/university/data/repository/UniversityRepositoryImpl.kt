@@ -17,6 +17,7 @@ import io.ktor.client.request.get
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
+import dev.core.common.locale.AppLocale
 
 private const val EMIS_UNIVERSITIES_URL =
     "https://prof-emis.edu.uz/api/v2/integration/stat/public/university?limit=10000"
@@ -40,7 +41,7 @@ class UniversityRepositoryImpl(
             val dtos: List<ProfEmisUniversityDto> = httpClient.get(EMIS_UNIVERSITIES_URL).body()
             Resource.Success(dtos.map { it.toUniversity() }.sortedBy { it.name })
         } catch (e: Exception) {
-            Resource.Error(e.message ?: "Universitetlarni yuklab bo'lmadi", e)
+            Resource.Error(e.message ?: AppLocale.pick(en = "Couldn't load universities", ru = "Не удалось загрузить университеты", uz = "Universitetlarni yuklab bo'lmadi"), e)
         }
     }
 

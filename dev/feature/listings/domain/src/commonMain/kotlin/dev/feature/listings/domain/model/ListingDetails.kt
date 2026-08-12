@@ -11,41 +11,45 @@ package dev.feature.listings.domain.model
  * demakdir.
  */
 enum class ListingKind(
-    val label: String,
+    private val labelUz: String,
     val emoji: String,
     val accent: Long,
-    val subtitle: String,
+    private val subtitleUz: String,
 ) {
     DISCOUNT(
-        label = "Chegirma va sotuv",
+        labelUz = "Chegirma va sotuv",
         emoji = "🏷️",
         accent = 0xFF7C5CFF,
-        subtitle = "Biznes talabaga chegirma yoki mahsulot taklif qiladi",
+        subtitleUz = "Biznes talabaga chegirma yoki mahsulot taklif qiladi",
     ),
     RENTAL(
-        label = "Ijara — turarjoy",
+        labelUz = "Ijara — turarjoy",
         emoji = "🏠",
         accent = 0xFF22C55E,
-        subtitle = "Kvartira, hovli yoki yotoqxonaga sherik izlash",
+        subtitleUz = "Kvartira, hovli yoki yotoqxonaga sherik izlash",
     ),
     SERVICE(
-        label = "Xizmatlar",
+        labelUz = "Xizmatlar",
         emoji = "🛠️",
         accent = 0xFF3B82F6,
-        subtitle = "Repetitor, chop etish, dizayn va boshqa xizmatlar",
+        subtitleUz = "Repetitor, chop etish, dizayn va boshqa xizmatlar",
     ),
     JOB(
-        label = "Ish e'loni",
+        labelUz = "Ish e'loni",
         emoji = "💼",
         accent = 0xFFF97316,
-        subtitle = "Kunlik ish yoki doimiy ish o'rni",
+        subtitleUz = "Kunlik ish yoki doimiy ish o'rni",
     ),
     TASK(
-        label = "Fanlardan yordam",
+        labelUz = "Fanlardan yordam",
         emoji = "📚",
         accent = 0xFFEC4899,
-        subtitle = "Bir martalik topshiriq: masala, qo'lyozma, referat, IT ishi",
+        subtitleUz = "Bir martalik topshiriq: masala, qo'lyozma, referat, IT ishi",
     ),
+    ;
+
+    val label: String get() = trListing(labelUz)
+    val subtitle: String get() = trListing(subtitleUz)
 }
 
 /**
@@ -111,8 +115,8 @@ sealed interface ListingDetails {
             if (!isDiscounted) return null
             return when (discountType) {
                 DiscountType.PERCENT -> "−$discountValue%"
-                DiscountType.FIXED_AMOUNT -> "−${discountValue.formatSum()} so'm"
-                DiscountType.SPECIAL_PRICE -> "${discountValue.formatSum()} so'm"
+                DiscountType.FIXED_AMOUNT -> "−${discountValue.formatSum()} ${listingCurrency()}"
+                DiscountType.SPECIAL_PRICE -> "${discountValue.formatSum()} ${listingCurrency()}"
                 DiscountType.FREE_ITEM -> "1+1"
             }
         }
@@ -161,9 +165,9 @@ sealed interface ListingDetails {
 
         /** "3 xonali · 2 kishi bor · 2 kishi kerak" — kartochkadagi qisqa satr. */
         fun summary(): String = listOfNotNull(
-            roomCount?.let { "$it xonali" },
-            currentTenants?.let { "$it kishi bor" },
-            neededTenants?.let { "$it kishi kerak" },
+            roomCount?.let { ListingText.rooms(it) },
+            currentTenants?.let { ListingText.tenantsNow(it) },
+            neededTenants?.let { ListingText.tenantsNeeded(it) },
             gender?.label,
         ).joinToString(" · ")
     }
@@ -318,10 +322,14 @@ sealed interface ListingDetails {
 // ---------------------------------------------------------------------------
 
 /** Topshiriq qanday bajariladi. Qo'lyozma kabi ishlar yuzma-yuz topshirishni talab qiladi. */
-enum class TaskFormat(val label: String) {
+enum class TaskFormat(private val labelUz: String) {
     ONLINE("Onlayn"),
     IN_PERSON("Yuzma-yuz"),
-    ANY("Farqi yo'q"),
+    ANY("Farqi yo'q")
+
+    ;
+
+    val label: String get() = trListing(labelUz)
 }
 
 // ---------------------------------------------------------------------------
@@ -329,28 +337,40 @@ enum class TaskFormat(val label: String) {
 // ---------------------------------------------------------------------------
 
 /** Turarjoy turi. */
-enum class PropertyType(val label: String, val emoji: String) {
+enum class PropertyType(private val labelUz: String, val emoji: String) {
     APARTMENT("Kvartira", "🏢"),
     ROOM("Alohida xona", "🚪"),
     HOUSE("Hovli / uy", "🏡"),
     DORMITORY("Yotoqxona", "🏨"),
-    BED_SPACE("Koyka joy", "🛏️"),
+    BED_SPACE("Koyka joy", "🛏️")
+
+    ;
+
+    val label: String get() = trListing(labelUz)
 }
 
 /**
  * Kim uchun. Ijarada **majburiy** — talaba uchun asosiy filtr.
  * Ish e'lonida ixtiyoriy (`null` — farqi yo'q).
  */
-enum class TenantGender(val label: String, val emoji: String) {
+enum class TenantGender(private val labelUz: String, val emoji: String) {
     MALE("O'g'il bolalar", "👦"),
     FEMALE("Qizlar", "👧"),
-    ANY("Farqi yo'q", "👥"),
+    ANY("Farqi yo'q", "👥")
+
+    ;
+
+    val label: String get() = trListing(labelUz)
 }
 
 /** Ijara muddati — narx shu davrga tegishli. */
-enum class RentPeriod(val label: String, val priceUnit: PriceUnit) {
+enum class RentPeriod(private val labelUz: String, val priceUnit: PriceUnit) {
     MONTHLY("Oylik", PriceUnit.PER_MONTH),
-    DAILY("Kunlik", PriceUnit.PER_DAY),
+    DAILY("Kunlik", PriceUnit.PER_DAY)
+
+    ;
+
+    val label: String get() = trListing(labelUz)
 }
 
 // ---------------------------------------------------------------------------
@@ -358,10 +378,14 @@ enum class RentPeriod(val label: String, val priceUnit: PriceUnit) {
 // ---------------------------------------------------------------------------
 
 /** Xizmat qanday ko'rsatiladi. */
-enum class ServiceFormat(val label: String) {
+enum class ServiceFormat(private val labelUz: String) {
     OFFLINE("Yuzma-yuz"),
     ONLINE("Onlayn"),
-    HYBRID("Aralash"),
+    HYBRID("Aralash")
+
+    ;
+
+    val label: String get() = trListing(labelUz)
 }
 
 // ---------------------------------------------------------------------------
@@ -369,48 +393,76 @@ enum class ServiceFormat(val label: String) {
 // ---------------------------------------------------------------------------
 
 /** Ish turi — formaning qaysi maydonlari ko'rinishini belgilaydi. */
-enum class EmploymentType(val label: String, val hint: String) {
+enum class EmploymentType(private val labelUz: String, private val hintUz: String) {
     DAILY("Kunlik ish", "Bir martalik yoki bir necha kunlik ish"),
-    PERMANENT("Doimiy ish", "Doimiy ish o'rni, oylik maosh bilan"),
+    PERMANENT("Doimiy ish", "Doimiy ish o'rni, oylik maosh bilan")
+
+    ;
+
+    val label: String get() = trListing(labelUz)
+
+    val hint: String get() = trListing(hintUz)
 }
 
 /** Smena — doimiy ishda eng ko'p so'raladigan shart. */
-enum class WorkShift(val label: String, val hint: String) {
+enum class WorkShift(private val labelUz: String, private val hintUz: String) {
     MORNING("Ertalabki", "08:00 — 16:00"),
     DAY("Kunduzgi", "10:00 — 18:00"),
     EVENING("Kechki", "16:00 — 00:00"),
     NIGHT("Tungi", "00:00 — 08:00"),
     SHIFT_2_2("2/2 smena", "Ikki kun ish, ikki kun dam"),
     SHIFT_1_2("1/2 smena", "Bir kun ish, ikki kun dam"),
-    FLEXIBLE("Erkin grafik", "Vaqtni o'zingiz tanlaysiz"),
+    FLEXIBLE("Erkin grafik", "Vaqtni o'zingiz tanlaysiz")
+
+    ;
+
+    val label: String get() = trListing(labelUz)
+
+    val hint: String get() = trListing(hintUz)
 }
 
 /** Maosh qanday hisoblanadi — kunlik ishda odatda kunlik, doimiy ishda oylik. */
-enum class PayPeriod(val label: String, val suffix: String) {
+enum class PayPeriod(private val labelUz: String, private val suffixUz: String) {
     HOURLY("Soatbay", "soatiga"),
     DAILY("Kunlik", "kuniga"),
     WEEKLY("Haftalik", "haftasiga"),
     MONTHLY("Oylik", "oyiga"),
-    PER_TASK("Ish bajarilishiga", "ish uchun"),
+    PER_TASK("Ish bajarilishiga", "ish uchun")
+
+    ;
+
+    val label: String get() = trListing(labelUz)
+
+    val suffix: String get() = trListing(suffixUz)
 }
 
 /** Tajriba talabi. */
-enum class ExperienceLevel(val label: String) {
+enum class ExperienceLevel(private val labelUz: String) {
     NONE("Tajriba shart emas"),
     LESS_THAN_YEAR("1 yilgacha"),
     ONE_TO_THREE("1–3 yil"),
-    MORE_THAN_THREE("3 yildan ortiq"),
+    MORE_THAN_THREE("3 yildan ortiq")
+
+    ;
+
+    val label: String get() = trListing(labelUz)
 }
 
 /** Hafta kuni. [WorkSchedule.days] shu ro'yxatdan iborat. */
-enum class WeekDay(val label: String, val shortLabel: String) {
+enum class WeekDay(private val labelUz: String, private val shortLabelUz: String) {
     MONDAY("Dushanba", "Du"),
     TUESDAY("Seshanba", "Se"),
     WEDNESDAY("Chorshanba", "Cho"),
     THURSDAY("Payshanba", "Pay"),
     FRIDAY("Juma", "Ju"),
     SATURDAY("Shanba", "Sha"),
-    SUNDAY("Yakshanba", "Yak"),
+    SUNDAY("Yakshanba", "Yak")
+
+    ;
+
+    val label: String get() = trListing(labelUz)
+
+    val shortLabel: String get() = trListing(shortLabelUz)
 }
 
 /**

@@ -7,6 +7,7 @@ import dev.feature.listings.domain.model.ListingQuery
 import dev.feature.listings.domain.model.ListingStatus
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
+import dev.core.common.locale.AppLocale
 
 /**
  * Backendsiz rejim (`REMOTE_SYNC_ENABLED = false`).
@@ -26,7 +27,7 @@ class LocalListingRemoteDataSource : ListingRemoteDataSource {
         Resource.Success(ListingPage())
 
     override suspend fun byId(id: String): Resource<Listing> =
-        Resource.Error("E'lon topilmadi")
+        Resource.Error(AppLocale.pick(en = "Listing not found", ru = "Объявление не найдено", uz = "E'lon topilmadi"))
 
     override suspend fun save(listing: Listing, submit: Boolean): Resource<Listing> =
         Resource.Success(
@@ -34,7 +35,7 @@ class LocalListingRemoteDataSource : ListingRemoteDataSource {
         )
 
     override suspend fun setStatus(id: String, status: ListingStatus): Resource<Listing> =
-        Resource.Error("Backend ulanmagan")
+        Resource.Error(AppLocale.pick(en = "The backend isn't connected", ru = "Бэкенд не подключён", uz = "Backend ulanmagan"))
 
     override suspend fun delete(id: String): Resource<Unit> = Resource.Success(Unit)
 
@@ -43,6 +44,6 @@ class LocalListingRemoteDataSource : ListingRemoteDataSource {
         val mime = if (fileName.endsWith(".png", ignoreCase = true)) "image/png" else "image/jpeg"
         Resource.Success("data:$mime;base64,${Base64.encode(bytes)}")
     } catch (e: Exception) {
-        Resource.Error(e.message ?: "Rasmni o'qib bo'lmadi", e)
+        Resource.Error(e.message ?: AppLocale.pick(en = "Couldn't read the image", ru = "Не удалось прочитать изображение", uz = "Rasmni o'qib bo'lmadi"), e)
     }
 }

@@ -84,6 +84,8 @@ import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import dev.feature.connections.domain.model.ConnectionView
+import dev.core.uikit.locale.uiStrings
+import dev.core.uikit.locale.uiStringsNow
 import dev.feature.connections.domain.model.SearchedStudent
 import org.koin.compose.viewmodel.koinViewModel
 import androidx.compose.runtime.ReadOnlyComposable
@@ -141,6 +143,7 @@ fun HomeScreen(
     vm: HomeViewModel = koinViewModel(),
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
+    val s = homeStrings()
     val scroll = rememberScrollState()
     // `scroll.value` — piksel, chegara esa dp: to'g'ridan-to'g'ri solishtirsak zich
     // ekranlarda topbar 12dp scroll'dayoq siqilib ketardi.
@@ -224,8 +227,8 @@ fun HomeScreen(
                     TasksSection(state.tasks, onOpenTasks, onOpenListing)
                     RentalsSection(state.rentals, onOpenRentals, onOpenListing)
                     StudentsSection(
-                        title = "Universitetimda",
-                        subtitle = "Bir universitetda o'qiyotgan talabalar",
+                        title = s.myUniversityStudents,
+                        subtitle = s.myUniversityStudentsSubtitle,
                         students = state.universityStudents,
                         onSeeAll = onOpenStudentSearch,
                         onConnect = vm::connect,
@@ -233,8 +236,8 @@ fun HomeScreen(
                         onOpenStudent = { profileStudent = it },
                     )
                     StudentsSection(
-                        title = "Barcha talabalar",
-                        subtitle = "Yangi qo'shilganlar birinchi",
+                        title = s.allStudents,
+                        subtitle = s.allStudentsSubtitle,
                         students = state.allStudents,
                         onSeeAll = onOpenStudentSearch,
                         onConnect = vm::connect,
@@ -334,6 +337,7 @@ private fun HomeHeader(
     onOpenNotifications: () -> Unit,
     onOpenStories: () -> Unit,
 ) {
+    val s = homeStrings()
     ScHeader(
         bottomRadius = lerp(36.dp, 26.dp, p),
         bottomPadding = lerp(28.dp, 12.dp, p),
@@ -389,7 +393,7 @@ private fun HomeHeader(
                 // "Assalomu alaykum 👋" — siqilganda balandligi 0 ga tushadi.
                 CollapsingRow(p, fullHeight = 18.dp) {
                     ScText(
-                        "Assalomu alaykum 👋",
+                        s.greeting,
                         13f,
                         FontWeight.Medium,
                         Color.White.copy(alpha = 0.85f),
@@ -440,10 +444,10 @@ private fun HomeHeader(
                 // panelda tab emas (u yerda "Takliflar" turibdi), ya'ni bu ilovadagi
                 // YAGONA kirish nuqtasi: ilgarigidek scroll'da yo'qolsa, foydalanuvchi
                 // xabarlarga tepaga qaytmasdan kirolmay qolardi.
-                HeaderCircleButton(ScIcons.ChatRound, "Xabarlar", onOpenChat)
+                HeaderCircleButton(ScIcons.ChatRound, s.messages, onOpenChat)
                 HeaderCircleButton(
                     ScIcons.Bell,
-                    "Bildirishnomalar",
+                    s.notifications,
                     onOpenNotifications,
                     badge = state.hasUnreadNotifications
                 )
@@ -508,7 +512,7 @@ private fun <T> EdgeRow(items: List<T>, spacing: Dp = 13.dp, item: @Composable (
 private fun PaddedHeader(
     title: String,
     subtitle: String? = null,
-    action: String? = "Barchasi",
+    action: String? = uiStrings().all,
     actionIcon: ImageVector? = null,
     onAction: (() -> Unit)? = null,
 ) {
@@ -677,7 +681,7 @@ private fun OfferPrice(offer: DiscountOffer) {
         horizontalArrangement = Arrangement.spacedBy(5.dp),
     ) {
         ScText(
-            "${offer.effectivePrice.formatAmount()} so'm", 15.5f, FontWeight.ExtraBold, Color.White,
+            "${offer.effectivePrice.formatAmount()} ${uiStrings().currency}", 15.5f, FontWeight.ExtraBold, Color.White,
             letterSpacing = -0.2f, maxLines = 1,
         )
         if (offer.isDiscount && offer.originalPrice > offer.finalPrice) {
@@ -702,9 +706,10 @@ private fun OfferPrice(offer: DiscountOffer) {
  * shunda yorliq "Erkaklar · Erkaklar" bo'lib qolardi — takror olib tashlanadi.
  */
 private fun DiscountOffer.typeLabel(): String {
+    val s = homeStringsNow()
     val genderLabel = when (gender.uppercase()) {
-        "MALE" -> "Erkaklar"
-        "FEMALE" -> "Ayollar"
+        "MALE" -> s.men
+        "FEMALE" -> s.women
         else -> null
     }
     val type = subcategory.takeIf { it.isNotBlank() }
@@ -731,10 +736,11 @@ private val InkOnLight = Color(0xFF0F2A43)
 @Composable
 private fun TasksSection(tasks: List<Listing>, onSeeAll: () -> Unit, onOpen: (String) -> Unit) {
     if (tasks.isEmpty()) return
+    val s = homeStrings()
     Column(verticalArrangement = Arrangement.spacedBy(13.dp)) {
         PaddedHeader(
-            "📚 Fanlardan yordam",
-            "Referat, masala, qo'lyozma va IT ishlari",
+            s.tasksTitle,
+            s.tasksSubtitle,
             onAction = onSeeAll,
         )
         Column(
@@ -781,8 +787,10 @@ private fun TaskRow(listing: Listing, onOpen: (String) -> Unit) {
 }
 
 /** "150 000 so'm" yoki "Kelishilgan". */
-private fun Listing.taskPriceLabel(): String =
-    if (isNegotiable) "Kelishilgan" else "${price.formatSum()} so'm"
+private fun Listing.taskPriceLabel(): String {
+    val ui = uiStringsNow()
+    return if (isNegotiable) ui.negotiable else "${price.formatSum()} ${ui.currency}"
+}
 
 /**
  * Muddat yorlig'i: "Bugun 18:00", "Ertaga 12:00", "5 kundan keyin" yoki "24.12".
@@ -790,6 +798,7 @@ private fun Listing.taskPriceLabel(): String =
  */
 private fun deadlineLabel(deadline: Long?): String? {
     if (deadline == null) return null
+    val ui = uiStringsNow()
     val zone = TimeZone.currentSystemDefault()
     val at = Instant.fromEpochMilliseconds(deadline).toLocalDateTime(zone)
     val today = Clock.System.now().toLocalDateTime(zone).date
@@ -797,9 +806,9 @@ private fun deadlineLabel(deadline: Long?): String? {
     val time = "${at.hour.toString().padStart(2, '0')}:${at.minute.toString().padStart(2, '0')}"
     return when {
         days < 0 -> null
-        days == 0 -> "Bugun $time"
-        days == 1 -> "Ertaga $time"
-        days in 2..13 -> "$days kundan keyin"
+        days == 0 -> "${ui.today} $time"
+        days == 1 -> "${ui.tomorrow} $time"
+        days in 2..13 -> ui.inDays(days)
         else -> "${at.date.dayOfMonth}.${at.date.monthNumber}"
     }
 }
@@ -811,8 +820,9 @@ private fun deadlineLabel(deadline: Long?): String? {
 @Composable
 private fun RentalsSection(rentals: List<Listing>, onSeeAll: () -> Unit, onOpen: (String) -> Unit) {
     if (rentals.isEmpty()) return
+    val s = homeStrings()
     Column(verticalArrangement = Arrangement.spacedBy(13.dp)) {
-        PaddedHeader("Ijara kvartiralar", "Sherik izlayotgan uylar", onAction = onSeeAll)
+        PaddedHeader(s.rentalsTitle, s.rentalsSubtitle, onAction = onSeeAll)
         EdgeRow(rentals.take(6)) { _, listing ->
             Column(
                 Modifier.width(260.dp).scCard(radius = 26.dp, onClick = { onOpen(listing.id) }),
@@ -878,8 +888,9 @@ private fun StudentsSection(
     onOpenStudent: (StudentSummary) -> Unit,
 ) {
     if (students.isEmpty()) return
+    val s = homeStrings()
     Column(verticalArrangement = Arrangement.spacedBy(13.dp)) {
-        PaddedHeader(title, subtitle, action = "Ko'proq", onAction = onSeeAll)
+        PaddedHeader(title, subtitle, action = uiStrings().more, onAction = onSeeAll)
         EdgeRow(students.take(10)) { index, result ->
             val student = result.student
             val (tint, accent) = studentVisuals[index.mod(studentVisuals.size)]
@@ -909,19 +920,19 @@ private fun StudentsSection(
                 Spacer(Modifier.height(14.dp))
                 when (result.connectionStatus) {
                     ConnectionView.CONNECTED -> ScGradientButton(
-                        "Xabar", { onMessage(student.id) },
+                        s.message, { onMessage(student.id) },
                         radius = 16.dp, verticalPadding = 10.dp, fontSize = 13.5f,
                         weight = FontWeight.Bold,
                     )
                     // Kiruvchi so'rovga ham shu tugma javob beradi: server qarshi so'rovni
                     // darhol qabul qilingan bog'lanishga aylantiradi (C1).
                     ConnectionView.NONE, ConnectionView.PENDING_IN -> ScGradientButton(
-                        "Bog'lanish", { onConnect(student.id) },
+                        s.connect, { onConnect(student.id) },
                         radius = 16.dp, verticalPadding = 10.dp, fontSize = 13.5f,
                         weight = FontWeight.Bold,
                     )
                     ConnectionView.PENDING_OUT -> ScText(
-                        "Yuborildi", 12.5f, FontWeight.Bold, Sc.Muted, maxLines = 1,
+                        s.requestSent, 12.5f, FontWeight.Bold, Sc.Muted, maxLines = 1,
                     )
                 }
             }
@@ -942,8 +953,9 @@ private fun Listing.locationLabel(): String? =
 
 /** "1 500 000 so'm / oy". */
 private fun Listing.rentLabel(): String {
-    if (isNegotiable) return "Kelishilgan"
+    val ui = uiStringsNow()
+    if (isNegotiable) return ui.negotiable
     val suffix = rentalDetails?.period?.priceUnit?.suffix
-    return listOfNotNull("${price.formatSum()} so'm", suffix).joinToString(" / ")
+    return listOfNotNull("${price.formatSum()} ${ui.currency}", suffix).joinToString(" / ")
 }
 

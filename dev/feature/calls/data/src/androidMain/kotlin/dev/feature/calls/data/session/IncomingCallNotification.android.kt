@@ -18,6 +18,7 @@ import kotlinx.coroutines.launch
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 import dev.feature.calls.domain.repository.CallController
+import dev.feature.calls.domain.model.CallStrings
 
 /**
  * Kiruvchi qo'ng'iroqning **to'liq ekranli** bildirishnomasi — tizim qo'ng'irog'idek.
@@ -57,8 +58,8 @@ internal object IncomingCallNotification {
     }.getOrElse { }
 
     private fun build(context: Context, peerName: String, video: Boolean): Notification {
-        val title = peerName.ifBlank { "Noma'lum raqam" }
-        val text = if (video) "Video qo'ng'iroq" else "Ovozli qo'ng'iroq"
+        val title = peerName.ifBlank { CallStrings.unknownCaller }
+        val text = if (video) CallStrings.videoCall else CallStrings.voiceCall
 
         val fullScreen = context.packageManager.getLaunchIntentForPackage(context.packageName)
             ?.let { launch ->
@@ -84,12 +85,12 @@ internal object IncomingCallNotification {
             .setFullScreenIntent(fullScreen, true)
             .addAction(
                 android.R.drawable.ic_menu_close_clear_cancel,
-                "Rad etish",
+                CallStrings.decline,
                 actionIntent(context, ACTION_DECLINE, REQUEST_DECLINE),
             )
             .addAction(
                 android.R.drawable.stat_sys_phone_call,
-                "Javob berish",
+                CallStrings.answer,
                 actionIntent(context, ACTION_ANSWER, REQUEST_ANSWER),
             )
             .build()
@@ -111,12 +112,12 @@ internal object IncomingCallNotification {
         if (manager.getNotificationChannel(CHANNEL_ID) != null) return
         val channel = NotificationChannel(
             CHANNEL_ID,
-            "Kiruvchi qo'ng'iroqlar",
+            CallStrings.incomingCallsChannel,
             // `HIGH` — bu to'liq ekranli bildirishnomaning SHARTI: past muhimlikda tizim
             // `fullScreenIntent` ni umuman ishlatmaydi va oyna ochilmaydi.
             NotificationManager.IMPORTANCE_HIGH,
         ).apply {
-            description = "Sizga kelayotgan qo'ng'iroqlar"
+            description = CallStrings.incomingCallsChannelBody
             setSound(null, null)
             enableVibration(false)
             lockscreenVisibility = Notification.VISIBILITY_PUBLIC
@@ -131,7 +132,7 @@ internal object IncomingCallNotification {
 }
 
 /**
- * Bildirishnomadagi "Javob berish" / "Rad etish" tugmalari.
+ * Bildirishnomadagi CallStrings.answer / CallStrings.decline tugmalari.
  *
  * Qabul qiluvchi Koin'dan [CallController] ni oladi — u ilova bo'ylab bitta `single`,
  * ya'ni jonli qo'ng'iroqning aynan o'shanisi. `goAsync()` ishlatilmaydi: ikkala amal ham

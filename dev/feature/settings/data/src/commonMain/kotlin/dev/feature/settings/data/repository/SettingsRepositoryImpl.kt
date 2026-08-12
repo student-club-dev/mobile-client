@@ -3,6 +3,7 @@ package dev.feature.settings.data.repository
 import app.cash.sqldelight.coroutines.asFlow
 import app.cash.sqldelight.coroutines.mapToOneOrNull
 import dev.core.common.AppDispatchers
+import dev.core.common.locale.AppLanguage
 import dev.core.database.sql.StudentClubDatabase
 import dev.feature.settings.domain.model.ThemeMode
 import dev.feature.settings.domain.repository.SettingsRepository
@@ -11,6 +12,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 
 private const val KEY_THEME_MODE = "theme_mode"
+private const val KEY_LANGUAGE = "app_language"
 
 class SettingsRepositoryImpl(
     private val db: StudentClubDatabase,
@@ -25,6 +27,14 @@ class SettingsRepositoryImpl(
         }
 
     override suspend fun setThemeMode(mode: ThemeMode) = withContext(dispatchers.io) { q.upsert(KEY_THEME_MODE, mode.name) }
+
+    // Saqlanmagan yoki buzuq qiymat → `AppLanguage.Default` (EN). Qurilma tili ataylab
+    // o'qilmaydi: ilova hamma qurilmada bir xil — ingliz tilida ochilishi kerak.
+    override fun observeLanguage(): Flow<AppLanguage> =
+        q.selectByKey(KEY_LANGUAGE).asFlow().mapToOneOrNull(dispatchers.io).map { AppLanguage.fromCode(it) }
+
+    override suspend fun setLanguage(language: AppLanguage) =
+        withContext(dispatchers.io) { q.upsert(KEY_LANGUAGE, language.code) }
 
     override fun observeFlag(key: String, default: Boolean): Flow<Boolean> =
         q.selectByKey(key).asFlow().mapToOneOrNull(dispatchers.io).map { value -> value?.let { it.toBooleanStrictOrNull() } ?: default }

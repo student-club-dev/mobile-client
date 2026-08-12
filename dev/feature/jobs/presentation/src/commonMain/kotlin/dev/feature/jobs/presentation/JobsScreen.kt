@@ -46,13 +46,21 @@ import dev.core.uikit.components.PrimaryButton
 import dev.core.uikit.theme.AppPalette
 import dev.core.uikit.theme.appPalette
 import org.koin.compose.viewmodel.koinViewModel
+import androidx.compose.runtime.ReadOnlyComposable
+import dev.core.uikit.locale.uiStrings
 
-private val filterLabels = listOf(
-    JobFilter.ALL to "Barchasi",
-    JobFilter.IT to "IT",
-    JobFilter.REMOTE to "Masofaviy",
-    JobFilter.PART_TIME to "Part-time",
-)
+/** Filtr yorliqlari — joriy tilda (Composable, chunki til daraxtdan keladi). */
+@Composable
+@ReadOnlyComposable
+private fun filterLabels(): List<Pair<JobFilter, String>> {
+    val s = jobsStrings()
+    return listOf(
+        JobFilter.ALL to s.filterAll,
+        JobFilter.IT to "IT",
+        JobFilter.REMOTE to s.filterRemote,
+        JobFilter.PART_TIME to s.filterPartTime,
+    )
+}
 
 @Composable
 fun JobsScreen(vm: JobsViewModel = koinViewModel()) {
@@ -69,15 +77,15 @@ fun JobsScreen(vm: JobsViewModel = koinViewModel()) {
     Column(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp).scTopInset()) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text("Ishlar", style = TextStyle(fontFamily = AppFontFamily, fontSize = 24.sp, fontWeight = FontWeight.Black, color = palette.ink), modifier = Modifier.weight(1f))
+                Text(jobsStrings().title, style = TextStyle(fontFamily = AppFontFamily, fontSize = 24.sp, fontWeight = FontWeight.Black, color = palette.ink), modifier = Modifier.weight(1f))
                 Box(
                     Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(palette.glass).border(1.dp, palette.border, RoundedCornerShape(12.dp)),
                     contentAlignment = Alignment.Center,
-                ) { Icon(AppIcons.Filter, "Filtr", tint = palette.ink, modifier = Modifier.size(18.dp)) }
+                ) { Icon(AppIcons.Filter, jobsStrings().filter, tint = palette.ink, modifier = Modifier.size(18.dp)) }
             }
             Spacer(Modifier.height(14.dp))
             Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                filterLabels.forEach { (filter, label) ->
+                filterLabels().forEach { (filter, label) ->
                     FilterChip(label, state.filter == filter, { vm.setFilter(filter) }, palette)
                 }
             }
@@ -130,7 +138,7 @@ private fun JobCard(job: Job, palette: AppPalette, onOpen: () -> Unit, onBookmar
                 Text("${job.company} · ${job.location}", style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.5f.sp, color = palette.inkFaint), maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             Icon(
-                AppIcons.Bookmark, "Saqlash",
+                AppIcons.Bookmark, jobsStrings().bookmark,
                 tint = if (job.bookmarked) palette.primary else palette.inkFaint,
                 modifier = Modifier.size(20.dp).clickable(onClick = onBookmark),
             )
@@ -172,10 +180,10 @@ private fun JobDetail(job: Job, palette: AppPalette, onBack: () -> Unit, onApply
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).scTopInset()) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(palette.glass).border(1.dp, palette.border, RoundedCornerShape(12.dp)).clickable(onClick = onBack), contentAlignment = Alignment.Center) {
-                    Icon(AppIcons.ArrowLeft, "Orqaga", tint = palette.ink, modifier = Modifier.size(18.dp))
+                    Icon(AppIcons.ArrowLeft, uiStrings().back, tint = palette.ink, modifier = Modifier.size(18.dp))
                 }
                 Spacer(Modifier.weight(1f))
-                Icon(AppIcons.Bookmark, "Saqlash", tint = if (job.bookmarked) palette.primary else palette.inkFaint, modifier = Modifier.size(22.dp).clickable(onClick = onBookmark))
+                Icon(AppIcons.Bookmark, jobsStrings().bookmark, tint = if (job.bookmarked) palette.primary else palette.inkFaint, modifier = Modifier.size(22.dp).clickable(onClick = onBookmark))
             }
             Spacer(Modifier.height(16.dp))
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -194,17 +202,17 @@ private fun JobDetail(job: Job, palette: AppPalette, onBack: () -> Unit, onApply
             Spacer(Modifier.height(16.dp))
             Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(palette.successBg).padding(14.dp)) {
                 Column {
-                    Text("Maosh", style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.sp, color = palette.inkFaint))
+                    Text(jobsStrings().salary, style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.sp, color = palette.inkFaint))
                     Text(job.salary, style = TextStyle(fontFamily = AppFontFamily, fontSize = 18.sp, fontWeight = FontWeight.Black, color = palette.successDeep))
                 }
             }
             Spacer(Modifier.height(16.dp))
-            Text("Bu ish sizning bo'limingizga (${job.field}) mos keladi. To'liq tavsif e'lon egasidan.", style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.sp, color = palette.inkMuted, lineHeight = 19.sp))
+            Text(jobsStrings().fieldNote(job.field), style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.sp, color = palette.inkMuted, lineHeight = 19.sp))
             Spacer(Modifier.height(16.dp))
         }
         Box(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
             PrimaryButton(
-                if (applied) "Ariza yuborildi ✓" else "Ariza berish",
+                if (applied) jobsStrings().applied else jobsStrings().apply,
                 onClick = { if (!applied) { onApply(); applied = true } },
                 enabled = !applied,
             )

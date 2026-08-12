@@ -40,6 +40,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import dev.core.common.locale.AppLocale
 
 /**
  * [AuthRepository] ning **backend** implementatsiyasi — `/v1/auth/student/…`.
@@ -137,7 +138,7 @@ class ApiAuthRepository(
 
     override suspend fun completeRegistration(): Resource<User> {
         val uid = tokenStore.userId()
-            ?: return errorOf(AppException.Server(cause = IllegalStateException("Kutilayotgan sessiya yo'q")))
+            ?: return errorOf(AppException.Server(cause = IllegalStateException(AppLocale.pick(en = "No pending session", ru = "Нет ожидающей сессии", uz = "Kutilayotgan sessiya yo'q"))))
         val user = cacheSession(uid, pendingIdentifier ?: AuthIdentifier.Phone(""))
         pendingIdentifier = null
         return Resource.Success(user)
@@ -306,7 +307,7 @@ class ApiAuthRepository(
             Resource.Loading -> errorOf(AppException.Unknown())
             is Resource.Success ->
                 if (result.data.verified) Resource.Success(Unit)
-                else errorOf(AppException.Validation("Kod noto'g'ri yoki muddati o'tgan."))
+                else errorOf(AppException.Validation(AppLocale.pick(en = "The code is wrong or has expired.", ru = "Код неверный или истёк.", uz = "Kod noto'g'ri yoki muddati o'tgan.")))
         }
 
     // ------------------------------------------------------------------
@@ -333,7 +334,7 @@ class ApiAuthRepository(
         Resource.Loading -> errorOf(AppException.Unknown())
         is Resource.Success ->
             if (result.data.reset) Resource.Success(Unit)
-            else errorOf(AppException.Validation("Parolni tiklab bo'lmadi. Kodni tekshiring."))
+            else errorOf(AppException.Validation(AppLocale.pick(en = "Couldn't reset the password. Check the code.", ru = "Не удалось восстановить пароль. Проверьте код.", uz = "Parolni tiklab bo'lmadi. Kodni tekshiring.")))
     }
 
     override suspend fun setPassword(currentPassword: String?, newPassword: String): Resource<Unit> =

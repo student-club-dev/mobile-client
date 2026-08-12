@@ -14,14 +14,14 @@ import kotlinx.coroutines.flow.Flow
  * Validatsiya shu yerda, bitta joyda: ekran ham, kelajakdagi boshqa chaqiruvchi ham bir xil
  * qoidaga bo'ysunadi. Backend qoidalari (`RegisterDto.password.minLength = 8`) bilan mos.
  */
-private const val MIN_PASSWORD_LENGTH = 8
+internal const val MIN_PASSWORD_LENGTH = 8
 
 /** Telefon yoki email + parol bilan kirish. */
 class LoginUseCase(private val repository: AuthRepository) {
     suspend operator fun invoke(login: String, password: String): Resource<User> {
         val identifier = AuthIdentifier.of(login)
-            ?: return Resource.Error("Telefon raqami yoki email manzilini to'g'ri kiriting")
-        if (password.isBlank()) return Resource.Error("Parolni kiriting")
+            ?: return Resource.Error(AuthStrings.invalidLogin)
+        if (password.isBlank()) return Resource.Error(AuthStrings.passwordRequired)
         return repository.login(identifier, password)
     }
 }
@@ -29,7 +29,7 @@ class LoginUseCase(private val repository: AuthRepository) {
 /** Google ID token bilan kirish (yoki avtomatik ro'yxatdan o'tish). */
 class LoginWithGoogleUseCase(private val repository: AuthRepository) {
     suspend operator fun invoke(idToken: String): Resource<User> {
-        if (idToken.isBlank()) return Resource.Error("Google token bo'sh")
+        if (idToken.isBlank()) return Resource.Error(AuthStrings.googleTokenEmpty)
         return repository.loginWithGoogle(idToken)
     }
 }
@@ -43,7 +43,7 @@ class LoginWithGoogleUseCase(private val repository: AuthRepository) {
 class RequestRegistrationOtpUseCase(private val repository: AuthRepository) {
     suspend operator fun invoke(phone: String): Resource<OtpChallenge> {
         val identifier = AuthIdentifier.of(phone) as? AuthIdentifier.Phone
-            ?: return Resource.Error("To'liq 9 xonali raqam kiriting")
+            ?: return Resource.Error(AuthStrings.invalidPhone)
         return repository.requestRegistrationOtp(identifier.value)
     }
 }
@@ -68,9 +68,9 @@ class RegisterUseCase(private val repository: AuthRepository) {
         otpCode: String? = null,
     ): Resource<User> {
         val identifier = AuthIdentifier.of(login)
-            ?: return Resource.Error("Telefon raqami yoki email manzilini to'g'ri kiriting")
+            ?: return Resource.Error(AuthStrings.invalidLogin)
         if (identifier is AuthIdentifier.Phone && otpCode?.length != OTP_LENGTH) {
-            return Resource.Error("$OTP_LENGTH xonali kodni kiriting")
+            return Resource.Error(AuthStrings.otpLength)
         }
         return repository.register(identifier, password, otpCode)
     }
@@ -109,7 +109,7 @@ class ObserveCurrentUserUseCase(private val repository: AuthRepository) {
 class RequestPhoneOtpUseCase(private val repository: AuthRepository) {
     suspend operator fun invoke(phone: String): Resource<OtpChallenge> {
         val identifier = AuthIdentifier.of(phone) as? AuthIdentifier.Phone
-            ?: return Resource.Error("To'liq 9 xonali raqam kiriting")
+            ?: return Resource.Error(AuthStrings.invalidPhone)
         return repository.requestPhoneOtp(identifier.value)
     }
 }
@@ -118,8 +118,8 @@ class RequestPhoneOtpUseCase(private val repository: AuthRepository) {
 class VerifyPhoneOtpUseCase(private val repository: AuthRepository) {
     suspend operator fun invoke(phone: String, code: String): Resource<Unit> {
         val identifier = AuthIdentifier.of(phone) as? AuthIdentifier.Phone
-            ?: return Resource.Error("To'liq 9 xonali raqam kiriting")
-        if (code.length != OTP_LENGTH) return Resource.Error("$OTP_LENGTH xonali kodni kiriting")
+            ?: return Resource.Error(AuthStrings.invalidPhone)
+        if (code.length != OTP_LENGTH) return Resource.Error(AuthStrings.otpLength)
         return repository.verifyPhoneOtp(identifier.value, code)
     }
 }
@@ -128,7 +128,7 @@ class VerifyPhoneOtpUseCase(private val repository: AuthRepository) {
 class ForgotPasswordUseCase(private val repository: AuthRepository) {
     suspend operator fun invoke(phone: String): Resource<Unit> {
         val identifier = AuthIdentifier.of(phone) as? AuthIdentifier.Phone
-            ?: return Resource.Error("Parolni tiklash uchun telefon raqamini kiriting")
+            ?: return Resource.Error(AuthStrings.phoneRequiredForReset)
         return repository.forgotPassword(identifier.value)
     }
 }
@@ -137,10 +137,10 @@ class ForgotPasswordUseCase(private val repository: AuthRepository) {
 class ResetPasswordUseCase(private val repository: AuthRepository) {
     suspend operator fun invoke(phone: String, code: String, newPassword: String): Resource<Unit> {
         val identifier = AuthIdentifier.of(phone) as? AuthIdentifier.Phone
-            ?: return Resource.Error("Telefon raqamini to'g'ri kiriting")
-        if (code.length != OTP_LENGTH) return Resource.Error("$OTP_LENGTH xonali kodni kiriting")
+            ?: return Resource.Error(AuthStrings.invalidPhoneShort)
+        if (code.length != OTP_LENGTH) return Resource.Error(AuthStrings.otpLength)
         if (newPassword.length < MIN_PASSWORD_LENGTH) {
-            return Resource.Error("Parol kamida $MIN_PASSWORD_LENGTH belgidan iborat bo'lsin")
+            return Resource.Error(AuthStrings.passwordTooShort)
         }
         return repository.resetPassword(identifier.value, code, newPassword)
     }
@@ -150,7 +150,7 @@ class ResetPasswordUseCase(private val repository: AuthRepository) {
 class SetPasswordUseCase(private val repository: AuthRepository) {
     suspend operator fun invoke(currentPassword: String?, newPassword: String): Resource<Unit> {
         if (newPassword.length < MIN_PASSWORD_LENGTH) {
-            return Resource.Error("Parol kamida $MIN_PASSWORD_LENGTH belgidan iborat bo'lsin")
+            return Resource.Error(AuthStrings.passwordTooShort)
         }
         return repository.setPassword(currentPassword?.ifBlank { null }, newPassword)
     }

@@ -59,6 +59,7 @@ import dev.core.uikit.components.ScText
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
+import dev.core.uikit.locale.uiStrings
 
 /**
  * Android: CameraX (`LifecycleCameraController`).
@@ -174,7 +175,7 @@ private fun CameraSurface(
     Box(Modifier.fillMaxSize()) {
         Icon(
             ScIcons.ChevronLeft,
-            "Yopish",
+            uiStrings().close,
             tint = Color.White,
             modifier = Modifier.align(Alignment.TopStart)
                 .statusBarsPadding()
@@ -310,14 +311,14 @@ private fun GalleryThumb(thumbnail: ImageBitmap?, onClick: () -> Unit) {
         if (thumbnail != null) {
             androidx.compose.foundation.Image(
                 bitmap = thumbnail,
-                contentDescription = "Galereyadan tanlash",
+                contentDescription = uiStrings().chooseFromGallery,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),
             )
         } else {
             Icon(
                 AppIcons.ImageIcon,
-                "Galereyadan tanlash",
+                uiStrings().chooseFromGallery,
                 tint = Color.White,
                 modifier = Modifier.size(20.dp),
             )
@@ -336,11 +337,10 @@ private fun PermissionPrompt(
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        ScText("Kameraga ruxsat kerak", 17f, FontWeight.ExtraBold, Color.White, maxLines = 2)
+        ScText(uiStrings().cameraPermissionTitle, 17f, FontWeight.ExtraBold, Color.White, maxLines = 2)
         Spacer(Modifier.height(8.dp))
         ScText(
-            "Hikoya olish uchun kamerani yoqing. Ruxsat bermasangiz ham galereyadan " +
-                "rasm yoki video tanlashingiz mumkin.",
+            uiStrings().cameraPermissionBody,
             13.5f,
             FontWeight.Medium,
             Color.White.copy(alpha = 0.75f),
@@ -349,9 +349,9 @@ private fun PermissionPrompt(
         )
         Spacer(Modifier.height(20.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            PromptButton("Ruxsat berish", onRequest)
+            PromptButton(uiStrings().grantPermission, onRequest)
             PromptButton("Galereya", onOpenGallery)
-            PromptButton("Yopish", onClose)
+            PromptButton(uiStrings().close, onClose)
         }
     }
 }

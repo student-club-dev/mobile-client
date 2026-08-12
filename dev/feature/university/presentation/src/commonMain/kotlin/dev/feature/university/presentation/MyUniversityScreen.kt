@@ -80,6 +80,8 @@ import org.koin.compose.viewmodel.koinViewModel
 import androidx.compose.runtime.ReadOnlyComposable
 import dev.core.common.format.formatAmountShort
 import dev.core.common.format.formatAmount
+import dev.core.uikit.locale.uiStringsNow
+import dev.core.uikit.locale.uiStrings
 
 /** Ro'yxatdagi plitkalar navbat bilan shu tint/accent juftlarini oladi. */
 private val tilePalette: List<Pair<Color, Color>>
@@ -105,6 +107,7 @@ fun MyUniversityScreen(
     vm: MyUniversityViewModel = koinViewModel(),
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
+    val s = universityStrings()
     val picker by vm.picker.collectAsStateWithLifecycle()
     var showPicker by remember { mutableStateOf(false) }
     var showStudents by remember { mutableStateOf(false) }
@@ -115,7 +118,7 @@ fun MyUniversityScreen(
     Box(Modifier.fillMaxSize().background(Sc.Bg)) {
         Column(Modifier.fillMaxSize()) {
             ScHeader {
-                ScHeaderTitle("Mening universitetim", modifier = Modifier.padding(top = 20.dp))
+                ScHeaderTitle(s.title, modifier = Modifier.padding(top = 20.dp))
             }
             ScPullRefresh(refreshing = state.refreshing, onRefresh = vm::refresh) {
                 LazyColumn(
@@ -144,9 +147,9 @@ fun MyUniversityScreen(
                         if (state.mates.isNotEmpty()) {
                             item {
                                 ScSectionHeader(
-                                    "Do'stlashish uchun talabalar",
+                                    s.matesSectionTitle,
                                     Modifier.padding(horizontal = Sc.ScreenPadding),
-                                    action = "Barchasi",
+                                    action = uiStringsNow().all,
                                     onAction = { showStudents = true },
                                 )
                             }
@@ -171,8 +174,8 @@ fun MyUniversityScreen(
                         tasksSection(state.tasks, onSeeAll = onOpenTasks, onOpen = onOpenListing)
                     }
 
-                    nearbySection("Ovqatlar", state.foods, onMap = { showFoodMap = true }) { selectedOffer = it }
-                    nearbySection("Printerxonalar", state.printShops, onMap = { showPrintMap = true }) { selectedOffer = it }
+                    nearbySection(s.food, state.foods, onMap = { showFoodMap = true }) { selectedOffer = it }
+                    nearbySection(s.printShops, state.printShops, onMap = { showPrintMap = true }) { selectedOffer = it }
                 }
             }
         }
@@ -195,7 +198,7 @@ fun MyUniversityScreen(
         }
         if (showPrintMap) {
             OffersMapSection(
-                title = "Printerxonalar xaritada",
+                title = s.printShopsOnMap,
                 shops = state.printShops,
                 onMarkerTap = { id -> selectedOffer = state.printShops.firstOrNull { it.id == id } },
                 onClose = { showPrintMap = false },
@@ -203,7 +206,7 @@ fun MyUniversityScreen(
         }
         if (showFoodMap) {
             OffersMapSection(
-                title = "Ovqatlar xaritada",
+                title = s.foodOnMap,
                 shops = state.foods,
                 onMarkerTap = { id -> selectedOffer = state.foods.firstOrNull { it.id == id } },
                 onClose = { showFoodMap = false },
@@ -234,7 +237,7 @@ private fun UniversitiesSelector(modifier: Modifier = Modifier, onClick: () -> U
         horizontalArrangement = Arrangement.spacedBy(11.dp),
     ) {
         Icon(ScIcons.CapBadge, null, tint = Sc.Brand, modifier = Modifier.size(22.dp))
-        ScText("Universitetlar", 16f, FontWeight.ExtraBold, Sc.Brand, Modifier.weight(1f), maxLines = 1)
+        ScText(universityStrings().universities, 16f, FontWeight.ExtraBold, Sc.Brand, Modifier.weight(1f), maxLines = 1)
         Icon(ScIcons.ChevronUpDown, null, tint = Sc.Brand, modifier = Modifier.size(20.dp))
     }
 }
@@ -273,7 +276,7 @@ private fun UniversityCard(uni: University, matesCount: Int, modifier: Modifier 
         }
         Spacer(Modifier.height(16.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(11.dp)) {
-            StatChip(ScIcons.Users, "$matesCount talaba", Modifier.weight(1f))
+            StatChip(ScIcons.Users, universityStrings().studentsCount(matesCount), Modifier.weight(1f))
             StatChip(ScIcons.CapBadge, uni.monogram, Modifier.weight(1f))
         }
     }
@@ -298,6 +301,7 @@ private fun StatChip(
 
 @Composable
 private fun EmptyUniversity(loading: Boolean, modifier: Modifier = Modifier) {
+    val s = universityStrings()
     Column(
         modifier.fillMaxWidth().scCard(radius = 26.dp).padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -313,9 +317,9 @@ private fun EmptyUniversity(loading: Boolean, modifier: Modifier = Modifier) {
         ScIconTile(Sc.TintBlue, size = 66.dp, radius = 20.dp) {
             Icon(ScIcons.CapBadge, null, tint = Sc.Brand, modifier = Modifier.size(30.dp))
         }
-        ScText("Universitet tanlanmagan", 17f, FontWeight.ExtraBold, Sc.Ink)
+        ScText(s.notSelectedTitle, 17f, FontWeight.ExtraBold, Sc.Ink)
         ScText(
-            "Yuqoridagi \"Universitetlar\" tugmasidan universitetingizni tanlang.",
+            s.notSelectedBody,
             13f, FontWeight.Medium, Sc.Muted, lineHeight = 19f,
         )
     }
@@ -363,11 +367,12 @@ private fun MateCard(
  */
 @Composable
 private fun ConnectButton(status: ConnectionView, onConnect: () -> Unit) {
+    val s = universityStrings()
     val label = when (status) {
-        ConnectionView.NONE -> "+ Bog'lanish"
-        ConnectionView.PENDING_OUT -> "Yuborildi"
-        ConnectionView.PENDING_IN -> "So'rov bor"
-        ConnectionView.CONNECTED -> "Bog'langan"
+        ConnectionView.NONE -> s.connect
+        ConnectionView.PENDING_OUT -> s.requestSent
+        ConnectionView.PENDING_IN -> s.requestIncoming
+        ConnectionView.CONNECTED -> s.connected
     }
     if (status == ConnectionView.NONE) {
         ScGradientButton(
@@ -401,12 +406,14 @@ private fun androidx.compose.foundation.lazy.LazyListScope.tasksSection(
     onOpen: (String) -> Unit,
 ) {
     if (tasks.isEmpty()) return
+    // `LazyListScope` — Composable EMAS, shuning uchun til global holatdan olinadi.
+    val s = universityStringsNow()
     item {
         ScSectionHeader(
-            "📚 Fanlardan yordam",
+            s.tasksTitle,
             Modifier.padding(horizontal = Sc.ScreenPadding),
-            subtitle = "Universitetimdagi topshiriq e'lonlari",
-            action = "Barchasi",
+            subtitle = s.tasksSubtitle,
+            action = uiStringsNow().all,
             onAction = onSeeAll,
         )
     }
@@ -417,6 +424,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.tasksSection(
 
 @Composable
 private fun TaskCard(listing: Listing, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    val ui = uiStrings()
     val task = listing.taskDetails
     Row(
         modifier.fillMaxWidth().scCard(radius = 20.dp, onClick = onClick).padding(14.dp),
@@ -435,7 +443,7 @@ private fun TaskCard(listing: Listing, modifier: Modifier = Modifier, onClick: (
             }
             Spacer(Modifier.height(6.dp))
             ScText(
-                if (listing.isNegotiable) "Kelishilgan" else "${listing.price.formatSum()} so'm",
+                if (listing.isNegotiable) ui.negotiable else "${listing.price.formatSum()} ${ui.currency}",
                 13.5f, FontWeight.ExtraBold, Sc.Success, maxLines = 1,
             )
         }
@@ -459,7 +467,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.nearbySection(
         ScSectionHeader(
             title,
             Modifier.padding(horizontal = Sc.ScreenPadding),
-            action = "Xarita",
+            action = universityStringsNow().map,
             actionIcon = ScIcons.Map,
             onAction = onMap,
         )
@@ -493,11 +501,11 @@ private fun NearbyOfferCard(shop: DiscountOffer, onClick: () -> Unit) {
         Spacer(Modifier.height(12.dp))
         ScText(shop.title, 13f, FontWeight.Medium, Sc.InkSoft, maxLines = 1)
         Spacer(Modifier.height(6.dp))
-        ScText("${shop.effectivePrice.formatAmount()} so'm / ${shop.priceUnit}", 16f, FontWeight.ExtraBold, Sc.Orange, maxLines = 1)
+        ScText("${shop.effectivePrice.formatAmount()} ${uiStrings().currency} / ${shop.priceUnit}", 16f, FontWeight.ExtraBold, Sc.Orange, maxLines = 1)
         Spacer(Modifier.height(10.dp))
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
             Icon(ScIcons.MapPin, null, tint = Sc.Pink, modifier = Modifier.size(14.dp))
-            ScText(shop.location ?: "Yunusobod", 12.5f, FontWeight.SemiBold, Sc.Muted, maxLines = 1)
+            ScText(shop.location ?: universityStrings().defaultLocation, 12.5f, FontWeight.SemiBold, Sc.Muted, maxLines = 1)
         }
     }
 }
@@ -513,6 +521,7 @@ private fun UniversitySheet(
     onSelect: (University) -> Unit,
     onDismiss: () -> Unit,
 ) {
+    val s = universityStrings()
     // Tanlangan universitet — pastdagi tugma bosilguncha faqat belgilanadi.
     var selected by remember { mutableStateOf<University?>(null) }
 
@@ -528,7 +537,7 @@ private fun UniversitySheet(
         ) {
             ScSheetHandle()
             Column(Modifier.padding(start = 22.dp, end = 22.dp, top = 10.dp, bottom = 14.dp)) {
-                ScText("Universitetni tanlang", 22f, FontWeight.ExtraBold, Sc.Ink, letterSpacing = -0.4f)
+                ScText(s.pickTitle, 22f, FontWeight.ExtraBold, Sc.Ink, letterSpacing = -0.4f)
                 Spacer(Modifier.height(15.dp))
                 SheetSearchField(picker.query, onQuery)
             }
@@ -541,12 +550,12 @@ private fun UniversitySheet(
                         rowHeight = 46.dp,
                     )
                     picker.error != null -> CenterNote {
-                        ScText("Ro'yxatni yuklab bo'lmadi.\nInternetni tekshiring.", 13f, FontWeight.Medium, Sc.Muted)
+                        ScText(s.pickListFailed, 13f, FontWeight.Medium, Sc.Muted)
                     }
                     picker.results.isEmpty() -> CenterNote {
                         ScEmptyState(
                             title = ScNotFoundTitle,
-                            message = "Bunday universitet ro'yxatda yo'q. Nomini boshqacha yozib ko'ring.",
+                            message = s.pickNotFound,
                             icon = ScIcons.Search,
                             compact = true,
                         )
@@ -570,9 +579,9 @@ private fun UniversitySheet(
             ) {
                 val target = selected
                 if (target != null) {
-                    ScGradientButton("Universitetni tanlang", onClick = { onSelect(target) })
+                    ScGradientButton(s.pickTitle, onClick = { onSelect(target) })
                 } else {
-                    ScSoftButton("Universitetni tanlang", {}, radius = 18.dp, fontSize = 15.5f, color = Sc.NavIdle)
+                    ScSoftButton(s.pickTitle, {}, radius = 18.dp, fontSize = 15.5f, color = Sc.NavIdle)
                 }
             }
         }
@@ -599,7 +608,7 @@ private fun SheetSearchField(query: String, onQuery: (String) -> Unit) {
         Icon(ScIcons.Search, null, tint = Sc.NavIdle, modifier = Modifier.size(19.dp))
         Box(Modifier.weight(1f)) {
             if (query.isEmpty()) {
-                ScText("Universitet qidiring", 14.5f, FontWeight.Medium, Sc.NavIdle, maxLines = 1)
+                ScText(universityStrings().searchUniversity, 14.5f, FontWeight.Medium, Sc.NavIdle, maxLines = 1)
             }
             BasicTextField(
                 value = query,
@@ -661,6 +670,7 @@ private fun StudentsOverlay(
     onOpenStudent: (StudentSummary) -> Unit,
     onClose: () -> Unit,
 ) {
+    val s = universityStrings()
     var query by remember { mutableStateOf("") }
     // Kurs — serverdagi shakl (`"1".."4"`, `"MASTER"`); `null` — "Hammasi".
     var course by remember { mutableStateOf<String?>(null) }
@@ -680,8 +690,8 @@ private fun StudentsOverlay(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(13.dp),
             ) {
-                ScCircleButton(ScIcons.ChevronLeft, onClose, contentDescription = "Orqaga")
-                ScHeaderTitle("Talabalar", modifier = Modifier.weight(1f))
+                ScCircleButton(ScIcons.ChevronLeft, onClose, contentDescription = uiStrings().back)
+                ScHeaderTitle(s.studentsTitle, modifier = Modifier.weight(1f))
             }
         }
         Column(Modifier.padding(horizontal = Sc.ScreenPadding).padding(top = 16.dp)) {
@@ -691,13 +701,13 @@ private fun StudentsOverlay(
                 Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                CoursePill("Hammasi", course == null) { course = null }
+                CoursePill(s.courseAll, course == null) { course = null }
                 listOf("1", "2", "3", "4", "MASTER").forEach { c ->
                     CoursePill(courseText(c), course == c) { course = c }
                 }
             }
             Spacer(Modifier.height(12.dp))
-            ScText("${filtered.size} ta talaba", 12.5f, FontWeight.Medium, Sc.Muted)
+            ScText(s.studentsCount(filtered.size), 12.5f, FontWeight.Medium, Sc.Muted)
         }
         Spacer(Modifier.height(10.dp))
         LazyColumn(
@@ -713,7 +723,7 @@ private fun StudentsOverlay(
                     ScEmptyState(
                         Modifier.padding(top = 24.dp),
                         title = ScNotFoundTitle,
-                        message = "Bu shartlarga mos talaba yo'q. Qidiruvni yoki filtrni o'zgartiring.",
+                        message = s.noStudentsMatch,
                         icon = ScIcons.Users,
                     )
                 }
@@ -762,7 +772,7 @@ private fun DetailedStudentCard(
                 // yashirilgan bo'lsa `online = false` va qator umuman chizilmaydi.
                 if (student.online) {
                     Spacer(Modifier.height(5.dp))
-                    ScText("🟢 Onlayn", 11.5f, FontWeight.Bold, Sc.Success)
+                    ScText(universityStrings().online, 11.5f, FontWeight.Bold, Sc.Success)
                 }
             }
             Box(Modifier.width(96.dp)) {
@@ -810,7 +820,7 @@ private fun OfferDetailSheet(shop: DiscountOffer, onClose: () -> Unit) {
             ScText(shop.title, 13.5f, FontWeight.Medium, Sc.InkSoft, lineHeight = 20f)
             Spacer(Modifier.height(10.dp))
             Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                ScText("${shop.effectivePrice.formatAmount()} so'm", 18f, FontWeight.ExtraBold, Sc.Orange)
+                ScText("${shop.effectivePrice.formatAmount()} ${uiStrings().currency}", 18f, FontWeight.ExtraBold, Sc.Orange)
                 if (shop.isDiscount && shop.originalPrice > shop.finalPrice) {
                     Text(
                         shop.originalPrice.formatAmount(),
@@ -829,10 +839,10 @@ private fun OfferDetailSheet(shop: DiscountOffer, onClose: () -> Unit) {
                 Box(
                     Modifier.clip(RoundedCornerShape(12.dp)).background(Sc.TintBlue)
                         .padding(horizontal = 12.dp, vertical = 7.dp),
-                ) { ScText("Promokod: $it", 12.5f, FontWeight.ExtraBold, Sc.Brand) }
+                ) { ScText(universityStrings().promoCode(it), 12.5f, FontWeight.ExtraBold, Sc.Brand) }
             }
             Spacer(Modifier.height(12.dp))
-            ScText("📍 ${shop.location ?: "Yunusobod, Toshkent"}", 12.5f, FontWeight.Medium, Sc.Muted)
+            ScText("📍 ${shop.location ?: universityStrings().defaultLocationFull}", 12.5f, FontWeight.Medium, Sc.Muted)
         }
     }
 }
@@ -846,7 +856,7 @@ private fun OffersMapSection(
 ) {
     val located = shops.filter { it.hasLocation }
     val markers = located.map {
-        OfferMarker(it.id, it.lat, it.lng, "${it.effectivePrice.formatAmountShort()} so'm", hexRgb(it.bannerAccent), highlight = true)
+        OfferMarker(it.id, it.lat, it.lng, "${it.effectivePrice.formatAmountShort()} ${uiStrings().currency}", hexRgb(it.bannerAccent), highlight = true)
     }
     val center = if (markers.isEmpty()) MapPoint(41.311081, 69.240562)
     else MapPoint(markers.map { it.lat }.average(), markers.map { it.lng }.average())
@@ -860,7 +870,7 @@ private fun OffersMapSection(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(11.dp),
         ) {
-            ScCircleButton(ScIcons.ChevronLeft, onClose, size = 46.dp, contentDescription = "Orqaga")
+            ScCircleButton(ScIcons.ChevronLeft, onClose, size = 46.dp, contentDescription = uiStrings().back)
             Box(
                 Modifier.clip(RoundedCornerShape(16.dp)).background(Sc.Card)
                     .padding(horizontal = 14.dp, vertical = 10.dp),
@@ -876,12 +886,15 @@ private fun hexRgb(argb: Long): String = "#" + (argb and 0xFFFFFF).toString(16).
  * Kurs yorlig'i. Server `"1".."4"` yoki `"MASTER"` qaytaradi; eski profillarda
  * `"ONE".."FOUR"` uchraydi. Ko'rsatilmagan bo'lsa (`null`/bo'sh) — "Talaba".
  */
-private fun courseText(courseYear: String?): String = when (courseYear) {
-    "1", "ONE" -> "1-kurs"
-    "2", "TWO" -> "2-kurs"
-    "3", "THREE" -> "3-kurs"
-    "4", "FOUR" -> "4-kurs"
-    "MASTER" -> "Magistr"
-    null, "" -> "Talaba"
-    else -> courseYear
+private fun courseText(courseYear: String?): String {
+    val s = universityStringsNow()
+    return when (courseYear) {
+        "1", "ONE" -> s.year1
+        "2", "TWO" -> s.year2
+        "3", "THREE" -> s.year3
+        "4", "FOUR" -> s.year4
+        "MASTER" -> s.master
+        null, "" -> uiStringsNow().student
+        else -> courseYear
+    }
 }

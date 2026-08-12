@@ -35,6 +35,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import dev.core.uikit.locale.uiStringsNow
 
 /**
  * Bosh ekrandagi bitta e'lon bo'limi.
@@ -55,7 +56,8 @@ data class HomeOfferSection(
 
 /** Home (1p) ekranining holati — barchasi local DB'dan reaktiv. */
 data class HomeUiState(
-    val userName: String = "Talaba",
+    /** Profil kelgunicha ko'rsatiladigan zaxira ism — joriy tilda ("Student"/"Студент"/"Talaba"). */
+    val userName: String = uiStringsNow().student,
     /** Profil rasmi manzili (`null` — bosh harf ko'rsatiladi). */
     val avatarUrl: String? = null,
     val universityMonogram: String? = null,
@@ -187,7 +189,7 @@ class HomeViewModel(
             // Ism profildan olinadi; profil hali to'ldirilmagan bo'lsa — sessiya nomidan.
             name = profile?.displayName
                 ?: user?.fullName?.takeIf { it.isNotBlank() }
-                ?: "Talaba",
+                ?: uiStringsNow().student,
             // Rasm ham shu tartibda: profil keshi, so'ng sessiya qatoridagi nusxa.
             avatarUrl = profile?.avatarUrl?.takeIf { it.isNotBlank() }
                 ?: user?.photoUrl?.takeIf { it.isNotBlank() },
@@ -381,7 +383,7 @@ private fun foodSection(
     val list = offers.filter { it.groupKey == FOOD_GROUP || it.categoryId in foodTypes }
     if (list.isEmpty()) return null
     // Guruh hali yuklanmagan bo'lsa ham bo'lim ko'rinadi — sarlavha zaxira matndan.
-    return HomeOfferSection(FOOD_GROUP, group?.name ?: "Ovqatlanish", group?.emoji ?: "🍽", list)
+    return HomeOfferSection(FOOD_GROUP, group?.name ?: homeStringsNow().foodSectionFallback, group?.emoji ?: "🍽", list)
 }
 
 /**
@@ -398,7 +400,7 @@ private fun clothingSection(
     profileGender: String?,
 ): HomeOfferSection? {
     val type = categories.firstOrNull { it.id.equals(CLOTHING_TYPE, ignoreCase = true) }
-        ?: categories.firstOrNull { it.name.startsWith("Kiyim", ignoreCase = true) }
+        ?: categories.firstOrNull { it.name.startsWith(homeStringsNow().clothingNamePrefix, ignoreCase = true) }
         ?: return null
     val wanted = if (profileGender.equals("FEMALE", ignoreCase = true)) "FEMALE" else "MALE"
     val list = offers.filter {

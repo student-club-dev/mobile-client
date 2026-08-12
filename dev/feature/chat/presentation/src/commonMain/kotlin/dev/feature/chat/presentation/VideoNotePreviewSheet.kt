@@ -30,6 +30,7 @@ import dev.core.uikit.media.PickedVideo
 import dev.core.uikit.media.ScVideoPlayer
 import dev.core.uikit.media.playbackUrl
 import dev.core.uikit.theme.Sc
+import dev.core.uikit.locale.uiStrings
 
 /**
  * Yozib olingan dumaloq video xabarni **yuborishdan oldin** ko'rsatadi.
@@ -78,7 +79,7 @@ internal fun VideoNotePreviewSheet(
                 }
                 Spacer(Modifier.height(18.dp))
                 ScText(
-                    text = tooLongOrNull(video) ?: "Video xabar",
+                    text = tooLongOrNull(video) ?: chatStrings().videoNote,
                     size = 14f,
                     weight = FontWeight.SemiBold,
                     color = if (tooLongOrNull(video) != null) Sc.Danger else Color.White.copy(alpha = 0.8f),
@@ -89,8 +90,8 @@ internal fun VideoNotePreviewSheet(
                     horizontalArrangement = Arrangement.SpaceEvenly,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    RoundAction(ScIcons.Close, "Bekor qilish", Color.White.copy(alpha = 0.14f), onCancel)
-                    RoundAction(ScIcons.Return, "Yuborish", Sc.Brand, onSend)
+                    RoundAction(ScIcons.Close, uiStrings().cancel, Color.White.copy(alpha = 0.14f), onCancel)
+                    RoundAction(ScIcons.Return, chatStrings().send, Sc.Brand, onSend)
                 }
             }
         }
@@ -107,7 +108,7 @@ internal fun VideoNotePreviewSheet(
 private fun tooLongOrNull(video: PickedVideo): String? {
     val duration = video.durationMs ?: return null
     if (duration <= MAX_VIDEO_NOTE_MS) return null
-    return "Video xabar 1 daqiqagacha qisqartiriladi"
+    return chatStringsNow().videoNoteTrimmed
 }
 
 @Composable

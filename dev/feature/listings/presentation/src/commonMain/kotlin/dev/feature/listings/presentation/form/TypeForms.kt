@@ -34,6 +34,9 @@ import dev.feature.listings.presentation.PostListingUiState
 import dev.feature.listings.presentation.PostListingViewModel
 import dev.feature.listings.presentation.components.ErrorColor
 import dev.feature.listings.presentation.components.IconSquareButton
+import dev.feature.listings.presentation.lt
+import dev.feature.listings.presentation.currency
+import dev.feature.listings.presentation.Lt
 
 /**
  * Tanlangan e'lon turining formasini ochadi.
@@ -90,7 +93,7 @@ fun ListingFormShell(
                 IconSquareButton(vm::back, AppIcons.ArrowLeft, palette)
                 Column {
                     Text(
-                        if (state.editing) "E'lonni tahrirlash" else title,
+                        if (state.editing) lt("E'lonni tahrirlash") else title,
                         style = TextStyle(
                             fontFamily = AppFontFamily,
                             fontSize = 18.sp,
@@ -129,7 +132,7 @@ fun ListingFormShell(
         ) {
             if (state.errors.isNotEmpty()) {
                 Text(
-                    "To'ldirilmagan ${state.errors.size} ta joy bor — yuqorida qizil bilan belgilandi.",
+                    Lt.emptyFields(state.errors.size),
                     style = TextStyle(
                         fontFamily = AppFontFamily,
                         fontSize = 11.5f.sp,
@@ -140,11 +143,11 @@ fun ListingFormShell(
             }
             Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
                 Box(Modifier.weight(1f)) {
-                    OutlineButton("Qoralama", vm::saveDraft)
+                    OutlineButton(lt("Qoralama"), vm::saveDraft)
                 }
                 Box(Modifier.weight(1.4f)) {
                     PrimaryButton(
-                        if (state.submitting) "Yuborilmoqda..." else "E'lonni joylash",
+                        if (state.submitting) lt("Yuborilmoqda...") else lt("E'lonni joylash"),
                         vm::publish,
                         enabled = !state.submitting,
                     )

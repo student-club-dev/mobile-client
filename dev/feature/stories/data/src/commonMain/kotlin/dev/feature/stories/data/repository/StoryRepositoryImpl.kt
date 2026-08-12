@@ -19,6 +19,7 @@ import io.ktor.client.plugins.ResponseException
 import io.ktor.client.statement.bodyAsText
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
+import dev.core.common.locale.AppLocale
 
 /**
  * Story repository'si — generatsiya qilingan [StoriesApi] ustida (`handoff/07-STORIES.md`).
@@ -120,7 +121,7 @@ class StoryRepositoryImpl(
                 if (attempt < CREATE_ATTEMPTS - 1) delay(RETRY_DELAY_MS)
             }
         }
-        throw lastError ?: IllegalStateException("Story yaratilmadi")
+        throw lastError ?: IllegalStateException(AppLocale.pick(en = "Couldn't create the story", ru = "Не удалось создать историю", uz = "Story yaratilmadi"))
     }.map { it.toDomain(apiOrigin) }
 
     /**

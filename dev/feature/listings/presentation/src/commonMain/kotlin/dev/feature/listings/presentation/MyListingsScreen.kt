@@ -84,22 +84,22 @@ fun MyListingsScreen(
                 if (onBack != null) {
                     ScCircleButton(
                         ScIcons.ChevronLeft, onBack,
-                        background = Sc.Card, tint = Sc.Ink, contentDescription = "Orqaga",
+                        background = Sc.Card, tint = Sc.Ink, contentDescription = lt("Orqaga"),
                     )
                 }
                 Column(Modifier.weight(1f)) {
                     // Sarlavha filtrga qarab — talaba shell'ida ("Mening e'lonlarim") chegirma
                     // yo'q, biznesda esa aksincha. [EmptyState] ham AYNAN shu shart bilan.
                     ScText(
-                        if (filterDiscount == false) "Mening e'lonlarim" else "Mening chegirmalarim",
+                        if (filterDiscount == false) lt("Mening e'lonlarim") else lt("Mening chegirmalarim"),
                         19f, FontWeight.ExtraBold, Sc.Ink, letterSpacing = -0.3f, maxLines = 1,
                     )
-                    ScText("${listings.size} ta e'lon", 12.5f, FontWeight.Medium, Sc.Muted, maxLines = 1)
+                    ScText(Lt.listingsCount(listings.size), 12.5f, FontWeight.Medium, Sc.Muted, maxLines = 1)
                 }
                 if (showHeaderCreate) {
                     ScCircleButton(
                         ScIcons.Plus, onCreate,
-                        background = Sc.Card, tint = Sc.Brand, contentDescription = "Qo'shish",
+                        background = Sc.Card, tint = Sc.Brand, contentDescription = lt("Qo'shish"),
                     )
                 }
             }
@@ -116,7 +116,7 @@ fun MyListingsScreen(
             ) {
                 ScText(message, 12.5f, FontWeight.Medium, Sc.Muted, Modifier.weight(1f))
                 ScText(
-                    "Qayta urinish", 12.5f, FontWeight.Bold, Sc.Brand,
+                    lt("Qayta urinish"), 12.5f, FontWeight.Bold, Sc.Brand,
                     Modifier.clickable { vm.consumeMessage(); vm.refresh() },
                 )
             }
@@ -186,22 +186,22 @@ private fun EmptyState(onCreate: () -> Unit, discount: Boolean?) {
         }
         Spacer(Modifier.height(18.dp))
         ScText(
-            if (isDiscount) "Hali chegirma yo'q" else "Hali e'lon yo'q",
+            if (isDiscount) lt("Hali chegirma yo'q") else lt("Hali e'lon yo'q"),
             19f, FontWeight.ExtraBold, Sc.Ink,
         )
         Spacer(Modifier.height(6.dp))
         Text(
             if (isDiscount) {
-                "Birinchi chegirmangizni joylang — talabalar uni Chegirmalar bo'limida ko'radi."
+                lt("Birinchi chegirmangizni joylang — talabalar uni Chegirmalar bo'limida ko'radi.")
             } else {
-                "Birinchi e'loningizni joylang — mahsulot yoki xizmatingizni talabalarga ko'rsating."
+                lt("Birinchi e'loningizni joylang — mahsulot yoki xizmatingizni talabalarga ko'rsating.")
             },
             style = scStyle(13.5f, FontWeight.Medium, Sc.Muted, lineHeight = 20f)
                 .copy(textAlign = TextAlign.Center),
         )
         Spacer(Modifier.height(22.dp))
         ScGradientButton(
-            if (isDiscount) "Chegirma qo'shish" else "E'lon qo'shish",
+            if (isDiscount) lt("Chegirma qo'shish") else lt("E'lon qo'shish"),
             onCreate,
         )
     }
@@ -260,7 +260,7 @@ private fun MyListingCard(
                     ScText(listing.categoryLabel, 11f, FontWeight.Bold, accent, maxLines = 1)
                 }
                 Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                    ScText("${listing.finalPrice.formatSum()} so'm", 15.5f, FontWeight.ExtraBold, Sc.Ink, maxLines = 1)
+                    ScText("${listing.finalPrice.formatSum()} ${currency()}", 15.5f, FontWeight.ExtraBold, Sc.Ink, maxLines = 1)
                     // Chegirmada eski narx — chiziq bilan; oddiy e'londa yo'q.
                     if (isDiscount && listing.price != listing.finalPrice) {
                         Text(
@@ -286,7 +286,7 @@ private fun MyListingCard(
                 val extra = listing.branches.size - 1
                 // Bir nechta filial bo'lsa: "📍 Chilonzor filiali — ... +2 filial"
                 ScText(
-                    "📍 ${first.display()}" + if (extra > 0) "  +$extra filial" else "",
+                    "📍 ${first.display()}" + if (extra > 0) " ${Lt.moreBranches(extra)}" else "",
                     11f, FontWeight.Medium, Sc.MutedLight,
                     Modifier.weight(1f),
                     maxLines = 1,
@@ -295,16 +295,16 @@ private fun MyListingCard(
                 Spacer(Modifier.weight(1f))
             }
 
-            CardAction(AppIcons.Pencil, "Tahrirlash", Sc.TintBlue, Sc.Brand, onEdit)
+            CardAction(AppIcons.Pencil, lt("Tahrirlash"), Sc.TintBlue, Sc.Brand, onEdit)
             if (listing.status == ListingStatus.ACTIVE || listing.status == ListingStatus.PAUSED) {
                 CardAction(
                     if (listing.status == ListingStatus.ACTIVE) AppIcons.EyeOff else AppIcons.Eye,
-                    if (listing.status == ListingStatus.ACTIVE) "To'xtatish" else "Yoqish",
+                    if (listing.status == ListingStatus.ACTIVE) lt("To'xtatish") else lt("Yoqish"),
                     Sc.Chip, Sc.ChipInk,
                     onTogglePaused,
                 )
             }
-            CardAction(ScIcons.Close, "O'chirish", Sc.TintPink, Sc.Danger, onDelete)
+            CardAction(ScIcons.Close, lt("O'chirish"), Sc.TintPink, Sc.Danger, onDelete)
         }
     }
 }

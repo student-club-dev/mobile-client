@@ -62,6 +62,8 @@ import dev.feature.connections.domain.model.StudentSort
 import dev.feature.connections.domain.model.StudentSummary
 import kotlinx.coroutines.delay
 import org.koin.compose.viewmodel.koinViewModel
+import androidx.compose.runtime.ReadOnlyComposable
+import dev.core.uikit.locale.uiStrings
 
 /**
  * **"Do'stlar"** — `Connections` bo'limining ekrani (handoff: `connections.md` §14).
@@ -95,6 +97,7 @@ fun ConnectionsScreen(
     LaunchedEffect(initialTab) { if (initialTab != null) vm.selectTab(initialTab) }
 
     val state by vm.state.collectAsStateWithLifecycle()
+    val s = connectionsStrings()
     var menuFor by remember { mutableStateOf<StudentSummary?>(null) }
     var reportFor by remember { mutableStateOf<StudentSummary?>(null) }
     var disconnectFor by remember { mutableStateOf<StudentSummary?>(null) }
@@ -108,8 +111,8 @@ fun ConnectionsScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(13.dp),
                 ) {
-                    ScCircleButton(ScIcons.ChevronLeft, onBack, contentDescription = "Orqaga")
-                    ScHeaderTitle("Do'stlar", modifier = Modifier.weight(1f))
+                    ScCircleButton(ScIcons.ChevronLeft, onBack, contentDescription = uiStrings().back)
+                    ScHeaderTitle(s.title, modifier = Modifier.weight(1f))
                 }
             }
 
@@ -117,16 +120,16 @@ fun ConnectionsScreen(
                 Modifier.fillMaxWidth().padding(horizontal = Sc.ScreenPadding).padding(top = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                TabChip("Do'stlar", state.tab == ConnectionsTab.CONNECTED, Modifier.weight(1f)) {
+                TabChip(s.tabConnections, state.tab == ConnectionsTab.CONNECTED, Modifier.weight(1f)) {
                     vm.selectTab(ConnectionsTab.CONNECTED)
                 }
                 TabChip(
-                    "So'rovlar",
+                    s.tabRequests,
                     state.tab == ConnectionsTab.REQUESTS,
                     Modifier.weight(1f),
                     badge = state.incomingTotal,
                 ) { vm.selectTab(ConnectionsTab.REQUESTS) }
-                TabChip("Qidiruv", state.tab == ConnectionsTab.SEARCH, Modifier.weight(1f)) {
+                TabChip(s.tabSearch, state.tab == ConnectionsTab.SEARCH, Modifier.weight(1f)) {
                     vm.selectTab(ConnectionsTab.SEARCH)
                 }
             }
@@ -201,20 +204,20 @@ fun ConnectionsScreen(
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     if (connected) {
-                        ActionRow(ScIcons.Message, "Xabar yozish") {
+                        ActionRow(ScIcons.Message, s.writeMessage) {
                             menuFor = null
                             onOpenChat(menuTarget.id, menuTarget.displayName)
                         }
-                        ActionRow(ScIcons.Close, "Bog'lanishni uzish") {
+                        ActionRow(ScIcons.Close, s.disconnect) {
                             menuFor = null
                             disconnectFor = menuTarget
                         }
                     }
-                    ActionRow(ScIcons.Users, "Bloklash", danger = true) {
+                    ActionRow(ScIcons.Users, s.block, danger = true) {
                         menuFor = null
                         blockFor = menuTarget
                     }
-                    ActionRow(ScIcons.Bell, "Shikoyat qilish", danger = true) {
+                    ActionRow(ScIcons.Bell, s.report, danger = true) {
                         menuFor = null
                         reportFor = menuTarget
                     }
@@ -223,7 +226,7 @@ fun ConnectionsScreen(
             confirmButton = {},
             dismissButton = {
                 TextButton(onClick = { menuFor = null }) {
-                    Text("Bekor", style = scStyle(14f, FontWeight.Bold, Sc.InkSoft))
+                    Text(s.cancel, style = scStyle(14f, FontWeight.Bold, Sc.InkSoft))
                 }
             },
         )
@@ -232,10 +235,10 @@ fun ConnectionsScreen(
     val disconnectTarget = disconnectFor
     if (disconnectTarget != null) {
         ConfirmDialog(
-            title = "Bog'lanishni uzish",
+            title = s.disconnect,
             // Sovish muddati YO'Q — u faqat *rad etish* dan keyin bo'ladi (connections.md §8).
-            message = "${disconnectTarget.displayName} bilan bog'lanish uziladi. Keyinroq qayta so'rov yuborishingiz mumkin.",
-            confirmLabel = "Uzish",
+            message = s.disconnectBody(disconnectTarget.displayName),
+            confirmLabel = s.disconnectConfirm,
             onConfirm = { vm.disconnect(disconnectTarget); disconnectFor = null },
             onDismiss = { disconnectFor = null },
         )
@@ -244,10 +247,9 @@ fun ConnectionsScreen(
     val blockTarget = blockFor
     if (blockTarget != null) {
         ConfirmDialog(
-            title = "Bloklash",
-            message = "${blockTarget.displayName} bloklanadi: bog'lanish o'chadi, ikkalangiz " +
-                "bir-biringizga yozolmaysiz. Blokni yechganda bog'lanish tiklanmaydi.",
-            confirmLabel = "Bloklash",
+            title = s.block,
+            message = s.blockBody(blockTarget.displayName),
+            confirmLabel = s.block,
             onConfirm = { vm.block(blockTarget); blockFor = null },
             onDismiss = { blockFor = null },
         )
@@ -282,6 +284,7 @@ private fun SearchSection(
     vm: ConnectionsViewModel,
     modifier: Modifier = Modifier,
 ) {
+    val s = connectionsStrings()
     Column(modifier.fillMaxWidth()) {
         SearchField(state.query, onQuery, onClear)
         Spacer(Modifier.height(10.dp))
@@ -296,9 +299,9 @@ private fun SearchSection(
             state.searched && state.results.isEmpty() -> Hint(
                 if (state.query.isNotBlank()) {
                     // Qidiruv `firstName` va `lastName` ni ALOHIDA tekshiradi — to'liq ism ishlamaydi.
-                    "Bitta so'z yozing — to'liq ism bo'yicha qidiruv ishlamaydi."
+                    s.searchOneWord
                 } else {
-                    "Bu filtrlarga mos talaba yo'q."
+                    s.noStudentsForFilters
                 },
                 icon = ScIcons.Search,
                 title = ScNotFoundTitle,
@@ -317,16 +320,16 @@ private fun SearchSection(
                     ) {
                         val busy = result.student.id in state.busyIds
                         when (result.connectionStatus) {
-                            ConnectionView.NONE -> PillButton("Bog'lanish", enabled = !busy) {
+                            ConnectionView.NONE -> PillButton(s.connect, enabled = !busy) {
                                 onConnect(result.student)
                             }
                             // Yuborilgan so'rovni bekor qilish endpointi yo'q — tugma o'chirilgan.
-                            ConnectionView.PENDING_OUT -> PillButton("Yuborildi", filled = false, enabled = false) {}
-                            ConnectionView.PENDING_IN -> PillButton("Javob berish", enabled = !busy) {
+                            ConnectionView.PENDING_OUT -> PillButton(s.requestSent, filled = false, enabled = false) {}
+                            ConnectionView.PENDING_IN -> PillButton(s.respond, enabled = !busy) {
                                 // Kiruvchi so'rov — "So'rovlar" bo'limida qabul qilinadi.
                                 onConnect(result.student)
                             }
-                            ConnectionView.CONNECTED -> PillButton("Xabar", filled = false) {
+                            ConnectionView.CONNECTED -> PillButton(s.message, filled = false) {
                                 onOpenChat(result.student.id, result.student.displayName)
                             }
                         }
@@ -346,6 +349,7 @@ private fun SearchSection(
  */
 @Composable
 private fun FilterBar(state: ConnectionsUiState, vm: ConnectionsViewModel) {
+    val s = connectionsStrings()
     Row(
         Modifier.fillMaxWidth().padding(horizontal = Sc.ScreenPadding)
             .horizontalScroll(rememberScrollState()),
@@ -353,33 +357,36 @@ private fun FilterBar(state: ConnectionsUiState, vm: ConnectionsViewModel) {
     ) {
         val mine = state.myUniversityId
         if (mine != null) {
-            SmallChip("Universitetim", mine in state.filter.universityIds, vm::toggleMyUniversity)
+            SmallChip(s.filterMyUniversity, mine in state.filter.universityIds, vm::toggleMyUniversity)
         }
         SmallChip(
-            "Yangi odamlar",
+            s.filterNewPeople,
             state.filter.connectionStatus == ConnectionView.NONE,
             vm::toggleOnlyNew,
         )
-        SmallChip("Erkak", Gender.MALE in state.filter.genders) { vm.toggleGender(Gender.MALE) }
-        SmallChip("Ayol", Gender.FEMALE in state.filter.genders) { vm.toggleGender(Gender.FEMALE) }
-        courseOptions.forEach { (value, label) ->
+        SmallChip(s.filterMale, Gender.MALE in state.filter.genders) { vm.toggleGender(Gender.MALE) }
+        SmallChip(s.filterFemale, Gender.FEMALE in state.filter.genders) { vm.toggleGender(Gender.FEMALE) }
+        courseOptions().forEach { (value, label) ->
             SmallChip(label, value in state.filter.courseYears) { vm.toggleCourseYear(value) }
         }
-        SmallChip("Ism bo'yicha", state.filter.sort == StudentSort.NAME) {
+        SmallChip(s.sortByName, state.filter.sort == StudentSort.NAME) {
             vm.setSort(if (state.filter.sort == StudentSort.NAME) StudentSort.RECENT else StudentSort.NAME)
         }
-        if (state.hasActiveFilters) SmallChip("Tozalash", active = false, onClick = vm::clearFilters)
+        if (state.hasActiveFilters) SmallChip(s.clear, active = false, onClick = vm::clearFilters)
     }
 }
 
 /** Filtr chiplaridagi va qatordagi kurs yorliqlari — profildagi qiymatlar bilan bir xil. */
-private val courseOptions = listOf(
-    "1" to "1-kurs",
-    "2" to "2-kurs",
-    "3" to "3-kurs",
-    "4" to "4-kurs",
-    "MASTER" to "Magistr",
-)
+private fun courseOptions(): List<Pair<String, String>> {
+    val s = connectionsStringsNow()
+    return listOf(
+        "1" to s.courseYear("1"),
+        "2" to s.courseYear("2"),
+        "3" to s.courseYear("3"),
+        "4" to s.courseYear("4"),
+        "MASTER" to s.masterDegree,
+    )
+}
 
 /**
  * Qator ostidagi matn: `@username · TATU · 2-kurs`. Universitet **monogrammasi** local
@@ -389,7 +396,7 @@ private fun ConnectionsUiState.subtitleOf(student: StudentSummary): String? =
     listOfNotNull(
         student.username?.let { "@$it" },
         universityLabel(student),
-        student.courseYear?.let { year -> courseOptions.firstOrNull { it.first == year }?.second },
+        student.courseYear?.let { year -> courseOptions().firstOrNull { it.first == year }?.second },
     ).joinToString(" · ").ifBlank { null }
 
 @Composable
@@ -402,14 +409,15 @@ private fun RequestsSection(
     onOpenStudent: (StudentSummary) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val s = connectionsStrings()
     Column(modifier.fillMaxWidth()) {
         Row(
             Modifier.fillMaxWidth().padding(horizontal = Sc.ScreenPadding)
                 .horizontalScroll(rememberScrollState()),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            SmallChip("Kiruvchi", state.requestsTab == RequestsTab.INCOMING) { onSelect(RequestsTab.INCOMING) }
-            SmallChip("Chiquvchi", state.requestsTab == RequestsTab.OUTGOING) { onSelect(RequestsTab.OUTGOING) }
+            SmallChip(s.incoming, state.requestsTab == RequestsTab.INCOMING) { onSelect(RequestsTab.INCOMING) }
+            SmallChip(s.outgoing, state.requestsTab == RequestsTab.OUTGOING) { onSelect(RequestsTab.OUTGOING) }
         }
         Spacer(Modifier.height(12.dp))
         val list = state.requests
@@ -430,11 +438,11 @@ private fun RequestsSection(
                     ) {
                         if (state.requestsTab == RequestsTab.INCOMING) {
                             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                PillButton("Qabul", enabled = !busy) { onAccept(request) }
-                                PillButton("Rad", filled = false, enabled = !busy) { onDecline(request) }
+                                PillButton(s.accept, enabled = !busy) { onAccept(request) }
+                                PillButton(s.decline, filled = false, enabled = !busy) { onDecline(request) }
                             }
                         } else {
-                            PillButton("Kutilmoqda", filled = false, enabled = false) {}
+                            PillButton(s.pending, filled = false, enabled = false) {}
                         }
                     }
                 }
@@ -451,6 +459,7 @@ private fun ConnectedSection(
     onOpenStudent: (StudentSummary) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val s = connectionsStrings()
     if (state.connections.isEmpty()) {
         // Yuklanayotgan bo'lsa skelet; bo'sh bo'lsa umuman hech nima.
         if (state.loading) {
@@ -470,7 +479,7 @@ private fun ConnectedSection(
                 onMenu = { onMenu(connected.student) },
                 onOpen = { onOpenStudent(connected.student) },
             ) {
-                PillButton("Xabar") { onOpenChat(connected.student.id, connected.student.displayName) }
+                PillButton(s.message) { onOpenChat(connected.student.id, connected.student.displayName) }
             }
         }
     }
@@ -509,7 +518,7 @@ private fun PersonRow(
         Box(
             Modifier.size(30.dp).clip(RoundedCornerShape(percent = 50)).clickable(onClick = onMenu),
             contentAlignment = Alignment.Center,
-        ) { Icon(ScIcons.DotsVertical, "Menyu", tint = Sc.MutedLight, modifier = Modifier.size(18.dp)) }
+        ) { Icon(ScIcons.DotsVertical, connectionsStrings().menu, tint = Sc.MutedLight, modifier = Modifier.size(18.dp)) }
     }
 }
 
@@ -526,7 +535,7 @@ private fun SearchField(query: String, onQuery: (String) -> Unit, onClear: () ->
     ) {
         Icon(ScIcons.Search, null, tint = Sc.Muted, modifier = Modifier.size(18.dp))
         Box(Modifier.weight(1f)) {
-            if (query.isEmpty()) ScText("Ism yoki username…", 14.5f, FontWeight.Medium, Sc.NavIdle, maxLines = 1)
+            if (query.isEmpty()) ScText(connectionsStrings().searchHint, 14.5f, FontWeight.Medium, Sc.NavIdle, maxLines = 1)
             BasicTextField(
                 value = query,
                 onValueChange = onQuery,
@@ -540,7 +549,7 @@ private fun SearchField(query: String, onQuery: (String) -> Unit, onClear: () ->
             Box(
                 Modifier.size(22.dp).clip(RoundedCornerShape(percent = 50)).clickable(onClick = onClear),
                 contentAlignment = Alignment.Center,
-            ) { Icon(ScIcons.Close, "Tozalash", tint = Sc.Muted, modifier = Modifier.size(14.dp)) }
+            ) { Icon(ScIcons.Close, connectionsStrings().clear, tint = Sc.Muted, modifier = Modifier.size(14.dp)) }
         }
     }
 }
@@ -655,7 +664,7 @@ private fun ConfirmDialog(
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Bekor", style = scStyle(14f, FontWeight.Bold, Sc.InkSoft))
+                Text(connectionsStrings().cancel, style = scStyle(14f, FontWeight.Bold, Sc.InkSoft))
             }
         },
     )
@@ -668,11 +677,12 @@ private fun ReportDialog(
     onSend: (ReportReason, String?) -> Unit,
     onDismiss: () -> Unit,
 ) {
+    val s = connectionsStrings()
     var reason by remember { mutableStateOf(ReportReason.SPAM) }
     var note by remember { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Shikoyat: $name", style = scStyle(17f, FontWeight.ExtraBold)) },
+        title = { Text(s.reportTitle(name), style = scStyle(17f, FontWeight.ExtraBold)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Row(
@@ -690,7 +700,7 @@ private fun ReportDialog(
                         .border(1.dp, Sc.Border, RoundedCornerShape(12.dp))
                         .padding(horizontal = 12.dp, vertical = 11.dp),
                 ) {
-                    if (note.isEmpty()) ScText("Izoh (ixtiyoriy)", 13.5f, FontWeight.Medium, Sc.NavIdle)
+                    if (note.isEmpty()) ScText(s.reportNote, 13.5f, FontWeight.Medium, Sc.NavIdle)
                     BasicTextField(
                         value = note,
                         onValueChange = { if (it.length <= 1000) note = it },
@@ -703,22 +713,24 @@ private fun ReportDialog(
         },
         confirmButton = {
             TextButton(onClick = { onSend(reason, note.takeIf { it.isNotBlank() }) }) {
-                Text("Yuborish", style = scStyle(14f, FontWeight.ExtraBold, Sc.Danger))
+                Text(s.reportSend, style = scStyle(14f, FontWeight.ExtraBold, Sc.Danger))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Bekor", style = scStyle(14f, FontWeight.Bold, Sc.InkSoft))
+                Text(connectionsStrings().cancel, style = scStyle(14f, FontWeight.Bold, Sc.InkSoft))
             }
         },
     )
 }
 
 private val ReportReason.label: String
-    get() = when (this) {
-        ReportReason.SPAM -> "Spam"
-        ReportReason.SCAM -> "Firibgarlik"
-        ReportReason.HARASSMENT -> "Haqorat"
-        ReportReason.INAPPROPRIATE -> "Nomaqbul"
-        ReportReason.OTHER -> "Boshqa"
+    @Composable @ReadOnlyComposable get() = connectionsStrings().let {
+        when (this) {
+            ReportReason.SPAM -> it.reasonSpam
+            ReportReason.SCAM -> it.reasonFraud
+            ReportReason.HARASSMENT -> it.reasonHarassment
+            ReportReason.INAPPROPRIATE -> it.reasonInappropriate
+            ReportReason.OTHER -> it.reasonOther
+        }
     }

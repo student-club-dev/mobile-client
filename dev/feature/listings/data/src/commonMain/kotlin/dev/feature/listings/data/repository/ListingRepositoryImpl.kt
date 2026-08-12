@@ -22,6 +22,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import kotlinx.datetime.Clock
+import dev.core.common.locale.AppLocale
 
 /**
  * E'lon repository'si — server yagona haqiqat manbasi, local baza esa kesh.
@@ -136,7 +137,7 @@ class ListingRepositoryImpl(
                     page++
                 }
                 is Resource.Error -> return res
-                Resource.Loading -> return Resource.Error("E'lonlarni yuklab bo'lmadi")
+                Resource.Loading -> return Resource.Error(AppLocale.pick(en = "Couldn't load listings", ru = "Не удалось загрузить объявления", uz = "E'lonlarni yuklab bo'lmadi"))
             }
         }
 
@@ -208,7 +209,7 @@ class ListingRepositoryImpl(
                 Resource.Success(saved)
             }
             is Resource.Error -> res
-            Resource.Loading -> Resource.Error("E'lonni yuborib bo'lmadi")
+            Resource.Loading -> Resource.Error(AppLocale.pick(en = "Couldn't submit the listing", ru = "Не удалось отправить объявление", uz = "E'lonni yuborib bo'lmadi"))
         }
     }
 
@@ -220,7 +221,7 @@ class ListingRepositoryImpl(
                     Resource.Success(Unit)
                 }
                 is Resource.Error -> res
-                Resource.Loading -> Resource.Error("Holatni o'zgartirib bo'lmadi")
+                Resource.Loading -> Resource.Error(AppLocale.pick(en = "Couldn't change the status", ru = "Не удалось изменить статус", uz = "Holatni o'zgartirib bo'lmadi"))
             }
         }
         return withContext(dispatchers.io) {

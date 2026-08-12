@@ -221,7 +221,7 @@ private fun extensionFor(isVideo: Boolean): String = if (isVideo) ".mp4" else ".
 private fun openSource(context: Context, sourcePath: String): InputStream =
     if (sourcePath.startsWith("content://")) {
         context.contentResolver.openInputStream(Uri.parse(sourcePath))
-            ?: error("Manbani ochib bo'lmadi: $sourcePath")
+            ?: error("Could not open source: $sourcePath")
     } else {
         File(sourcePath.removePrefix("file://")).inputStream()
     }

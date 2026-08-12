@@ -38,6 +38,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.core.common.locale.AppLanguage
 import dev.core.domain.model.Region
 import dev.core.uikit.components.AppIcons
 import dev.core.uikit.components.ScCircleButton
@@ -70,6 +71,7 @@ fun SettingsScreen(
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
     val settings by settingsVm.state.collectAsStateWithLifecycle()
+    val s = settingsStrings()
 
     var aboutExpanded by remember { mutableStateOf(false) }
     var regionSheet by remember { mutableStateOf(false) }
@@ -95,8 +97,8 @@ fun SettingsScreen(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(13.dp),
             ) {
-                ScCircleButton(ScIcons.ChevronLeft, onBack, contentDescription = "Orqaga")
-                ScHeaderTitle("Sozlamalar", modifier = Modifier.weight(1f))
+                ScCircleButton(ScIcons.ChevronLeft, onBack, contentDescription = s.back)
+                ScHeaderTitle(s.title, modifier = Modifier.weight(1f))
             }
         }
         Spacer(Modifier.height(20.dp))
@@ -105,32 +107,42 @@ fun SettingsScreen(
             Modifier.fillMaxWidth().padding(horizontal = Sc.ScreenPadding),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            SectionTitle("Hisob")
-            SettingRow(AppIcons.Pencil, Sc.TintBlue, Sc.Brand, "Profilni tahrirlash", state.name, onClick = onEditProfile)
+            SectionTitle(s.sectionAccount)
+            SettingRow(AppIcons.Pencil, Sc.TintBlue, Sc.Brand, s.editProfile, state.name, onClick = onEditProfile)
 
+            // Til — mavzudan OLDIN: ilova birinchi marta ingliz tilida ochiladi, shuning
+            // uchun o'z tilini qidirayotgan foydalanuvchi uni ro'yxatning boshida topsin.
             Spacer(Modifier.height(4.dp))
-            SectionTitle("Mavzu")
-            ThemeSelector(settings.themeMode) { settingsVm.setThemeMode(it) }
-
-            Spacer(Modifier.height(4.dp))
-            SectionTitle("E'lonlar")
-            SettingRow(
-                ScIcons.MapPin, Sc.TintOrange, Sc.Orange,
-                "Viloyat",
-                settings.region?.name ?: "Butun O'zbekiston",
-            ) { regionSheet = true }
+            SectionTitle(s.sectionLanguage)
+            LanguageSelector(settings.language) { settingsVm.setLanguage(it) }
             Text(
-                "Chegirma va e'lonlar shu viloyat bo'yicha ko'rsatiladi.",
+                s.languageHint,
                 style = scStyle(12f, FontWeight.Medium, Sc.Muted, lineHeight = 17f),
                 modifier = Modifier.padding(horizontal = 6.dp),
             )
 
             Spacer(Modifier.height(4.dp))
-            SectionTitle("Maxfiylik")
+            SectionTitle(s.sectionAppearance)
+            ThemeSelector(settings.themeMode) { settingsVm.setThemeMode(it) }
+
+            Spacer(Modifier.height(4.dp))
+            SectionTitle(s.sectionListings)
+            SettingRow(
+                ScIcons.MapPin, Sc.TintOrange, Sc.Orange,
+                s.region,
+                settings.region?.name ?: s.allUzbekistan,
+            ) { regionSheet = true }
+            Text(
+                s.regionHint,
+                style = scStyle(12f, FontWeight.Medium, Sc.Muted, lineHeight = 17f),
+                modifier = Modifier.padding(horizontal = 6.dp),
+            )
+
+            Spacer(Modifier.height(4.dp))
+            SectionTitle(s.sectionPrivacy)
             LastSeenSelector(state.profile?.lastSeenVisibility) { vm.setLastSeenVisibility(it) }
             Text(
-                "\"Oxirgi ko'rilgan\" va \"onlayn\" holatini kim ko'rishi. \"Hech kim\" " +
-                    "tanlansa, siz ham boshqalarnikini ko'rishda davom etasiz.",
+                s.lastSeenHint,
                 style = scStyle(12f, FontWeight.Medium, Sc.Muted, lineHeight = 17f),
                 modifier = Modifier.padding(horizontal = 6.dp),
             )
@@ -138,8 +150,7 @@ fun SettingsScreen(
             Spacer(Modifier.height(10.dp))
             PhoneVisibilitySelector(state.profile?.phoneVisibility) { vm.setPhoneVisibility(it) }
             Text(
-                "Telefon raqamingizni kim ko'rishi. Sukut bo'yicha — hech kim: raqam ochiq " +
-                    "bo'lsa notanish odamlardan qo'ng'iroq kelishi mumkin.",
+                s.phoneVisibilityHint,
                 style = scStyle(12f, FontWeight.Medium, Sc.Muted, lineHeight = 17f),
                 modifier = Modifier.padding(horizontal = 6.dp),
             )
@@ -147,28 +158,27 @@ fun SettingsScreen(
             // yozadi, bu yerda esa tugma "kim meni bloklagan" degan kutuvni uyg'otmasligi kerak.
             SettingRow(
                 AppIcons.Lock, Sc.TintAmber, Sc.Danger,
-                "Bloklangan talabalar", null, onClick = onOpenBlocked,
+                s.blockedStudents, null, onClick = onOpenBlocked,
             )
 
             Spacer(Modifier.height(4.dp))
-            SectionTitle("Bildirishnomalar")
-            ToggleRow(AppIcons.Bell, Sc.TintPink, Sc.Pink, "Push bildirishnomalar", settings.pushEnabled) {
+            SectionTitle(s.sectionNotifications)
+            ToggleRow(AppIcons.Bell, Sc.TintPink, Sc.Pink, s.pushNotifications, settings.pushEnabled) {
                 settingsVm.setPush(it)
             }
-            ToggleRow(AppIcons.Mail, Sc.TintViolet, Sc.Violet, "Email xabarnomalar", settings.emailEnabled) {
+            ToggleRow(AppIcons.Mail, Sc.TintViolet, Sc.Violet, s.emailNotifications, settings.emailEnabled) {
                 settingsVm.setEmail(it)
             }
 
             Spacer(Modifier.height(4.dp))
-            SectionTitle("Umumiy")
+            SectionTitle(s.sectionGeneral)
             SettingRow(
                 AppIcons.ShieldCheck, Sc.TintGreenDeep, Sc.Success,
-                "Ilova haqida", if (aboutExpanded) "Versiya 1.0.0" else null,
+                s.about, if (aboutExpanded) s.version else null,
             ) { aboutExpanded = !aboutExpanded }
             if (aboutExpanded) {
                 Text(
-                    "Student Club — talabalar uchun super-app: chegirmalar, ishlar, " +
-                        "e'lonlar va xabarlar.\nVersiya 1.0.0",
+                    s.aboutBody,
                     style = scStyle(12.5f, FontWeight.Medium, Sc.Muted, lineHeight = 19f),
                     modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                 )
@@ -185,7 +195,7 @@ fun SettingsScreen(
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 Icon(AppIcons.LogOut, null, tint = Sc.Danger, modifier = Modifier.size(18.dp))
-                ScText("Chiqish", 14f, FontWeight.ExtraBold, Sc.Danger, maxLines = 1)
+                ScText(s.logout, 14f, FontWeight.ExtraBold, Sc.Danger, maxLines = 1)
             }
             Spacer(Modifier.height(28.dp))
         }
@@ -204,15 +214,16 @@ private fun RegionPickerSheet(
     onSelect: (Region?) -> Unit,
     onDismiss: () -> Unit,
 ) {
+    val s = settingsStrings()
     ModalBottomSheet(onDismissRequest = onDismiss, containerColor = Sc.Bg) {
         Column(
             Modifier.fillMaxWidth().padding(horizontal = Sc.ScreenPadding).padding(bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            ScText("Viloyatni tanlang", 18f, FontWeight.ExtraBold, Sc.Ink)
+            ScText(s.selectRegion, 18f, FontWeight.ExtraBold, Sc.Ink)
             Spacer(Modifier.height(4.dp))
 
-            RegionRow("Butun O'zbekiston", selected == null) { onSelect(null) }
+            RegionRow(s.allUzbekistan, selected == null) { onSelect(null) }
 
             when {
                 // Viloyat qatorlari kelguncha — o'sha qatorlarning skeleti.
@@ -267,10 +278,11 @@ private fun RegionRow(label: String, active: Boolean, onClick: () -> Unit) {
  */
 @Composable
 private fun LastSeenSelector(current: String?, onSelect: (String) -> Unit) {
+    val s = settingsStrings()
     val options = listOf(
-        "EVERYONE" to "Hamma",
-        "CONNECTIONS" to "Do'stlar",
-        "NOBODY" to "Hech kim",
+        "EVERYONE" to s.visibilityEveryone,
+        "CONNECTIONS" to s.visibilityConnections,
+        "NOBODY" to s.visibilityNobody,
     )
     val selected = current ?: "CONNECTIONS"
     Row(
@@ -303,10 +315,11 @@ private fun LastSeenSelector(current: String?, onSelect: (String) -> Unit) {
  */
 @Composable
 private fun PhoneVisibilitySelector(current: String?, onSelect: (String) -> Unit) {
+    val s = settingsStrings()
     val options = listOf(
-        "EVERYONE" to "Hamma",
-        "CONNECTIONS" to "Do'stlar",
-        "NOBODY" to "Hech kim",
+        "EVERYONE" to s.visibilityEveryone,
+        "CONNECTIONS" to s.visibilityConnections,
+        "NOBODY" to s.visibilityNobody,
     )
     val selected = current ?: "NOBODY"
     Row(
@@ -328,13 +341,46 @@ private fun PhoneVisibilitySelector(current: String?, onSelect: (String) -> Unit
     }
 }
 
+/**
+ * Til selektori — uchta variant bir qatorda (mavzu selektori bilan bir xil ko'rinish).
+ *
+ * Tillar O'Z tilida yoziladi (`English` / `Русский` / `O'zbekcha`), tarjima qilinmaydi:
+ * ilova ingliz tilida ochilganda o'zbek foydalanuvchi o'z tilini tanish yozuv bo'yicha
+ * topishi kerak.
+ */
+@Composable
+private fun LanguageSelector(current: AppLanguage, onSelect: (AppLanguage) -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().scCard(radius = 18.dp).padding(5.dp),
+        horizontalArrangement = Arrangement.spacedBy(5.dp),
+    ) {
+        AppLanguage.entries.forEach { language ->
+            val active = language == current
+            Box(
+                Modifier.weight(1f).height(38.dp)
+                    .clip(RoundedCornerShape(13.dp))
+                    .background(if (active) Sc.TintBlue else Color.Transparent)
+                    .clickable { onSelect(language) },
+                contentAlignment = Alignment.Center,
+            ) {
+                ScText(
+                    language.nativeName, 13f, FontWeight.Bold,
+                    if (active) Sc.Brand else Sc.Muted,
+                    maxLines = 1,
+                )
+            }
+        }
+    }
+}
+
 /** Uch holatli mavzu selektori — faol variant ko'k tint bilan ajratiladi. */
 @Composable
 private fun ThemeSelector(current: ThemeMode, onSelect: (ThemeMode) -> Unit) {
+    val s = settingsStrings()
     val options = listOf(
-        ThemeMode.SYSTEM to "Tizim",
-        ThemeMode.LIGHT to "Yorug'",
-        ThemeMode.DARK to "Tungi",
+        ThemeMode.SYSTEM to s.themeSystem,
+        ThemeMode.LIGHT to s.themeLight,
+        ThemeMode.DARK to s.themeDark,
     )
     Row(
         Modifier.fillMaxWidth().scCard(radius = 18.dp).padding(5.dp),

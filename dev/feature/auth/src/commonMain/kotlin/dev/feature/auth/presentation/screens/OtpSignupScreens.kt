@@ -77,10 +77,11 @@ fun OtpScreen(
     onBack: () -> Unit,
     onVerify: () -> Unit,
     onResend: () -> Unit,
-    title: String = "Tasdiqlash kodi",
-    confirmLabel: String = "Tasdiqlash",
+    title: String = authStrings().otpTitle,
+    confirmLabel: String = authStrings().otpAction,
     palette: AppPalette = appPalette,
 ) {
+    val s = authStrings()
     AppScreenScaffold(
         scroll = true,
         // Tugma scroll maydonidan TASHQARIDA: klaviatura kodni kiritish uchun ochiq
@@ -108,13 +109,22 @@ fun OtpScreen(
         Spacer(Modifier.height(16.dp))
         ScreenTitle(title)
         Spacer(Modifier.height(6.dp))
+        // Raqam jumlada QALIN bo'ladi, lekin uning o'rni tilga qarab o'zgaradi
+        // (o'zbekchada boshida, inglizchada oxirida) — shuning uchun tayyor jumlada
+        // raqam qidiriladi, jumla qo'lda ikkiga bo'linmaydi.
+        val phoneText = formatUzPhoneFull(state.phone.ifEmpty { "901234567" })
+        val hint = s.otpHint(phoneText)
         Text(
             buildAnnotatedString {
-                withStyle(androidx.compose.ui.text.SpanStyle(color = palette.ink, fontWeight = FontWeight.Bold)) {
-                    append("${formatUzPhoneFull(state.phone.ifEmpty { "901234567" })} ")
-                }
-                withStyle(androidx.compose.ui.text.SpanStyle(color = palette.inkMuted)) {
-                    append("raqamiga yuborilgan 6 xonali kodni kiriting.")
+                val at = hint.indexOf(phoneText)
+                val muted = androidx.compose.ui.text.SpanStyle(color = palette.inkMuted)
+                val strong = androidx.compose.ui.text.SpanStyle(color = palette.ink, fontWeight = FontWeight.Bold)
+                if (at < 0) {
+                    withStyle(muted) { append(hint) }
+                } else {
+                    withStyle(muted) { append(hint.substring(0, at)) }
+                    withStyle(strong) { append(phoneText) }
+                    withStyle(muted) { append(hint.substring(at + phoneText.length)) }
                 }
             },
             style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.sp, lineHeight = 19.sp),
@@ -129,7 +139,7 @@ fun OtpScreen(
             Spacer(Modifier.width(6.dp))
             if (state.resendSeconds > 0) {
                 Text(
-                    "Kodni qayta yuborish · ",
+                    s.resendIn,
                     style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.5f.sp, color = palette.inkFaint),
                 )
                 Text(
@@ -138,7 +148,7 @@ fun OtpScreen(
                 )
             } else {
                 Text(
-                    "Kodni qayta yuborish",
+                    s.resend,
                     style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.5f.sp, fontWeight = FontWeight.Bold, color = palette.primary),
                     modifier = Modifier.clickableNoRipple(onResend),
                 )
@@ -217,6 +227,7 @@ fun SignUpScreen(
     onCreate: () -> Unit,
     palette: AppPalette = appPalette,
 ) {
+    val s = authStrings()
     // Qaysi hujjat ochiq — `null` bo'lsa varaq yopiq.
     var openDocument by remember { mutableStateOf<LegalDocument?>(null) }
 
@@ -236,18 +247,18 @@ fun SignUpScreen(
             )
             ErrorText(state.error)
             Spacer(Modifier.height(12.dp))
-            PrimaryButton("Hisob yaratish", onCreate, enabled = state.termsAccepted && !state.isLoading)
+            PrimaryButton(s.createAccount, onCreate, enabled = state.termsAccepted && !state.isLoading)
         },
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(11.dp)) {
             BackButton(onBack)
-            ScreenTitle("Hisob yaratish", size = 21)
+            ScreenTitle(s.createAccount, size = 21)
         }
 
         Spacer(Modifier.height(16.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-            GlassTextField(state.firstName, vm::onFirstNameChange, "Ism", Modifier.weight(1f), height = 46)
-            GlassTextField(state.lastName, vm::onLastNameChange, "Familya", Modifier.weight(1f), height = 46)
+            GlassTextField(state.firstName, vm::onFirstNameChange, s.firstName, Modifier.weight(1f), height = 46)
+            GlassTextField(state.lastName, vm::onLastNameChange, s.lastName, Modifier.weight(1f), height = 46)
         }
         Spacer(Modifier.height(9.dp))
         GlassTextField(
@@ -294,7 +305,7 @@ fun SignUpScreen(
                 Icon(AppIcons.ShieldCheck, null, tint = palette.successDeep, modifier = Modifier.size(16.dp))
                 Box(Modifier.weight(1f)) {
                     if (state.universityEmail.isEmpty()) {
-                        Text("aziz@tuit.uz", style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.5f.sp, color = palette.inkFaint))
+                        Text(s.emailHint, style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.5f.sp, color = palette.inkFaint))
                     }
                     BasicTextField(
                         state.universityEmail, vm::onUniversityEmailChange, singleLine = true,
@@ -311,7 +322,7 @@ fun SignUpScreen(
                 }
             }
             Spacer(Modifier.height(6.dp))
-            HintText("Universitet emaili (ixtiyoriy) — verified talaba nishoni beradi.")
+            HintText(s.universityEmailNote)
         }
 
         Spacer(Modifier.height(12.dp))
@@ -336,6 +347,7 @@ private fun TermsConsentRow(
     onOpenDocument: (LegalDocument) -> Unit,
     palette: AppPalette,
 ) {
+    val s = authStrings()
     val linkStyle = TextLinkStyles(
         style = SpanStyle(color = palette.primary, fontWeight = FontWeight.Bold),
     )
@@ -349,16 +361,16 @@ private fun TermsConsentRow(
                         styles = linkStyle,
                         linkInteractionListener = { onOpenDocument(LegalDocument.TERMS) },
                     ),
-                ) { append("Foydalanish shartlari") }
-                withStyle(SpanStyle(color = palette.label)) { append(" va ") }
+                ) { append(s.terms) }
+                withStyle(SpanStyle(color = palette.label)) { append(s.and) }
                 withLink(
                     LinkAnnotation.Clickable(
                         tag = LegalDocument.PRIVACY.name,
                         styles = linkStyle,
                         linkInteractionListener = { onOpenDocument(LegalDocument.PRIVACY) },
                     ),
-                ) { append("Maxfiylik siyosati") }
-                withStyle(SpanStyle(color = palette.label)) { append("ga roziman.") }
+                ) { append(s.privacy) }
+                withStyle(SpanStyle(color = palette.label)) { append(s.agree) }
             },
             style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.5f.sp, lineHeight = 16.sp),
         )
@@ -378,6 +390,7 @@ fun ForgotPasswordScreen(
     onBackToLogin: () -> Unit,
     palette: AppPalette = appPalette,
 ) {
+    val s = authStrings()
     AppScreenScaffold(scroll = true) {
         BackButton(onBack)
         Spacer(Modifier.height(40.dp))
@@ -395,17 +408,17 @@ fun ForgotPasswordScreen(
                 }
             }
             Spacer(Modifier.height(22.dp))
-            ScreenTitle("Parolni tiklash", size = 23)
+            ScreenTitle(s.resetPassword, size = 23)
             Spacer(Modifier.height(8.dp))
             Text(
-                "Telefon raqamingizni kiriting — SMS orqali 6 xonali kod yuboramiz. Yangi parolni kod tasdiqlangandan keyin belgilaysiz.",
+                s.resetPasswordBody,
                 style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.sp, color = palette.inkMuted, textAlign = androidx.compose.ui.text.style.TextAlign.Center, lineHeight = 19.sp),
                 modifier = Modifier.padding(horizontal = 6.dp),
             )
         }
 
         Spacer(Modifier.height(26.dp))
-        FieldLabel("Telefon raqamingiz")
+        FieldLabel(s.phoneLabel)
         Spacer(Modifier.height(7.dp))
         GlassTextField(
             value = state.phone,
@@ -419,7 +432,7 @@ fun ForgotPasswordScreen(
         )
 
         Spacer(Modifier.height(18.dp))
-        PrimaryButton("Kod yuborish", onSend, enabled = state.forgotReady && !state.isLoading)
+        PrimaryButton(s.sendCode, onSend, enabled = state.forgotReady && !state.isLoading)
 
         state.info?.let {
             Spacer(Modifier.height(12.dp))
@@ -434,7 +447,7 @@ fun ForgotPasswordScreen(
         Row(Modifier.fillMaxWidth().clickableNoRipple(onBackToLogin), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
             Icon(AppIcons.ArrowLeft, null, tint = palette.primary, modifier = Modifier.size(16.dp))
             Spacer(Modifier.width(7.dp))
-            Text("Kirishga qaytish", style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = palette.primary))
+            Text(s.backToSignIn, style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = palette.primary))
         }
     }
 }
@@ -458,6 +471,7 @@ fun NewPasswordScreen(
     onSave: () -> Unit,
     palette: AppPalette = appPalette,
 ) {
+    val s = authStrings()
     AppScreenScaffold(scroll = true) {
         BackButton(onBack)
         Spacer(Modifier.height(30.dp))
@@ -475,17 +489,17 @@ fun NewPasswordScreen(
                 }
             }
             Spacer(Modifier.height(20.dp))
-            ScreenTitle("Yangi parol", size = 23)
+            ScreenTitle(s.newPassword, size = 23)
             Spacer(Modifier.height(8.dp))
             Text(
-                "Raqamingiz tasdiqlandi. Endi yangi parolni o‘ylab toping — kamida 8 belgi.",
+                s.newPasswordBody,
                 style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.sp, color = palette.inkMuted, textAlign = androidx.compose.ui.text.style.TextAlign.Center, lineHeight = 19.sp),
                 modifier = Modifier.padding(horizontal = 6.dp),
             )
         }
 
         Spacer(Modifier.height(26.dp))
-        FieldLabel("Yangi parol")
+        FieldLabel(s.newPassword)
         Spacer(Modifier.height(7.dp))
         GlassTextField(
             value = state.password,
@@ -506,7 +520,7 @@ fun NewPasswordScreen(
         )
 
         Spacer(Modifier.height(13.dp))
-        FieldLabel("Parolni takrorlang")
+        FieldLabel(s.repeatPassword)
         Spacer(Modifier.height(7.dp))
         GlassTextField(
             value = state.passwordConfirm,
@@ -526,11 +540,11 @@ fun NewPasswordScreen(
         )
 
         // Mos kelmagani darhol ko'rinadi — tugmani bosib ko'rishni kutmasdan.
-        if (state.passwordMismatch) ErrorText("Parollar mos kelmadi.")
+        if (state.passwordMismatch) ErrorText(s.passwordsDontMatch)
 
         Spacer(Modifier.height(18.dp))
         PrimaryButton(
-            "Parolni saqlash", onSave,
+            s.savePassword, onSave,
             enabled = state.newPasswordReady && !state.isLoading,
             trailingIcon = AppIcons.Check,
         )

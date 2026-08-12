@@ -47,7 +47,7 @@ fun rememberPeerProfileSections(
     //
     // Ilgari yuklanish paytida bo'lim "Yuklanmoqda…" yozuvi bilan turardi. Natijada eng
     // ko'p uchraydigan holat eng yomon ko'rinardi: odamda post yo'q bo'lsa (bu odatiy hol),
-    // foydalanuvchi avval "Postlar" tabini va bo'sh kartani ko'rar, bir soniyadan keyin
+    // foydalanuvchi avval chatStrings().tabPosts tabini va bo'sh kartani ko'rar, bir soniyadan keyin
     // esa ular **ko'z oldida yo'qolardi** — tablar suriladi, balandlik o'zgaradi, barmoq
     // ostidagi element boshqasiga almashadi.
     //
@@ -55,11 +55,11 @@ fun rememberPeerProfileSections(
     // hech narsani olib ketmaydi, faqat qo'shiladi.
     return buildList {
         if (postsState.group?.stories.orEmpty().isNotEmpty()) {
-            add(ProfileSection("Postlar") { StudentPostsSection(studentId, vm = postsVm) })
+            add(ProfileSection(chatStrings().tabPosts) { StudentPostsSection(studentId, vm = postsVm) })
         }
         if (state.media.isNotEmpty()) {
             add(
-                ProfileSection("Media") {
+                ProfileSection(chatStrings().tabMedia) {
                     ChatPhotoGrid(state.media, onOpen = { index -> vm.openViewer(index) })
                     // Ko'rgich bo'limning ICHIDA: profil varag'i dialog bo'lib ochilgan va
                     // ko'rgichni tashqarida chizsak u varaq ostida qolib ketardi.
@@ -74,10 +74,10 @@ fun rememberPeerProfileSections(
             )
         }
         if (state.files.isNotEmpty()) {
-            add(ProfileSection("Fayllar") { ChatFileList(state.files, onOpen = onOpenFile) })
+            add(ProfileSection(chatStrings().tabFiles) { ChatFileList(state.files, onOpen = onOpenFile) })
         }
         if (state.links.isNotEmpty()) {
-            add(ProfileSection("Havolalar") { ChatLinkList(state.links) })
+            add(ProfileSection(chatStrings().tabLinks) { ChatLinkList(state.links) })
         }
     }
 }
@@ -147,7 +147,7 @@ class PeerMediaViewModel(private val repository: ChatRepository) : ViewModel() {
                         .map { message ->
                             ChatFileUi(
                                 messageId = message.id,
-                                fileName = message.attachment?.fileName ?: "Fayl",
+                                fileName = message.attachment?.fileName ?: chatStringsNow().file,
                                 sizeBytes = message.attachment?.sizeBytes ?: 0,
                             )
                         },

@@ -548,7 +548,7 @@ private fun MyStoryCell(
                 if (publishing) {
                     Icon(
                         AppIcons.Camera,
-                        "Yuklanmoqda",
+                        storiesStrings().loading,
                         tint = Color.White,
                         modifier = Modifier.size(11.dp),
                     )
@@ -559,7 +559,7 @@ private fun MyStoryCell(
                     // markazida chizilgan.
                     Icon(
                         AppIcons.Plus,
-                        "Hikoya qo'shish",
+                        storiesStrings().addStory,
                         tint = Color.White,
                         modifier = Modifier.size(13.dp),
                     )
@@ -569,10 +569,10 @@ private fun MyStoryCell(
         Spacer(Modifier.height(5.dp))
         ScText(
             when {
-                publishing && progress != null -> "Yuklanmoqda ${scUploadPercent(progress)}"
+                publishing && progress != null -> storiesStrings().uploading(scUploadPercent(progress))
                 // Fayl ketib bo'lgan, server hikoyani yaratmoqda — foiz o'rniga holat.
-                publishing -> "Tayyorlanmoqda…"
-                else -> "Hikoyam"
+                publishing -> storiesStrings().preparing
+                else -> storiesStrings().myStory
             },
             11.5f,
             FontWeight.SemiBold,
@@ -806,12 +806,12 @@ private fun StoryMessageDialog(text: String, onDismiss: () -> Unit) {
                     .clickable(onClick = onDismiss)
                     .padding(horizontal = 26.dp, vertical = 9.dp),
             ) {
-                ScText("Tushunarli", 13.5f, FontWeight.ExtraBold, Sc.Brand, maxLines = 1)
+                ScText(storiesStrings().gotIt, 13.5f, FontWeight.ExtraBold, Sc.Brand, maxLines = 1)
             }
         }
     }
 }
 
 /** Chegara **mahsulot** qarori — `CHAT_MEDIA_PARITY_BACKEND.md` §2. */
-private const val STORY_TOO_LONG_MESSAGE =
-    "Hikoya 1 daqiqadan uzun bo'lmasin. Videoni qisqartirib qayta tanlang."
+private val STORY_TOO_LONG_MESSAGE: String
+    get() = storiesStringsNow().videoTooLong

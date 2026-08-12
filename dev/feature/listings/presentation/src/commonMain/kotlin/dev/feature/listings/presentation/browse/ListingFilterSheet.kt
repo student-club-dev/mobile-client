@@ -45,6 +45,9 @@ import dev.feature.listings.domain.model.WorkShift
 import dev.feature.listings.domain.model.formatSum
 import dev.feature.listings.presentation.components.ChipFlow
 import dev.feature.listings.presentation.components.SelectChip
+import dev.feature.listings.presentation.lt
+import dev.feature.listings.presentation.currency
+import dev.feature.listings.presentation.Lt
 
 /**
  * Filtr oynasi.
@@ -82,7 +85,7 @@ fun ListingFilterSheet(
                 Modifier.fillMaxWidth().padding(start = 22.dp, end = 22.dp, top = 6.dp, bottom = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                ScText("Filtrlar", 20f, FontWeight.ExtraBold, Sc.Ink, Modifier.weight(1f), letterSpacing = -0.3f)
+                ScText(lt("Filtrlar"), 20f, FontWeight.ExtraBold, Sc.Ink, Modifier.weight(1f), letterSpacing = -0.3f)
                 ScSheetClose(onClose)
             }
 
@@ -112,9 +115,9 @@ fun ListingFilterSheet(
                     .padding(start = 22.dp, end = 22.dp, top = 12.dp, bottom = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(11.dp),
             ) {
-                ScSoftButton("Tozalash", vm::resetDraft, Modifier.weight(1f))
+                ScSoftButton(lt("Tozalash"), vm::resetDraft, Modifier.weight(1f))
                 ScGradientButton(
-                    "Qo'llash · ${state.previewCount}",
+                    "${lt("Qo'llash")} · ${state.previewCount}",
                     onApply,
                     Modifier.weight(1.6f),
                     radius = 16.dp,
@@ -131,7 +134,7 @@ fun ListingFilterSheet(
 
 @Composable
 private fun RentalFilters(draft: ListingFilters, palette: AppPalette, vm: ListingsBrowseViewModel) {
-    FilterSection("Kim uchun", palette, "Talabalar eng ko'p shu bo'yicha qidiradi") {
+    FilterSection(lt("Kim uchun"), palette, lt("Talabalar eng ko'p shu bo'yicha qidiradi")) {
         ChipFlow {
             TenantGender.entries.forEach { gender ->
                 SelectChip("${gender.emoji} ${gender.label}", draft.gender == gender, onClick = {
@@ -141,7 +144,7 @@ private fun RentalFilters(draft: ListingFilters, palette: AppPalette, vm: Listin
         }
     }
 
-    FilterSection("Turarjoy turi", palette) {
+    FilterSection(lt("Turarjoy turi"), palette) {
         ChipFlow {
             PropertyType.entries.forEach { type ->
                 SelectChip(type.label, draft.propertyType == type, onClick = {
@@ -151,19 +154,19 @@ private fun RentalFilters(draft: ListingFilters, palette: AppPalette, vm: Listin
         }
     }
 
-    FilterSection("Kamida nechi xonali", palette) {
+    FilterSection(lt("Kamida nechi xonali"), palette) {
         ChipFlow {
             ListingFilters.ROOM_OPTIONS.forEach { rooms ->
-                SelectChip("$rooms+ xona", draft.minRooms == rooms, onClick = {
+                SelectChip(Lt.roomsPlus(rooms), draft.minRooms == rooms, onClick = {
                     vm.updateDraft { it.copy(minRooms = it.minRooms.toggle(rooms)) }
                 })
             }
         }
     }
 
-    FilterSection("Qo'shimcha", palette) {
+    FilterSection(lt("Qo'shimcha"), palette) {
         ChipFlow {
-            SelectChip("Bo'sh joyi bor", draft.onlyAvailable, onClick = {
+            SelectChip(lt("Bo'sh joyi bor"), draft.onlyAvailable, onClick = {
                 vm.updateDraft { it.copy(onlyAvailable = !it.onlyAvailable) }
             })
         }
@@ -176,7 +179,7 @@ private fun RentalFilters(draft: ListingFilters, palette: AppPalette, vm: Listin
 
 @Composable
 private fun TaskFilters(draft: ListingFilters, palette: AppPalette, vm: ListingsBrowseViewModel) {
-    FilterSection("Ish yo'nalishi", palette, "Qaysi turdagi topshiriqlarni ko'rmoqchisiz") {
+    FilterSection(lt("Ish yo'nalishi"), palette, lt("Qaysi turdagi topshiriqlarni ko'rmoqchisiz")) {
         ChipFlow {
             TaskCategory.entries.forEach { category ->
                 SelectChip("${category.emoji} ${category.label}", draft.taskCategory == category, onClick = {
@@ -188,7 +191,7 @@ private fun TaskFilters(draft: ListingFilters, palette: AppPalette, vm: Listings
 
     // Turlar faqat yo'nalish tanlanganda — ular aynan undan kelib chiqadi.
     draft.taskCategory?.let { category ->
-        FilterSection("Ish turi", palette) {
+        FilterSection(lt("Ish turi"), palette) {
             ChipFlow {
                 TaskCatalog.types(category).forEach { type ->
                     SelectChip(type.label, draft.taskTypeKey == type.key, onClick = {
@@ -199,7 +202,7 @@ private fun TaskFilters(draft: ListingFilters, palette: AppPalette, vm: Listings
         }
     }
 
-    FilterSection("Qanday topshiriladi", palette) {
+    FilterSection(lt("Qanday topshiriladi"), palette) {
         ChipFlow {
             TaskFormat.entries.forEach { format ->
                 SelectChip(format.label, draft.taskFormat == format, onClick = {
@@ -212,7 +215,7 @@ private fun TaskFilters(draft: ListingFilters, palette: AppPalette, vm: Listings
 
 @Composable
 private fun ServiceFilters(draft: ListingFilters, palette: AppPalette, vm: ListingsBrowseViewModel) {
-    FilterSection("Xizmat sohasi", palette) {
+    FilterSection(lt("Xizmat sohasi"), palette) {
         ChipFlow {
             ServiceType.entries.forEach { type ->
                 SelectChip("${type.emoji} ${type.label}", draft.serviceType == type, onClick = {
@@ -222,7 +225,7 @@ private fun ServiceFilters(draft: ListingFilters, palette: AppPalette, vm: Listi
         }
     }
 
-    FilterSection("Qanday ko'rsatiladi", palette) {
+    FilterSection(lt("Qanday ko'rsatiladi"), palette) {
         ChipFlow {
             ServiceFormat.entries.forEach { format ->
                 SelectChip(format.label, draft.serviceFormat == format, onClick = {
@@ -232,9 +235,9 @@ private fun ServiceFilters(draft: ListingFilters, palette: AppPalette, vm: Listi
         }
     }
 
-    FilterSection("Qo'shimcha", palette) {
+    FilterSection(lt("Qo'shimcha"), palette) {
         ChipFlow {
-            SelectChip("Sinov bepul", draft.onlyFreeTrial, onClick = {
+            SelectChip(lt("Sinov bepul"), draft.onlyFreeTrial, onClick = {
                 vm.updateDraft { it.copy(onlyFreeTrial = !it.onlyFreeTrial) }
             })
         }
@@ -247,7 +250,7 @@ private fun ServiceFilters(draft: ListingFilters, palette: AppPalette, vm: Listi
 
 @Composable
 private fun JobFilters(draft: ListingFilters, palette: AppPalette, vm: ListingsBrowseViewModel) {
-    FilterSection("Ish turi", palette) {
+    FilterSection(lt("Ish turi"), palette) {
         ChipFlow {
             EmploymentType.entries.forEach { type ->
                 SelectChip(type.label, draft.employment == type, onClick = {
@@ -262,7 +265,7 @@ private fun JobFilters(draft: ListingFilters, palette: AppPalette, vm: ListingsB
         }
     }
 
-    FilterSection("Qanday ish", palette) {
+    FilterSection(lt("Qanday ish"), palette) {
         ChipFlow {
             JobCatalog.CATEGORIES.forEach { category ->
                 SelectChip(category.label, draft.jobCategoryKey == category.key, onClick = {
@@ -273,7 +276,7 @@ private fun JobFilters(draft: ListingFilters, palette: AppPalette, vm: ListingsB
     }
 
     val shifts = draft.employment?.let { JobCatalog.shifts(it) } ?: WorkShift.entries
-    FilterSection("Smena", palette) {
+    FilterSection(lt("Smena"), palette) {
         ChipFlow {
             shifts.forEach { shift ->
                 SelectChip(shift.label, draft.shift == shift, onClick = {
@@ -283,9 +286,9 @@ private fun JobFilters(draft: ListingFilters, palette: AppPalette, vm: ListingsB
         }
     }
 
-    FilterSection("Qo'shimcha", palette) {
+    FilterSection(lt("Qo'shimcha"), palette) {
         ChipFlow {
-            SelectChip("Tajriba shart emas", draft.noExperienceOnly, onClick = {
+            SelectChip(lt("Tajriba shart emas"), draft.noExperienceOnly, onClick = {
                 vm.updateDraft { it.copy(noExperienceOnly = !it.noExperienceOnly) }
             })
         }
@@ -306,10 +309,10 @@ private fun PriceFilter(
     val options = ListingFilters.priceOptions(kind)
     if (options.isEmpty()) return
 
-    FilterSection("Narx chegarasi", palette, "Kelishilgan narxli e'lonlar baribir ko'rinadi") {
+    FilterSection(lt("Narx chegarasi"), palette, lt("Kelishilgan narxli e'lonlar baribir ko'rinadi")) {
         ChipFlow {
             options.forEach { limit ->
-                SelectChip("${limit.formatSum()} gacha", draft.maxPrice == limit, onClick = {
+                SelectChip(Lt.upTo(limit.formatSum()), draft.maxPrice == limit, onClick = {
                     vm.updateDraft { it.copy(maxPrice = it.maxPrice.toggle(limit)) }
                 })
             }
@@ -328,7 +331,7 @@ private fun PriceFilter(
 @Composable
 private fun SortFilter(state: ListingFilterUiState, palette: AppPalette, vm: ListingsBrowseViewModel) {
     if (state.sortOptions.size < 2) return
-    FilterSection("Saralash", palette) {
+    FilterSection(lt("Saralash"), palette) {
         ChipFlow {
             state.sortOptions.forEach { sort ->
                 SelectChip(sort.label, state.sort == sort, onClick = { vm.updateSort(sort) })

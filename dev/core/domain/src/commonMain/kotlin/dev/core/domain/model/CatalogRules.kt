@@ -1,5 +1,7 @@
 package dev.core.domain.model
 
+import dev.core.common.locale.AppLocale
+
 /**
  * "Siz uchun" (Takliflar) katalogining ILOVADAGI tuzatishlari — server katalogi ustidan.
  *
@@ -25,8 +27,15 @@ object CatalogRules {
 
     /** Ajratilgan bo'lim kaliti: "SHOPPING" → "SHOPPING:SERVICES" (server guruhi o'zgarmaydi). */
     const val SERVICES_SUFFIX = ":SERVICES"
-    const val SERVICES_NAME = "Xizmatlar"
     const val SERVICES_EMOJI = "🛠"
+
+    /**
+     * Ajratilgan bo'limning nomi — serverdan kelmaydi, ilova o'zi qo'yadi, demak
+     * tarjimasi ham ilovada. Guruh ro'yxati ViewModel'da (Compose'dan tashqarida)
+     * yig'iladi, shuning uchun til [AppLocale] dan olinadi.
+     */
+    val servicesName: String
+        get() = AppLocale.pick(en = "Services", ru = "Услуги", uz = "Xizmatlar")
 
     fun isHidden(typeKey: String): Boolean = typeKey.uppercase() in HIDDEN_TYPES
 

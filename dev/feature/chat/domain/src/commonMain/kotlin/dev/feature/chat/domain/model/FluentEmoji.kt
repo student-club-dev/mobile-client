@@ -112,14 +112,14 @@ object FluentEmoji {
     )
 
     private val GROUPS = listOf(
-        Group("fluent_smileys", "Kayfiyat", "😄", FluentEmojiAssets.SMILEYS),
-        Group("fluent_people", "Odamlar", "🙌", FluentEmojiAssets.PEOPLE),
-        Group("fluent_nature", "Tabiat", "🐱", FluentEmojiAssets.NATURE),
-        Group("fluent_food", "Ovqat", "🍕", FluentEmojiAssets.FOOD),
-        Group("fluent_activities", "Faoliyat", "⚽", FluentEmojiAssets.ACTIVITIES),
-        Group("fluent_travel", "Sayohat", "✈️", FluentEmojiAssets.TRAVEL),
-        Group("fluent_objects", "Buyumlar", "💡", FluentEmojiAssets.OBJECTS),
-        Group("fluent_symbols", "Belgilar", "❤️", FluentEmojiAssets.SYMBOLS),
+        Group("fluent_smileys", ChatDomainStrings.emojiMood, "😄", FluentEmojiAssets.SMILEYS),
+        Group("fluent_people", ChatDomainStrings.emojiPeople, "🙌", FluentEmojiAssets.PEOPLE),
+        Group("fluent_nature", ChatDomainStrings.emojiNature, "🐱", FluentEmojiAssets.NATURE),
+        Group("fluent_food", ChatDomainStrings.emojiFood, "🍕", FluentEmojiAssets.FOOD),
+        Group("fluent_activities", ChatDomainStrings.emojiActivity, "⚽", FluentEmojiAssets.ACTIVITIES),
+        Group("fluent_travel", ChatDomainStrings.emojiTravel, "✈️", FluentEmojiAssets.TRAVEL),
+        Group("fluent_objects", ChatDomainStrings.emojiObjects, "💡", FluentEmojiAssets.OBJECTS),
+        Group("fluent_symbols", ChatDomainStrings.emojiSymbols, "❤️", FluentEmojiAssets.SYMBOLS),
     )
 
     /** `U+FE0F` — ko'rinmas belgi, shuning uchun ataylab kod bilan yozilgan. */

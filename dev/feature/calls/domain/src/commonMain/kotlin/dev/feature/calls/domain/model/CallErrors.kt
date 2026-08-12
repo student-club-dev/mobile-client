@@ -56,17 +56,17 @@ object CallErrorCode {
 
     const val INTERNAL_ERROR = "INTERNAL_ERROR"
 
-    /** Foydalanuvchiga ko'rsatiladigan zaxira matn (server o'zbekcha `message` bermasa). */
+    /** Foydalanuvchiga ko'rsatiladigan zaxira matn (server o'z `message` ini bermasa). */
     fun message(code: String?): String = when (code) {
-        CALL_BUSY -> "Foydalanuvchi hozir band."
-        NOT_CONNECTED -> "Bu foydalanuvchi bilan bog'lanmagansiz."
-        USER_BLOCKED -> "Qo'ng'iroq qilib bo'lmaydi."
-        RATE_LIMITED -> "Juda ko'p urinish. Birozdan so'ng qayta urining."
-        NOT_IMPLEMENTED -> "Qo'ng'iroq hozircha mavjud emas."
-        TOKEN_EXPIRED, UNAUTHORIZED -> "Sessiya tugagan. Qaytadan kiring."
-        FORBIDDEN -> "Bu amal uchun ruxsat yo'q."
-        INVALID_CALL_STATE -> "Qo'ng'iroqqa boshqa qurilmada javob berildi."
-        CALL_NOT_FOUND -> "Qo'ng'iroq tugadi."
-        else -> "Qo'ng'iroqni amalga oshirib bo'lmadi."
+        CALL_BUSY -> CallStrings.busy
+        NOT_CONNECTED -> CallStrings.notConnected
+        USER_BLOCKED -> CallStrings.blocked
+        RATE_LIMITED -> CallStrings.rateLimited
+        NOT_IMPLEMENTED -> CallStrings.notAvailable
+        TOKEN_EXPIRED, UNAUTHORIZED -> CallStrings.sessionExpired
+        FORBIDDEN -> CallStrings.forbidden
+        INVALID_CALL_STATE -> CallStrings.answeredElsewhere
+        CALL_NOT_FOUND -> CallStrings.callEnded
+        else -> CallStrings.callFailed
     }
 }

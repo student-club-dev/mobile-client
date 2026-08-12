@@ -1,9 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Sukut (til belgilanmagan) katalog — INGLIZCHA. Ilova ingliz tilida ochiladi, shuning
+  uchun tizim resurslari ham shu tilda: `values-ru/` va `values-uz/` faqat mos qurilma
+  tilida ustidan yoziladi.
+-->
 <resources>
     <string name="app_name">Student Club</string>
 
     <!-- Push bildirishnomalari (03-WEBSOCKET.md §10) -->
-    <string name="push_channel_chat">Xabarlar</string>
-    <string name="push_channel_chat_description">Yangi chat xabarlari haqida bildirishnoma</string>
-    <string name="push_default_title">Yangi xabar</string>
+    <string name="push_channel_chat">Messages</string>
+    <string name="push_channel_chat_description">Notifications about new chat messages</string>
+    <string name="push_default_title">New message</string>
 </resources>

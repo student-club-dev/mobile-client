@@ -95,13 +95,15 @@ import dev.feature.profile.presentation.ProfileScreen
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.ime
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.runtime.ReadOnlyComposable
+import dev.core.common.locale.AppLocale
 
-private enum class StudentTab(val route: String, val label: String) {
-    HOME("home", "Home"),
-    UNIVERSITY("university", "Universitet"),
+private enum class StudentTab(val route: String) {
+    HOME("home"),
+    UNIVERSITY("university"),
     // Ilgari faqat "Ishlar" edi; endi bitta ekranda Ijara, Xizmatlar va Ish e'lonlari
     // tab bilan almashadi, shuning uchun umumiy nom.
-    LISTINGS("listings", "E'lonlar"),
+    LISTINGS("listings"),
     /**
      * Bizneslardan keladigan e'lonlar ("Siz uchun" feed'i) — chegirmali va chegirmasiz.
      * [LISTINGS] dan farqi: u yerda TALABALAR e'lonlari (ijara, ish, yordam).
@@ -109,7 +111,17 @@ private enum class StudentTab(val route: String, val label: String) {
      * Chat tab'i o'rniga keldi: suhbatlar bosh ekran sarlavhasidagi tugmadan ochiladi,
      * ya'ni pastki panelda ikkinchi kirish nuqtasi ortiqcha edi.
      */
-    OFFERS("discounts", "Takliflar"),
+    OFFERS("discounts"),
+    ;
+
+    /** Panel yorlig'i — enum konstantasiga qotirib bo'lmaydi, til daraxtdan keladi. */
+    val label: String
+        @Composable @ReadOnlyComposable get() = when (this) {
+            HOME -> "Home"
+            UNIVERSITY -> AppLocale.pick(en = "University", ru = "Университет", uz = "Universitet")
+            LISTINGS -> AppLocale.pick(en = "Listings", ru = "Объявления", uz = "E'lonlar")
+            OFFERS -> AppLocale.pick(en = "Offers", ru = "Предложения", uz = "Takliflar")
+        }
 }
 
 /**
@@ -182,7 +194,7 @@ private fun String?.toListingKind(): ListingKind =
  * Talaba karkasi — pastki navigatsiya (Home / Universitet / E'lonlar / Takliflar) + markaziy
  * "E'lon" FAB (talaba e'lonlari: ijara, ish, xizmat, yordam).
  *
- * "Takliflar" — bizneslardan keladigan e'lonlar feed'i, faqat O'QISH uchun. Biznesmenning
+ * shellOffers() — bizneslardan keladigan e'lonlar feed'i, faqat O'QISH uchun. Biznesmenning
  * e'lon qo'yish oqimi bu yerda YO'Q — u [BusinessShell] da.
  */
 @Composable
@@ -302,7 +314,7 @@ fun StudentShell(onLoggedOut: () -> Unit) {
                         onOpenProfile = { nav.navigateSafe(PROFILE) },
                         onOpenChat = { nav.navigateSafe(CHAT) },
                         onOpenNotifications = { nav.navigateSafe(NOTIFICATIONS) },
-                        // "Takliflar" tab'ini KONKRET bo'lim ochilgan holda ochadi ("Ovqatlar →
+                        // shellOffers() tab'ini KONKRET bo'lim ochilgan holda ochadi ("Ovqatlar →
                         // Barchasi"). [openListingsKind] dagi kabi `restoreState` YO'Q: saqlangan
                         // holat tiklansa Navigation eski argumentlarni qaytarib, yangi `?group=`
                         // bekor bo'lardi. Kalitsiz — odatdagi to'liq feed.
@@ -315,7 +327,7 @@ fun StudentShell(onLoggedOut: () -> Unit) {
                         },
                         // "Fanlardan yordam" — o'sha ekran, Yordam tab'i ochilgan holda.
                         onOpenTasks = { openListingsKind(ListingKind.TASK) },
-                        // "E'lonlar" ekrani, darrov ijara tab'i ochilgan holda.
+                        // shellListings() ekrani, darrov ijara tab'i ochilgan holda.
                         onOpenRentals = { openListingsKind(ListingKind.RENTAL) },
                         onOpenListing = { id -> nav.navigateSafe("$LISTING_DETAIL/${encodeArg(id)}") },
                         onOpenStudents = { nav.navigateSafe(CONNECTIONS) },
@@ -343,7 +355,7 @@ fun StudentShell(onLoggedOut: () -> Unit) {
                     )
                 }
                 composable(
-                    // "Takliflar" — bizneslardan keladigan e'lonlar, pastki paneldagi tab.
+                    // shellOffers() — bizneslardan keladigan e'lonlar, pastki paneldagi tab.
                     // `?group=` — Home'dagi bo'lim ("Ovqatlar") tugmasidan; bo'sh bo'lsa butun feed.
                     route = "${StudentTab.OFFERS.route}?group={group}",
                     enterTransition = TabEnter, exitTransition = TabExit,
@@ -577,7 +589,7 @@ private fun BottomBar(
                 .clickable(onClick = onFab),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(ScIcons.Plus, "Elon berish", tint = Color.White, modifier = Modifier.size(26.dp))
+            Icon(ScIcons.Plus, discountsStrings().postListing, tint = Color.White, modifier = Modifier.size(26.dp))
         }
     }
 }

@@ -15,6 +15,7 @@ import io.ktor.client.request.header
 import io.ktor.client.request.parameter
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import dev.core.common.locale.AppLocale
 
 /**
  * **Zaxira** geokoder — OpenStreetMap Nominatim (tekin, API kalit talab qilmaydi).
@@ -55,7 +56,7 @@ class NominatimGeoRepository(
 
         Resource.Success(results.mapNotNull { it.toSuggestion() })
     } catch (e: Exception) {
-        Resource.Error(e.message ?: "Qidirib bo'lmadi", e)
+        Resource.Error(e.message ?: AppLocale.pick(en = "Search failed", ru = "Не удалось выполнить поиск", uz = "Qidirib bo'lmadi"), e)
     }
 
     override suspend fun reverseGeocode(lat: Double, lng: Double): Resource<ResolvedAddress> = try {
@@ -81,7 +82,7 @@ class NominatimGeoRepository(
             ),
         )
     } catch (e: Exception) {
-        Resource.Error(e.message ?: "Manzilni aniqlab bo'lmadi", e)
+        Resource.Error(e.message ?: AppLocale.pick(en = "Couldn't determine the address", ru = "Не удалось определить адрес", uz = "Manzilni aniqlab bo'lmadi"), e)
     }
 
     private companion object {

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="push_channel_chat">Сообщения</string>
+    <string name="push_channel_chat_description">Уведомления о новых сообщениях в чате</string>
+    <string name="push_default_title">Новое сообщение</string>
+</resources>

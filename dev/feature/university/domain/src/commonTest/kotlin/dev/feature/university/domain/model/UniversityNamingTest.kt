@@ -1,5 +1,8 @@
 package dev.feature.university.domain.model
 
+import dev.core.common.locale.AppLanguage
+import dev.core.common.locale.AppLocale
+import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -10,6 +13,16 @@ import kotlin.test.assertTrue
  * Ular tasodifiy tanlanmagan: har biri bitta buzilish turini qamrab oladi.
  */
 class UniversityNamingTest {
+
+    /**
+     * Testlar o'zbekcha nomlarni ajratishni tekshiradi, "filial" so'zi esa endi tilga
+     * qarab tarjima qilinadi. Ilovaning sukut tili — ingliz tili, shuning uchun bu yerda
+     * til aniq belgilanadi: aks holda kutilgan qator emas, tarjimasi qaytardi.
+     */
+    @BeforeTest
+    fun useUzbek() {
+        AppLocale.set(AppLanguage.UZ)
+    }
 
     // ---------------------------------------------------------------------------------
     // Qisqa nom

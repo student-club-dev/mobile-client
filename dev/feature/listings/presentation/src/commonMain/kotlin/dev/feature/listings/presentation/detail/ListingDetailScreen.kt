@@ -60,6 +60,9 @@ import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import org.koin.compose.viewmodel.koinViewModel
+import dev.feature.listings.presentation.lt
+import dev.feature.listings.presentation.currency
+import dev.feature.listings.presentation.Lt
 
 /**
  * E'lonni to'liq ko'rish ekrani — talaba ro'yxatdan bosganda ochiladi.
@@ -116,21 +119,21 @@ fun ListingDetailScreen(
                 Text(if (networkError != null) "📡" else "🔍", style = TextStyle(fontSize = 40.sp))
                 Spacer(Modifier.height(12.dp))
                 ScText(
-                    if (networkError != null) "Yuklab bo'lmadi" else "E'lon topilmadi",
+                    if (networkError != null) lt("Yuklab bo'lmadi") else lt("E'lon topilmadi"),
                     19f, FontWeight.ExtraBold, Sc.Ink,
                 )
                 Spacer(Modifier.height(6.dp))
                 Text(
-                    networkError ?: "E'lon o'chirilgan yoki havola eskirgan bo'lishi mumkin.",
+                    networkError ?: lt("E'lon o'chirilgan yoki havola eskirgan bo'lishi mumkin."),
                     style = scStyle(13.5f, FontWeight.Medium, Sc.Muted, lineHeight = 20f)
                         .copy(textAlign = TextAlign.Center),
                 )
                 Spacer(Modifier.height(20.dp))
                 if (networkError != null) {
-                    ScSoftButton("Qayta urinish", vm::retry, Modifier.width(180.dp))
+                    ScSoftButton(lt("Qayta urinish"), vm::retry, Modifier.width(180.dp))
                     Spacer(Modifier.height(10.dp))
                 }
-                ScSoftButton("Orqaga", onBack, Modifier.width(180.dp))
+                ScSoftButton(lt("Orqaga"), onBack, Modifier.width(180.dp))
             }
         }
 
@@ -186,7 +189,7 @@ private fun GallerySection(listing: Listing, onBack: () -> Unit) {
         }
 
         Box(Modifier.align(Alignment.TopStart).scTopInset().padding(start = Sc.ScreenPadding)) {
-            ScCircleButton(ScIcons.ChevronLeft, onBack, contentDescription = "Orqaga")
+            ScCircleButton(ScIcons.ChevronLeft, onBack, contentDescription = lt("Orqaga"))
         }
     }
 }
@@ -218,12 +221,12 @@ private fun PriceSection(listing: Listing) {
     val priceMax = listing.priceMax
     // "Kelishilgan holda" bo'lsa raqam umuman ma'nosiz — narx o'rniga shu yozuv chiqadi.
     val priceText = when {
-        listing.isNegotiable -> "Kelishilgan holda"
+        listing.isNegotiable -> lt("Kelishilgan holda")
         // Maosh vilkasi ("3–5 mln") — yuqori chegara pastdan katta bo'lsagina oraliq chiqadi.
         priceMax != null && priceMax > listing.price ->
-            "${listing.price.formatSum()} — ${priceMax.formatSum()} so'm"
+            "${listing.price.formatSum()} — ${priceMax.formatSum()} ${currency()}"
 
-        else -> "${listing.price.formatSum()} so'm"
+        else -> "${listing.price.formatSum()} ${currency()}"
     } + " / ${listing.priceUnit.suffix}"
 
     Column(Modifier.fillMaxWidth().padding(horizontal = Sc.ScreenPadding)) {
@@ -238,7 +241,7 @@ private fun PriceSection(listing: Listing) {
             // Chegirmada asl narx — talaba qancha yutayotganini ko'rishi kerak.
             if (listing.isDiscount && listing.price != listing.finalPrice) {
                 Text(
-                    "${listing.price.formatSum()} so'm",
+                    "${listing.price.formatSum()} ${currency()}",
                     style = scStyle(13.5f, FontWeight.Medium, Sc.Muted)
                         .copy(textDecoration = TextDecoration.LineThrough),
                 )
@@ -265,22 +268,22 @@ private fun DetailsSection(listing: Listing) {
 @Composable
 private fun RentalDetails(d: ListingDetails.Rental) {
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        DetailSection("Turarjoy") {
-            DetailRow("Turi", d.propertyType?.label)
+        DetailSection(lt("Turarjoy")) {
+            DetailRow(lt("Turi"), d.propertyType?.label)
             DetailRow(RentalCatalog.roomCountLabel(d.propertyType), d.roomCount?.toString())
-            DetailRow("Hozir yashaydi", d.currentTenants?.let { "$it kishi" })
-            DetailRow("Nechi kishi kerak", d.neededTenants?.let { "$it kishi" })
+            DetailRow(lt("Hozir yashaydi"), d.currentTenants?.let { Lt.people(it) })
+            DetailRow(lt("Nechi kishi kerak"), d.neededTenants?.let { Lt.people(it) })
             // Talaba uchun asosiy filtr — shuning uchun ajratib ko'rsatiladi.
-            DetailRow("Kim uchun", d.gender?.label, accented = true)
-            DetailRow("To'lov davri", d.period.label)
-            DetailRow("Kommunal narxga kiradi", if (d.utilitiesIncluded) "Ha" else "Yo'q")
-            DetailRow("Depozit", d.depositMonths?.let { "$it oylik" })
-            DetailRow("Qavat", d.floor?.let { floor -> d.totalFloors?.let { "$floor / $it" } })
+            DetailRow(lt("Kim uchun"), d.gender?.label, accented = true)
+            DetailRow(lt("To'lov davri"), d.period.label)
+            DetailRow(lt("Kommunal narxga kiradi"), if (d.utilitiesIncluded) lt("Ha") else lt("Yo'q"))
+            DetailRow(lt("Depozit"), d.depositMonths?.let { Lt.months(it) })
+            DetailRow(lt("Qavat"), d.floor?.let { floor -> d.totalFloors?.let { "$floor / $it" } })
         }
 
         val amenities = d.amenities.mapNotNull { RentalCatalog.amenity(it)?.label }
         if (amenities.isNotEmpty()) {
-            DetailSection("Qulayliklar") {
+            DetailSection(lt("Qulayliklar")) {
                 PillFlow(amenities)
             }
         }
@@ -299,19 +302,19 @@ private fun ServiceDetails(d: ListingDetails.Service) {
     }
 
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        DetailSection("Xizmat") {
-            DetailRow("Soha", type?.label)
-            DetailRow(type?.let { ServiceCatalog.subjectLabel(it) } ?: "Yo'nalish", subject, accented = true)
-            DetailRow("Ish shakli", d.format.label)
-            DetailRow("Tajriba", d.experienceYears?.let { "$it yil" })
-            DetailRow("Qabul vaqti", d.workingHours)
-            DetailRow("Mijoz joyiga boradi", if (d.hasHomeVisit) "Ha" else "Yo'q")
-            DetailRow("Sinov bepul", if (d.hasFreeTrial) "Ha" else "Yo'q")
+        DetailSection(lt("Xizmat")) {
+            DetailRow(lt("Soha"), type?.label)
+            DetailRow(type?.let { ServiceCatalog.subjectLabel(it) } ?: lt("Yo'nalish"), subject, accented = true)
+            DetailRow(lt("Ish shakli"), d.format.label)
+            DetailRow(lt("Tajriba"), d.experienceYears?.let { Lt.years(it) })
+            DetailRow(lt("Qabul vaqti"), d.workingHours)
+            DetailRow(lt("Mijoz joyiga boradi"), if (d.hasHomeVisit) lt("Ha") else lt("Yo'q"))
+            DetailRow(lt("Sinov bepul"), if (d.hasFreeTrial) lt("Ha") else lt("Yo'q"))
         }
 
         val filled = d.filledFields()
         if (filled.isNotEmpty()) {
-            DetailSection("Tafsilotlar") {
+            DetailSection(lt("Tafsilotlar")) {
                 filled.forEach { (label, value) -> DetailRow(label, value) }
             }
         }
@@ -320,42 +323,42 @@ private fun ServiceDetails(d: ListingDetails.Service) {
 
 @Composable
 private fun TaskDetails(d: ListingDetails.Task) {
-    DetailSection("Topshiriq") {
-        DetailRow("Yo'nalish", d.category?.label)
-        DetailRow("Ish turi", d.typeLabel(), accented = true)
-        DetailRow("Hajmi", d.volume)
-        DetailRow("Qanday topshiriladi", d.format.label)
-        DetailRow("Muddat", taskDeadlineText(d.deadline), accented = true)
+    DetailSection(lt("Topshiriq")) {
+        DetailRow(lt("Yo'nalish"), d.category?.label)
+        DetailRow(lt("Ish turi"), d.typeLabel(), accented = true)
+        DetailRow(lt("Hajmi"), d.volume)
+        DetailRow(lt("Qanday topshiriladi"), d.format.label)
+        DetailRow(lt("Muddat"), taskDeadlineText(d.deadline), accented = true)
     }
 }
 
 @Composable
 private fun JobDetails(d: ListingDetails.Job) {
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        DetailSection("Ish sharti") {
-            DetailRow("Ish turi", d.employment.label)
-            DetailRow("Yo'nalish", JobCatalog.category(d.categoryKey)?.label, accented = true)
-            DetailRow("Kompaniya", d.companyName)
-            DetailRow("Smena", d.shift?.label)
-            DetailRow("Ish vaqti", d.schedule.timeRange())
-            DetailRow("Ish kunlari", d.schedule.daysLabel())
-            DetailRow("Kuniga", d.schedule.hoursPerDay?.let { "$it soat" })
-            DetailRow("Nechta odam kerak", d.vacancies?.let { "$it kishi" })
-            DetailRow("Tajriba", d.experience.label)
-            DetailRow("Kimlar uchun", d.gender?.label)
-            DetailRow("Yosh", d.ageFrom?.let { from -> d.ageTo?.let { "$from–$it" } })
-            DetailRow("To'lov", d.payPeriod.label)
-            DetailRow("To'lov qachon", d.payoutNote)
+        DetailSection(lt("Ish sharti")) {
+            DetailRow(lt("Ish turi"), d.employment.label)
+            DetailRow(lt("Yo'nalish"), JobCatalog.category(d.categoryKey)?.label, accented = true)
+            DetailRow(lt("Kompaniya"), d.companyName)
+            DetailRow(lt("Smena"), d.shift?.label)
+            DetailRow(lt("Ish vaqti"), d.schedule.timeRange())
+            DetailRow(lt("Ish kunlari"), d.schedule.daysLabel())
+            DetailRow(lt("Kuniga"), d.schedule.hoursPerDay?.let { Lt.hours(it) })
+            DetailRow(lt("Nechta odam kerak"), d.vacancies?.let { Lt.people(it) })
+            DetailRow(lt("Tajriba"), d.experience.label)
+            DetailRow(lt("Kimlar uchun"), d.gender?.label)
+            DetailRow(lt("Yosh"), d.ageFrom?.let { from -> d.ageTo?.let { "$from–$it" } })
+            DetailRow(lt("To'lov"), d.payPeriod.label)
+            DetailRow(lt("To'lov qachon"), d.payoutNote)
         }
 
         if (d.requirements.isNotEmpty()) {
-            DetailSection("Talablar") {
+            DetailSection(lt("Talablar")) {
                 d.requirements.forEach { BulletRow(it) }
             }
         }
 
         if (d.benefits.isNotEmpty()) {
-            DetailSection("Sharoit va imtiyozlar") {
+            DetailSection(lt("Sharoit va imtiyozlar")) {
                 d.benefits.forEach { BulletRow(it) }
             }
         }
@@ -364,11 +367,11 @@ private fun JobDetails(d: ListingDetails.Job) {
 
 @Composable
 private fun DiscountDetails(d: ListingDetails.Discount) {
-    DetailSection("Chegirma") {
-        DetailRow("Biznes", d.businessName)
-        DetailRow("Chegirma", d.badge(), accented = true)
-        DetailRow("Shartlar", d.conditions)
-        DetailRow("Qanday olinadi", d.redemption.method.label)
+    DetailSection(lt("Chegirma")) {
+        DetailRow(lt("Biznes"), d.businessName)
+        DetailRow(lt("Chegirma"), d.badge(), accented = true)
+        DetailRow(lt("Shartlar"), d.conditions)
+        DetailRow(lt("Qanday olinadi"), d.redemption.method.label)
         DetailRow("Promokod", d.redemption.promoCode, accented = true)
     }
 }
@@ -380,7 +383,7 @@ private fun DiscountDetails(d: ListingDetails.Discount) {
 @Composable
 private fun DescriptionSection(listing: Listing) {
     val description = listing.description?.takeIf { it.isNotBlank() } ?: return
-    DetailSection("Tavsif") {
+    DetailSection(lt("Tavsif")) {
         ScText(description, 13.5f, FontWeight.Medium, Sc.InkSoft, lineHeight = 20f)
     }
 }
@@ -388,7 +391,7 @@ private fun DescriptionSection(listing: Listing) {
 @Composable
 private fun BranchesSection(listing: Listing) {
     if (listing.branches.isEmpty()) return
-    DetailSection("Manzil") {
+    DetailSection(lt("Manzil")) {
         listing.branches.forEachIndexed { index, branch ->
             Row(
                 Modifier.fillMaxWidth(),
@@ -434,9 +437,9 @@ private fun CallBar(listing: Listing, onCall: (String) -> Unit) {
             ScText(formatUzPhoneFull(phone), 12.5f, FontWeight.Bold, Sc.Muted, maxLines = 1)
         }
         if (phone.isNullOrBlank()) {
-            ScSoftButton("Telefon ko'rsatilmagan", onClick = {})
+            ScSoftButton(lt("Telefon ko'rsatilmagan"), onClick = {})
         } else {
-            ScGradientButton("Qo'ng'iroq qilish", onClick = { onCall(phone) })
+            ScGradientButton(lt("Qo'ng'iroq qilish"), onClick = { onCall(phone) })
         }
     }
 }

@@ -146,20 +146,23 @@ fun CallScreen(viewModel: CallViewModel, onClose: () -> Unit) {
  * `MISSED`/`DECLINED`/`CANCELED` matnlari **terminal holatda** ko'rinadi — ekran shu
  * yozuv bilan bir necha soniya turadi, so'ng yopiladi.
  */
-private fun statusText(session: CallSession, timer: String): String = when (session.status) {
-    CallStatus.RINGING -> if (session.direction == CallDirection.OUTGOING) {
-        "Jiringlamoqda…"
-    } else {
-        if (session.media == CallMedia.VIDEO) "Video qo'ng'iroq" else "Ovozli qo'ng'iroq"
-    }
+private fun statusText(session: CallSession, timer: String): String {
+    val s = callScreenStringsNow()
+    return when (session.status) {
+        CallStatus.RINGING -> if (session.direction == CallDirection.OUTGOING) {
+            s.ringing
+        } else {
+            if (session.media == CallMedia.VIDEO) s.videoCall else s.voiceCall
+        }
 
-    CallStatus.CONNECTING -> "Ulanmoqda…"
-    CallStatus.ACTIVE -> timer.ifEmpty { "Ulandi" }
-    CallStatus.MISSED -> "Javobsiz qo'ng'iroq"
-    CallStatus.DECLINED -> if (session.endReason == CallEndReason.BUSY) "Band" else "Rad etildi"
-    CallStatus.CANCELED -> "Bekor qilindi"
-    CallStatus.FAILED -> "Aloqa uzildi"
-    CallStatus.ENDED -> "Qo'ng'iroq tugadi"
+        CallStatus.CONNECTING -> s.connecting
+        CallStatus.ACTIVE -> timer.ifEmpty { s.connected }
+        CallStatus.MISSED -> s.missed
+        CallStatus.DECLINED -> if (session.endReason == CallEndReason.BUSY) s.busy else s.declined
+        CallStatus.CANCELED -> s.canceled
+        CallStatus.FAILED -> s.failed
+        CallStatus.ENDED -> s.ended
+    }
 }
 
 /**
@@ -179,6 +182,7 @@ private fun CallControls(
     onDecline: () -> Unit,
     onHangUp: () -> Unit,
 ) {
+    val s = callScreenStrings()
     val incomingRinging = session.status == CallStatus.RINGING &&
         session.direction == CallDirection.INCOMING
 
@@ -188,8 +192,8 @@ private fun CallControls(
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            CallButton(ScIcons.CallEnd, "Rad etish", DangerRed, onDecline)
-            CallButton(ScIcons.PhoneCall, "Javob berish", AcceptGreen, onAccept)
+            CallButton(ScIcons.CallEnd, s.decline, DangerRed, onDecline)
+            CallButton(ScIcons.PhoneCall, s.answer, AcceptGreen, onAccept)
         }
         return
     }
@@ -202,21 +206,21 @@ private fun CallControls(
         ) {
             CallButton(
                 icon = if (session.micEnabled) ScIcons.Mic else ScIcons.MicOff,
-                label = if (session.micEnabled) "Mikrofon" else "O'chirilgan",
+                label = if (session.micEnabled) s.mic else s.micOff,
                 background = toggleColor(session.micEnabled),
                 onClick = onToggleMic,
                 size = 56.dp,
             )
             CallButton(
                 icon = if (session.cameraEnabled) ScIcons.Video else ScIcons.VideoOff,
-                label = "Kamera",
+                label = s.camera,
                 background = toggleColor(session.cameraEnabled),
                 onClick = onToggleCamera,
                 size = 56.dp,
             )
             CallButton(
                 icon = ScIcons.Speaker,
-                label = "Karnay",
+                label = s.speaker,
                 background = toggleColor(session.speakerOn),
                 onClick = onToggleSpeaker,
                 size = 56.dp,
@@ -224,7 +228,7 @@ private fun CallControls(
             if (session.cameraEnabled) {
                 CallButton(
                     icon = ScIcons.CameraSwitch,
-                    label = "Almashtirish",
+                    label = s.switchCamera,
                     background = toggleColor(false),
                     onClick = onSwitchCamera,
                     size = 56.dp,
@@ -232,7 +236,7 @@ private fun CallControls(
             }
         }
         Spacer(Modifier.height(28.dp))
-        CallButton(ScIcons.CallEnd, "Tugatish", DangerRed, onHangUp)
+        CallButton(ScIcons.CallEnd, s.hangUp, DangerRed, onHangUp)
     }
 }
 

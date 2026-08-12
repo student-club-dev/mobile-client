@@ -145,7 +145,7 @@ class BlockedStudentsViewModel(
                         it.copy(
                             items = it.items.filterNot { b -> b.student.id == id },
                             total = (it.total - 1).coerceAtLeast(0),
-                            message = "${blocked.student.displayName} blokdan chiqarildi",
+                            message = connectionsStringsNow().userUnblocked(blocked.student.displayName),
                         )
                     }
                     is Resource.Error -> _state.update { it.copy(message = res.message) }

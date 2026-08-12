@@ -3,7 +3,7 @@ package dev.core.common.error
 /**
  * Ilova bo'ylab yagona **typed xato** ierarxiyasi — oddiy `String` xabar o'rniga.
  *
- * Har bir xato [userMessage] beradi (foydalanuvchiga ko'rsatiladigan o'zbekcha matn) va
+ * Har bir xato [userMessage] beradi (foydalanuvchiga joriy tilda ko'rsatiladigan matn) va
  * asl [cause] ni saqlaydi (log/telemetriya uchun). Repository/UseCase qatlamlari istalgan
  * `Throwable` ni [toAppException] orqali shu turlarga aylantiradi — UI esa faqat shu
  * cheklangan to'plam bilan ishlaydi (retry ko'rsatishmi, login'ga yuborishmi va h.k.).
@@ -33,11 +33,11 @@ sealed class AppException(
 
     /** Internet yo'q — retry mazmunli. */
     class NoInternet(cause: Throwable? = null) :
-        AppException("Internet aloqasi yo'q. Ulanishni tekshirib, qayta urining.", cause)
+        AppException(ErrorStrings.noInternet, cause)
 
     /** So'rov muddati tugadi. [reason] — konvertdagi `message` (bo'lsa). */
     class Timeout(cause: Throwable? = null, val reason: String? = null) :
-        AppException(reason ?: "So'rov vaqti tugadi. Qayta urining.", cause)
+        AppException(reason ?: ErrorStrings.timeout, cause)
 
     /**
      * Sessiya tugagan yoki kirilmagan — login kerak.
@@ -48,7 +48,7 @@ sealed class AppException(
      * chiqardi — foydalanuvchi parolini emas, sessiyasini ayblardi.
      */
     class Unauthorized(cause: Throwable? = null, val reason: String? = null) :
-        AppException(reason ?: "Sessiya tugagan. Iltimos, qaytadan kiring.", cause)
+        AppException(reason ?: ErrorStrings.unauthorized, cause)
 
     /**
      * Ruxsat yo'q (403).
@@ -58,11 +58,11 @@ sealed class AppException(
      * umumiy "ruxsat yo'q" dan ancha aniqroq.
      */
     class PermissionDenied(cause: Throwable? = null, val reason: String? = null) :
-        AppException(reason ?: "Bu amal uchun ruxsat yo'q.", cause)
+        AppException(reason ?: ErrorStrings.permissionDenied, cause)
 
     /** Ma'lumot topilmadi (404). [reason] — backend bergan aniqroq matn (bo'lsa). */
     class NotFound(cause: Throwable? = null, val reason: String? = null) :
-        AppException(reason ?: "Ma'lumot topilmadi.", cause)
+        AppException(reason ?: ErrorStrings.notFound, cause)
 
     /**
      * Server xatosi (5xx).
@@ -71,7 +71,7 @@ sealed class AppException(
      * "Xizmat vaqtincha o'chirilgan") foydalanuvchi umumiy matn o'rniga o'shani ko'radi.
      */
     class Server(val code: Int? = null, cause: Throwable? = null, val reason: String? = null) :
-        AppException(reason ?: "Serverda xatolik. Birozdan so'ng qayta urining.", cause)
+        AppException(reason ?: ErrorStrings.server, cause)
 
     /**
      * Kiritilgan ma'lumot noto'g'ri (validatsiya / 4xx).
@@ -89,7 +89,7 @@ sealed class AppException(
     ) : AppException(reason, cause)
 
     /** Boshqa/noma'lum xato. */
-    class Unknown(message: String = "Noma'lum xatolik yuz berdi.", cause: Throwable? = null) :
+    class Unknown(message: String = ErrorStrings.unknown, cause: Throwable? = null) :
         AppException(message, cause)
 }
 
@@ -120,7 +120,7 @@ fun Throwable.toAppException(isOnline: Boolean = true): AppException {
         msg.containsAny("unavailable", "network", "host", "connection", "internet", "offline", "resolve") ->
             AppException.NoInternet(this)
         msg.containsAny("internal", "server", "unknown error") -> AppException.Server(cause = this)
-        else -> AppException.Unknown(message ?: "Noma'lum xatolik yuz berdi.", this)
+        else -> AppException.Unknown(message ?: ErrorStrings.unknown, this)
     }
 }
 

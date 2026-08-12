@@ -37,6 +37,9 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.atStartOfDayIn
 import kotlinx.datetime.plus
 import kotlinx.datetime.toLocalDateTime
+import dev.feature.listings.presentation.lt
+import dev.feature.listings.presentation.currency
+import dev.feature.listings.presentation.Lt
 
 /** Sana yorlig'i uchun oy nomlari — "12-avgust" ko'rinishida yoziladi. */
 private val UZ_MONTHS = listOf(
@@ -61,14 +64,14 @@ fun RentalForm(state: PostListingUiState, palette: AppPalette, vm: PostListingVi
     }
 
     ListingFormShell(
-        title = "Ijara e'loni",
-        subtitle = "Turarjoy va sherik izlash",
+        title = lt("Ijara e'loni"),
+        subtitle = lt("Turarjoy va sherik izlash"),
         state = state,
         palette = palette,
         vm = vm,
     ) {
         FormSection(
-            title = "Turarjoy turi",
+            title = lt("Turarjoy turi"),
             error = state.errorFor(ListingField.PROPERTY_TYPE),
         ) {
             Row(
@@ -86,8 +89,8 @@ fun RentalForm(state: PostListingUiState, palette: AppPalette, vm: PostListingVi
         }
 
         FormSection(
-            title = "Xonalar va yashovchilar",
-            subtitle = "Talaba shu raqamlarga qarab tanlaydi",
+            title = lt("Xonalar va yashovchilar"),
+            subtitle = lt("Talaba shu raqamlarga qarab tanlaydi"),
             error = state.errorForAny(ListingField.ROOMS, ListingField.TENANTS),
         ) {
             // Savol matni turarjoy turiga bog'liq: koyka joyda "nechi xonalik" ma'nosiz.
@@ -100,7 +103,7 @@ fun RentalForm(state: PostListingUiState, palette: AppPalette, vm: PostListingVi
             )
 
             NumberChipsField(
-                label = "Hozir nechi kishi yashaydi",
+                label = lt("Hozir nechi kishi yashaydi"),
                 value = rental.currentTenants,
                 options = RentalCatalog.TENANT_COUNTS,
                 onSelect = { value -> vm.updateRental { it.copy(currentTenants = value) } },
@@ -108,7 +111,7 @@ fun RentalForm(state: PostListingUiState, palette: AppPalette, vm: PostListingVi
             )
 
             NumberChipsField(
-                label = "Yana nechi kishi kerak",
+                label = lt("Yana nechi kishi kerak"),
                 value = rental.neededTenants,
                 options = RentalCatalog.TENANT_COUNTS.filter { it > 0 },
                 onSelect = { value -> vm.updateRental { it.copy(neededTenants = value) } },
@@ -120,13 +123,13 @@ fun RentalForm(state: PostListingUiState, palette: AppPalette, vm: PostListingVi
             val current = rental.currentTenants.toIntOrNull()
             val needed = rental.neededTenants.toIntOrNull()
             if (current != null && needed != null) {
-                FieldHint("Uyda jami ${current + needed} kishi bo'ladi", palette)
+                FieldHint(Lt.totalTenants(current + needed), palette)
             }
         }
 
         FormSection(
-            title = "Kim uchun",
-            subtitle = "Bu majburiy — talaba birinchi navbatda shuni qaraydi",
+            title = lt("Kim uchun"),
+            subtitle = lt("Bu majburiy — talaba birinchi navbatda shuni qaraydi"),
             error = state.errorFor(ListingField.GENDER),
         ) {
             ChipFlow {
@@ -142,7 +145,7 @@ fun RentalForm(state: PostListingUiState, palette: AppPalette, vm: PostListingVi
 
         // Davr narxdan oldin turadi: "oylik"mi yoki "kunlik"mi — narx maydonining
         // yozuvini shu belgilaydi.
-        FormSection(title = "To'lov davri") {
+        FormSection(title = lt("To'lov davri")) {
             Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                 RentPeriod.entries.forEach { period ->
                     SelectChip(
@@ -157,26 +160,26 @@ fun RentalForm(state: PostListingUiState, palette: AppPalette, vm: PostListingVi
         PriceSection(
             state = state,
             vm = vm,
-            sectionTitle = "Ijara narxi",
-            priceLabel = if (rental.period == RentPeriod.MONTHLY) "Oylik to'lov" else "Kunlik to'lov",
+            sectionTitle = lt("Ijara narxi"),
+            priceLabel = if (rental.period == RentPeriod.MONTHLY) lt("Oylik to'lov") else lt("Kunlik to'lov"),
             hint = "2 500 000",
             allowNegotiable = true,
             palette = palette,
         )
 
         FormSection(
-            title = "Qo'shimcha shartlar",
+            title = lt("Qo'shimcha shartlar"),
             error = state.errorFor(ListingField.ATTRIBUTES),
         ) {
             FormSwitch(
-                "Kommunal to'lov narxga kiradi",
+                lt("Kommunal to'lov narxga kiradi"),
                 rental.utilitiesIncluded,
                 { checked -> vm.updateRental { it.copy(utilitiesIncluded = checked) } },
                 palette,
             )
 
             NumberChipsField(
-                label = "Necha oylik depozit",
+                label = lt("Necha oylik depozit"),
                 value = rental.depositMonths,
                 options = RentalCatalog.DEPOSIT_MONTHS,
                 onSelect = { value -> vm.updateRental { it.copy(depositMonths = value) } },
@@ -186,7 +189,7 @@ fun RentalForm(state: PostListingUiState, palette: AppPalette, vm: PostListingVi
 
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                    MiniLabel("Qavat", palette)
+                    MiniLabel(lt("Qavat"), palette)
                     GlassTextField(
                         rental.floor,
                         { input -> vm.updateRental { it.copy(floor = input.filter(Char::isDigit)) } },
@@ -196,7 +199,7 @@ fun RentalForm(state: PostListingUiState, palette: AppPalette, vm: PostListingVi
                     )
                 }
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                    MiniLabel("Binoda qavat", palette)
+                    MiniLabel(lt("Binoda qavat"), palette)
                     GlassTextField(
                         rental.totalFloors,
                         { input -> vm.updateRental { it.copy(totalFloors = input.filter(Char::isDigit)) } },
@@ -208,7 +211,7 @@ fun RentalForm(state: PostListingUiState, palette: AppPalette, vm: PostListingVi
             }
         }
 
-        FormSection(title = "Qulayliklar", subtitle = "Bor narsalarni belgilang") {
+        FormSection(title = lt("Qulayliklar"), subtitle = lt("Bor narsalarni belgilang")) {
             MultiSelectChips(RentalCatalog.AMENITIES, rental.amenities) { key ->
                 vm.updateRental { r ->
                     r.copy(amenities = if (key in r.amenities) r.amenities - key else r.amenities + key)
@@ -216,7 +219,7 @@ fun RentalForm(state: PostListingUiState, palette: AppPalette, vm: PostListingVi
             }
         }
 
-        FormSection(title = "Qachondan ko'chib kirish mumkin") {
+        FormSection(title = lt("Qachondan ko'chib kirish mumkin")) {
             // Sanalar joriy vaqtdan kelib chiqadi, lekin har qayta chizilishda qayta
             // hisoblanishi shart emas — ro'yxat bir marta tuziladi.
             val days = remember {
@@ -234,7 +237,7 @@ fun RentalForm(state: PostListingUiState, palette: AppPalette, vm: PostListingVi
                 horizontalArrangement = Arrangement.spacedBy(7.dp),
             ) {
                 SelectChip(
-                    "Hoziroq",
+                    lt("Hoziroq"),
                     rental.availableFrom == null,
                     { vm.updateRental { it.copy(availableFrom = null) } },
                 )
@@ -251,29 +254,29 @@ fun RentalForm(state: PostListingUiState, palette: AppPalette, vm: PostListingVi
         AboutSection(
             state = state,
             vm = vm,
-            sectionTitle = "E'lon matni",
-            titleHint = "Sarlavha: Chilonzorda 3 xonali kvartira",
-            descriptionHint = "Uy sharoiti, qoidalar, metroga masofa...",
+            sectionTitle = lt("E'lon matni"),
+            titleHint = lt("Sarlavha: Chilonzorda 3 xonali kvartira"),
+            descriptionHint = lt("Uy sharoiti, qoidalar, metroga masofa..."),
         )
 
         ImagesSection(
             state = state,
             vm = vm,
             onAdd = imagePicker::pick,
-            sectionTitle = "Uy rasmlari",
-            hint = "Xonalar, oshxona, hammom",
+            sectionTitle = lt("Uy rasmlari"),
+            hint = lt("Xonalar, oshxona, hammom"),
         )
 
         ContactSection(
             state = state,
             vm = vm,
-            subtitle = "Sherik izlayotganlar shu raqamga qo'ng'iroq qiladi",
+            subtitle = lt("Sherik izlayotganlar shu raqamga qo'ng'iroq qiladi"),
         )
 
         BranchesSection(
             state, palette, vm,
-            title = "Uy joyi",
-            subtitle = "Xaritadan aniq joyni belgilang",
+            title = lt("Uy joyi"),
+            subtitle = lt("Xaritadan aniq joyni belgilang"),
         )
 
         AudienceSection(state, vm)

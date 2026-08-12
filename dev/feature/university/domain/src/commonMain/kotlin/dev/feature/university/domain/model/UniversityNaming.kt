@@ -1,5 +1,7 @@
 package dev.feature.university.domain.model
 
+import dev.core.common.locale.AppLocale
+
 /**
  * Universitetning UI'da ko'rsatiladigan ko'rinishi — [UniversityNaming] hisoblab beradi.
  *
@@ -97,7 +99,11 @@ object UniversityNaming {
             val prevIsCity = prevText.length >= 3 &&
                 prevText.lowercase() !in TYPE_WORDS && prevText.lowercase() !in STOP_WORDS
             val city = if (prevIsCity) prevText else cityPrefix
-            branch = if (!city.isNullOrBlank()) "$city filiali" else "Filial"
+            branch = if (!city.isNullOrBlank()) {
+                AppLocale.pick(en = "$city branch", ru = "$city филиал", uz = "$city filiali")
+            } else {
+                AppLocale.pick(en = "Branch", ru = "Филиал", uz = "Filial")
+            }
             val cutFrom = when {
                 prev == null -> m.range.first
                 prevIsCity -> prev.range.first

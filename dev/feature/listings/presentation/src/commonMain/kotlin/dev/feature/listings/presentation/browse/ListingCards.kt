@@ -42,6 +42,9 @@ import dev.feature.listings.domain.model.RentalCatalog
 import dev.feature.listings.domain.model.ServiceCatalog
 import dev.feature.listings.domain.model.formatSum
 import dev.feature.listings.presentation.components.ListingImage
+import dev.feature.listings.presentation.lt
+import dev.feature.listings.presentation.currency
+import dev.feature.listings.presentation.Lt
 
 /**
  * Talabaga ko'rinadigan e'lon kartochkasi — turini o'zi aniqlaydi.
@@ -98,9 +101,9 @@ private fun RentalCard(
             // Raqamlar ijarada asosiy narsa: talaba avval "nechi kishi kerak" ni qidiradi,
             // shuning uchun ular matn satri emas, alohida ko'rinadigan pilllar.
             FlowRow(horizontalArrangement = Arrangement.spacedBy(5.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                details.roomCount?.let { StatPill("$it xona", palette) }
-                details.currentTenants?.let { StatPill("$it kishi bor", palette) }
-                details.neededTenants?.let { StatPill("$it kishi kerak", palette) }
+                details.roomCount?.let { StatPill(Lt.rooms(it), palette) }
+                details.currentTenants?.let { StatPill(Lt.tenantsNow(it), palette) }
+                details.neededTenants?.let { StatPill(Lt.tenantsNeeded(it), palette) }
                 // Jins — talaba uchun birinchi filtr, shuning uchun rangi bilan ajratilgan.
                 details.gender?.let { AccentPill("${it.emoji} ${it.label}", accent) }
             }
@@ -156,8 +159,8 @@ private fun ServiceCard(
 
             FlowRow(horizontalArrangement = Arrangement.spacedBy(5.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                 StatPill(details.format.label, palette)
-                if (details.hasFreeTrial) AccentPill("Sinov bepul", accent)
-                if (details.hasHomeVisit) StatPill("Mijoz joyiga boradi", palette)
+                if (details.hasFreeTrial) AccentPill(lt("Sinov bepul"), accent)
+                if (details.hasHomeVisit) StatPill(lt("Mijoz joyiga boradi"), palette)
             }
 
             PriceLine(priceText(listing, listing.priceUnit.suffix), palette)
@@ -260,7 +263,7 @@ private fun JobCard(
                 details.shift?.let { StatPill(it.label, palette) }
                 details.schedule.timeRange()?.let { StatPill(it, palette) }
                 details.schedule.daysLabel()?.let { StatPill(it, palette) }
-                details.vacancies?.let { StatPill("$it kishi kerak", palette) }
+                details.vacancies?.let { StatPill(Lt.tenantsNeeded(it), palette) }
                 // Talaba uchun eng kuchli sotuv argumenti — ko'rinib turishi kerak.
                 if (details.experience == ExperienceLevel.NONE) {
                     AccentPill(ExperienceLevel.NONE.label, accent)
@@ -305,7 +308,7 @@ private fun DiscountBrowseCard(
 
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(
-                    "${listing.finalPrice.formatSum()} so'm",
+                    "${listing.finalPrice.formatSum()} ${currency()}",
                     style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.sp, fontWeight = FontWeight.Black, color = palette.successDeep),
                 )
                 // Chizilgan asl narx faqat chegirma bo'lganda ma'noli.
@@ -449,13 +452,13 @@ private fun AccentPill(text: String, accent: Color) {
  * haqiqiy narxdek ko'rinib qolardi.
  */
 private fun priceText(listing: Listing, unitSuffix: String?): String {
-    if (listing.isNegotiable) return "Kelishilgan"
+    if (listing.isNegotiable) return lt("Kelishilgan")
 
     val max = listing.priceMax
     val amount = if (max != null && max > listing.price) {
-        "${listing.price.formatSum()} — ${max.formatSum()} so'm"
+        "${listing.price.formatSum()} — ${max.formatSum()} ${currency()}"
     } else {
-        "${listing.price.formatSum()} so'm"
+        "${listing.price.formatSum()} ${currency()}"
     }
     return if (unitSuffix.isNullOrBlank()) amount else "$amount / $unitSuffix"
 }
@@ -475,7 +478,7 @@ private fun deadlineLabel(deadline: Long?): String? {
     return when (days) {
         0 -> "Bugun $time"
         1 -> "Ertaga $time"
-        in 2..13 -> "$days kundan keyin"
+        in 2..13 -> Lt.inDays(days)
         else -> "${at.date.dayOfMonth}.${at.date.monthNumber}"
     }
 }

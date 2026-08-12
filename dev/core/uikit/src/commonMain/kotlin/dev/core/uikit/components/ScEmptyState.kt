@@ -23,6 +23,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.core.uikit.theme.Sc
+import androidx.compose.runtime.ReadOnlyComposable
+import dev.core.uikit.locale.uiStrings
 
 /**
  * Bo'sh ro'yxatning YAGONA ko'rinishi: markazda ikona, ostida sarlavha va (ixtiyoriy)
@@ -148,7 +150,9 @@ fun ScEmptyStateBox(
  * Universal sarlavha: "bu yerda hozircha hech nima yo'q" ma'nosini beradi va har qanday
  * ro'yxatga (e'lon, talaba, suhbat, fayl) mos tushadi.
  */
-const val ScEmptyTitle: String = "Hozircha bo'sh"
+val ScEmptyTitle: String
+    @Composable @ReadOnlyComposable get() = uiStrings().emptyTitle
 
 /** Qidiruv/filtr natijasi bo'sh bo'lganda — "yo'q" emas, "topilmadi". */
-const val ScNotFoundTitle: String = "Hech narsa topilmadi"
+val ScNotFoundTitle: String
+    @Composable @ReadOnlyComposable get() = uiStrings().notFoundTitle

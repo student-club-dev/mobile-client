@@ -166,9 +166,9 @@ internal fun AttachGallerySheet(
                 ScText(
                     if (selected.size >= DEFAULT_MAX_IMAGES) {
                         // Chegaraga yetilganda keyingi bosish jimgina e'tiborsiz qolardi.
-                        "${selected.size} ta — bir martada shuncha"
+                        chatStrings().maxAtOnce(selected.size)
                     } else {
-                        "${selected.size} ta ${selected.kindLabel()} tanlandi"
+                        chatStrings().selectedItems(selected.size, selected.kindLabel())
                     },
                     16f,
                     FontWeight.ExtraBold,
@@ -228,10 +228,13 @@ internal fun AttachGallerySheet(
 }
 
 /** Sarlavhadagi so'z: hammasi rasm bo'lsa «rasm», hammasi video bo'lsa «video», aralashda «fayl». */
-private fun List<GalleryItem>.kindLabel(): String = when {
-    all { !it.isVideo } -> "rasm"
-    all { it.isVideo } -> "video"
-    else -> "fayl"
+private fun List<GalleryItem>.kindLabel(): String {
+    val s = chatStringsNow()
+    return when {
+        all { !it.isVideo } -> s.kindPhotos
+        all { it.isVideo } -> s.kindVideos
+        else -> s.kindItems
+    }
 }
 
 /** Tanlash — tartib saqlanadi (albomdagi ketma-ketlik shunga qarab chiziladi). */
@@ -269,8 +272,8 @@ private fun GalleryGrid(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                ScText("Faqat siz tanlagan rasmlar ko'rinmoqda", 12.5f, FontWeight.Medium, Sc.Muted)
-                ScText("Barchasini ko'rsatish", 12.5f, FontWeight.ExtraBold, Sc.Brand)
+                ScText(chatStrings().onlySelectedShown, 12.5f, FontWeight.Medium, Sc.Muted)
+                ScText(chatStrings().showAll, 12.5f, FontWeight.ExtraBold, Sc.Brand)
             }
         }
 
@@ -291,7 +294,7 @@ private fun GalleryGrid(
                         .clickable(onClick = onCamera),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Icon(AppIcons.Camera, "Kamera", tint = Color.White, modifier = Modifier.size(26.dp))
+                    Icon(AppIcons.Camera, chatStrings().camera, tint = Color.White, modifier = Modifier.size(26.dp))
                 }
             }
 
@@ -368,19 +371,18 @@ private fun GalleryCell(
 /** Ruxsat berilmagan holat — to'r o'rnida. */
 @Composable
 private fun AccessPrompt(denied: Boolean, onRequest: () -> Unit) {
+    val s = chatStrings()
     Column(
         Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 28.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        ScText("Galereyaga ruxsat kerak", 15f, FontWeight.ExtraBold, Sc.Ink)
+        ScText(s.galleryPermissionTitle, 15f, FontWeight.ExtraBold, Sc.Ink)
         ScText(
             if (denied) {
-                "Ruxsat rad etilgan. Sozlamalardan yoqsangiz rasmlar shu yerda ko'rinadi — " +
-                    "yoki pastdagi «Galereya» orqali ruxsatsiz tanlang."
+                s.galleryPermissionDenied
             } else {
-                "Rasmlaringiz shu yerda ko'rinishi uchun ruxsat bering. Xohlamasangiz — " +
-                    "pastdagi «Galereya» ruxsatsiz ham ishlaydi."
+                s.galleryPermissionAsk
             },
             12.5f,
             FontWeight.Medium,
@@ -391,7 +393,7 @@ private fun AccessPrompt(denied: Boolean, onRequest: () -> Unit) {
                 .clickable(onClick = onRequest)
                 .padding(horizontal = 18.dp, vertical = 10.dp),
         ) {
-            ScText(if (denied) "Sozlamalarni ochish" else "Ruxsat berish", 13f, FontWeight.ExtraBold, Color.White)
+            ScText(if (denied) s.openSettings else s.grantPermission, 13f, FontWeight.ExtraBold, Color.White)
         }
     }
 }
@@ -431,7 +433,7 @@ private fun AttachActions(
             // bitta izoh biriktiriladi (birinchi rasmning tanasiga yoziladi).
             Box(Modifier.weight(1f).padding(start = 14.dp)) {
                 if (caption.isEmpty()) {
-                    ScText("Izoh qo'shish…", 14f, FontWeight.Medium, Sc.NavIdle, maxLines = 1)
+                    ScText(chatStrings().addCaption, 14f, FontWeight.Medium, Sc.NavIdle, maxLines = 1)
                 }
                 BasicTextField(
                     value = caption,
@@ -448,7 +450,7 @@ private fun AttachActions(
                     .clickable(enabled = !sending, onClick = onSend),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(ScIcons.Return, "Yuborish", tint = Color.White, modifier = Modifier.size(20.dp))
+                Icon(ScIcons.Return, chatStrings().send, tint = Color.White, modifier = Modifier.size(20.dp))
             }
         } else {
             // ⚠️ To'r ochiq bo'lsa bu tugma HECH NARSA qilmaydi — u shunchaki "hozir
@@ -457,17 +459,17 @@ private fun AttachActions(
             // bajarardi. Ruxsat bo'lmaganda esa u yagona ishlaydigan yo'l bo'lib qoladi.
             AttachAction(
                 icon = AppIcons.ImageIcon,
-                label = "Galereya",
+                label = chatStrings().gallery,
                 active = galleryOpen,
                 modifier = Modifier.weight(1f),
                 onClick = { if (!galleryOpen) onOpenSystemPicker() },
             )
-            AttachAction(ScIcons.Paperclip, "Fayl", false, Modifier.weight(1f), onPickFile)
-            AttachAction(AppIcons.Camera, "Kamera", false, Modifier.weight(1f), onCaptureVideo)
+            AttachAction(ScIcons.Paperclip, chatStrings().file, false, Modifier.weight(1f), onPickFile)
+            AttachAction(AppIcons.Camera, chatStrings().camera, false, Modifier.weight(1f), onCaptureVideo)
             // Dumaloq video xabar — kamerada yozib olinadi, so'ng markazidan kvadrat
             // kesilib yuboriladi. Kameradan alohida band: natija boshqa turdagi xabar
             // (`VIDEO_NOTE`) va uni izoh bilan yuborib bo'lmaydi.
-            AttachAction(ScIcons.Video, "Video xabar", false, Modifier.weight(1f), onRecordVideoNote)
+            AttachAction(ScIcons.Video, chatStrings().videoNote, false, Modifier.weight(1f), onRecordVideoNote)
         }
     }
 }

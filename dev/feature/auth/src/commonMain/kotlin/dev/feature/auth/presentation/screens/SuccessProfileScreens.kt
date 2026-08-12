@@ -78,17 +78,17 @@ fun SuccessScreen(
                 Icon(AppIcons.Check, null, tint = Color.White, modifier = Modifier.size(46.dp))
             }
             Spacer(Modifier.height(20.dp))
-            ScreenTitle("Tabriklaymiz! 🎉")
+            ScreenTitle(authStrings().congrats)
             Spacer(Modifier.height(6.dp))
             Text(
-                "Hisobingiz tayyor. Endi profilingizni to'ldiramiz.",
+                authStrings().accountReady,
                 style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.sp, color = palette.inkMuted, textAlign = TextAlign.Center, lineHeight = 19.sp),
                 modifier = Modifier.padding(horizontal = 8.dp),
             )
         }
 
         Spacer(Modifier.height(26.dp))
-        PrimaryButton("Davom etish", onContinue, trailingIcon = AppIcons.ArrowRight)
+        PrimaryButton(authStrings().proceedButton, onContinue, trailingIcon = AppIcons.ArrowRight)
     }
 }
 
@@ -109,8 +109,8 @@ fun ProfileScreen(
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(11.dp)) {
             BackButton(onBack)
             Column {
-                ScreenTitle("Profilingiz haqida", size = 20)
-                Text("Deyarli tayyor — 2-qadam / 2", style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.5f.sp, fontWeight = FontWeight.SemiBold, color = palette.inkFaint))
+                ScreenTitle(authStrings().aboutYourProfile, size = 20)
+                Text(authStrings().almostDone, style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.5f.sp, fontWeight = FontWeight.SemiBold, color = palette.inkFaint))
             }
         }
         Spacer(Modifier.height(14.dp))
@@ -122,25 +122,25 @@ fun ProfileScreen(
         }
 
         Spacer(Modifier.height(16.dp))
-        FieldLabel("Ism va familya")
+        FieldLabel(authStrings().nameAndSurname)
         Spacer(Modifier.height(8.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-            GlassTextField(state.firstName, vm::onFirstNameChange, "Aziz", Modifier.weight(1f), height = 46)
-            GlassTextField(state.lastName, vm::onLastNameChange, "Karimov", Modifier.weight(1f), height = 46)
+            GlassTextField(state.firstName, vm::onFirstNameChange, authStrings().firstNameHint, Modifier.weight(1f), height = 46)
+            GlassTextField(state.lastName, vm::onLastNameChange, authStrings().lastNameHint, Modifier.weight(1f), height = 46)
         }
 
         Spacer(Modifier.height(14.dp))
-        FieldLabel("Universitet")
+        FieldLabel(authStrings().university)
         Spacer(Modifier.height(8.dp))
         UniversitySelectorRow(state.selectedUniversity, onPickUniversity, palette)
 
         Spacer(Modifier.height(14.dp))
-        FieldLabel("Tug‘ilgan yil")
+        FieldLabel(authStrings().birthYear)
         Spacer(Modifier.height(8.dp))
         BirthYearRow(state.birthYear, vm::onBirthYearChange, palette)
 
         Spacer(Modifier.height(14.dp))
-        FieldLabel("Nechanchi kurs")
+        FieldLabel(authStrings().courseYear)
         Spacer(Modifier.height(8.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
             CourseYear.entries.forEach { c ->
@@ -151,7 +151,7 @@ fun ProfileScreen(
         // Ixtiyoriy: talabalar qidiruvidagi jins filtri aynan shu maydonga tayanadi
         // (ko'rsatilmasa, filtrlangan ro'yxatga tushmaysiz).
         Spacer(Modifier.height(14.dp))
-        FieldLabel("Jins (ixtiyoriy)")
+        FieldLabel(authStrings().gender)
         Spacer(Modifier.height(8.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
             ProfileGender.entries.forEach { g ->
@@ -163,7 +163,7 @@ fun ProfileScreen(
 
         Spacer(Modifier.height(20.dp))
         Spacer(Modifier.height(16.dp))
-        PrimaryButton("Boshlash", onStart, enabled = !state.isLoading, trailingIcon = AppIcons.ArrowRight)
+        PrimaryButton(authStrings().start, onStart, enabled = !state.isLoading, trailingIcon = AppIcons.ArrowRight)
     }
 }
 
@@ -185,12 +185,12 @@ internal fun UniversitySelectorRow(university: University?, onClick: () -> Unit,
         }
         Column(Modifier.weight(1f)) {
             Text(
-                university?.shortName ?: "Universitetni tanlang",
+                university?.shortName ?: authStrings().selectUniversity,
                 style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.5f.sp, fontWeight = FontWeight.Bold, color = palette.ink),
                 maxLines = 1, overflow = TextOverflow.Ellipsis,
             )
             Text(
-                university?.let { it.display.subtitle.ifBlank { it.monogram } } ?: "Ro‘yxatdan tanlang",
+                university?.let { it.display.subtitle.ifBlank { it.monogram } } ?: authStrings().pickFromList,
                 style = TextStyle(fontFamily = AppFontFamily, fontSize = 10.5f.sp, color = palette.inkFaint),
                 maxLines = 1, overflow = TextOverflow.Ellipsis,
             )
@@ -282,13 +282,13 @@ fun UniversityPickerScreen(
     AppScreenScaffold(horizontalPadding = 18, topPadding = 54) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(11.dp)) {
             BackButton(onClose, icon = AppIcons.Close)
-            ScreenTitle("Universitetni tanlang", size = 18)
+            ScreenTitle(authStrings().selectUniversity, size = 18)
         }
         Spacer(Modifier.height(14.dp))
         GlassTextField(
             value = picker.query,
             onValueChange = vm::onUniversityQueryChange,
-            placeholder = "Toshkent",
+            placeholder = authStrings().cityHint,
             leading = AppIcons.Search,
             focused = true,
             height = 46,
@@ -296,9 +296,9 @@ fun UniversityPickerScreen(
         Spacer(Modifier.height(16.dp))
         Text(
             when {
-                picker.loading -> "YUKLANMOQDA…"
-                picker.error != null -> "RO‘YXATNI YUKLAB BO‘LMADI"
-                else -> "${picker.results.size} TA NATIJA"
+                picker.loading -> authStrings().loadingUpper
+                picker.error != null -> authStrings().loadFailedUpper
+                else -> authStrings().resultsUpper(picker.results.size)
             },
             style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp, color = palette.inkFaint),
         )
@@ -319,7 +319,7 @@ fun UniversityPickerScreen(
         picker.error?.let { ErrorText(it) }
 
         Spacer(Modifier.height(12.dp))
-        PrimaryButton("Tanlash", onSelectDone, enabled = state.universityId != null)
+        PrimaryButton(authStrings().select, onSelectDone, enabled = state.universityId != null)
     }
 }
 

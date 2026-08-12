@@ -52,6 +52,9 @@ import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import org.koin.compose.viewmodel.koinViewModel
+import dev.core.uikit.locale.uiStrings
+import dev.core.common.locale.AppLocale
+import androidx.compose.runtime.ReadOnlyComposable
 
 /**
  * **Boshqa talabaning profili** — Telegram maketida: yig'iluvchi sarlavha (pastga tortilsa
@@ -94,6 +97,14 @@ fun StudentProfileSheet(
     vm: StudentProfileViewModel = koinViewModel(),
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
+    val s = connectionsStrings()
+    val ui = uiStrings()
+    // Status matni `when` ichida — u yerda Composable chaqirilmaydi, shuning uchun
+    // qiymatlar oldindan olinadi (`onSoon` lambdalari uchun ham shunday).
+    val profileOnline = profileOnlineLabel()
+    val muteSoon = s.muteSoon
+    val callSoon = s.callSoon
+    val videoSoon = s.videoSoon
     LaunchedEffect(studentId) { vm.load(studentId, known) }
     // Bog'lanish uzilgan yoki odam bloklangan — ko'rsatadigan narsa qolmadi.
     LaunchedEffect(state.closed) { if (state.closed) onClose() }
@@ -131,10 +142,10 @@ fun StudentProfileSheet(
             Column(Modifier.fillMaxSize()) {
                 ScProfileHeader(
                     state = header,
-                    name = student?.displayName ?: "Talaba",
+                    name = student?.displayName ?: ui.student,
                     status = statusOverride ?: when {
-                        state.loading -> "yuklanmoqda…"
-                        student?.online == true -> "onlayn"
+                        state.loading -> s.loadingProfile
+                        student?.online == true -> profileOnline
                         else -> lastSeenLabel(student?.lastSeenAt)
                     },
                     photoUrls = photos,
@@ -152,7 +163,7 @@ fun StudentProfileSheet(
                             photoIndex = (photoIndex + if (forward) 1 else photos.size - 1) % photos.size
                         }
                     },
-                    topBar = { ScGlassButton(ScIcons.ChevronLeft, "Orqaga", onClose) },
+                    topBar = { ScGlassButton(ScIcons.ChevronLeft, ui.back, onClose) },
                 )
 
                 Column(
@@ -172,11 +183,11 @@ fun StudentProfileSheet(
                         when (state.connection) {
                             // Bog'langanmiz — suhbat ochiladi (chat eshigi aynan shu).
                             ConnectionView.CONNECTED -> onOpenChat?.let { open ->
-                                ProfileTile(ScIcons.ChatRound, "Xabar", Modifier.weight(1f)) { open(studentId) }
+                                ProfileTile(ScIcons.ChatRound, s.message, Modifier.weight(1f)) { open(studentId) }
                             }
                             ConnectionView.NONE -> ProfileTile(
                                 ScIcons.Users,
-                                "Bog'lanish",
+                                s.connect,
                                 Modifier.weight(1f),
                                 onClick = vm::connect,
                             )
@@ -184,13 +195,13 @@ fun StudentProfileSheet(
                             // ekranidagi so'rovlar bo'limining ishi.
                             ConnectionView.PENDING_OUT -> ProfileTile(
                                 ScIcons.Bell,
-                                "Yuborildi",
+                                s.requestSent,
                                 Modifier.weight(1f),
                                 enabled = false,
                             ) {}
                             ConnectionView.PENDING_IN -> ProfileTile(
                                 ScIcons.Bell,
-                                "So'rov yuborgan",
+                                s.requestedYou,
                                 Modifier.weight(1f),
                                 enabled = false,
                             ) {}
@@ -198,14 +209,14 @@ fun StudentProfileSheet(
                         // Hali tayyor bo'lmagan amallar — chatdagi varaqdagi bilan bir xil
                         // to'rtlik saqlanadi, aks holda profil chatdan ochilganda tugmalar
                         // "yo'qolgandek" ko'rinardi.
-                        ProfileTile(ScIcons.Bell, "Sukut qilish", Modifier.weight(1f)) {
-                            onSoon("Sukut qilish tez orada")
+                        ProfileTile(ScIcons.Bell, s.mute, Modifier.weight(1f)) {
+                            onSoon(muteSoon)
                         }
-                        ProfileTile(ScIcons.PhoneCall, "Chaqiruv", Modifier.weight(1f)) {
-                            onSoon("Qo'ng'iroq tez orada")
+                        ProfileTile(ScIcons.PhoneCall, s.call, Modifier.weight(1f)) {
+                            onSoon(callSoon)
                         }
-                        ProfileTile(AppIcons.Camera, "Video", Modifier.weight(1f)) {
-                            onSoon("Video qo'ng'iroq tez orada")
+                        ProfileTile(AppIcons.Camera, s.video, Modifier.weight(1f)) {
+                            onSoon(videoSoon)
                         }
                     }
 
@@ -213,15 +224,15 @@ fun StudentProfileSheet(
                     if (student != null) {
                         Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(Sc.Card)) {
                             student.username?.takeIf { it.isNotBlank() }?.let {
-                                InfoLine("@$it", "Foydalanuvchi nomi")
+                                InfoLine("@$it", s.usernameLabel)
                             }
                             // ⚠️ Telefon ko'pincha `null`: sukut sozlama — `NOBODY`.
-                            student.phoneNumber?.let { InfoLine(formatUzPhoneFull(it), "Mobil raqam") }
-                            student.bio?.takeIf { it.isNotBlank() }?.let { InfoLine(it, "Tarjimayi hol") }
-                            state.universityName?.let { InfoLine(it, "Universitet") }
-                            student.courseYear?.let { InfoLine(courseLabel(it), "Kurs") }
+                            student.phoneNumber?.let { InfoLine(formatUzPhoneFull(it), s.phoneLabel) }
+                            student.bio?.takeIf { it.isNotBlank() }?.let { InfoLine(it, s.bioLabel) }
+                            state.universityName?.let { InfoLine(it, s.universityLabel) }
+                            student.courseYear?.let { InfoLine(courseLabel(it), s.courseLabel) }
                             student.gender?.let {
-                                InfoLine(if (it == Gender.MALE) "Erkak" else "Ayol", "Jinsi")
+                                InfoLine(if (it == Gender.MALE) s.genderMale else s.genderFemale, s.genderLabel)
                             }
                         }
                     }
@@ -241,10 +252,10 @@ fun StudentProfileSheet(
                     // --- Xavfli amallar --------------------------------------------------
                     Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(Sc.Card)) {
                         if (state.connection == ConnectionView.CONNECTED) {
-                            DangerRow(ScIcons.Close, "Bog'lanishni uzish", onDisconnect ?: vm::disconnect)
+                            DangerRow(ScIcons.Close, s.disconnect, onDisconnect ?: vm::disconnect)
                         }
-                        DangerRow(ScIcons.Users, "Bloklash", onBlock ?: vm::block, danger = true)
-                        onReport?.let { DangerRow(ScIcons.Bell, "Shikoyat qilish", it, danger = true) }
+                        DangerRow(ScIcons.Users, s.block, onBlock ?: vm::block, danger = true)
+                        onReport?.let { DangerRow(ScIcons.Bell, s.report, it, danger = true) }
                     }
 
                     Spacer(Modifier.height(8.dp).navigationBarsPadding())
@@ -304,15 +315,25 @@ private fun DangerRow(icon: ImageVector, label: String, onClick: () -> Unit, dan
  * deb yozamiz, chunki aniq vaqtni bilmaymiz.
  */
 private fun lastSeenLabel(instant: Instant?): String {
-    if (instant == null) return "oflayn"
+    if (instant == null) return AppLocale.pick(en = "offline", ru = "не в сети", uz = "oflayn")
     val date = instant.toLocalDateTime(TimeZone.currentSystemDefault()).date
-    return "oxirgi faollik ${date.dayOfMonth}.${date.monthNumber.toString().padStart(2, '0')}"
+    val day = "${date.dayOfMonth}.${date.monthNumber.toString().padStart(2, '0')}"
+    return connectionsStringsNow().lastSeenOn(day)
 }
 
-private fun courseLabel(courseYear: String): String = when (courseYear.uppercase()) {
-    "MASTER" -> "Magistratura"
-    else -> "$courseYear-kurs"
+private fun courseLabel(courseYear: String): String {
+    val s = connectionsStringsNow()
+    return when (courseYear.uppercase()) {
+        "MASTER" -> s.masterDegree
+        else -> s.courseYear(courseYear)
+    }
 }
+
+/** «onlayn» — profil sarlavhasidagi holat. */
+@Composable
+@ReadOnlyComposable
+private fun profileOnlineLabel(): String =
+    AppLocale.pick(en = "online", ru = "в сети", uz = "onlayn")
 
 /** Yig'ilgan sarlavha balandligi — chatdagi suhbatdosh varag'i bilan bir xil. */
 private val COLLAPSED_HEADER = 250.dp

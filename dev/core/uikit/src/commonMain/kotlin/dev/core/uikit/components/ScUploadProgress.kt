@@ -31,6 +31,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
+import dev.core.uikit.locale.uiStrings
 
 /**
  * Yuklash foizi — Telegramdagi halqa.
@@ -105,7 +106,7 @@ fun ScUploadOverlay(
         if (onCancel != null) {
             Icon(
                 ScIcons.Close,
-                "Yuborishni bekor qilish",
+                uiStrings().cancelUpload,
                 tint = Color.White,
                 modifier = Modifier.size(ringSize * CANCEL_ICON_RATIO).clickable(onClick = onCancel),
             )

@@ -225,7 +225,7 @@ class StoriesViewModel(
             // yuklashdan boshlanadi va yarmidan sakrab ketmaydi.
             val prepareShare = if (videoNeedsPreparing(video.sizeBytes)) PREPARE_SHARE else 0f
             val ready = preparer.prepare(video) { fraction -> onProgress(fraction * prepareShare) }
-                ?: return@publish Resource.Error("Videoni yuborib bo'lmadi — u juda katta.")
+                ?: return@publish Resource.Error(storiesStringsNow().videoTooLarge)
 
             repository.createFromFile(
                 path = ready.path,
@@ -284,7 +284,7 @@ class StoriesViewModel(
             when (result) {
                 is Resource.Success -> {
                     _state.update {
-                        it.copy(publishing = false, publishProgress = null, message = "Hikoya joylandi")
+                        it.copy(publishing = false, publishProgress = null, message = storiesStringsNow().storyPosted)
                     }
                     refresh()
                 }

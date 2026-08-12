@@ -1,5 +1,7 @@
 package dev.feature.profile.domain.model
 
+import dev.core.common.locale.AppLocale
+
 /**
  * Foydalanuvchining profil ma'lumotlari — Firebase Auth bermaydigan maydonlar.
  *
@@ -115,7 +117,11 @@ fun bioRejectionReason(raw: String): String? {
     val bio = raw.trim()
     if (bio.isEmpty()) return null
     if (bio.length > UserProfile.MAX_BIO) {
-        return "Tarjimayi hol ${UserProfile.MAX_BIO} belgidan uzun bo'lmasin."
+        return AppLocale.pick(
+            en = "Your bio must be no longer than ${UserProfile.MAX_BIO} characters.",
+            ru = "Описание не должно быть длиннее ${UserProfile.MAX_BIO} символов.",
+            uz = "Tarjimayi hol ${UserProfile.MAX_BIO} belgidan uzun bo'lmasin.",
+        )
     }
 
     val lower = bio.lowercase()
@@ -124,12 +130,20 @@ fun bioRejectionReason(raw: String): String? {
         // Yalang'och domen: `arzonkiyim.uz` — nuqta va tanish zona.
         BARE_DOMAIN.containsMatchIn(lower)
     if (hasLink) {
-        return "Tarjimayi holda havola yoki foydalanuvchi nomi bo'lishi mumkin emas."
+        return AppLocale.pick(
+            en = "Your bio can't contain links or usernames.",
+            ru = "В описании нельзя указывать ссылки или имена пользователей.",
+            uz = "Tarjimayi holda havola yoki foydalanuvchi nomi bo'lishi mumkin emas.",
+        )
     }
 
     // Ajratgichlar tashlanadi — `+998 90 123 45 67` 12 xonali ketma-ketlikka aylanadi.
     if (bio.count { it.isDigit() } >= MIN_PHONE_DIGITS) {
-        return "Tarjimayi holda telefon raqami bo'lishi mumkin emas."
+        return AppLocale.pick(
+            en = "Your bio can't contain a phone number.",
+            ru = "В описании нельзя указывать номер телефона.",
+            uz = "Tarjimayi holda telefon raqami bo'lishi mumkin emas.",
+        )
     }
     return null
 }

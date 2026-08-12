@@ -50,6 +50,7 @@ import dev.feature.notifications.domain.model.AppNotification
 import dev.feature.notifications.domain.model.NotificationTarget
 import dev.feature.notifications.domain.model.NotificationType
 import org.koin.compose.viewmodel.koinViewModel
+import dev.core.uikit.locale.uiStrings
 
 /**
  * Bildirishnomalar ekrani. Gradient topbar (aylana `‹` orqaga tugma) + rangli plitkali
@@ -76,10 +77,10 @@ fun NotificationsScreen(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(13.dp),
             ) {
-                ScCircleButton(ScIcons.ChevronLeft, onBack, contentDescription = "Orqaga")
+                ScCircleButton(ScIcons.ChevronLeft, onBack, contentDescription = uiStrings().back)
                 // Sarlavha qatorda YOLG'IZ: ilgari yonida "Hammasi o'qildi" chipi turardi va
                 // "Bildirishnomalar" uch nuqta bilan kesilib qolardi. Tugma endi pastda.
-                ScHeaderTitle("Bildirishnomalar")
+                ScHeaderTitle(notificationsStrings().title)
             }
             Spacer(Modifier.height(10.dp))
             ScHeaderSubtitle(state.subtitle())
@@ -125,10 +126,13 @@ private fun BoxScope.FloatingMarkAllRead(unreadCount: Int, onMarkAll: () -> Unit
 }
 
 /** Topbar ostidagi izoh — o'qilmaganlar soni yoki tinch holat. */
-private fun NotificationsUiState.subtitle(): String = when {
-    unreadCount > 0 -> "$unreadCount ta o'qilmagan bildirishnoma"
-    items.isNotEmpty() -> "Hammasi o'qilgan"
-    else -> "Yangiliklar shu yerda to'planadi"
+private fun NotificationsUiState.subtitle(): String {
+    val s = notificationsStringsNow()
+    return when {
+        unreadCount > 0 -> s.unreadCount(unreadCount)
+        items.isNotEmpty() -> s.allRead
+        else -> s.emptySubtitle
+    }
 }
 
 @Composable
@@ -227,7 +231,7 @@ private fun MarkAllReadBar(unreadCount: Int, onClick: () -> Unit) {
             .padding(start = Sc.ScreenPadding, end = Sc.ScreenPadding, top = 26.dp, bottom = 16.dp),
     ) {
         // Sondagi qiymat matnda: tugma "nima bo'ladi" ni ham, "nechtasiga" ni ham aytadi.
-        ScGradientButton("Hammasini o'qildi ($unreadCount)", onClick, radius = 18.dp)
+        ScGradientButton(notificationsStrings().markAllRead(unreadCount), onClick, radius = 18.dp)
     }
 }
 
@@ -239,12 +243,12 @@ private fun MarkAllReadBar(unreadCount: Int, onClick: () -> Unit) {
 private fun LoadFailed(message: String, onRetry: () -> Unit) {
     ScEmptyStateBox(
         Modifier.fillMaxSize(),
-        title = "Ro'yxat yuklanmadi",
+        title = uiStrings().loadFailed,
         message = message,
         icon = ScIcons.Bell,
         tint = Sc.TintBlue,
         iconColor = Sc.Brand,
-        actionText = "Qayta urinish",
+        actionText = uiStrings().retry,
         onAction = onRetry,
     )
 }

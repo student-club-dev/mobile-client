@@ -35,14 +35,12 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.plus
 import kotlinx.datetime.toInstant
 import kotlinx.datetime.toLocalDateTime
+import dev.feature.listings.presentation.lt
+import dev.core.uikit.locale.uiStringsNow
 
 /** Muddat chipi: ko'rinadigan yozuv va sana. */
 private class DeadlineDay(val label: String, val date: LocalDate)
 
-private val UZ_MONTHS = listOf(
-    "yanvar", "fevral", "mart", "aprel", "may", "iyun",
-    "iyul", "avgust", "sentabr", "oktabr", "noyabr", "dekabr",
-)
 
 /** Muddat uchun sana chiplari — bugundan boshlab ikki hafta. */
 private const val DAY_CHIP_COUNT = 14
@@ -69,16 +67,16 @@ fun TaskForm(state: PostListingUiState, palette: AppPalette, vm: PostListingView
     }
 
     ListingFormShell(
-        title = category?.label ?: "Fanlardan yordam",
-        subtitle = "Qanday ish kerakligini va muddatini aniq yozing",
+        title = category?.label ?: lt("Fanlardan yordam"),
+        subtitle = lt("Qanday ish kerakligini va muddatini aniq yozing"),
         state = state,
         palette = palette,
         vm = vm,
     ) {
         // 1) Yo'nalish — talaba o'ylaydigan tabiiy bo'linish.
         FormSection(
-            title = "Ish yo'nalishi",
-            subtitle = "Qaysi turdagi yordam kerak",
+            title = lt("Ish yo'nalishi"),
+            subtitle = lt("Qaysi turdagi yordam kerak"),
             error = state.errorFor(ListingField.TASK_SUBJECT),
         ) {
             ChipFlow {
@@ -95,8 +93,8 @@ fun TaskForm(state: PostListingUiState, palette: AppPalette, vm: PostListingView
         // Qolgani yo'nalish tanlangandan keyin — turlar aynan undan kelib chiqadi.
         if (category != null) {
             FormSection(
-                title = "Ish turi",
-                subtitle = "Aniq nima kerakligini tanlang",
+                title = lt("Ish turi"),
+                subtitle = lt("Aniq nima kerakligini tanlang"),
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
                     ChipFlow {
@@ -112,7 +110,7 @@ fun TaskForm(state: PostListingUiState, palette: AppPalette, vm: PostListingView
                         GlassTextField(
                             task.customTypeName,
                             { v -> vm.updateTask { t -> t.copy(customTypeName = v) } },
-                            "Ish turini yozing",
+                            lt("Ish turini yozing"),
                             height = 48,
                         )
                     }
@@ -123,14 +121,14 @@ fun TaskForm(state: PostListingUiState, palette: AppPalette, vm: PostListingView
             AboutSection(
                 state = state,
                 vm = vm,
-                sectionTitle = "Topshiriq sharti",
-                titleHint = "Matematikadan 12 ta masala",
-                descriptionHint = "Masala shartini, talablarni va formatni yozing. " +
+                sectionTitle = lt("Topshiriq sharti"),
+                titleHint = lt("Matematikadan 12 ta masala"),
+                descriptionHint = lt("Masala shartini, talablarni va formatni yozing. ") +
                     "Masalan: \"Ehtimollar nazariyasi, 3-mavzu, qo'lda yechilsin\"",
-                subtitle = "Bajaruvchi shu matnga qarab baho beradi — qanchalik aniq bo'lsa, shuncha yaxshi",
+                subtitle = lt("Bajaruvchi shu matnga qarab baho beradi — qanchalik aniq bo'lsa, shuncha yaxshi"),
             )
 
-            FormSection(title = "Ish hajmi", subtitle = "Ixtiyoriy, lekin narxni aniqlashda yordam beradi") {
+            FormSection(title = lt("Ish hajmi"), subtitle = lt("Ixtiyoriy, lekin narxni aniqlashda yordam beradi")) {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     GlassTextField(
                         task.volume,
@@ -145,7 +143,7 @@ fun TaskForm(state: PostListingUiState, palette: AppPalette, vm: PostListingView
             // 3) Muddat — MAJBURIY. Muddatsiz topshiriq bajaruvchi uchun ma'nosiz.
             DeadlineSection(state, palette, vm)
 
-            FormSection(title = "Qanday topshiriladi") {
+            FormSection(title = lt("Qanday topshiriladi")) {
                 ChipFlow {
                     TaskFormat.entries.forEach { item ->
                         SelectChip(
@@ -164,22 +162,22 @@ fun TaskForm(state: PostListingUiState, palette: AppPalette, vm: PostListingView
 
             ImagesSection(
                 state, vm, imagePicker::pick,
-                sectionTitle = "Masala surati",
-                hint = "Topshiriq varag'i yoki ekran surati — ko'p narsani tushuntiradi",
+                sectionTitle = lt("Masala surati"),
+                hint = lt("Topshiriq varag'i yoki ekran surati — ko'p narsani tushuntiradi"),
                 optional = true,
             )
 
             PriceSection(
                 state = state,
                 vm = vm,
-                sectionTitle = "Qancha to'laysiz",
-                priceLabel = "Narx",
+                sectionTitle = lt("Qancha to'laysiz"),
+                priceLabel = lt("Narx"),
                 hint = "50000",
-                subtitle = "Butun ish uchun. Aniq bilmasangiz \"kelishilgan\" ni belgilang",
+                subtitle = lt("Butun ish uchun. Aniq bilmasangiz \"kelishilgan\" ni belgilang"),
                 priceUnits = listOf(PriceUnit.PER_ITEM),
             )
 
-            ContactSection(state, vm, "Bajaruvchi shu raqamga bog'lanadi")
+            ContactSection(state, vm, lt("Bajaruvchi shu raqamga bog'lanadi"))
             AudienceSection(state, vm)
         }
     }
@@ -222,12 +220,12 @@ private fun DeadlineSection(state: PostListingUiState, palette: AppPalette, vm: 
     }
 
     FormSection(
-        title = "Qachongacha kerak",
-        subtitle = "Muddatsiz topshiriqni hech kim olmaydi",
+        title = lt("Qachongacha kerak"),
+        subtitle = lt("Muddatsiz topshiriqni hech kim olmaydi"),
         error = state.errorFor(ListingField.TASK_DEADLINE),
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(11.dp)) {
-            MiniLabel("Sana", palette)
+            MiniLabel(lt("Sana"), palette)
             Row(
                 Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(7.dp),
@@ -242,7 +240,7 @@ private fun DeadlineSection(state: PostListingUiState, palette: AppPalette, vm: 
                 }
             }
 
-            MiniLabel("Soat", palette)
+            MiniLabel(lt("Soat"), palette)
             ChipFlow {
                 TIME_OPTIONS.forEach { time ->
                     SelectChip(
@@ -259,7 +257,7 @@ private fun DeadlineSection(state: PostListingUiState, palette: AppPalette, vm: 
 }
 
 private fun dayChipLabel(offset: Int, date: LocalDate): String = when (offset) {
-    0 -> "Bugun"
-    1 -> "Ertaga"
-    else -> "${date.dayOfMonth}-${UZ_MONTHS[date.monthNumber - 1]}"
+    0 -> lt("Bugun")
+    1 -> lt("Ertaga")
+    else -> "${date.dayOfMonth}-${uiStringsNow().months[date.monthNumber - 1]}"
 }

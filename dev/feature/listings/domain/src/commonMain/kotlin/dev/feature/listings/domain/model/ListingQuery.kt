@@ -49,7 +49,7 @@ data class ListingQuery(
  * [NEAREST] koordinatasiz so'ralsa server xato bermaydi — jimgina [NEWEST] ga tushadi.
  * [RELEVANCE] hozircha [NEWEST] bilan bir xil (universitet reytingi — Faza 2).
  */
-enum class ListingSort(val label: String) {
+enum class ListingSort(private val labelUz: String) {
     RELEVANCE("Mos kelishi bo'yicha"),
     NEWEST("Yangi e'lonlar"),
     PRICE_ASC("Arzondan qimmatga"),
@@ -69,6 +69,10 @@ enum class ListingSort(val label: String) {
             else -> listOf(NEWEST, PRICE_ASC, PRICE_DESC, NEAREST)
         }
     }
+
+    ;
+
+    val label: String get() = trListing(labelUz)
 }
 
 /**

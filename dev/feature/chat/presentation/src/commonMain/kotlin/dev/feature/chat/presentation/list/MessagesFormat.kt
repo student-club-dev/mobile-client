@@ -5,6 +5,7 @@ import dev.feature.chat.domain.model.Message
 import dev.feature.chat.domain.model.MessageType
 import dev.feature.chat.presentation.callPreview
 import dev.feature.clubs.domain.model.Club
+import dev.feature.chat.presentation.chatStringsNow
 
 /**
  * Ro'yxatdagi qisqa ko'rinish.
@@ -12,22 +13,25 @@ import dev.feature.clubs.domain.model.Club
  * Media xabarda tana **bo'sh** (server `body` ni faqat matn va izoh uchun to'ldiradi),
  * shuning uchun ko'rinish turdan quriladi. Turi keshda saqlanadi (`lastMessageType`).
  */
-internal fun Message?.preview(): String = when {
-    this == null -> "Xabar yozing…"
-    deleted -> "Xabar o'chirildi"
-    type == MessageType.IMAGE -> "📷 Rasm"
-    type == MessageType.GIF -> "GIF"
-    type == MessageType.VIDEO -> "🎬 Video"
-    type == MessageType.VIDEO_NOTE -> "⭕️ Video xabar"
-    type == MessageType.VOICE -> "🎤 Ovozli xabar"
-    type == MessageType.FILE -> "📎 Fayl"
-    type == MessageType.STICKER -> "${sticker?.emoji.orEmpty()} Stiker".trim()
-    // Qo'ng'iroq — push matni bilan **bir xil** shakl (`handoff/09-CALLS-REST.md` §4).
-    // `call` keshdan kelmasa (suhbatlar ro'yxatining qisqa qatorida u yo'q) turdan
-    // umumiy matn quriladi.
-    type == MessageType.CALL -> call?.let { "📞 ${callPreview(it)}" } ?: "📞 Qo'ng'iroq"
-    body.isBlank() -> "Xabar yozing…"
-    else -> body
+internal fun Message?.preview(): String {
+    val s = chatStringsNow()
+    return when {
+        this == null -> s.messageHint
+        deleted -> s.messageDeleted
+        type == MessageType.IMAGE -> s.previewPhoto
+        type == MessageType.GIF -> "GIF"
+        type == MessageType.VIDEO -> s.previewVideo
+        type == MessageType.VIDEO_NOTE -> s.previewVideoNote
+        type == MessageType.VOICE -> s.previewVoice
+        type == MessageType.FILE -> s.previewFile
+        type == MessageType.STICKER -> s.previewSticker(sticker?.emoji.orEmpty()).trim()
+        // Qo'ng'iroq — push matni bilan **bir xil** shakl (`handoff/09-CALLS-REST.md` §4).
+        // `call` keshdan kelmasa (suhbatlar ro'yxatining qisqa qatorida u yo'q) turdan
+        // umumiy matn quriladi.
+        type == MessageType.CALL -> s.previewCall(call?.let { callPreview(it) } ?: s.call)
+        body.isBlank() -> s.messageHint
+        else -> body
+    }
 }
 
 /**

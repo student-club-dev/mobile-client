@@ -5,6 +5,7 @@ import dev.feature.profile.domain.model.ProfilePhoto
 import dev.feature.profile.domain.model.UserProfile
 import dev.feature.profile.domain.repository.ProfileRepository
 import kotlinx.coroutines.flow.Flow
+import dev.core.common.locale.AppLocale
 
 /** Local keshdagi joriy profilni reaktiv kuzatadi (Home sarlavhasi, Profil ekrani...). */
 class ObserveProfileUseCase(private val repository: ProfileRepository) {
@@ -46,8 +47,8 @@ class AddProfilePhotoUseCase(private val repository: ProfileRepository) {
         /** Yuklash foizi (`0f..1f`) — ekrandagi halqa uchun. */
         onProgress: ((Float) -> Unit)? = null,
     ): Resource<ProfilePhoto> {
-        if (bytes.isEmpty()) return Resource.Error("Rasm bo'sh")
-        if (bytes.size > MAX_PHOTO_BYTES) return Resource.Error("Rasm juda katta (maks. 12 MB)")
+        if (bytes.isEmpty()) return Resource.Error(AppLocale.pick(en = "The image is empty", ru = "Изображение пустое", uz = "Rasm bo'sh"))
+        if (bytes.size > MAX_PHOTO_BYTES) return Resource.Error(AppLocale.pick(en = "The image is too large (max 12 MB)", ru = "Изображение слишком большое (макс. 12 МБ)", uz = "Rasm juda katta (maks. 12 MB)"))
         return repository.addPhoto(bytes, fileName, onProgress)
     }
 
@@ -78,9 +79,9 @@ class DeleteProfilePhotoUseCase(private val repository: ProfileRepository) {
 class UploadAvatarUseCase(private val repository: ProfileRepository) {
 
     suspend operator fun invoke(bytes: ByteArray, fileName: String): Resource<String> {
-        if (bytes.isEmpty()) return Resource.Error("Rasm bo'sh")
+        if (bytes.isEmpty()) return Resource.Error(AppLocale.pick(en = "The image is empty", ru = "Изображение пустое", uz = "Rasm bo'sh"))
         if (bytes.size > MAX_AVATAR_BYTES) {
-            return Resource.Error("Rasm juda katta (maks. 5 MB)")
+            return Resource.Error(AppLocale.pick(en = "The image is too large (max 5 MB)", ru = "Изображение слишком большое (макс. 5 МБ)", uz = "Rasm juda katta (maks. 5 MB)"))
         }
         return repository.uploadAvatar(bytes, fileName)
     }

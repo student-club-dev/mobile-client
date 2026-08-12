@@ -14,6 +14,7 @@ import dev.feature.profile.domain.model.ProfilePhoto
 import dev.feature.profile.domain.model.UserProfile
 import io.ktor.client.plugins.ClientRequestException
 import io.ktor.http.HttpStatusCode
+import dev.core.common.locale.AppLocale
 
 /**
  * Real backend (`GET/PUT /v1/profile/me`) — spetsifikatsiya:
@@ -35,7 +36,7 @@ class ApiProfileRemoteDataSource(
         if (e.response.status == HttpStatusCode.NotFound) Resource.Success(null)
         else Resource.Error(e.message, e)
     } catch (e: Exception) {
-        Resource.Error(e.message ?: "Profilni yuklab bo'lmadi", e)
+        Resource.Error(e.message ?: AppLocale.pick(en = "Couldn't load the profile", ru = "Не удалось загрузить профиль", uz = "Profilni yuklab bo'lmadi"), e)
     }
 
     /**

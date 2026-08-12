@@ -31,6 +31,7 @@ import dev.core.uikit.components.AppFontFamily
 import dev.core.uikit.components.AppIcons
 import dev.core.uikit.theme.AppPalette
 import dev.core.uikit.theme.Sc
+import dev.core.uikit.locale.uiStrings
 
 /**
  * Ro'yxatdan xaritaga o'tish tugmasi.
@@ -44,7 +45,7 @@ fun MapLinkButton(
     palette: AppPalette,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    label: String = "Xaritada ko'rish",
+    label: String = uiStrings().viewOnMap,
 ) {
     Row(
         modifier.fillMaxWidth().height(44.dp).clip(RoundedCornerShape(13.dp))
@@ -121,7 +122,7 @@ fun OffersMapOverlay(
                     Modifier.size(46.dp).clip(RoundedCornerShape(13.dp)).background(palette.glass)
                         .border(1.dp, palette.border, RoundedCornerShape(13.dp)).clickable(onClick = onClose),
                     contentAlignment = Alignment.Center,
-                ) { Icon(AppIcons.ArrowLeft, "Yopish", tint = palette.ink, modifier = Modifier.size(18.dp)) }
+                ) { Icon(AppIcons.ArrowLeft, uiStrings().close, tint = palette.ink, modifier = Modifier.size(18.dp)) }
                 topBarExtras()
             }
 
@@ -137,7 +138,7 @@ fun OffersMapOverlay(
                 Text(
                     // Marker soni EMAS, e'lonlar soni: bitta marker ortida bir biznesning
                     // bir nechta e'loni turishi mumkin.
-                    if (markers.isEmpty()) "Bu shartlarga mos e'lon topilmadi"
+                    if (markers.isEmpty()) uiStrings().noListingsForFilters
                     else "${markers.sumOf { it.count }} ta e'lon xaritada",
                     style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.5f.sp, fontWeight = FontWeight.Bold, color = Color.White),
                 )
