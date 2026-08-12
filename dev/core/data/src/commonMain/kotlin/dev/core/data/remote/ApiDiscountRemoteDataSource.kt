@@ -43,6 +43,7 @@ import dev.core.network.response.safeCall
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import dev.core.domain.model.CatalogNames
 
 /**
  * "Siz uchun" bo'limining real backend manbasi. Spetsifikatsiya:
@@ -513,9 +514,11 @@ private fun List<OfferFilterSchema>.merge(): OfferFilterSchema {
 }
 
 private fun FilterSchemaDto.toDomain() = OfferFilterSchema(
-    types = types.map { SchemaOption(it.key, it.nameUz, it.emoji, it.listingsCount) },
-    categories = categories.map { SchemaCategoryOption(it.key, it.label, it.typeKey, it.count) },
-    attributes = attributes.map { SchemaAttributeOption(it.key, it.label, it.suffix) },
+    // Filtr sxemasi ham serverdan faqat o'zbekcha keladi — chiplar qolgan interfeys
+    // bilan bir tilda bo'lishi uchun shu yerda o'giriladi (`CatalogNames`).
+    types = types.map { SchemaOption(it.key, CatalogNames.tr(it.key, it.nameUz), it.emoji, it.listingsCount) },
+    categories = categories.map { SchemaCategoryOption(it.key, CatalogNames.tr(it.key, it.label), it.typeKey, it.count) },
+    attributes = attributes.map { SchemaAttributeOption(it.key, CatalogNames.tr(it.key, it.label), it.suffix) },
     listingKinds = listingKind.associate { it.key to it.count },
     priceRange = priceRange?.let { it.min.toLong()..it.max.toLong() },
     discountPercentRange = discountPercentRange?.let { it.min..it.max },

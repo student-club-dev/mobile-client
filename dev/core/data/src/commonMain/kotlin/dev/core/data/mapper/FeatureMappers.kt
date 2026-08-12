@@ -9,6 +9,7 @@ import dev.core.domain.model.DiscountOffer
 import dev.core.domain.model.DiscountTag
 import dev.core.domain.model.OfferBranch
 import dev.core.domain.model.OfferDetail
+import dev.core.domain.model.CatalogNames
 
 // --- List <-> TEXT ("|" bilan) ---
 internal fun List<String>.joinDb(): String = joinToString("|")
@@ -23,13 +24,17 @@ internal fun Long.toBool(): Boolean = this != 0L
 private inline fun <reified T : Enum<T>> parseEnum(value: String, default: T): T =
     runCatching { enumValueOf<T>(value) }.getOrDefault(default)
 
+// Katalog nomlari serverdan FAQAT o'zbekcha keladi (`nameUz`), shuning uchun tarjima
+// keshdan o'qishda qo'llanadi: bazada kanonik (o'zbekcha) nom qoladi, ekranga esa joriy
+// til chiqadi. Aks holda til almashganda kesh eski tilda qotib qolardi (`CatalogNames`).
 fun DiscountGroupEntity.toDomain(): DiscountGroup = DiscountGroup(
-    key = key, name = name, emoji = emoji, accent = accent, sortOrder = sortOrder.toInt(),
+    key = key, name = CatalogNames.tr(key, name), emoji = emoji, accent = accent,
+    sortOrder = sortOrder.toInt(),
 )
 
 fun DiscountCategoryEntity.toDomain(): DiscountCategory = DiscountCategory(
-    id = id, name = name, emoji = emoji, offerCount = offerCount.toInt(), accent = accent,
-    groupKey = groupKey,
+    id = id, name = CatalogNames.tr(id, name), emoji = emoji, offerCount = offerCount.toInt(),
+    accent = accent, groupKey = groupKey,
 )
 
 /**
@@ -65,7 +70,9 @@ fun DiscountOfferEntity.toDomain(): DiscountOffer = DiscountOffer(
     id = id,
     categoryId = categoryId,
     groupKey = groupKey,
-    subcategory = subcategory,
+    // Bo'lim nomi ("Burger", "Chet tillari") kartochkada ko'rinadi va u ham serverdan
+    // faqat o'zbekcha keladi — kalitsiz, shuning uchun nom bo'yicha tarjima qilinadi.
+    subcategory = CatalogNames.tr(key = "", uzName = subcategory),
     gender = gender,
     merchant = merchant,
     title = title,
