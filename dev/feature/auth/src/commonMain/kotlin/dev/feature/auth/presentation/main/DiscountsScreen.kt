@@ -66,6 +66,7 @@ import dev.core.domain.model.DiscountTag
 import dev.core.uikit.components.AppFontFamily
 import dev.core.uikit.components.ScCircleButton
 import dev.core.uikit.components.ScEmptyState
+import dev.core.uikit.components.ScFavoriteButton
 import dev.core.uikit.components.ScHeader
 import dev.core.uikit.components.ScHideBottomBar
 import dev.core.uikit.components.ScHeaderSubtitle
@@ -306,12 +307,16 @@ private fun CatalogSectionCard(
                 style = TextStyle(fontFamily = AppFontFamily, fontSize = 21.sp),
             )
         }
+        // `minLines = 2` — nom bir qatorga sig'sa ham ikki qator joy oladi. Bunsiz
+        // "Ovqatlanish" (1 qator) va "O'yin va dam olish" (2 qator) kataklari har xil
+        // balandlikda chiqib, to'r zinapoyaga o'xshab qolardi (bug hisoboti #39).
         Text(
             item.name,
             style = TextStyle(
                 fontFamily = AppFontFamily, fontSize = 14.sp,
                 fontWeight = FontWeight.ExtraBold, color = palette.ink,
             ),
+            minLines = 2,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
@@ -325,17 +330,26 @@ private fun CatalogSectionCard(
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
-        // Sonni server beradi (turlarning `listingsCount` yig'indisi). `0` bo'lsa chizilmaydi.
-        if (item.offerCount > 0) {
-            Text(
-                discountsStrings().offersCount(item.offerCount),
-                style = TextStyle(
-                    fontFamily = AppFontFamily, fontSize = 11.5f.sp,
-                    fontWeight = FontWeight.Bold, color = accent,
-                ),
-                maxLines = 1,
-            )
-        }
+        // Sonni server beradi (turlarning `listingsCount` yig'indisi).
+        //
+        // ⚠️ `0` bo'lganda ham qator CHIZILADI — faqat qizil "e'lon yo'q" matni bilan.
+        // Ilgari u butunlay yashirilardi va yonma-yon turgan ikkita katak har xil
+        // balandlikda chiqib, to'r "buzuq" ko'rinardi (bug hisoboti #39). Endi qator
+        // har doim bor, ya'ni kataklar bir chiziqda tugaydi — va bo'sh bo'lim ham
+        // ochilishidan oldin bo'shligini aytadi.
+        Text(
+            if (item.offerCount > 0) {
+                discountsStrings().offersCount(item.offerCount)
+            } else {
+                discountsStrings().noListings
+            },
+            style = TextStyle(
+                fontFamily = AppFontFamily, fontSize = 11.5f.sp,
+                fontWeight = FontWeight.Bold,
+                color = if (item.offerCount > 0) accent else Sc.Danger,
+            ),
+            maxLines = 1,
+        )
     }
 }
 
@@ -365,27 +379,33 @@ private fun CatalogTypeCard(
                 style = TextStyle(fontFamily = AppFontFamily, fontSize = 21.sp),
             )
         }
+        // Bo'lim katagi bilan bir xil balandlik uchun — [CatalogSectionCard] izohiga q.
         Text(
             type.name,
             style = TextStyle(
                 fontFamily = AppFontFamily, fontSize = 14.sp,
                 fontWeight = FontWeight.ExtraBold, color = palette.ink,
             ),
+            minLines = 2,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
         // Sonni server beradi (`CatalogTypeDto.offerCount`) — keshdagi e'lonlar emas,
-        // shuning uchun bu yerda hisoblanmaydi. `0` bo'lsa qator umuman chizilmaydi.
-        if (type.offerCount > 0) {
-            Text(
-                discountsStrings().offersCount(type.offerCount),
-                style = TextStyle(
-                    fontFamily = AppFontFamily, fontSize = 11.5f.sp,
-                    fontWeight = FontWeight.Bold, color = accent,
-                ),
-                maxLines = 1,
-            )
-        }
+        // shuning uchun bu yerda hisoblanmaydi. `0` bo'lsa qizil "e'lon yo'q" yoziladi:
+        // qator har doim bor, ya'ni to'rdagi kataklar bir chiziqda tugaydi (#39).
+        Text(
+            if (type.offerCount > 0) {
+                discountsStrings().offersCount(type.offerCount)
+            } else {
+                discountsStrings().noListings
+            },
+            style = TextStyle(
+                fontFamily = AppFontFamily, fontSize = 11.5f.sp,
+                fontWeight = FontWeight.Bold,
+                color = if (type.offerCount > 0) accent else Sc.Danger,
+            ),
+            maxLines = 1,
+        )
     }
 }
 
@@ -519,8 +539,7 @@ private fun FeedContent(
                 items(state.offers, key = { it.id }) { offer ->
                     val saved = state.savedIds.contains(offer.id)
                     val openDetail = { vm.openOffer(offer.id) }
-                    if (offer.isDiscount) DiscountOfferCard(offer, saved, palette, vm::toggleSaved, openDetail)
-                    else RegularOfferCard(offer, saved, palette, vm::toggleSaved, openDetail)
+                    OfferCard(offer, saved, palette, vm::toggleSaved, openDetail)
                 }
 
                 if (state.offers.isEmpty()) {
@@ -711,7 +730,7 @@ private fun MapOverlay(
 /**
  * Xaritadagi nuqta bosilganda ochiladigan modal varaq.
  *
- * Kartalar feed'dagi bilan AYNAN bir xil ([DiscountOfferCard] / [RegularOfferCard]) —
+ * Kartalar feed'dagi bilan AYNAN bir xil ([OfferCard]) —
  * foydalanuvchi xaritada ham, ro'yxatda ham bitta ko'rinishni ko'radi. Bir biznesning
  * bir nechta e'loni bo'lsa, tepada uning nomi va soni turadi.
  */
@@ -762,11 +781,7 @@ private fun MapOffersSheet(
             ) {
                 items(offers, key = { it.id }) { offer ->
                     val saved = savedIds.contains(offer.id)
-                    if (offer.isDiscount) {
-                        DiscountOfferCard(offer, saved, palette, onToggleSaved) { onOpen(offer.id) }
-                    } else {
-                        RegularOfferCard(offer, saved, palette, onToggleSaved) { onOpen(offer.id) }
-                    }
+                    OfferCard(offer, saved, palette, onToggleSaved) { onOpen(offer.id) }
                 }
             }
         }
@@ -889,31 +904,51 @@ private fun FilterScreen(
             // (`filter.geo.regionIds`) va feed qayta tortiladi.
             RegionSelect(vm, palette)
 
-            // Katalog bo'limi — katalog ekranidagi kataklar bilan bir xil ro'yxat
-            // ("Ovqatlanish", "Sport", "Savdo", "Xizmatlar"). Home'dan uiStrings().all bilan
-            // kelinganda shu yerda tanlangan bo'lib turadi.
+            // Katalog bo'limi va biznes turi — ochiluvchi SELECT'lar.
+            //
+            // Ilgari ikkalasi ham chiplar "devori" edi: 8 ta bo'lim + 20 gacha tur filtr
+            // ekranining butun balandligini egallab, Saralash va «Qo'llash» pastga surilib
+            // ketardi (bug hisoboti #29). Endi tanlangani bitta qatorda ko'rinadi
+            // (bittadan ortiq bo'lsa — «+N»), ro'yxat esa varaqda ochiladi.
             if (fs.sections.isNotEmpty()) {
-                FilterSection(discountsStrings().catalogSection, palette) {
-                    CategoryPill(uiStrings().all, null, d.groupKey == null, palette) { vm.onDraftSection(null) }
-                    fs.sections.forEach { s ->
-                        // Bo'lingan guruhda (Savdo/Xizmatlar) turlar to'plami ham mos kelishi shart.
-                        val selected = d.groupKey == s.groupKey &&
-                            (if (s.partial) d.typeKeys == s.typeKeys else d.typeKeys.isEmpty())
-                        CategoryPill(
-                            "${s.emoji} ${s.name}".trim(), s.accent, selected, palette,
-                        ) { vm.onDraftSection(s) }
-                    }
+                val selectedSection = fs.sections.firstOrNull { s ->
+                    d.groupKey == s.groupKey &&
+                        (if (s.partial) d.typeKeys == s.typeKeys else d.typeKeys.isEmpty())
                 }
+                FilterSelectField(
+                    label = discountsStrings().catalogSection,
+                    selected = listOfNotNull(selectedSection?.let { "${it.emoji} ${it.name}".trim() }),
+                    palette = palette,
+                    options = fs.sections.map { s ->
+                        FilterOption(
+                            id = s.key,
+                            label = "${s.emoji} ${s.name}".trim(),
+                            selected = s == selectedSection,
+                        )
+                    },
+                    // Bo'lim — bitta: u butun ekranning konteksti (sarlavha, feed doirasi).
+                    multiple = false,
+                    onToggle = { key -> vm.onDraftSection(fs.sections.firstOrNull { it.key == key }) },
+                    onClear = { vm.onDraftSection(null) },
+                )
             }
 
-            // Biznes turi
-            FilterSection(discountsStrings().businessType, palette) {
-                CategoryPill(uiStrings().all, null, d.categoryId == null, palette) { vm.onDraftCategory(null) }
-                fs.categories.forEach { cat ->
-                    val label = "${cat.emoji} ${cat.name}".withCount(fs.typeCounts[cat.id])
-                    CategoryPill(label, cat.accent, d.categoryId == cat.id, palette) { vm.onDraftCategory(cat.id) }
-                }
-            }
+            FilterSelectField(
+                label = discountsStrings().businessType,
+                selected = fs.categories.filter { it.id in d.categoryIds }
+                    .map { "${it.emoji} ${it.name}".trim() },
+                palette = palette,
+                options = fs.categories.map { cat ->
+                    FilterOption(
+                        id = cat.id,
+                        label = "${cat.emoji} ${cat.name}".trim().withCount(fs.typeCounts[cat.id]),
+                        selected = cat.id in d.categoryIds,
+                    )
+                },
+                multiple = true,
+                onToggle = vm::toggleDraftCategory,
+                onClear = { vm.toggleDraftCategory(null) },
+            )
 
             // Jins (faqat tanlangan turda jins bo'lsa — masalan kiyim)
             if (fs.genderApplicable) {
@@ -924,16 +959,11 @@ private fun FilterScreen(
                 }
             }
 
-            // Bo'lim — server sxemasi kelgan bo'lsa undan (sonlari bilan), aks holda keshdan.
-            if (fs.availableSubcategories.isNotEmpty()) {
-                FilterSection(discountsStrings().section, palette) {
-                    fs.availableSubcategories.forEach { sub ->
-                        FilterPill(sub.withCount(fs.subcategoryCounts[sub]), sub in d.subcategories, palette) {
-                            vm.toggleDraftSubcategory(sub)
-                        }
-                    }
-                }
-            }
+            // ⚠️ «Bo'lim» (menyu ichidagi taom/xizmat nomi: "Osh", "Burger") filtri
+            // ATAYLAB olib tashlangan. Biznes turi bo'yicha filtr yetarli, ikkinchi
+            // daraja esa filtrni faqat uzaytirib, tanlovni chalkashtirardi (bug hisoboti
+            // #31). Model va so'rov qatlamida u saqlanib turibdi (`subcategories`) —
+            // xaritadagi chiplar va qidiruv takliflari o'sha yo'ldan foydalanadi.
 
             // Saralash
             FilterSection(discountsStrings().sort, palette) {
@@ -969,6 +999,115 @@ private fun FilterScreen(
                 Text(discountsStrings().apply(fs.previewCount), style = TextStyle(fontFamily = AppFontFamily, fontSize = 14.sp, fontWeight = FontWeight.Black, color = Color.White))
             }
         }
+    }
+}
+
+/** [FilterSelectField] dagi bitta variant. */
+private data class FilterOption(val id: String, val label: String, val selected: Boolean)
+
+/**
+ * Filtr guruhi — bitta qatorli **select**, ro'yxati varaqda.
+ *
+ * Tanlanganlar qatorda ko'rinadi, lekin **eng ko'pi bitta yorliq**: qolganlari `+N`
+ * bo'lib yig'iladi. Uzun nomli uchta tur tanlanganda qator ikki-uch qatorga cho'zilib,
+ * filtr yana o'sha "devor" ko'rinishiga qaytardi (bug hisoboti #29).
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun FilterSelectField(
+    label: String,
+    selected: List<String>,
+    options: List<FilterOption>,
+    palette: AppPalette,
+    multiple: Boolean,
+    onToggle: (String) -> Unit,
+    onClear: () -> Unit,
+) {
+    if (options.isEmpty()) return
+    var open by remember { mutableStateOf(false) }
+
+    Column(Modifier.fillMaxWidth().padding(top = 14.dp)) {
+        Text(
+            label,
+            style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = palette.ink),
+        )
+        Spacer(Modifier.size(9.dp))
+        Row(
+            Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp))
+                .background(palette.glass)
+                .border(1.dp, palette.border, RoundedCornerShape(14.dp))
+                .clickable { open = true }
+                .padding(horizontal = 13.dp, vertical = 11.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            if (selected.isEmpty()) {
+                Text(
+                    uiStrings().all,
+                    style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.5f.sp, fontWeight = FontWeight.Bold, color = palette.inkFaint),
+                    modifier = Modifier.weight(1f),
+                )
+            } else {
+                SelectedTag(selected.first(), palette, Modifier.weight(1f, fill = false))
+                if (selected.size > 1) {
+                    Text(
+                        "+${selected.size - 1}",
+                        style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.5f.sp, fontWeight = FontWeight.ExtraBold, color = palette.primary),
+                    )
+                }
+                Spacer(Modifier.weight(1f))
+            }
+            Icon(AppIcons.ChevronDown, null, tint = palette.inkFaint, modifier = Modifier.size(17.dp))
+        }
+    }
+
+    if (open) {
+        ModalBottomSheet(
+            onDismissRequest = { open = false },
+            containerColor = Sc.Card,
+            dragHandle = { BottomSheetDefaults.DragHandle() },
+        ) {
+            Column(
+                Modifier.fillMaxWidth()
+                    .padding(start = 16.dp, end = 16.dp, bottom = 24.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Text(
+                    label,
+                    style = TextStyle(fontFamily = AppFontFamily, fontSize = 17.sp, fontWeight = FontWeight.Black, color = palette.ink),
+                    modifier = Modifier.padding(bottom = 8.dp),
+                )
+                RegionOption(uiStrings().all, options.none { it.selected }, palette) {
+                    onClear()
+                    // Bitta tanlovda varaq darhol yopiladi, ko'p tanlovda ochiq qoladi:
+                    // odam odatda ketma-ket bir nechtasini belgilaydi.
+                    if (!multiple) open = false
+                }
+                options.forEach { option ->
+                    RegionOption(option.label, option.selected, palette) {
+                        onToggle(option.id)
+                        if (!multiple) open = false
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** Select qatoridagi tanlangan qiymat yorlig'i. */
+@Composable
+private fun SelectedTag(label: String, palette: AppPalette, modifier: Modifier = Modifier) {
+    Box(
+        modifier.clip(RoundedCornerShape(9.dp)).background(palette.primary.copy(alpha = 0.12f))
+            .padding(horizontal = 9.dp, vertical = 4.dp),
+    ) {
+        Text(
+            label,
+            style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.5f.sp, fontWeight = FontWeight.Bold, color = palette.primary),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 
@@ -1127,20 +1266,6 @@ private fun FilterPill(label: String, selected: Boolean, palette: AppPalette, on
     }
 }
 
-@Composable
-private fun CategoryPill(label: String, accent: Long?, selected: Boolean, palette: AppPalette, onClick: () -> Unit) {
-    val tint = accent?.let { Color(it) } ?: palette.primary
-    Box(
-        Modifier.clip(RoundedCornerShape(11.dp))
-            .background(if (selected) tint.copy(alpha = 0.16f) else palette.glass)
-            .border(1.dp, if (selected) tint else palette.border, RoundedCornerShape(11.dp))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 7.dp),
-    ) {
-        Text(label, style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = if (selected) tint else palette.inkMuted), maxLines = 1)
-    }
-}
-
 // ---------------------------------------------------------------------------
 // Karta rasmi
 // ---------------------------------------------------------------------------
@@ -1149,9 +1274,8 @@ private fun CategoryPill(label: String, accent: Long?, selected: Boolean, palett
 private val BannerHeight = 150.dp
 
 /**
- * Chegirmali karta banneri: e'lon RASMI (`DiscountOffer.imageUrl`) va uning USTIDAGI
- * ma'lumot — chegirma nishoni, tur yorlig'i, narx va manzil. E'lon nomi/tavsifi kartada
- * YO'Q (ular tafsilot oynasida).
+ * Karta banneri: e'lon RASMI (`DiscountOffer.imageUrl`) va uning USTIDAGI ma'lumot —
+ * chegirma nishoni, tur yorlig'i, narx va manzil. E'lon NOMI banner OSTIDA ([OfferCard]).
  *
  * Rasm kelguncha kulrang shimmer, havola yo'q/buzuq bo'lsa — turning emoji si; banner
  * hech qachon bo'sh qolmaydi. Matn o'qilishi uchun pastdan qora gradient tushiriladi.
@@ -1184,12 +1308,14 @@ private fun OfferBanner(offer: DiscountOffer, accent: Color, saved: Boolean, onT
             }
         }
 
-        // Saqlash — rasmning o'ng-tepasida (pastda endi matn turadi).
-        Icon(
-            AppIcons.Bookmark, discountsStrings().save,
-            tint = if (saved) accent else Color.White,
-            modifier = Modifier.align(Alignment.TopEnd).padding(12.dp).size(22.dp)
-                .clickable(onClick = onToggleSaved),
+        // Saqlash — rasmning o'ng-tepasida (pastda endi matn turadi). Yurak, arxiv
+        // qutisi emas: ikonaning ma'nosi ko'rinishidan tushunilishi kerak (#36).
+        ScFavoriteButton(
+            saved = saved,
+            onToggle = { onToggleSaved() },
+            modifier = Modifier.align(Alignment.TopEnd).padding(4.dp),
+            idleTint = Color.White,
+            contentDescription = discountsStrings().save,
         )
 
         Column(
@@ -1206,11 +1332,27 @@ private fun OfferBanner(offer: DiscountOffer, accent: Color, saved: Boolean, onT
                     Text(offer.subcategory, style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, color = InkOnLight))
                 }
             }
-            if (offer.originalPrice > 0) {
-                Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                    Text("${offer.finalPrice.formatAmount()} ${uiStrings().currency}", style = TextStyle(fontFamily = AppFontFamily, fontSize = 16.sp, fontWeight = FontWeight.Black, color = Color.White))
-                    Text("${offer.originalPrice.formatAmount()}", style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.5f.sp, color = Color.White.copy(alpha = 0.7f), textDecoration = TextDecoration.LineThrough))
-                    Text("/ ${offer.priceUnit}", style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.sp, color = Color.White.copy(alpha = 0.7f)))
+            if (offer.effectivePrice > 0) {
+                Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                    Text(
+                        "${offer.effectivePrice.formatAmount()} ${uiStrings().currency}",
+                        style = TextStyle(fontFamily = AppFontFamily, fontSize = 16.sp, fontWeight = FontWeight.Black, color = Color.White),
+                        modifier = Modifier.alignByBaseline(),
+                    )
+                    // Ustidan chizilgan eski narx FAQAT chegirmada: chegirmasiz e'londa u
+                    // joriy narxning nusxasi bo'lib, "arzonlashgandek" yolg'on his berardi.
+                    if (offer.isDiscount && offer.originalPrice > offer.finalPrice) {
+                        Text(
+                            offer.originalPrice.formatAmount(),
+                            style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.5f.sp, color = Color.White.copy(alpha = 0.7f), textDecoration = TextDecoration.LineThrough),
+                            modifier = Modifier.alignByBaseline(),
+                        )
+                    }
+                    Text(
+                        "/ ${offer.priceUnit}",
+                        style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.sp, color = Color.White.copy(alpha = 0.7f)),
+                        modifier = Modifier.alignByBaseline(),
+                    )
                 }
             }
             offer.location?.takeIf { it.isNotBlank() }?.let { location ->
@@ -1241,10 +1383,24 @@ private fun OfferThumb(offer: DiscountOffer, accent: Color, size: Dp = 52.dp) {
 private val InkOnLight = Color(0xFF0F2A43)
 
 // ---------------------------------------------------------------------------
-// Chegirmali e'lon kartasi — rasmli banner + eski/yangi narx
+// E'lon kartasi — chegirmali ham, chegirmasiz ham AYNAN bir xil ko'rinishda
 // ---------------------------------------------------------------------------
+
+/**
+ * Feed'dagi yagona e'lon kartasi.
+ *
+ * Ilgari ikki xil karta bor edi: chegirmalisi katta rasmli banner, chegirmasizi esa
+ * ixcham gorizontal qator. Bitta ro'yxatda ular navbatma-navbat kelib, feed "buzuq"
+ * ko'rinardi — ba'zi e'lonlar ko'zga tashlanib, boshqalari deyarli ko'rinmasdi (bug
+ * hisoboti #40). Endi hamma e'lon bir xil vaznda: farq faqat chegirma nishonida va
+ * ustidan chizilgan eski narxda.
+ *
+ * Rasm ostida **e'lon nomi** turadi. Ilgari u yerda faqat biznes nomi bo'lgani uchun
+ * "Jordan shoes Pro" kabi nomlar kartada umuman ko'rinmasdi (#41) — foydalanuvchi nima
+ * sotilayotganini faqat tafsilotni ochib bilardi.
+ */
 @Composable
-private fun DiscountOfferCard(
+private fun OfferCard(
     offer: DiscountOffer,
     saved: Boolean,
     palette: AppPalette,
@@ -1253,98 +1409,29 @@ private fun DiscountOfferCard(
 ) {
     val accent = Color(offer.bannerAccent)
 
-    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(palette.glass).border(1.dp, palette.border, RoundedCornerShape(18.dp)).clickable(onClick = onOpen)) {
-        // E'lon ma'lumoti rasm USTIDA; rasm ostida faqat biznes nomi qoladi.
-        OfferBanner(offer, accent, saved) { onToggleSaved(offer, saved) }
-        Text(
-            offer.merchant,
-            style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, color = palette.ink),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 11.dp),
-        )
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Chegirmasiz oddiy e'lon kartasi — ixcham gorizontal, bannersiz
-// ---------------------------------------------------------------------------
-@Composable
-private fun RegularOfferCard(
-    offer: DiscountOffer,
-    saved: Boolean,
-    palette: AppPalette,
-    onToggleSaved: (DiscountOffer, Boolean) -> Unit,
-    onOpen: () -> Unit,
-) {
-    val accent = Color(offer.bannerAccent)
-    Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(palette.glass).border(1.dp, palette.border, RoundedCornerShape(16.dp)).clickable(onClick = onOpen).padding(11.dp),
-        horizontalArrangement = Arrangement.spacedBy(11.dp),
-        verticalAlignment = Alignment.CenterVertically,
+    Column(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(palette.glass)
+            .border(1.dp, palette.border, RoundedCornerShape(18.dp)).clickable(onClick = onOpen),
     ) {
-        OfferThumb(offer, accent)
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-            // Faqat biznes nomi — e'lon nomi kartada ko'rsatilmaydi.
-            Text(offer.merchant, style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.5f.sp, fontWeight = FontWeight.ExtraBold, color = palette.ink), maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                if (offer.subcategory.isNotBlank()) {
-                    Box(Modifier.clip(RoundedCornerShape(7.dp)).background(accent.copy(alpha = 0.12f)).padding(horizontal = 7.dp, vertical = 2.dp)) {
-                        Text(offer.subcategory, style = TextStyle(fontFamily = AppFontFamily, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = accent))
-                    }
-                }
-                offer.location?.let { Text(it, style = TextStyle(fontFamily = AppFontFamily, fontSize = 10.5f.sp, color = palette.inkFaint), maxLines = 1) }
-            }
-            if (offer.originalPrice > 0) {
-                Text("${offer.originalPrice.formatAmount()} ${uiStrings().currency} / ${offer.priceUnit}", style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.sp, fontWeight = FontWeight.Black, color = palette.ink))
-            }
+        // Narx, tur yorlig'i va manzil rasm USTIDA; rasm ostida nom va biznes qoladi.
+        OfferBanner(offer, accent, saved) { onToggleSaved(offer, saved) }
+        Column(
+            Modifier.padding(horizontal = 14.dp, vertical = 11.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            Text(
+                offer.title,
+                style = TextStyle(fontFamily = AppFontFamily, fontSize = 14.sp, fontWeight = FontWeight.ExtraBold, color = palette.ink),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                offer.merchant,
+                style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = accent),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
-        Icon(
-            AppIcons.Bookmark, discountsStrings().save,
-            tint = if (saved) palette.primary else palette.inkFaint,
-            modifier = Modifier.size(20.dp).clickable { onToggleSaved(offer, saved) },
-        )
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Tag (Talaba ID / Promokod) + promo nusxalash + bookmark
-// ---------------------------------------------------------------------------
-@Composable
-private fun OfferTagRow(
-    offer: DiscountOffer,
-    saved: Boolean,
-    palette: AppPalette,
-    clipboard: androidx.compose.ui.platform.ClipboardManager,
-    copied: Boolean,
-    onCopy: () -> Unit,
-    onToggleSaved: (DiscountOffer, Boolean) -> Unit,
-) {
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        val tagText = if (offer.tag == DiscountTag.STUDENT_ID) discountsStrings().studentId else discountsStrings().promoCode
-        Box(Modifier.clip(RoundedCornerShape(8.dp)).background(palette.primary.copy(alpha = 0.10f)).padding(horizontal = 9.dp, vertical = 4.dp)) {
-            Text(tagText, style = TextStyle(fontFamily = AppFontFamily, fontSize = 10.5f.sp, fontWeight = FontWeight.Bold, color = palette.primary))
-        }
-        val promo = offer.promoCode
-        if (promo != null) {
-            Spacer(Modifier.size(6.dp))
-            Row(
-                Modifier.clip(RoundedCornerShape(8.dp)).background(palette.primary.copy(alpha = 0.08f))
-                    .clickable { clipboard.setText(AnnotatedString(promo)); onCopy() }
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                Text(if (copied) discountsStrings().copied else promo, style = TextStyle(fontFamily = AppFontFamily, fontSize = 10.5f.sp, fontWeight = FontWeight.ExtraBold, color = palette.primary))
-                if (!copied) Icon(AppIcons.FileText, "Nusxalash", tint = palette.primary, modifier = Modifier.size(11.dp))
-            }
-        }
-        Spacer(Modifier.weight(1f))
-        Icon(
-            AppIcons.Bookmark, discountsStrings().save,
-            tint = if (saved) palette.primary else palette.inkFaint,
-            modifier = Modifier.size(20.dp).clickable { onToggleSaved(offer, saved) },
-        )
     }
 }
 

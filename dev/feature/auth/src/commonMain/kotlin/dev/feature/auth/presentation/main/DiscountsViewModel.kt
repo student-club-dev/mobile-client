@@ -50,17 +50,27 @@ data class FilterValues(
      * bu esa keshdagi e'lonlarni bo'lim doirasiga qisqartiradi.
      */
     val typeKeys: Set<String> = emptySet(),
-    val categoryId: String? = null,
+    /**
+     * Tanlangan biznes turlari — **bir nechtasi bo'lishi mumkin** ("Fast food" VA "Somsa").
+     *
+     * Ilgari bitta qiymat (`categoryId: String?`) edi: foydalanuvchi ikkita turni birga
+     * ko'rmoqchi bo'lsa iloji yo'q edi va har tanlov avvalgisini o'chirardi (bug hisoboti
+     * #29). Bo'sh — tur filtri qo'llanmaydi.
+     */
+    val categoryIds: Set<String> = emptySet(),
     val subcategories: Set<String> = emptySet(),
     val gender: String? = null,
     val sort: OfferSort = OfferSort.RELEVANCE,
 ) {
+    /** Yagona tanlangan tur (sarlavha va sxema uchun); bir nechtasi bo'lsa `null`. */
+    val singleCategoryId: String? get() = categoryIds.singleOrNull()
+
     // [typeKeys] sanalmaydi: u alohida filtr emas, ochiq bo'limning o'zi.
     val activeCount: Int
         get() = listOf(
             discountFilter != DiscountFilter.ALL,
             groupKey != null,
-            categoryId != null,
+            categoryIds.isNotEmpty(),
             subcategories.isNotEmpty(),
             gender != null,
             sort != OfferSort.RELEVANCE,
@@ -336,7 +346,7 @@ class DiscountsViewModel(
             totalCount = filtered.size,
             activeFilterCount = f.activeCount,
             section = section,
-            type = types.firstOrNull { it.id == f.categoryId },
+            type = f.singleCategoryId?.let { id -> types.firstOrNull { it.id == id } },
             // Chiplar faqat bo'lim ochiq bo'lganda: "hamma turlar" ro'yxati juda uzun.
             sectionTypes = section?.types.orEmpty(),
             subcategories = f.subcategories,
@@ -357,9 +367,11 @@ class DiscountsViewModel(
         // Zaxira ro'yxat (sxema kelmagan holat) ham ochiq bo'lim doirasida bo'lsin —
         // aks holda ovqat ekranida keshdagi sport bo'limlari chiqib qolardi.
         val inGroup = filterSection(offers, d)
-        val inCategory = if (d.categoryId == null) inGroup else inGroup.filter { it.categoryId == d.categoryId }
+        val inCategory = if (d.categoryIds.isEmpty()) inGroup
+        else inGroup.filter { it.categoryId in d.categoryIds }
         // Bo'limlar: sxema kelgan bo'lsa serverdan (sonlari bilan), aks holda keshdan.
-        val schemaSubs = sc?.categories.orEmpty().filter { d.categoryId == null || it.typeKey == d.categoryId }
+        val schemaSubs = sc?.categories.orEmpty()
+            .filter { d.categoryIds.isEmpty() || it.typeKey in d.categoryIds }
         val availableSubs = if (schemaSubs.isNotEmpty()) {
             schemaSubs.sortedByDescending { it.count }.map { it.label }
         } else {
@@ -424,11 +436,11 @@ class DiscountsViewModel(
         when (s.kind) {
             SuggestionKind.TYPE -> {
                 query.value = ""
-                applied.value = applied.value.copy(categoryId = s.typeKey, subcategories = emptySet())
+                applied.value = applied.value.copy(categoryIds = setOfNotNull(s.typeKey), subcategories = emptySet())
             }
             SuggestionKind.CATEGORY -> {
                 query.value = ""
-                applied.value = applied.value.copy(categoryId = s.typeKey, subcategories = setOf(s.label))
+                applied.value = applied.value.copy(categoryIds = setOfNotNull(s.typeKey), subcategories = setOf(s.label))
             }
             // Biznes nomi local qidiruvda ham topiladi — matnni qatorga qo'yamiz.
             SuggestionKind.BUSINESS -> query.value = s.label
@@ -454,7 +466,7 @@ class DiscountsViewModel(
 
     private fun filter(offers: List<DiscountOffer>, f: FilterValues, q: String): List<DiscountOffer> =
         filterSection(offers, f)
-        .let { list -> if (f.categoryId == null) list else list.filter { it.categoryId == f.categoryId } }
+        .let { list -> if (f.categoryIds.isEmpty()) list else list.filter { it.categoryId in f.categoryIds } }
         .let { list -> if (f.gender == null) list else list.filter { it.gender == f.gender } }
         .let { list -> if (f.subcategories.isEmpty()) list else list.filter { it.subcategory in f.subcategories } }
         .let { list ->
@@ -523,7 +535,7 @@ class DiscountsViewModel(
      * (`null` — "Hammasi", ya'ni butun bo'lim). Bo'lim filtri saqlanadi.
      */
     fun selectType(id: String?) {
-        applied.value = applied.value.copy(categoryId = id, subcategories = emptySet(), gender = null)
+        applied.value = applied.value.copy(categoryIds = setOfNotNull(id), subcategories = emptySet(), gender = null)
         draft.value = applied.value
     }
 
@@ -537,7 +549,7 @@ class DiscountsViewModel(
      */
     fun openType(type: DiscountCategory) {
         val groupKey = type.groupKey.takeIf { it.isNotBlank() }
-        val values = FilterValues(groupKey = groupKey, categoryId = type.id)
+        val values = FilterValues(groupKey = groupKey, categoryIds = setOf(type.id))
         applied.value = values
         draft.value = values
         _catalogOpen.value = false
@@ -632,7 +644,7 @@ class DiscountsViewModel(
      */
     private fun loadSchema(f: FilterValues) = viewModelScope.launch {
         val typeKeys = when {
-            f.categoryId != null -> listOf(f.categoryId)
+            f.categoryIds.isNotEmpty() -> f.categoryIds.toList()
             f.typeKeys.isNotEmpty() -> f.typeKeys.toList()
             f.groupKey != null -> discountRepository.observeCategories().first()
                 .filter { it.groupKey == f.groupKey && !CatalogRules.isHidden(it.id) }
@@ -653,14 +665,27 @@ class DiscountsViewModel(
         draft.value = draft.value.copy(
             groupKey = section?.groupKey,
             typeKeys = section?.takeIf { it.partial }?.typeKeys ?: emptySet(),
-            categoryId = null, subcategories = emptySet(), gender = null,
+            categoryIds = emptySet(), subcategories = emptySet(), gender = null,
         )
         loadSchema(draft.value)
     }
 
-    /** Biznes turi o'zgarsa — unga bog'liq sub-kategoriya va jins tanlovlari tozalanadi. */
-    fun onDraftCategory(id: String?) {
-        draft.value = draft.value.copy(categoryId = id, subcategories = emptySet(), gender = null)
+/**
+     * Biznes turini qo'shadi/olib tashlaydi — **ko'p tanlov**. `null` — hammasini bekor
+     * qilish ("Barchasi").
+     *
+     * Tur o'zgarganda unga bog'liq sub-kategoriya va jins tanlovlari tozalanadi: ular
+     * boshqa turda umuman mavjud bo'lmasligi mumkin.
+     */
+    fun toggleDraftCategory(id: String?) {
+        draft.value = draft.value.let { current ->
+            val next = when {
+                id == null -> emptySet()
+                id in current.categoryIds -> current.categoryIds - id
+                else -> current.categoryIds + id
+            }
+            current.copy(categoryIds = next, subcategories = emptySet(), gender = null)
+        }
         // bo'limlar va sonlar yangi turga moslanadi (tur bo'sh bo'lsa — ochiq bo'lim doirasida)
         loadSchema(draft.value)
     }

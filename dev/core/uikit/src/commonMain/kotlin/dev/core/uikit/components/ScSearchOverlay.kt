@@ -1,5 +1,8 @@
 package dev.core.uikit.components
 
+import androidx.compose.foundation.border
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -76,6 +79,14 @@ fun ScSearchOverlay(
                     .shadow(16.dp, pill, ambientColor = Color(0xFF0B1622), spotColor = Color(0xFF0B1622))
                     .clip(pill)
                     .background(Sc.Card)
+                    // ⚠️ Maydonning O'ZI bosishni yutadi. Bunsiz pill'ning matn maydonidan
+                    // tashqaridagi qismiga (masalan mikrofon yoniga) tegilganda bosish
+                    // ORQADAGI ro'yxatga o'tib ketardi va tasodifan e'lon ochilardi
+                    // (bug hisoboti #38).
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                    ) { focus.requestFocus() }
                     .padding(horizontal = 18.dp, vertical = 13.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -112,15 +123,26 @@ fun ScSearchOverlay(
                             modifier = Modifier.size(12.dp),
                         )
                     }
-                } else {
-                    Icon(ScIcons.Mic, null, tint = Sc.Muted, modifier = Modifier.size(19.dp))
                 }
+                // ⚠️ Mikrofon ikonasi OLIB TASHLANDI. U hech qanday vazifa bajarmasdi —
+                // ovozli qidiruv umuman yozilmagan — lekin tugmadek ko'rinardi va
+                // bosilganda "hech nima bo'lmadi" degan taassurot qoldirardi
+                // (bug hisoboti #38). Ovozli qidiruv qo'shilganda shu yerga qaytadi.
             }
-            ScCircleButton(
-                ScIcons.Close, { keyboard?.hide(); onClose() },
-                size = 48.dp, background = Sc.Card.copy(alpha = 0.92f),
-                tint = Sc.InkSoft, contentDescription = uiStrings().close,
-            )
+            // Yopish tugmasi maydonga YOPISHIB turmasligi kerak edi (bug hisoboti #37):
+            // endi u to'liq shaffofmas fonda, brend rangidagi chegara va o'z soyasi bilan
+            // — maydonning davomi emas, alohida boshqaruv ekani ko'rinib turadi.
+            Box(
+                Modifier.size(48.dp)
+                    .shadow(12.dp, CircleShape, ambientColor = Color(0xFF0B1622), spotColor = Color(0xFF0B1622))
+                    .clip(CircleShape)
+                    .background(Sc.Card)
+                    .border(1.5.dp, Sc.Brand.copy(alpha = 0.55f), CircleShape)
+                    .clickable { keyboard?.hide(); onClose() },
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(ScIcons.Close, uiStrings().close, tint = Sc.Brand, modifier = Modifier.size(18.dp))
+            }
         }
 
         // Takliflar tasmasi — klaviatura ustida (iOS uslubidagi kulrang tasma).

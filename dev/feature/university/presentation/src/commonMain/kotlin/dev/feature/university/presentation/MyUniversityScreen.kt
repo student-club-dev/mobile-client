@@ -113,7 +113,6 @@ fun MyUniversityScreen(
     var showPicker by remember { mutableStateOf(false) }
     var showStudents by remember { mutableStateOf(false) }
     var showPrintMap by remember { mutableStateOf(false) }
-    var showFoodMap by remember { mutableStateOf(false) }
     var selectedOffer by remember { mutableStateOf<DiscountOffer?>(null) }
 
     Box(Modifier.fillMaxSize().background(Sc.Bg)) {
@@ -175,7 +174,13 @@ fun MyUniversityScreen(
                         tasksSection(state.tasks, onSeeAll = onOpenTasks, onOpen = onOpenListing)
                     }
 
-                    nearbySection(s.food, state.foods, onMap = { showFoodMap = true }) { selectedOffer = it }
+                    // ⚠️ «Ovqatlanish» bo'limi bu ekranda YO'Q. "Universitetim" — o'quv
+                    // muhiti haqidagi ekran (talabalar, e'lonlar, o'quvga kerakli joylar);
+                    // kafe va restoranlar esa "Takliflar" feed'ining o'zida, o'z filtri
+                    // bilan turadi. Ikkalasini aralashtirish ekranni "yana bir feed"ga
+                    // aylantirardi (bug hisoboti #32).
+                    //
+                    // Nusxa ko'chirish joylari qoladi: ular aynan o'qishga bog'liq.
                     nearbySection(s.printShops, state.printShops, onMap = { showPrintMap = true }) { selectedOffer = it }
                 }
             }
@@ -203,14 +208,6 @@ fun MyUniversityScreen(
                 shops = state.printShops,
                 onMarkerTap = { id -> selectedOffer = state.printShops.firstOrNull { it.id == id } },
                 onClose = { showPrintMap = false },
-            )
-        }
-        if (showFoodMap) {
-            OffersMapSection(
-                title = s.foodOnMap,
-                shops = state.foods,
-                onMarkerTap = { id -> selectedOffer = state.foods.firstOrNull { it.id == id } },
-                onClose = { showFoodMap = false },
             )
         }
         selectedOffer?.let { offer ->
@@ -540,7 +537,7 @@ private fun UniversitySheet(
             Column(Modifier.padding(start = 22.dp, end = 22.dp, top = 10.dp, bottom = 14.dp)) {
                 ScText(s.pickTitle, 22f, FontWeight.ExtraBold, Sc.Ink, letterSpacing = -0.4f)
                 Spacer(Modifier.height(15.dp))
-                SheetSearchField(picker.query, onQuery)
+                SheetSearchField(picker.query, onQuery = onQuery)
             }
             Box(Modifier.fillMaxWidth().weight(1f, fill = false)) {
                 when {
@@ -595,7 +592,11 @@ private fun CenterNote(content: @Composable () -> Unit) {
 }
 
 @Composable
-private fun SheetSearchField(query: String, onQuery: (String) -> Unit) {
+private fun SheetSearchField(
+    query: String,
+    placeholder: String = universityStrings().searchUniversity,
+    onQuery: (String) -> Unit,
+) {
     val shape = RoundedCornerShape(16.dp)
     Row(
         Modifier.fillMaxWidth()
@@ -609,7 +610,7 @@ private fun SheetSearchField(query: String, onQuery: (String) -> Unit) {
         Icon(ScIcons.Search, null, tint = Sc.NavIdle, modifier = Modifier.size(19.dp))
         Box(Modifier.weight(1f)) {
             if (query.isEmpty()) {
-                ScText(universityStrings().searchUniversity, 14.5f, FontWeight.Medium, Sc.NavIdle, maxLines = 1)
+                ScText(placeholder, 14.5f, FontWeight.Medium, Sc.NavIdle, maxLines = 1)
             }
             BasicTextField(
                 value = query,
@@ -673,14 +674,16 @@ private fun StudentsOverlay(
 ) {
     val s = universityStrings()
     var query by remember { mutableStateOf("") }
-    // Kurs — serverdagi shakl (`"1".."4"`, `"MASTER"`); `null` — "Hammasi".
-    var course by remember { mutableStateOf<String?>(null) }
+    // Kurs — serverdagi shakl (`"1".."4"`, `"MASTER"`). **Bir nechtasi** tanlanishi mumkin:
+    // "2 va 3-kurs" ni birga ko'rish tabiiy so'rov, ilgari esa har tanlov avvalgisini
+    // o'chirardi (bug hisoboti #33). Bo'sh to'plam — "Hammasi".
+    var courses by remember { mutableStateOf(emptySet<String>()) }
     // Qidiruv/filtr shu sahifadagi ro'yxat ustida ishlaydi: butun bazani qidirish
     // "Do'stlar" ekranida (`GET /v1/students?q=`), bu yerda esa universitetim ro'yxati.
-    val filtered = remember(students, query, course) {
+    val filtered = remember(students, query, courses) {
         students.filter {
             (query.isBlank() || it.student.displayName.contains(query, ignoreCase = true)) &&
-                (course == null || it.student.courseYear == course)
+                (courses.isEmpty() || it.student.courseYear in courses)
         }
     }
 
@@ -696,15 +699,19 @@ private fun StudentsOverlay(
             }
         }
         Column(Modifier.padding(horizontal = Sc.ScreenPadding).padding(top = 16.dp)) {
-            SheetSearchField(query) { query = it }
+            // Ekran talabalar haqida — qidiruv ham talabalar bo'yicha. Ilgari bu yerda
+            // universitet tanlash varag'ining matni turardi (bug hisoboti #33).
+            SheetSearchField(query, placeholder = s.searchStudents) { query = it }
             Spacer(Modifier.height(12.dp))
             Row(
                 Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                CoursePill(s.courseAll, course == null) { course = null }
+                CoursePill(s.courseAll, courses.isEmpty()) { courses = emptySet() }
                 listOf("1", "2", "3", "4", "MASTER").forEach { c ->
-                    CoursePill(courseText(c), course == c) { course = c }
+                    CoursePill(courseText(c), c in courses) {
+                        courses = if (c in courses) courses - c else courses + c
+                    }
                 }
             }
             Spacer(Modifier.height(12.dp))

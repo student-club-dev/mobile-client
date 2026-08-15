@@ -10,7 +10,14 @@ data class UniversityStrings(
     val title: String = "My university",
     val universities: String = "Universities",
     val matesSectionTitle: String = "Students to connect with",
-    val studentsCount: (Int) -> String = { "$it students" },
+    /**
+     * Talabalar soni.
+     *
+     * ⚠️ Bittasi uchun BIRLIK shakl: "1 students" grammatik xato edi (bug hisoboti #34).
+     * Ingliz va rus tillarida shakl sonning o'ziga bog'liq, o'zbekchada esa ot soni bilan
+     * ko'plikda kelmaydi — shuning uchun har til o'z qoidasini o'zi yozadi.
+     */
+    val studentsCount: (Int) -> String = { if (it == 1) "1 student" else "$it students" },
     val notSelectedTitle: String = "No university selected",
     val notSelectedBody: String = "Pick your university from the \"Universities\" button above.",
 
@@ -37,6 +44,7 @@ data class UniversityStrings(
     val pickListFailed: String = "Couldn't load the list.\nCheck your connection.",
     val pickNotFound: String = "No such university in the list. Try spelling the name differently.",
     val searchUniversity: String = "Search universities",
+    val searchStudents: String = "Search students",
 
     // Talabalar ro'yxati
     val studentsTitle: String = "Students",
@@ -58,7 +66,15 @@ private val UniversityRu = UniversityStrings(
     title = "Мой университет",
     universities = "Университеты",
     matesSectionTitle = "Студенты для знакомства",
-    studentsCount = { "$it студентов" },
+    studentsCount = {
+        val mod10 = it % 10
+        val mod100 = it % 100
+        when {
+            mod10 == 1 && mod100 != 11 -> "$it студент"
+            mod10 in 2..4 && mod100 !in 12..14 -> "$it студента"
+            else -> "$it студентов"
+        }
+    },
     notSelectedTitle = "Университет не выбран",
     notSelectedBody = "Выберите свой университет через кнопку «Университеты» выше.",
 
@@ -82,6 +98,7 @@ private val UniversityRu = UniversityStrings(
     pickListFailed = "Не удалось загрузить список.\nПроверьте интернет.",
     pickNotFound = "Такого университета нет в списке. Попробуйте написать название иначе.",
     searchUniversity = "Поиск университета",
+    searchStudents = "Поиск студентов",
 
     studentsTitle = "Студенты",
     courseAll = "Все",
@@ -123,6 +140,7 @@ private val UniversityUz = UniversityStrings(
     pickListFailed = "Ro'yxatni yuklab bo'lmadi.\nInternetni tekshiring.",
     pickNotFound = "Bunday universitet ro'yxatda yo'q. Nomini boshqacha yozib ko'ring.",
     searchUniversity = "Universitet qidiring",
+    searchStudents = "Talaba qidiring",
 
     studentsTitle = "Talabalar",
     courseAll = "Hammasi",

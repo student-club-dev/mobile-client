@@ -11,7 +11,10 @@ data class DiscountsStrings(
     val title: String = "Offers",
     val pickDirection: String = "Pick a direction",
     val search: String = "Search",
-    val offersCount: (Int) -> String = { "$it listings" },
+    /** ⚠️ Bittasi uchun birlik shakl: "1 listings" grammatik xato edi (#39). */
+    val offersCount: (Int) -> String = { if (it == 1) "1 listing" else "$it listings" },
+    /** Bo'limda e'lon yo'q — katakda qizil rangda chiziladi. */
+    val noListings: String = "No listings",
     val allOffers: String = "All offers",
     val allDirectionsCount: (Int) -> String = { "$it listings — all directions" },
     val allDirections: String = "By all directions",
@@ -91,7 +94,16 @@ private val DiscountsRu = DiscountsStrings(
     title = "Предложения",
     pickDirection = "Выберите направление",
     search = "Поиск",
-    offersCount = { "$it объявлений" },
+    offersCount = {
+        val mod10 = it % 10
+        val mod100 = it % 100
+        when {
+            mod10 == 1 && mod100 != 11 -> "$it объявление"
+            mod10 in 2..4 && mod100 !in 12..14 -> "$it объявления"
+            else -> "$it объявлений"
+        }
+    },
+    noListings = "Нет объявлений",
     allOffers = "Все предложения",
     allDirectionsCount = { "$it объявлений — все направления" },
     allDirections = "По всем направлениям",
@@ -155,6 +167,7 @@ private val DiscountsUz = DiscountsStrings(
     pickDirection = "Yo'nalishni tanlang",
     search = "Qidiruv",
     offersCount = { "$it ta e'lon" },
+    noListings = "E'lon yo'q",
     allOffers = "Barcha takliflar",
     allDirectionsCount = { "$it ta e'lon — barcha yo'nalishlar" },
     allDirections = "Barcha yo'nalishlar bo'yicha",
