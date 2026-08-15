@@ -183,6 +183,8 @@ class SocketIoClient(
         var attempt = 0
         // Birinchi urinishda tokenni yangilash shart emas — saqlangani odatda yaroqli.
         var refreshToken = false
+        /** Ketma-ket muvaffaqiyatsiz urinishlar — tokenni qachon yangilashni shu hal qiladi. */
+        var failures = 0
         while (currentCoroutineContext().isActive) {
             val startedAt = Clock.System.now().toEpochMilliseconds()
             val outcome = runSession(refreshToken)
@@ -198,8 +200,20 @@ class SocketIoClient(
                 // Sessiya deyarli darhol tugadi → ehtimol token yaroqsiz. `03-WEBSOCKET.md`:
                 // server sabab bildirmaydi, faqat `disconnect`. Shuning uchun keyingi
                 // urinishdan oldin yangilaymiz.
-                SessionOutcome.CONNECTED -> lasted < SHORT_SESSION_MS
-                SessionOutcome.FAILED -> true
+                SessionOutcome.CONNECTED -> {
+                    failures = 0
+                    lasted < SHORT_SESSION_MS
+                }
+                // ⚠️ HAR muvaffaqiyatsizlikda EMAS. "Ulanib bo'lmadi" ning eng keng tarqalgan
+                // sababi — tarmoq yoki proxy (nginx WS ni o'tkazmasa har urinish shu yerga
+                // tushadi), token emas. Har safar yangilash esa refresh tokenni bir necha
+                // soniyada bir aylantirardi — behuda va xavfli (u har yangilashda almashadi).
+                // Shuning uchun har [REFRESH_EVERY_FAILURES] urinishda bir marta: yaroqsiz
+                // token baribir tuzatiladi, faqat biroz kechroq.
+                SessionOutcome.FAILED -> {
+                    failures += 1
+                    failures % REFRESH_EVERY_FAILURES == 0
+                }
             }
             attempt = if (lasted > STABLE_SESSION_MS) 0 else attempt + 1
 
@@ -533,6 +547,14 @@ class SocketIoClient(
 
         /** Shundan qisqa sessiya — deyarli aniq auth muammosi. */
         const val SHORT_SESSION_MS = 3_000L
+
+        /**
+         * Ketma-ket shuncha muvaffaqiyatsiz urinishdan keyin token yangilanadi.
+         *
+         * Har urinishda emas: refresh token har yangilashda almashadi va ulanmaslikning
+         * odatiy sababi token emas, tarmoq/proxy.
+         */
+        const val REFRESH_EVERY_FAILURES = 5
 
         /** Shundan uzun sessiya "barqaror" — kechikish hisoblagichi nolga qaytadi. */
         const val STABLE_SESSION_MS = 30_000L

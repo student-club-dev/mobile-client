@@ -1,5 +1,13 @@
 package dev.core.network
 
+import kotlin.time.TimeSource.Monotonic.ValueTimeMark
+import kotlin.time.TimeSource
+import kotlin.time.Duration.Companion.seconds
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.sync.Mutex
+import io.ktor.util.AttributeKey
+import io.ktor.http.HttpStatusCode
+import io.ktor.client.plugins.ClientRequestException
 import dev.core.common.auth.AuthTokens
 import dev.core.common.auth.TokenStore
 import dev.core.common.deviceName
@@ -93,25 +101,13 @@ fun createHttpClient(
             }
             // 401 kelganda chaqiriladi. `markAsRefreshTokenRequest` bo'lmasa yangilash
             // so'rovining o'zi ham 401'ga tushib cheksiz sikl hosil qilardi.
+            // 401 kelganda chaqiriladi. Ish [refreshSession] ga topshiriladi — ilovada
+            // yangilashning YAGONA yo'li shu bo'lishi kerak: soketlar ham o'sha funksiyani
+            // chaqiradi va faqat umumiy qulf ikkalasini bir vaqtda tokenni aylantirishdan
+            // saqlaydi (refresh token har yangilashda almashadi).
             refreshTokens {
-                val current = tokenStore.tokens()?.refreshToken ?: return@refreshTokens null
-                val renewed = runCatching {
-                    client.post(config.baseUrl + config.refreshPath) {
-                        markAsRefreshTokenRequest()
-                        contentType(ContentType.Application.Json)
-                        setBody(RefreshRequest(refreshToken = current))
-                    }.body<TokensResponse>()
-                }.getOrNull()
-
-                if (renewed == null) {
-                    // Refresh token yaroqsiz/muddati o'tgan — sessiyani tozalaymiz, aks holda
-                    // ilova har so'rovda yaroqsiz token bilan urinaverardi.
-                    tokenStore.clear()
-                    null
-                } else {
-                    tokenStore.save(AuthTokens(renewed.accessToken, renewed.refreshToken))
-                    BearerTokens(renewed.accessToken, renewed.refreshToken)
-                }
+                client.refreshSession(config, tokenStore) ?: return@refreshTokens null
+                tokenStore.tokens()?.let { BearerTokens(it.accessToken, it.refreshToken) }
             }
         }
     }
@@ -132,43 +128,123 @@ fun HttpClient.resetAuthTokenCache() {
 }
 
 /**
- * Sessiyani **to'g'ridan-to'g'ri** yangilaydi (`POST {baseUrl}{refreshPath}`) va yangi
- * access tokenni qaytaradi; yangilab bo'lmasa `null` (sessiya tozalanadi).
+ * Sessiyani yangilaydi (`POST {baseUrl}{refreshPath}`) va yangi access tokenni qaytaradi.
  *
- * Nega alohida funksiya kerak: Socket.IO kanallari (chat, qo'ng'iroq) tokenni yangilash
- * uchun "arzon avtorizatsiyali REST so'rovi" yuborardi — chatda `/v1/conversations`,
- * qo'ng'iroqda `/v1/calls/ice-servers`. Ktor `Auth` plagini 401 da tokenni yangilagani
- * uchun bu ISHLARDI, lekin narxi bor edi: server WS ni qabul qilmaganda soket har
- * urinishda uziladi va shu "arzon so'rov" **davriy** ravishda ketaverardi. Trafik
- * jurnalida bu `GET /v1/calls/ice-servers` ning bir necha daqiqada bir takrorlanishi
- * bo'lib ko'rinardi — ya'ni hech qanday qo'ng'iroq bo'lmasa ham.
+ * Ilovadagi **yagona** yangilash nuqtasi: Ktor `Auth` plagini ham (401 javobda), Socket.IO
+ * kanallari ham (chat, qo'ng'iroq — ulanish uzilganda) shu funksiyani chaqiradi.
  *
- * Endi yangilash O'ZI so'raladi: bitta `refresh` so'rovi, hech qanday yon ta'sirsiz.
- * Muvaffaqiyatsiz bo'lsa Ktor keshi ham tozalanadi — aks holda klient xotiradagi eski
- * token bilan ishlashda davom etardi.
+ * ## Nega bir joyda va qulf bilan
+ *
+ * Refresh token **har yangilashda almashadi** (spec: "Rotate a student refresh token").
+ * Ya'ni ikkita chaqiruvchi bir vaqtda yangilasa, birinchisi tokenni aylantiradi va
+ * ikkinchisi allaqachon ISHLATILGAN tokenni yuboradi. Server buni o'g'irlik deb biladi va
+ * sessiyani butunlay bekor qiladi — foydalanuvchi hech qanday sababsiz "Qaytadan kiring"
+ * xabarini oladi. Chat va qo'ng'iroq soketlari mustaqil qayta ulanadi, ya'ni bu poyga
+ * nazariy emas: server WS ni qabul qilmaganda ikkalasi bir necha soniyada bir uriniadi.
+ *
+ * Qulf ushlangach saqlangan token QAYTA o'qiladi: biz kutib turganda kimdir yangilagan
+ * bo'lsa, so'rov umuman yuborilmaydi va tayyor token qaytariladi.
+ *
+ * ## Nega har xatoda sessiya tozalanmaydi
+ *
+ * Sessiya FAQAT server refresh tokenni aniq rad etganda o'chiriladi ([isSessionRejected]).
+ * Tarmoq uzilishi, timeout yoki `502` — bularning hech biri "sessiya tugadi" degani emas;
+ * ularda tokenlar joyida qoladi va keyingi urinish ishlaydi. Aks holda metro tunnelida
+ * bir marta uzilgan aloqa foydalanuvchini ilovadan chiqarib yuborardi.
  */
 suspend fun HttpClient.refreshSession(config: NetworkConfig, tokenStore: TokenStore): String? {
-    val current = tokenStore.tokens()?.refreshToken ?: return null
-    val renewed = runCatching {
-        post(config.baseUrl + config.refreshPath) {
-            // `markAsRefreshTokenRequest()` ning o'zi — `RefreshTokensParams` a'zosi, ya'ni
-            // faqat `refreshTokens { }` bloki ichida mavjud. U aynan shu bayroqni qo'yadi:
-            // busiz yangilash so'rovining 401 i `Auth` plaginini yana yangilashga chorlab,
-            // cheksiz siklga aylanardi.
-            attributes.put(AuthCircuitBreaker, Unit)
-            contentType(ContentType.Application.Json)
-            setBody(RefreshRequest(refreshToken = current))
-        }.body<TokensResponse>()
-    }.getOrNull()
-    if (renewed == null) {
-        tokenStore.clear()
-        resetAuthTokenCache()
-        return null
+    val before = tokenStore.tokens()?.refreshToken ?: return null
+    val state = refreshState
+    return state.mutex.withLock {
+        // Kutib turganimizda boshqa chaqiruvchi yangilagan bo'lsa — tayyor tokenni olamiz
+        // va TOKENNI QAYTA AYLANTIRMAYMIZ (aks holda poyga aynan shu yerda tug'ilardi).
+        val current = tokenStore.tokens() ?: return@withLock null
+        if (current.refreshToken != before) return@withLock current.accessToken
+
+        // Juda tez-tez yangilashdan himoya. Access token 15 daqiqa yashaydi, ya'ni
+        // daqiqasiga bir martadan ko'p aylantirishning HECH QANDAY sababi yo'q. Bu —
+        // chaqiruvchining xatosidan qutqaradigan to'siq: soket qayta-qayta uzilganda
+        // (server WS ni qabul qilmasa) u har urinishda yangilashni so'rashi mumkin, har
+        // yangilash esa refresh tokenni aylantiradi va poyga ehtimolini oshiradi.
+        val since = state.lastRefreshAt
+        if (since != null && since.elapsedNow() < MIN_REFRESH_INTERVAL) {
+            return@withLock current.accessToken
+        }
+
+        val outcome = runCatching {
+            post(config.baseUrl + config.refreshPath) {
+                // `markAsRefreshTokenRequest()` ning o'zi — `RefreshTokensParams` a'zosi,
+                // ya'ni faqat `refreshTokens { }` bloki ichida mavjud. U aynan shu
+                // bayroqni qo'yadi: busiz yangilash so'rovining 401 i `Auth` plaginini
+                // yana yangilashga chorlab, cheksiz siklga (va shu qulfda o'zini kutib
+                // qotib qolishga) aylanardi.
+                attributes.put(AuthCircuitBreaker, Unit)
+                contentType(ContentType.Application.Json)
+                setBody(RefreshRequest(refreshToken = current.refreshToken))
+            }.body<TokensResponse>()
+        }
+
+        val renewed = outcome.getOrNull()
+        if (renewed != null) {
+            tokenStore.save(AuthTokens(renewed.accessToken, renewed.refreshToken))
+            resetAuthTokenCache()
+            state.lastRefreshAt = TimeSource.Monotonic.markNow()
+            return@withLock renewed.accessToken
+        }
+        if (outcome.exceptionOrNull().isSessionRejected()) {
+            tokenStore.clear()
+            resetAuthTokenCache()
+        }
+        null
     }
-    tokenStore.save(AuthTokens(renewed.accessToken, renewed.refreshToken))
-    resetAuthTokenCache()
-    return renewed.accessToken
 }
+
+/**
+ * Server refresh tokenni ANIQ rad etdimi — ya'ni sessiya haqiqatan tugaganmi.
+ *
+ * `401`/`403` — token yaroqsiz yoki bekor qilingan; `400` — server uni umuman qabul
+ * qilmadi (buzuq/muddati o'tgan). Bularda qayta urinishning ma'nosi yo'q.
+ *
+ * `408` va `429` esa 4xx bo'lsa ham VAQTINCHA: birinchisi timeout, ikkinchisi "juda tez-tez
+ * so'rayapsiz". Ularda sessiya tirik qoladi. Qolgan hamma xato (tarmoq, `5xx`, parse)
+ * shu yerga umuman yetib kelmaydi — ular [ClientRequestException] emas.
+ */
+private fun Throwable?.isSessionRejected(): Boolean =
+    isSessionRejected((this as? ClientRequestException)?.response?.status)
+
+/**
+ * Statusga qarab qaror: `null` — javob umuman kelmagan (tarmoq, timeout, `5xx`), ya'ni
+ * sessiya tirik deb hisoblanadi.
+ *
+ * `internal`: bu qaror foydalanuvchini ilovadan chiqarib yuboradi, shuning uchun u
+ * testlanadi (`RefreshPolicyTest`).
+ */
+internal fun isSessionRejected(status: HttpStatusCode?): Boolean {
+    if (status == null) return false
+    return status !in TRANSIENT_AUTH_STATUSES
+}
+
+private val TRANSIENT_AUTH_STATUSES = setOf(HttpStatusCode.RequestTimeout, HttpStatusCode.TooManyRequests)
+
+/**
+ * Yangilash holati — qulf va oxirgi muvaffaqiyatli yangilash vaqti.
+ *
+ * **Klientga bog'langan**, global emas: global bo'lsa testlar bir-birining throttle'iga
+ * urilib qolardi va bir nechta klientli sozlamada nusxalar bir-birini kutardi.
+ * [lastRefreshAt] faqat [mutex] ostida o'qiladi va yoziladi.
+ */
+private class RefreshState {
+    val mutex = Mutex()
+    var lastRefreshAt: ValueTimeMark? = null
+}
+
+private val RefreshStateKey = AttributeKey<RefreshState>("scRefreshState")
+
+private val HttpClient.refreshState: RefreshState
+    get() = attributes.computeIfAbsent(RefreshStateKey) { RefreshState() }
+
+/** Shu oraliqda ikkinchi yangilash yuborilmaydi (access token 15 daqiqa yashaydi). */
+private val MIN_REFRESH_INTERVAL = 60.seconds
 
 /** Token yangilash so'rovi/javobi — generatsiya qilingan modelga bog'lanmaslik uchun local. */
 @Serializable
