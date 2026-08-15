@@ -1,5 +1,6 @@
 package dev.feature.stories.presentation
 
+import dev.core.uikit.components.ScShimmerList
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -133,7 +134,13 @@ internal fun StoryViewersSheet(
             }
 
             when {
-                state.loading && state.items.isEmpty() -> SheetNote(storiesStrings().loadingEllipsis)
+                // "Yuklanmoqda…" yozuvi o'rniga skelet: ro'yxat kelganda varaqning
+                // balandligi sakramaydi va kutish qancha davom etishi ko'rinib turadi.
+                state.loading && state.items.isEmpty() -> ScShimmerList(
+                    rows = VIEWER_SKELETON_ROWS,
+                    modifier = Modifier.fillMaxWidth(),
+                    spacing = 10.dp,
+                )
 
                 state.message != null -> SheetNote(state.message.orEmpty())
 
@@ -259,3 +266,6 @@ private const val SHEET_HEIGHT = 0.62f
 
 /** Oxirigacha shuncha qator qolganda keyingi sahifa so'raladi. */
 private const val VIEWERS_PREFETCH = 5
+
+/** Ko'ruvchilar skeletidagi qatorlar soni. */
+private const val VIEWER_SKELETON_ROWS = 5

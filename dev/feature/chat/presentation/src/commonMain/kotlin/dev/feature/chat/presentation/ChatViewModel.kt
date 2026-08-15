@@ -255,6 +255,15 @@ data class ChatUiState(
     val hasMoreHistory: Boolean = true,
     /** Suhbatlar ro'yxati "tepadan tortish" bilan yangilanmoqda. */
     val refreshing: Boolean = false,
+    /**
+     * Suhbatlar BIRINCHI marta serverdan o'qilyapti va keshda hech nima yo'q.
+     *
+     * [refreshing] dan alohida: bu skelet uchun, u esa foydalanuvchi o'zi so'ragan
+     * yangilanishning aylanma indikatori uchun. Bunsiz yangi o'rnatishda ekran
+     * "Hali hech kim yozmagan" degan bo'sh holatni ko'rsatib turardi — ro'yxat aslida
+     * kelayotgan bo'lsa ham.
+     */
+    val conversationsLoading: Boolean = false,
     /** Bir martalik xabar (xato / tasdiq). */
     val message: String? = null,
     /**
@@ -460,6 +469,8 @@ class ChatViewModel(
     /** State'ga qo'shiladigan, oqimga bog'liq bo'lmagan qismlar. */
     private data class ExtraState(
         val loadingOlder: Boolean = false,
+        /** Birinchi `refreshConversations()` hali tugamagan. */
+        val conversationsLoading: Boolean = true,
         val hasMoreHistory: Boolean = true,
         val message: String? = null,
         val unreadTotal: Int = 0,
@@ -491,8 +502,13 @@ class ChatViewModel(
     init {
         chatRepository.connectRealtime()
         viewModelScope.launch {
-            chatRepository.refreshConversations()
-            refreshUnreadTotal()
+            try {
+                chatRepository.refreshConversations()
+                refreshUnreadTotal()
+            } finally {
+                // Xatoda ham tushadi — aks holda skelet abadiy aylanib qolardi.
+                extra.update { it.copy(conversationsLoading = false) }
+            }
         }
         viewModelScope.launch {
             universityRepository.observeUniversities()
@@ -652,6 +668,8 @@ class ChatViewModel(
             peerTyping = rest.typing,
             realtime = rest.realtime,
             loadingOlder = rest.extra.loadingOlder,
+            // Kesh bo'sh bo'lgandagina skelet: keshda suhbat bo'lsa ekran darrov to'ladi.
+            conversationsLoading = rest.extra.conversationsLoading && conversations.isEmpty(),
             hasMoreHistory = rest.extra.hasMoreHistory,
             message = rest.extra.message,
             unreadTotal = rest.extra.unreadTotal,

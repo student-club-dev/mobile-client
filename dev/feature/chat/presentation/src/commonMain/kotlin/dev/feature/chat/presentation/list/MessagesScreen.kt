@@ -1,5 +1,6 @@
 package dev.feature.chat.presentation.list
 
+import dev.core.uikit.components.ScShimmerList
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animate
@@ -113,6 +114,8 @@ internal fun MessagesScreen(
     onNewChat: (() -> Unit)?,
     /** Suhbatlar ro'yxati serverdan qayta o'qilmoqda (tepadagi aylanma indikator). */
     refreshing: Boolean,
+    /** Suhbatlar birinchi marta yuklanmoqda va kesh bo'sh — ro'yxat o'rniga skelet. */
+    loading: Boolean,
     /** Ekran pastga tortildi — ro'yxatni serverdan qayta o'qish. */
     onRefresh: () -> Unit,
     onOpen: (ConversationItem) -> Unit,
@@ -333,6 +336,7 @@ internal fun MessagesScreen(
                         emptyTitle = if (query.isBlank()) ScEmptyTitle else ScNotFoundTitle,
                         onOpen = onOpen,
                         onLongPress = { actionFor = it },
+                        loading = loading,
                     )
                 } else {
                     HorizontalPager(
@@ -366,6 +370,9 @@ internal fun MessagesScreen(
                                         emptyTitle = if (query.isNotBlank()) ScNotFoundTitle else ScEmptyTitle,
                                         onOpen = onOpen,
                                         onLongPress = { actionFor = it },
+                                        // Qidiruvda skelet YO'Q: u local ro'yxat ustida
+                                        // ishlaydi va darhol javob beradi.
+                                        loading = loading && query.isBlank(),
                                     )
 
                                     ChatFolder.CLUBS -> ClubsPage(
@@ -493,7 +500,19 @@ private fun ConversationsPage(
     emptyTitle: String,
     onOpen: (ConversationItem) -> Unit,
     onLongPress: (ConversationItem) -> Unit,
+    loading: Boolean = false,
 ) {
+    // ⚠️ Skelet BO'SH HOLATDAN OLDIN tekshiriladi. Aks holda yangi o'rnatishda ekran
+    // "Hali hech kim yozmagan" deb turardi — ro'yxat aslida serverdan kelayotgan bo'lsa
+    // ham. Bo'sh holat faqat javob kelgach, u haqiqatan bo'sh bo'lsa ko'rsatiladi.
+    if (loading && items.isEmpty()) {
+        ScShimmerList(
+            rows = CONVERSATION_SKELETON_ROWS,
+            modifier = Modifier.fillMaxSize().padding(contentPadding),
+            spacing = 12.dp,
+        )
+        return
+    }
     if (items.isEmpty()) {
         ScEmptyStateBox(
             Modifier.fillMaxSize(),
@@ -633,3 +652,6 @@ private const val PageParallax = 0.15f
 /** Pastga surilgandagi FAB o'lchami va shaffofligi. */
 private const val CompactFab = 0.78f
 private const val CompactFabAlpha = 0.9f
+
+/** Suhbatlar skeletidagi qatorlar soni — bitta ekranni to'ldiradi. */
+private const val CONVERSATION_SKELETON_ROWS = 7

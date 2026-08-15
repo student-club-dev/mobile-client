@@ -243,6 +243,7 @@ fun ChatScreen(
                 onBack = onBack,
                 onNewChat = onNewChat,
                 refreshing = state.refreshing,
+                loading = state.conversationsLoading,
                 onRefresh = vm::refreshConversations,
                 onOpen = vm::open,
                 onArchive = { vm.setArchived(it.id, true) },
