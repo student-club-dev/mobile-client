@@ -31,6 +31,10 @@ data class DiscountsStrings(
     val gender: String = "Gender",
     val male: String = "Male",
     val female: String = "Female",
+    /**
+     * ⚠️ Hozircha ISHLATILMAYDI — «Bo'lim» filtri ekrandan olib tashlangan (bug hisoboti
+     * #31). Matn qoldirilgan: filtr qaytarilsa tarjimalar bilan birga tayyor turadi.
+     */
     val section: String = "Section",
     val sort: String = "Sort",
     val sortRelevant: String = "Best match",

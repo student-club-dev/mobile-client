@@ -1086,14 +1086,14 @@ private fun FilterSelectField(
                     style = TextStyle(fontFamily = AppFontFamily, fontSize = 17.sp, fontWeight = FontWeight.Black, color = palette.ink),
                     modifier = Modifier.padding(bottom = 8.dp),
                 )
-                RegionOption(uiStrings().all, options.none { it.selected }, palette) {
+                PickerOption(uiStrings().all, options.none { it.selected }, palette) {
                     onClear()
                     // Bitta tanlovda varaq darhol yopiladi, ko'p tanlovda ochiq qoladi:
                     // odam odatda ketma-ket bir nechtasini belgilaydi.
                     if (!multiple) open = false
                 }
                 options.forEach { option ->
-                    RegionOption(option.label, option.selected, palette) {
+                    PickerOption(option.label, option.selected, palette) {
                         onToggle(option.id)
                         if (!multiple) open = false
                     }
@@ -1209,11 +1209,11 @@ private fun RegionPickerSheet(
                     style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.5f.sp, color = Color(0xFFDC2626)),
                 )
                 else -> {
-                    RegionOption(discountsStrings().allRegions, selectedId == null, palette) {
+                    PickerOption(discountsStrings().allRegions, selectedId == null, palette) {
                         onSelect(null)
                     }
                     picker.regions.forEach { region ->
-                        RegionOption(region.name, region.id == selectedId, palette) { onSelect(region) }
+                        PickerOption(region.name, region.id == selectedId, palette) { onSelect(region) }
                     }
                 }
             }
@@ -1221,8 +1221,14 @@ private fun RegionPickerSheet(
     }
 }
 
+/**
+ * Tanlash varag'idagi bitta qator — viloyat ham, katalog bo'limi ham, biznes turi ham.
+ *
+ * Belgilangani ko'k ramka va «✓» bilan ajraladi. Ko'p tanlovli ro'yxatda ham shu qator
+ * ishlatiladi: bir nechta qator bir vaqtda belgilangan bo'lishi mumkin.
+ */
 @Composable
-private fun RegionOption(label: String, active: Boolean, palette: AppPalette, onClick: () -> Unit) {
+private fun PickerOption(label: String, active: Boolean, palette: AppPalette, onClick: () -> Unit) {
     Row(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
             .background(if (active) palette.primary.copy(alpha = 0.10f) else palette.glass)

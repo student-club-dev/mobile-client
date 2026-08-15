@@ -52,6 +52,7 @@ import dev.core.uikit.components.scCard
 import dev.core.uikit.components.scStyle
 import dev.core.uikit.components.ScSearchOverlay
 import dev.core.uikit.components.ScPullRefresh
+import dev.core.uikit.components.ScShimmerCard
 import dev.core.uikit.map.OfferMarker
 import dev.core.uikit.map.OffersMapOverlay
 import dev.core.uikit.map.rememberUserLocation
@@ -154,7 +155,13 @@ fun ListingsBrowseScreen(
                                 BrowseMoreError(failed) { vm.consumeError(); vm.loadMore() }
                             }
                         }
-                        state.loading -> item(key = "loading") { BrowseFooter(loading = true) }
+                        // Birinchi yuklanish (ro'yxat hali bo'sh) — aylanma indikator EMAS,
+                        // skelet: ekran nima kelishini oldindan ko'rsatadi va ma'lumot
+                        // kelganda joyidan sakramaydi (bug hisoboti #19). Aylanma indikator
+                        // faqat KEYINGI sahifa uchun qoladi ([BrowseFooter]).
+                        state.loading -> items(SKELETON_ROWS, key = { "skeleton-$it" }) {
+                            ScShimmerCard(imageHeight = 120.dp, radius = 20.dp)
+                        }
                         state.error != null -> item(key = "error") {
                             BrowseErrorState(state.error!!, onRetry = vm::refresh)
                         }
@@ -382,7 +389,7 @@ private val searchSuggestions = listOf("kuryer", "IELTS", "referat")
 // Bo'sh holat
 // ---------------------------------------------------------------------------
 
-/** Ro'yxat ostidagi "yuklanmoqda" qatori — birinchi yuklashda ham, keyingi sahifada ham. */
+/** Ro'yxat oxiridagi "keyingi sahifa yuklanmoqda" qatori. Birinchi yuklashda skelet chiziladi. */
 @Composable
 private fun BrowseFooter(loading: Boolean) {
     if (!loading) return
@@ -488,3 +495,6 @@ private fun hexRgb(argb: Long): String {
     val rgb = (argb and 0xFFFFFF).toString(16).padStart(6, '0')
     return "#$rgb"
 }
+
+/** Birinchi yuklanishda ko'rsatiladigan skelet kartalar soni — bir ekranni to'ldiradi. */
+private const val SKELETON_ROWS = 4

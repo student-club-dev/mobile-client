@@ -3,8 +3,14 @@
 Manba: `~/Desktop/StudentClub Bug.docx` (43 ta skrinshot + izohlar, Sherzod Jo'ra).
 Har bir band skrinshot tartibida raqamlangan; `#N` — hujjatdagi `imageN.png`.
 
-**Holat: hammasi bajarildi.** ✅ — tuzatildi, ☑️ — tekshirildi, tuzatish talab qilmaydi
-(sabab ustunda).
+**Holat: 43 ta bandning hammasi ko'rib chiqildi.** ✅ — tuzatildi, ☑️ — tekshirildi va
+tuzatish talab qilmadi (sabab ustunda).
+
+⚠️ **Qurilmada sinalmagan.** Kod kompilyatsiya bo'ladi, testlar o'tadi va APK yig'iladi,
+lekin sessiya davomida telefon/emulyator ulanmagan edi. Quyidagi bandlar xatti-harakatga
+bog'liq va HAQIQIY qurilmada tekshirilishi kerak: **C3** (bitta xabarni belgilash),
+**C5** (klaviatura ostidagi xabarlar), **C8** (Android 14 ruxsat oynasi), **C4**
+(«internet yo'q» — sabab yo'q qilindi, lekin xatoning o'zi qayta ishlab chiqarilmadi).
 
 ---
 
@@ -28,7 +34,7 @@ Har bir band skrinshot tartibida raqamlangan; `#N` — hujjatdagi `imageN.png`.
 | B3 (#7) | Bottom menu kontentga yopishgan | Menyu ortiga yumshoq soya (shadow/scrim) | ✅ Panel ostiga fon rangiga eriydigan gradient + kuchliroq soya |
 | B4 (#8) | Stories bloki tepa/past marjini katta | Marjin biroz kamaytirilsin (siqilib qolmasin) | ✅ 22dp → 12dp |
 | B5 (#9) | Bir joyda «All», boshqasida «More» | Hamma joyda bitta so'z — **All** | ✅ Hamma joyda `uiStrings().all` |
-| B6 (#19) | Yuklanish paytida bo'sh joy | Skeleton (shimmer) ko'rsatilsin | ✅ Talabalar bo'limlari uchun `StudentsSkeleton` + `studentsLoading` |
+| B6 (#19) | Yuklanish paytida bo'sh joy / aylanma indikator | Skeleton (shimmer) ko'rsatilsin | ✅ Talabalar bo'limlari uchun `StudentsSkeleton`; E'lonlar ekranining BIRINCHI yuklanishi ham spinnerdan skeletga o'tdi (aylanma faqat keyingi sahifada) |
 | B7 (#20) | Scrollda header cho'zilib qotib qaytadi | Collapse animatsiyasi smooth bo'lsin | ✅ Siqilish endi scroll masofasidan uzluksiz hisoblanadi |
 | B8 (#22) | Food ichidan bitta kartani bosganda umumiy ro'yxat ochiladi | Karta bosilsa **listing detail** ochilsin (barcha kategoriyalar uchun) | ✅ `onOpenOffer` → `discounts?group=…&offer=…`, tafsilot darhol ochiladi |
 
