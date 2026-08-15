@@ -14,8 +14,10 @@ import dev.core.domain.usecase.ObserveCurrentUserUseCase
 import dev.core.domain.usecase.RegisterUseCase
 import dev.core.domain.usecase.RequestRegistrationOtpUseCase
 import dev.core.domain.usecase.ResetPasswordUseCase
+import dev.core.common.locale.AppLanguage
 import dev.feature.profile.domain.model.UserProfile
 import dev.feature.profile.domain.usecase.SaveProfileUseCase
+import dev.feature.settings.domain.model.ThemeMode
 import dev.feature.settings.domain.repository.SettingsRepository
 import dev.feature.university.domain.model.University
 import dev.feature.university.domain.repository.UniversityRepository
@@ -110,6 +112,28 @@ class AuthFlowViewModel(
     val onboardingSeen: StateFlow<Boolean?> =
         settingsRepository.observeFlag(SettingsRepository.KEY_ONBOARDING_SEEN, default = false)
             .stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
+    /**
+     * Kirish ekranidagi til va mavzu almashtirgichlari uchun.
+     *
+     * Sozlamalar ekrani faqat kirgandan KEYIN ochiladi, ya'ni ilovani ilk marta ochgan
+     * odam interfeys tilini umuman o'zgartira olmasdi. Shuning uchun ikkala tanlov
+     * kirish ekranining o'ziga chiqarildi — bu bir xil `SettingsRepository`, ya'ni
+     * tanlov kirgandan keyin ham saqlanib qoladi.
+     */
+    val language: StateFlow<AppLanguage> = settingsRepository.observeLanguage()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), AppLanguage.Default)
+
+    val themeMode: StateFlow<ThemeMode> = settingsRepository.observeThemeMode()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), ThemeMode.SYSTEM)
+
+    fun setLanguage(value: AppLanguage) {
+        viewModelScope.launch { settingsRepository.setLanguage(value) }
+    }
+
+    fun setThemeMode(value: ThemeMode) {
+        viewModelScope.launch { settingsRepository.setThemeMode(value) }
+    }
 
     /** Tanishtiruv tugadi (yoki o'tkazib yuborildi) — boshqa ko'rsatilmaydi. */
     fun markOnboardingSeen() {
@@ -417,11 +441,31 @@ class AuthFlowViewModel(
         viewModelScope.launch {
             when (val result = resetPasswordUseCase(s.phoneE164, s.otp, s.password)) {
                 is Resource.Success -> {
-                    _state.update {
-                        it.copy(isLoading = false, otp = "", password = "", passwordConfirm = "")
-                    }
                     AppMessageBus.success(authStringsNow().passwordUpdated)
-                    _events.send(AuthEvent.PasswordReset)
+                    // Foydalanuvchi raqamini kod bilan tasdiqladi va parolni O'ZI hozir
+                    // yozdi — undan yana kirish ekranida shu parolni qayta yozishni
+                    // so'rash ortiqcha qadam. Shuning uchun darhol kiramiz.
+                    //
+                    // `password/reset` javobida token YO'Q (spec: faqat `reset: true`),
+                    // shuning uchun avtomatik kirish yangi parol bilan oddiy `login`
+                    // orqali bajariladi — natija bir xil (sessiya ochiladi), qo'shimcha
+                    // backend o'zgarishi talab qilinmaydi.
+                    when (val session = loginUseCase(s.phoneE164, s.password)) {
+                        is Resource.Success -> {
+                            _state.update {
+                                it.copy(isLoading = false, otp = "", password = "", passwordConfirm = "")
+                            }
+                            _events.send(AuthEvent.Authenticated(session.data))
+                        }
+                        // Avto-kirish yiqilsa oqim buzilmaydi: parol ALLAQACHON
+                        // yangilangan, shuning uchun kirish ekraniga qaytamiz.
+                        else -> {
+                            _state.update {
+                                it.copy(isLoading = false, otp = "", password = "", passwordConfirm = "")
+                            }
+                            _events.send(AuthEvent.PasswordReset)
+                        }
+                    }
                 }
                 is Resource.Error -> _state.update { it.copy(isLoading = false, error = result.message) }
                 Resource.Loading -> Unit

@@ -22,10 +22,13 @@
          varaqdagi «Galereya» tizim tanlagichini ochadi, u esa ruxsat talab qilmaydi. -->
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
     <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
-    <!-- ⚠️ `READ_MEDIA_VISUAL_USER_SELECTED` ATAYLAB YO'Q. U e'lon qilinsa Android 14+ da
-         tizim oynasida «faqat tanlanganlar» varianti paydo bo'ladi va foydalanuvchi uni
-         bosgach to'rda butun galereya emas, faqat o'sha bir nechta rasm ko'rinadi — bu
-         "rasmlarim qani?" degan savolni tug'diradi. Bizga to'liq ro'yxat kerak. -->
+    <!-- Android 14+ dagi UCHINCHI variant — «faqat tanlanganlar». Telegram ham aynan shu
+         uchta variantli tizim oynasini ko'rsatadi va foydalanuvchi shuni kutadi. Bu ruxsat
+         e'lon qilinmasa oyna faqat «Ruxsat berish / Rad etish» bo'lib chiqadi.
+
+         «Rasmlarim qani?» savoli javobsiz qolmaydi: qisman ruxsatda to'r tepasida
+         «Yana tanlash» qatori chiziladi (`GalleryAccess.LIMITED`). -->
+    <uses-permission android:name="android.permission.READ_MEDIA_VISUAL_USER_SELECTED" />
     <!-- Android 12 va undan eskilarida media ruxsatlari hali ajratilmagan edi. -->
     <uses-permission
         android:name="android.permission.READ_EXTERNAL_STORAGE"

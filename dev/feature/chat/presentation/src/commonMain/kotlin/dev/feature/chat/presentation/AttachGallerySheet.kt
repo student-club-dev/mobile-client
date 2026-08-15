@@ -114,6 +114,16 @@ internal fun AttachGallerySheet(
 
     val gridState = rememberLazyGridState()
 
+    // Varaq birinchi marta ochilganda TIZIM oynasi darhol so'raladi — Telegramdagi kabi.
+    //
+    // Ilgari o'rniga ilovaning O'Z «Galereyaga ruxsat kerak → Ruxsat berish» varag'i
+    // chiqardi va tizim oynasi faqat undan keyin ko'rinardi: foydalanuvchi bir xil
+    // savolga ikki marta javob berardi. Rad etilgandan keyin esa o'sha varaq o'z
+    // vazifasini bajaradi — u yerda sozlamalarga havola bor (tizim oynasi boshqa chiqmaydi).
+    LaunchedEffect(Unit) {
+        if (gallery.access == GalleryAccess.UNKNOWN) gallery.requestAccess()
+    }
+
     // Ruxsat o'zgarganda ro'yxat noldan yig'iladi: «faqat tanlanganlar» dan «hammasi» ga
     // o'tilganda eski qisqa ro'yxat qolib ketardi.
     LaunchedEffect(gallery.access) {

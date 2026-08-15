@@ -56,6 +56,15 @@ data class AppPalette(
     val successBg: Color,
     val onPrimary: Color,
 ) {
+    /**
+     * Bo'sh maydondagi namuna matn rangi.
+     *
+     * [inkFaint] dan ATAYLAB pastroq kontrastda: ilgari placeholder kiritilgan qiymat
+     * bilan deyarli bir xil yorug'likda edi va maydon "to'ldirilgan" ko'rinardi
+     * (`aziz@tuit.uz` namunasi haqiqiy emaildek o'qilardi).
+     */
+    val placeholder: Color get() = inkFaint.copy(alpha = if (dark) 0.50f else 0.60f)
+
     /** 135° primary gradient — tugmalar va logo uchun. */
     val primaryBrush: Brush get() = Brush.linearGradient(primaryGradient)
 

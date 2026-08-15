@@ -28,6 +28,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -155,12 +156,13 @@ private fun NotificationList(
             ),
             verticalArrangement = Arrangement.spacedBy(13.dp),
         ) {
-            items(state.items, key = { it.id }) { n ->
-                NotificationCard(n) {
-                    vm.onOpened(n)
+            items(state.items, key = { it.id }) { row ->
+                NotificationCard(row) {
+                    vm.onOpened(row)
                     // `None` — hech qayerga olib bormaydigan bildirishnoma (masalan "Xush
                     // kelibsiz"): u ham bosiladi, faqat o'qilgan bo'ladi.
-                    if (n.target != NotificationTarget.None) onOpenTarget(n.target)
+                    val target = row.notification.target
+                    if (target != NotificationTarget.None) onOpenTarget(target)
                 }
             }
         }
@@ -168,7 +170,8 @@ private fun NotificationList(
 }
 
 @Composable
-private fun NotificationCard(n: AppNotification, onClick: () -> Unit) {
+private fun NotificationCard(row: NotificationRow, onClick: () -> Unit) {
+    val n = row.notification
     val (icon, tint, accent) = n.type.visual()
     Row(
         Modifier.fillMaxWidth()
@@ -196,7 +199,18 @@ private fun NotificationCard(n: AppNotification, onClick: () -> Unit) {
                     n.title, 15.5f, FontWeight.ExtraBold, Sc.Ink,
                     modifier = Modifier.weight(1f), lineHeight = 20f, maxLines = 2,
                 )
-                if (!n.read) {
+                // Guruhlangan qatorda nechta xabar yashiringanini raqam aytadi
+                // (Telegram/Gmail'dagi kabi), aks holda faqat oxirgisi ko'rinib,
+                // qolganlari jimgina yo'qolgandek bo'lardi.
+                if (row.count > 1) {
+                    Box(
+                        Modifier.clip(RoundedCornerShape(percent = 50))
+                            .background(Sc.Brand)
+                            .padding(horizontal = 7.dp, vertical = 2.dp),
+                    ) {
+                        ScText("${row.count}", 11f, FontWeight.ExtraBold, Color.White)
+                    }
+                } else if (!n.read) {
                     Box(
                         Modifier.padding(top = 6.dp).size(8.dp)
                             .background(Sc.Brand, RoundedCornerShape(percent = 50)),

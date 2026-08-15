@@ -8,15 +8,21 @@ import dev.feature.notifications.domain.model.NotificationType
 import kotlinx.datetime.Instant
 
 /** DB qatori → domen. */
-internal fun NotificationEntity.toDomain(): AppNotification = AppNotification(
-    id = id,
-    title = title,
-    body = body,
-    type = parseEnum(type, NotificationType.SYSTEM),
-    createdAt = Instant.fromEpochMilliseconds(createdAt),
-    target = NotificationTarget.of(targetType, targetId),
-    read = read != 0L,
-)
+internal fun NotificationEntity.toDomain(): AppNotification {
+    val kind = parseEnum(type, NotificationType.SYSTEM)
+    return AppNotification(
+        id = id,
+        title = title,
+        body = body,
+        type = kind,
+        createdAt = Instant.fromEpochMilliseconds(createdAt),
+        // `targetType` bo'lmasa bildirishnomaning O'Z turi ishlatiladi: server xabar
+        // bildirishnomasini ba'zan `target` siz yuboradi va u holda qator bosilganda
+        // hech nima bo'lmasdi. Tur esa har doim keladi va u ham xuddi shu ma'noni beradi.
+        target = NotificationTarget.of(targetType ?: kind.name, targetId),
+        read = read != 0L,
+    )
+}
 
 /**
  * Server javobi → DB qatori.

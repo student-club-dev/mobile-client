@@ -26,6 +26,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -67,6 +68,7 @@ import dev.core.uikit.components.scStyle
 import dev.core.uikit.components.ScNetworkImage
 import dev.core.uikit.components.ScShimmerLine
 import dev.core.uikit.components.ScShimmerCard
+import dev.core.uikit.components.ScShimmerBox
 import dev.core.uikit.theme.Sc
 import dev.feature.stories.presentation.StoriesCollapsed
 import dev.feature.stories.presentation.storiesCollapsedStackWidth
@@ -97,8 +99,15 @@ import dev.core.common.format.formatAmount
  */
 internal val ScEasing = CubicBezierEasing(0.4f, 0f, 0.2f, 1f)
 
-/** Shu masofadan ortiq scroll qilinganda topbar siqiladi (maketda `scrollTop > 36`). */
-private val CondenseThreshold = 36.dp
+/**
+ * Topbar shu masofa davomida **uzluksiz** siqiladi.
+ *
+ * Ilgari bu bitta chegara edi (`scrollTop > 36` → 300ms animatsiya): sarlavha barmoq
+ * ostida emas, chegaradan o'tgach o'zicha "otilib" yig'ilardi va orqaga qaytganda
+ * cho'zilib qaytardi. Endi qiymat scroll masofasidan to'g'ridan-to'g'ri hisoblanadi,
+ * ya'ni sarlavha barmoq bilan bir kadrda harakatlanadi (Xabarlar ekranidagi kabi).
+ */
+private val CondenseDistance = 96.dp
 
 /**
  * Yig'ilgan to'plam bilan avatar orasidagi bo'shliq.
@@ -120,6 +129,14 @@ fun HomeScreen(
      * filtrsiz butun feed.
      */
     onOpenDiscounts: (String?) -> Unit = {},
+    /**
+     * Bitta biznes e'loni — karta bosilganda uning TAFSILOTI ochiladi.
+     *
+     * Ilgari karta ham "Barchasi" bilan bir xil ishlardi: "McDonald's Superburger" ni
+     * bosgan odam butun "Ovqatlanish" ro'yxatiga tushib qolar va bosgan e'lonini
+     * qaytadan qidirishga majbur bo'lardi.
+     */
+    onOpenOffer: (offerId: String, groupKey: String?) -> Unit = { _, _ -> },
     /** "Fanlardan yordam" bo'limi — talaba e'lonlari ekrani, Yordam tab'i bilan. */
     onOpenTasks: () -> Unit = {},
     onOpenRentals: () -> Unit = {},
@@ -145,13 +162,15 @@ fun HomeScreen(
     val state by vm.state.collectAsStateWithLifecycle()
     val s = homeStrings()
     val scroll = rememberScrollState()
-    // `scroll.value` — piksel, chegara esa dp: to'g'ridan-to'g'ri solishtirsak zich
+    // `scroll.value` — piksel, masofa esa dp: to'g'ridan-to'g'ri solishtirsak zich
     // ekranlarda topbar 12dp scroll'dayoq siqilib ketardi.
-    val thresholdPx = with(LocalDensity.current) { CondenseThreshold.roundToPx() }
-    val condensed = scroll.value > thresholdPx
-    val p by animateFloatAsState(
-        if (condensed) 1f else 0f, tween(300, easing = ScEasing), label = "condense"
-    )
+    val condenseDistancePx = with(LocalDensity.current) { CondenseDistance.toPx() }
+    // Uzluksiz: siqilish darajasi AYNAN scroll masofasidan kelib chiqadi, ya'ni barmoq
+    // qayerda to'xtasa sarlavha ham o'sha yerda qoladi. `derivedStateOf` — `scroll.value`
+    // har piksel uchun o'zgaradi, lekin `p` yaxlitlangandan keyingina qayta chizadi.
+    val p by remember(condenseDistancePx) {
+        derivedStateOf { (scroll.value / condenseDistancePx).coerceIn(0f, 1f) }
+    }
 
     val scope = rememberCoroutineScope()
 
@@ -198,7 +217,10 @@ fun HomeScreen(
                 modifier = Modifier.weight(1f),
             ) {
                 Column(
-                    Modifier.fillMaxSize().verticalScroll(scroll).padding(top = 22.dp),
+                    // Story lentasi bilan sarlavha orasidagi bo'shliq: 22 → 12dp.
+                    // Lentaning O'ZI ham ichkarida bo'shliq beradi, ya'ni ikkalasi
+                    // qo'shilib kerakdan ortiq havo hosil qilardi.
+                    Modifier.fillMaxSize().verticalScroll(scroll).padding(top = 12.dp),
                     verticalArrangement = Arrangement.spacedBy(26.dp),
                 ) {
                     // Story lentasi — eng tepada, bo'limlardan oldin (`handoff/07-STORIES.md` §2).
@@ -222,7 +244,7 @@ fun HomeScreen(
                     // serverniki), keyingi ikkitasi — talaba e'lonlari. Qolgan turlar
                     // ("Siz uchun", ish, xizmat) o'z ekranlarida.
                     state.offerSections.forEach { section ->
-                        OfferSection(section, onOpenDiscounts)
+                        OfferSection(section, onOpenDiscounts, onOpenOffer)
                     }
                     TasksSection(state.tasks, onOpenTasks, onOpenListing)
                     RentalsSection(state.rentals, onOpenRentals, onOpenListing)
@@ -230,6 +252,7 @@ fun HomeScreen(
                         title = s.myUniversityStudents,
                         subtitle = s.myUniversityStudentsSubtitle,
                         students = state.universityStudents,
+                        loading = state.studentsLoading,
                         onSeeAll = onOpenStudentSearch,
                         onConnect = vm::connect,
                         onMessage = onOpenChatWith,
@@ -239,6 +262,7 @@ fun HomeScreen(
                         title = s.allStudents,
                         subtitle = s.allStudentsSubtitle,
                         students = state.allStudents,
+                        loading = state.studentsLoading,
                         onSeeAll = onOpenStudentSearch,
                         onConnect = vm::connect,
                         onMessage = onOpenChatWith,
@@ -325,8 +349,13 @@ private fun HomeSkeleton() {
 
 /**
  * Gradient topbar. [p] — siqilish darajasi (0 = to'liq, 1 = siqilgan):
- * salomlashish, universitet chipi va chat tugmasi yo'qoladi, avatar 54→40 ga
- * kichrayadi, ism 20→16 sp bo'lib markazga suriladi.
+ * universitet chipi yo'qoladi, avatar 54→40 ga kichrayadi, ism 20→16 sp bo'lib
+ * markazga suriladi.
+ *
+ * Xabar/bildirishnoma tugmalari **alohida, yuqori qatorda**: ilgari ular ism bilan bir
+ * qatorda edi va uzun ism ularga tegib turardi (ekranda "Alisher Usmo…" tugmalarga
+ * yopishib qolgan edi). Endi ular status bar ostidagi o'z qatorida — ism esa butun
+ * kenglikni oladi.
  */
 @Composable
 private fun HomeHeader(
@@ -342,8 +371,23 @@ private fun HomeHeader(
         bottomRadius = lerp(36.dp, 26.dp, p),
         bottomPadding = lerp(28.dp, 12.dp, p),
     ) {
+        // Yuqori qator — faqat amallar. Siqilganda ham qoladi: suhbatlar pastki panelda
+        // tab emas, ya'ni bu ilovadagi YAGONA kirish nuqtasi.
         Row(
-            Modifier.fillMaxWidth().padding(top = lerp(22.dp, 6.dp, p)),
+            Modifier.fillMaxWidth().padding(top = lerp(6.dp, 2.dp, p)),
+            horizontalArrangement = Arrangement.spacedBy(9.dp, Alignment.End),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            HeaderCircleButton(ScIcons.ChatRound, s.messages, onOpenChat)
+            HeaderCircleButton(
+                ScIcons.Bell,
+                s.notifications,
+                onOpenNotifications,
+                badge = state.hasUnreadNotifications,
+            )
+        }
+        Row(
+            Modifier.fillMaxWidth().padding(top = lerp(10.dp, 4.dp, p)),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(13.dp),
         ) {
@@ -390,16 +434,8 @@ private fun HomeHeader(
                 }
             }
             Column(Modifier.weight(1f)) {
-                // "Assalomu alaykum 👋" — siqilganda balandligi 0 ga tushadi.
-                CollapsingRow(p, fullHeight = 18.dp) {
-                    ScText(
-                        s.greeting,
-                        13f,
-                        FontWeight.Medium,
-                        Color.White.copy(alpha = 0.85f),
-                        maxLines = 1
-                    )
-                }
+                // "Assalomu alaykum 👋" ATAYLAB yo'q: u hech qanday ma'lumot bermaydi,
+                // lekin sarlavhaning eng qimmatli qatorini egallab turardi.
                 // Siqilganda ism markazga suriladi (dizayndagi `.cond .sc-name`).
                 Text(
                     state.userName,
@@ -435,22 +471,6 @@ private fun HomeHeader(
                         }
                     }
                 }
-            }
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(9.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Chat tugmasi HAR DOIM ko'rinadi — siqilganda ham. Suhbatlar pastki
-                // panelda tab emas (u yerda "Takliflar" turibdi), ya'ni bu ilovadagi
-                // YAGONA kirish nuqtasi: ilgarigidek scroll'da yo'qolsa, foydalanuvchi
-                // xabarlarga tepaga qaytmasdan kirolmay qolardi.
-                HeaderCircleButton(ScIcons.ChatRound, s.messages, onOpenChat)
-                HeaderCircleButton(
-                    ScIcons.Bell,
-                    s.notifications,
-                    onOpenNotifications,
-                    badge = state.hasUnreadNotifications
-                )
             }
         }
     }
@@ -548,16 +568,21 @@ private fun categoryVisual(accentArgb: Long): CategoryVisual {
  * Bitta chegirma bo'limi — sarlavha + gorizontal lenta. Sarlavha va rang katalog
  * guruhidan keladi ([HomeOfferSection]); bo'sh bo'lim ViewModel'da tashlab yuboriladi.
  *
- * "Barchasi" ham, kartaning o'zi ham feed'ni SHU bo'lim filtri bilan ochadi — foydalanuvchi
- * "Ovqatlar" ni bosib, aralash "Siz uchun" ro'yxatiga tushib qolmasin.
+ * "Barchasi" feed'ni SHU bo'lim filtri bilan ochadi — foydalanuvchi "Ovqatlar" ni bosib,
+ * aralash "Siz uchun" ro'yxatiga tushib qolmasin. Kartaning o'zi esa AYNAN o'sha e'lonning
+ * tafsilotini ochadi.
  */
 @Composable
-private fun OfferSection(section: HomeOfferSection, onSeeAll: (String?) -> Unit) {
+private fun OfferSection(
+    section: HomeOfferSection,
+    onSeeAll: (String?) -> Unit,
+    onOpenOffer: (String, String?) -> Unit,
+) {
     val openSection = { onSeeAll(section.key) }
     Column(verticalArrangement = Arrangement.spacedBy(13.dp)) {
         PaddedHeader("${section.emoji} ${section.title}".trim(), onAction = openSection)
         EdgeRow(section.offers.take(8), spacing = 12.dp) { _, offer ->
-            OfferCard(offer, openSection)
+            OfferCard(offer) { onOpenOffer(offer.id, section.key) }
         }
     }
 }
@@ -882,15 +907,24 @@ private fun StudentsSection(
     title: String,
     subtitle: String,
     students: List<SearchedStudent>,
+    loading: Boolean,
     onSeeAll: () -> Unit,
     onConnect: (String) -> Unit,
     onMessage: (String) -> Unit,
     onOpenStudent: (StudentSummary) -> Unit,
 ) {
+    // Hali kutilyapti — bo'sh joy emas, skelet. Bunsiz bo'limlar ma'lumot kelganda
+    // pastdan "sakrab" paydo bo'lardi va ekran bir necha marta siljirdi.
+    if (loading && students.isEmpty()) {
+        StudentsSkeleton(title, subtitle)
+        return
+    }
     if (students.isEmpty()) return
     val s = homeStrings()
     Column(verticalArrangement = Arrangement.spacedBy(13.dp)) {
-        PaddedHeader(title, subtitle, action = uiStrings().more, onAction = onSeeAll)
+        // Bo'lim sarlavhasidagi amal HAMMA joyda bitta so'z — «Barchasi». Ilgari
+        // talabalar bo'limida «Yana» turardi va bir ekranda ikki xil so'z ko'rinardi.
+        PaddedHeader(title, subtitle, action = uiStrings().all, onAction = onSeeAll)
         EdgeRow(students.take(10)) { index, result ->
             val student = result.student
             val (tint, accent) = studentVisuals[index.mod(studentVisuals.size)]
@@ -934,6 +968,36 @@ private fun StudentsSection(
                     ConnectionView.PENDING_OUT -> ScText(
                         s.requestSent, 12.5f, FontWeight.Bold, Sc.Muted, maxLines = 1,
                     )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Talabalar bo'limining skeleti — haqiqiy kartalar bilan bir xil o'lchamda (150dp eni),
+ * shuning uchun ro'yxat kelganda ekran joyidan sakramaydi. Sarlavha darrov chiziladi:
+ * u serverdan kelmaydi, ya'ni uni shimmer bilan yashirishning ma'nosi yo'q.
+ */
+@Composable
+private fun StudentsSkeleton(title: String, subtitle: String) {
+    Column(verticalArrangement = Arrangement.spacedBy(13.dp)) {
+        PaddedHeader(title, subtitle, action = null)
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = Sc.ScreenPadding),
+            horizontalArrangement = Arrangement.spacedBy(13.dp),
+        ) {
+            repeat(2) {
+                Column(
+                    Modifier.width(150.dp).scCard(radius = 26.dp)
+                        .padding(horizontal = 16.dp, vertical = 18.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    ScShimmerBox(Modifier.size(62.dp), RoundedCornerShape(24.dp))
+                    ScShimmerLine(0.8f, 15.dp)
+                    ScShimmerLine(0.5f, 12.dp)
+                    ScShimmerBox(Modifier.fillMaxWidth().height(36.dp), RoundedCornerShape(16.dp))
                 }
             }
         }

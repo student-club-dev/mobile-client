@@ -38,7 +38,9 @@ data class AuthScreenStrings(
     val createAccount: String = "Create account",
     val firstName: String = "First name",
     val lastName: String = "Last name",
-    val emailHint: String = "aziz@tuit.uz",
+    /** Namuna ekanligi ko'rinib tursin — aks holda maydon to'ldirilgandek o'qiladi. */
+    val emailHint: String = "e.g. aziz@tuit.uz",
+    val continueWithGoogle: String = "Continue with Google",
     val universityEmailNote: String = "University email (optional) — gives you a verified student badge.",
     val terms: String = "Terms of Use",
     val and: String = " and ",
@@ -83,7 +85,7 @@ data class AuthScreenStrings(
     val phoneIncomplete: String = "Enter the full 9-digit number.",
     val acceptTerms: String = "Please accept the terms.",
     val passwordTooShort: (Int) -> String = { "The password must be at least $it characters." },
-    val passwordUpdated: String = "Password updated. Sign in with the new one.",
+    val passwordUpdated: String = "Password updated.",
     val googleNotConfigured: String = "Signing in with Google isn't set up on this device.",
 
     // Jins
@@ -122,7 +124,8 @@ private val AuthRu = AuthScreenStrings(
     createAccount = "Создать аккаунт",
     firstName = "Имя",
     lastName = "Фамилия",
-    emailHint = "aziz@tuit.uz",
+    emailHint = "напр. aziz@tuit.uz",
+    continueWithGoogle = "Войти через Google",
     universityEmailNote = "Университетская почта (необязательно) — даёт значок подтверждённого студента.",
     terms = "Условиями использования",
     and = " и ",
@@ -164,7 +167,7 @@ private val AuthRu = AuthScreenStrings(
     phoneIncomplete = "Введите полный 9-значный номер.",
     acceptTerms = "Примите условия.",
     passwordTooShort = { "Пароль должен содержать не менее $it символов." },
-    passwordUpdated = "Пароль обновлён. Войдите с новым паролем.",
+    passwordUpdated = "Пароль обновлён.",
     googleNotConfigured = "Вход через Google не настроен на этом устройстве.",
 
     genderMale = "Мужской",
@@ -200,7 +203,8 @@ private val AuthUz = AuthScreenStrings(
     createAccount = "Hisob yaratish",
     firstName = "Ism",
     lastName = "Familya",
-    emailHint = "aziz@tuit.uz",
+    emailHint = "masalan, aziz@tuit.uz",
+    continueWithGoogle = "Google bilan kirish",
     universityEmailNote = "Universitet emaili (ixtiyoriy) — verified talaba nishoni beradi.",
     terms = "Foydalanish shartlari",
     and = " va ",
@@ -242,7 +246,7 @@ private val AuthUz = AuthScreenStrings(
     phoneIncomplete = "To‘liq 9 xonali raqam kiriting.",
     acceptTerms = "Shartlarga rozilik bering.",
     passwordTooShort = { "Parol kamida $it belgidan iborat bo‘lsin." },
-    passwordUpdated = "Parol yangilandi. Endi yangi parol bilan kiring.",
+    passwordUpdated = "Parol yangilandi.",
     googleNotConfigured = "Bu qurilmada Google bilan kirish sozlanmagan.",
 
     genderMale = "Erkak",

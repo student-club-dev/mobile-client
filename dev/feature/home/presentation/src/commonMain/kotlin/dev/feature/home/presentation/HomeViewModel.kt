@@ -98,6 +98,15 @@ data class HomeUiState(
      * joyida qoladi).
      */
     val refreshing: Boolean = false,
+    /**
+     * Talabalar bo'limlari hali serverdan kelmagan — ular o'rniga skelet chiziladi.
+     *
+     * [loading] dan ALOHIDA: e'lon bo'limlari keshdan darrov to'lishi mumkin, talabalar
+     * ro'yxati esa keshsiz (`ConnectionsRepository` oqim bermaydi) va HAR DOIM tarmoqni
+     * kutadi. Bitta bayroqqa jamlansa, e'lonlar tayyor bo'lgani bilan butun ekran skelet
+     * bo'lib turardi.
+     */
+    val studentsLoading: Boolean = false,
 )
 
 class HomeViewModel(
@@ -126,6 +135,9 @@ class HomeViewModel(
 
     /** Birinchi chegirma `refresh()` i tugaguncha `true` — Home skeletini shu boshqaradi. */
     private val refreshing = MutableStateFlow(true)
+
+    /** Talabalar bo'limlarining birinchi yuklanishi — ular ham bo'sh joy emas, skelet ko'rsatadi. */
+    private val studentsLoading = MutableStateFlow(true)
 
     /**
      * "Tepadan tortib yangilash" ketyapti. [refreshing] dan ALOHIDA: u birinchi
@@ -237,11 +249,12 @@ class HomeViewModel(
     private val extras = combine(
         notificationRepository.observeUnreadCount(),
         pullRefreshing,
-    ) { unread, pulling -> unread to pulling }
+        studentsLoading,
+    ) { unread, pulling, students -> Extras(unread, pulling, students) }
 
     val state: StateFlow<HomeUiState> = combine(
         header, content, extras, _universityStudents, _students,
-    ) { h, c, (unread, pulling), universityStudents, students ->
+    ) { h, c, extra, universityStudents, students ->
         HomeUiState(
             userName = h.name,
             avatarUrl = h.avatarUrl,
@@ -254,9 +267,10 @@ class HomeViewModel(
             allStudents = students.filterNot { s ->
                 universityStudents.any { it.student.id == s.student.id }
             },
-            hasUnreadNotifications = unread > 0,
+            hasUnreadNotifications = extra.unread > 0,
             loading = c.loading,
-            refreshing = pulling,
+            refreshing = extra.pullRefreshing,
+            studentsLoading = extra.studentsLoading,
         )
     }
         .catch { emit(HomeUiState()) }
@@ -308,8 +322,13 @@ class HomeViewModel(
      */
     fun refreshStudents() {
         viewModelScope.launch {
-            val res = connectionsRepository.students(size = HOME_STUDENTS_SIZE)
-            if (res is Resource.Success) _students.value = res.data.items
+            try {
+                val res = connectionsRepository.students(size = HOME_STUDENTS_SIZE)
+                if (res is Resource.Success) _students.value = res.data.items
+            } finally {
+                // Xatoda ham tushadi — aks holda skelet abadiy aylanib turardi.
+                studentsLoading.value = false
+            }
         }
     }
 
@@ -357,6 +376,12 @@ class HomeViewModel(
         )
         if (res is Resource.Success) _universityStudents.value = res.data.items
     }
+
+    private data class Extras(
+        val unread: Int,
+        val pullRefreshing: Boolean,
+        val studentsLoading: Boolean,
+    )
 
     private data class Header(
         val name: String,

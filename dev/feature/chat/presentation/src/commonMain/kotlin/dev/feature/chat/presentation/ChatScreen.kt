@@ -1,5 +1,12 @@
 package dev.feature.chat.presentation
 
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.layout.SubcomposeLayout
+import androidx.compose.ui.unit.Constraints
+import kotlin.math.ceil
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -545,8 +552,27 @@ private fun ChatThread(
     val clipboard = LocalClipboardManager.current
     val haptics = LocalHapticFeedback.current
 
+    /**
+     * Uzun bosishdan KEYINGI bosishni yutish uchun bayroq.
+     *
+     * Muammo: uzun bosish belgilashni ochadi (`onStart`), lekin barmoq ko'tarilganda
+     * pufakning O'Z `clickable` i ham ishlaydi — `Modifier.clickable` da uzun bosish
+     * tushunchasi yo'q, u har qanday down→up ni bosish deb biladi. Belgilash rejimi shu
+     * lahzada allaqachon yoqilgani uchun bosish `toggleSelection` ni chaqirib, endigina
+     * belgilangan yagona xabarni DARHOL bekor qilardi. Ikkitasini belgilash "ishlardi",
+     * chunki u yerda barmoq suriladi va surish pufakning bosishini bekor qiladi.
+     *
+     * Bayroq har YANGI imo-ishora boshida tozalanadi (`onGestureStart`), ya'ni keyingi
+     * oddiy bosish odatdagidek ishlaydi.
+     */
+    val suppressTap = remember { booleanArrayOf(false) }
+
     val toggleSelection: (ChatMessageUi) -> Unit = { m ->
-        selectedIds = if (m.id in selectedIds) selectedIds - m.id else selectedIds + m.id
+        if (suppressTap[0]) {
+            suppressTap[0] = false
+        } else {
+            selectedIds = if (m.id in selectedIds) selectedIds - m.id else selectedIds + m.id
+        }
     }
 
     /**
@@ -656,8 +682,22 @@ private fun ChatThread(
             atBottom -> listState.animateScrollToItem(messages.lastIndex)
         }
     }
-    LaunchedEffect(imeOpen) {
-        if (imeOpen && messages.isNotEmpty()) listState.animateScrollToItem(messages.lastIndex)
+    // Klaviatura ochilishi — bir lahzalik hodisa emas, ANIMATSIYA: ko'rinish maydoni
+    // bir necha yuz millisekund davomida kichrayib boradi. Ilgari faqat "ochildi"
+    // bayrog'iga bir marta javob berilardi va o'sha bitta surishdan keyin maydon yana
+    // kichrayib, oxirgi xabarlar klaviatura ostida qolib ketardi.
+    //
+    // Endi ro'yxat inset balandligining HAR o'zgarishida pastda ushlab turiladi.
+    // `scrollToItem` (animatsiyasiz) ataylab: u shunchaki pozitsiyani qo'yadi, ya'ni
+    // klaviatura bilan bir kadrda harakatlanadi va animatsiyalar navbati yig'ilmaydi.
+    LaunchedEffect(listState, imeInsets, density) {
+        snapshotFlow { imeInsets.getBottom(density) }
+            .collect {
+                // Foydalanuvchi eski xabarlarni o'qiyotgan bo'lsa uni pastga tortmaymiz.
+                if (imeOpen && atBottom && messages.isNotEmpty()) {
+                    listState.scrollToItem(messages.lastIndex)
+                }
+            }
     }
 
     // Ekran ochiq turganda kelgan xabarlar darhol o'qilgan hisoblanadi. Kalit — oxirgi
@@ -735,10 +775,16 @@ private fun ChatThread(
                 // bo'lmasdi.
                 modifier = Modifier.fillMaxSize().pointerInput(Unit) {
                     detectLongPressDragSelect(
+                        // Har yangi imo-ishora — toza varaq: oldingi uzun bosishning
+                        // "bosishni yut" bayrog'i keyingi oddiy bosishga o'tmasin.
+                        onGestureStart = { suppressTap[0] = false },
                         onStart = { offset ->
                             val y = offset.y - listPadPx
                             val row = listState.indexAt(y)?.let { currentMessages.getOrNull(it) }
                             if (row != null) {
+                                // Barmoq ko'tarilganda pufakning `clickable` i ham
+                                // ishlaydi — o'sha bosish yutiladi.
+                                suppressTap[0] = true
                                 // Telegram'dagidek: belgilash rejimi qisqa titrash bilan
                                 // ochiladi, aks holda uzun bosish "ishladimi?" degan savol
                                 // qolardi.
@@ -1335,11 +1381,14 @@ private fun LazyListState.indexAt(y: Float): Int? {
  * ya'ni **oddiy aylantirish avvalgidek** ishlaydi.
  */
 private suspend fun PointerInputScope.detectLongPressDragSelect(
+    /** Har bir imo-ishoraning boshi (uzun bosish bo'lishi shart emas). */
+    onGestureStart: () -> Unit = {},
     onStart: (Offset) -> Unit,
     onDrag: (Offset) -> Unit,
     onEnd: () -> Unit,
 ) = awaitEachGesture {
     val down = awaitFirstDown(requireUnconsumed = false)
+    onGestureStart()
     val longPress = awaitLongPressOrCancellation(down.id) ?: return@awaitEachGesture
     onStart(longPress.position)
     try {
@@ -1699,7 +1748,7 @@ private fun TextBubble(message: ChatMessageUi, onTap: () -> Unit) {
         } else {
             RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp, bottomEnd = 20.dp, bottomStart = 6.dp)
         }
-        Column(
+        Box(
             Modifier.widthIn(max = 280.dp)
                 .clip(shape)
                 .then(
@@ -1716,12 +1765,74 @@ private fun TextBubble(message: ChatMessageUi, onTap: () -> Unit) {
                 message.outgoing -> Color.White
                 else -> Sc.Ink
             }
-            ScText(message.text, 15f, FontWeight.Medium, textColor, lineHeight = 21f)
-            Spacer(Modifier.height(2.dp))
-            MessageMeta(message, Modifier.align(Alignment.End), onDark = message.outgoing)
+            TextWithTrailingMeta(
+                text = message.text,
+                textColor = textColor,
+                meta = { MessageMeta(message, onDark = message.outgoing) },
+            )
         }
     }
 }
+
+/**
+ * Xabar matni + vaqt/belgich — **oxirgi qatorning yonida**, sig'sa.
+ *
+ * Nega o'z layout'i: ilgari matn va vaqt oddiy `Column` da turardi, ya'ni pufakning eni
+ * ikkalasining kattasiga tenglashardi va vaqt HAR DOIM alohida qatorga tushardi. Qisqa
+ * xabarda bu ikki xil nuqsonni birdan berardi — pufak ostida bo'sh qator va matnning
+ * o'z eni yetarli bo'lsa ham ikkiga bo'linishi ("joniz sog / bosn").
+ *
+ * O'lchash BITTA o'tishda: `SubcomposeLayout` matnni shu yerda o'lchaydi, `onTextLayout`
+ * esa aynan shu o'lchash paytida chaqiriladi — ya'ni oxirgi qator eni `measure()` qaytishi
+ * bilan tayyor bo'ladi, qo'shimcha kadr kutilmaydi.
+ */
+@Composable
+private fun TextWithTrailingMeta(
+    text: String,
+    textColor: Color,
+    meta: @Composable () -> Unit,
+) {
+    val gapPx = with(LocalDensity.current) { META_GAP.roundToPx() }
+    SubcomposeLayout { constraints ->
+        val metaPlaceable = subcompose(BubbleSlot.META, meta)
+            .first()
+            .measure(Constraints())
+
+        var lastLineWidth = 0
+        val textPlaceable = subcompose(BubbleSlot.TEXT) {
+            Text(
+                text,
+                style = scStyle(15f, FontWeight.Medium, textColor, lineHeight = 21f),
+                onTextLayout = { result ->
+                    lastLineWidth = ceil(result.getLineRight(result.lineCount - 1)).toInt()
+                },
+            )
+        }.first().measure(constraints.copy(minWidth = 0))
+
+        // Vaqt oxirgi qator yoniga sig'adimi — pufak kengaytirilsa ham chegaradan
+        // oshmasligi kerak.
+        val inlineWidth = lastLineWidth + gapPx + metaPlaceable.width
+        val inline = inlineWidth <= constraints.maxWidth
+
+        val width = if (inline) maxOf(textPlaceable.width, inlineWidth)
+        else maxOf(textPlaceable.width, metaPlaceable.width)
+        val height = if (inline) textPlaceable.height
+        else textPlaceable.height + metaPlaceable.height
+
+        layout(width.coerceAtLeast(constraints.minWidth), height) {
+            textPlaceable.place(0, 0)
+            metaPlaceable.place(
+                x = width - metaPlaceable.width,
+                y = height - metaPlaceable.height,
+            )
+        }
+    }
+}
+
+private enum class BubbleSlot { TEXT, META }
+
+/** Matnning oxirgi qatori bilan vaqt orasidagi eng kichik bo'shliq. */
+private val META_GAP = 8.dp
 
 /**
  * Pastdagi kiritish paneli — biriktirish + pill maydon + gradient tugma, tagida ochiladigan
@@ -1749,6 +1860,17 @@ private fun Composer(
     onPickStickerRef: (StickerSearchItem) -> Unit,
     onPickGif: (GifItem) -> Unit,
 ) {
+    // Panel va tizim klaviaturasi bir vaqtda ochiq turishi MUMKIN EMAS: ikkalasi ham
+    // ekranning pastki yarmini talab qiladi va birga chiqqanda suhbatdan hech nima
+    // ko'rinmay qolardi (panel klaviatura ustiga chiqib, xabarlarni butunlay to'sardi).
+    val keyboard = LocalSoftwareKeyboardController.current
+    val focusManager = LocalFocusManager.current
+    LaunchedEffect(stickersOpen) {
+        if (stickersOpen) {
+            focusManager.clearFocus()
+            keyboard?.hide()
+        }
+    }
     Column(Modifier.fillMaxWidth().background(Sc.Card).navigationBarsPadding()) {
         Box(Modifier.fillMaxWidth().height(1.dp).background(Sc.Border))
         Row(
@@ -1779,7 +1901,11 @@ private fun Composer(
                         onValueChange = onDraft,
                         textStyle = scStyle(15f, FontWeight.Medium, Sc.Ink),
                         cursorBrush = SolidColor(Sc.Brand),
-                        modifier = Modifier.fillMaxWidth(),
+                        // Maydonga qaytilsa panel yopiladi — teskari yo'nalish
+                        // (`LaunchedEffect(stickersOpen)`) yuqorida.
+                        modifier = Modifier.fillMaxWidth().onFocusChanged { focus ->
+                            if (focus.isFocused && stickersOpen) onToggleStickers()
+                        },
                     )
                 }
                 Icon(
@@ -1818,6 +1944,9 @@ private fun Composer(
                 onPickSticker = onPickSticker,
                 onPickStickerRef = onPickStickerRef,
                 onPickGif = onPickGif,
+                // Emoji — matnga qo'shiladi va panel OCHIQ qoladi: odam odatda
+                // ketma-ket bir nechtasini tanlaydi.
+                onPickEmoji = { onDraft(draft + it) },
             )
         }
     }

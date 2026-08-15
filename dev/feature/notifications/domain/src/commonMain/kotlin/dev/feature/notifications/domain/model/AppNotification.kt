@@ -36,6 +36,17 @@ sealed interface NotificationTarget {
     data object Profile : NotificationTarget
 
     /**
+     * Suhbatlar RO'YXATI — `CHAT` turidagi bildirishnomada `targetId` bo'lmaganda.
+     *
+     * Server xabar bildirishnomasini ba'zan `targetId` siz yuboradi va o'shanda [Chat] ni
+     * qurib bo'lmaydi. Ilgari bunday qator [None] ga tushardi, ya'ni bosilganda **hech
+     * nima bo'lmasdi** — foydalanuvchi nuqtai nazaridan bu shunchaki "ishlamaydigan"
+     * bildirishnoma edi. Suhbatlar ro'yxatini ochish esa doim to'g'ri: yangi xabar aynan
+     * o'sha yerda, ro'yxatning tepasida turadi.
+     */
+    data object Conversations : NotificationTarget
+
+    /**
      * Hech qayerga olib bormaydi (masalan "Xush kelibsiz").
      *
      * Bunday bildirishnoma ham BOSILADI — faqat o'qilgan bo'ladi, ekran almashmaydi.
@@ -56,7 +67,9 @@ sealed interface NotificationTarget {
          * suhbat" ni ochishga urinish bo'sh ekranga olib borardi.
          */
         fun of(type: String?, id: String?): NotificationTarget = when (type) {
-            "CHAT" -> id?.takeIf { it.isNotBlank() }?.let(::Chat) ?: None
+            // Id bo'lmasa ham bosish ISHLAYDI — suhbatlar ro'yxati ochiladi (qarang
+            // [Conversations]).
+            "CHAT", "MESSAGE" -> id?.takeIf { it.isNotBlank() }?.let(::Chat) ?: Conversations
             "LISTING" -> id?.takeIf { it.isNotBlank() }?.let(::Listing) ?: None
             "CONNECTION_REQUESTS" -> ConnectionRequests
             "MY_LISTINGS" -> MyListings

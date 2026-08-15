@@ -1,5 +1,6 @@
 package dev.feature.chat.data.repository
 
+import dev.core.common.event.RealtimeSignals
 import app.cash.sqldelight.coroutines.asFlow
 import app.cash.sqldelight.coroutines.mapToList
 import app.cash.sqldelight.coroutines.mapToOneOrNull
@@ -190,6 +191,12 @@ class ChatRepositoryImpl(
                 // Suhbat hali keshda yo'q (yangi suhbatdosh yozdi) — butun ro'yxat o'rniga
                 // bitta qatorni olamiz (`GET /v1/conversations/{id}`, §4b).
                 if (!conversationCached(row.conversationId)) refreshConversation(row.conversationId)
+                // Kiruvchi xabar bildirishnomalar ro'yxatini ham eskirtiradi: server unga
+                // yangi qator qo'shadi, lekin ro'yxat o'zi yangilanmaydi. Ilgari yangi
+                // xabar u yerda faqat foydalanuvchi ekranni qo'lda tortib yangilagandan
+                // keyin paydo bo'lardi. Signal — modullararo yupqa shina orqali
+                // (bildirishnomalar moduli chatga bog'lanmaydi).
+                if (row.senderId != currentUserId) RealtimeSignals.incomingMessage()
             }
         }
         launch {

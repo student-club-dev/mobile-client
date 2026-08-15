@@ -44,6 +44,7 @@ import dev.core.uikit.components.ScShimmerFooter
 import dev.core.uikit.components.ScShimmerGrid
 import dev.feature.chat.domain.model.GifItem
 import dev.feature.chat.domain.model.Sticker
+import dev.feature.chat.domain.model.StickerCatalog
 import dev.feature.chat.domain.model.StickerSearchItem
 import dev.feature.chat.domain.model.stickerMessage
 import dev.feature.chat.presentation.StickerImage
@@ -52,8 +53,16 @@ import org.koin.compose.viewmodel.koinViewModel
 import dev.feature.chat.presentation.chatStrings
 import dev.feature.chat.presentation.chatStringsNow
 
-/** Kompozitor ustidagi panelning ikki bo'limi. */
+/** Kompozitor ustidagi panelning bo'limlari. */
 enum class ChatMediaTab {
+    /**
+     * Oddiy emoji belgilari — **matnga qo'shiladi**, alohida xabar bo'lib ketmaydi.
+     *
+     * Stikerlardan farqi shu: stiker bosilishi bilan xabar sifatida yuboriladi, emoji esa
+     * yozilayotgan jumlaning ichiga tushadi. Panelda emoji umuman yo'q edi va uni faqat
+     * tizim klaviaturasidan kiritish mumkin edi.
+     */
+    EMOJI,
     STICKERS,
     GIF,
     ;
@@ -61,6 +70,7 @@ enum class ChatMediaTab {
     /** Yorliq joriy tilda — enum konstantasiga qotirib qo'yib bo'lmaydi. */
     val title: String
         get() = when (this) {
+            EMOJI -> chatStringsNow().emoji
             STICKERS -> chatStringsNow().stickers
             GIF -> "GIF"
         }
@@ -84,8 +94,10 @@ fun ChatMediaPanel(
     onPickSticker: (Sticker) -> Unit,
     onPickStickerRef: (StickerSearchItem) -> Unit,
     onPickGif: (GifItem) -> Unit,
+    /** Emoji tanlandi — yozilayotgan matnning oxiriga qo'shiladi. */
+    onPickEmoji: (String) -> Unit,
     modifier: Modifier = Modifier,
-    initialTab: ChatMediaTab = ChatMediaTab.STICKERS,
+    initialTab: ChatMediaTab = ChatMediaTab.EMOJI,
 ) {
     var tab by remember { mutableStateOf(initialTab) }
 
@@ -114,6 +126,7 @@ fun ChatMediaPanel(
         }
 
         when (tab) {
+            ChatMediaTab.EMOJI -> EmojiPanel(onPick = onPickEmoji)
             ChatMediaTab.STICKERS -> RemoteStickerPanel(
                 onPick = onPickSticker,
                 onPickSearchResult = onPickStickerRef,
@@ -123,6 +136,45 @@ fun ChatMediaPanel(
         }
     }
 }
+
+/**
+ * Emoji to'ri — paketlarga bo'lingan (stiker katalogi bilan **bir xil** manba,
+ * [StickerCatalog]), lekin bu yerda belgilarning O'ZI chiziladi, 3D tasvir emas:
+ * tanlangan emoji xabar bo'lib ketmaydi, matn ichiga qo'shiladi.
+ */
+@Composable
+private fun EmojiPanel(onPick: (String) -> Unit, modifier: Modifier = Modifier) {
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(EMOJI_GRID_COLUMNS),
+        modifier = modifier.fillMaxWidth().height(PANEL_HEIGHT),
+        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
+    ) {
+        StickerCatalog.packs.forEach { pack ->
+            item(key = "header-${pack.id}", span = { GridItemSpan(maxLineSpan) }) {
+                ScText(
+                    pack.name,
+                    11.5f,
+                    FontWeight.ExtraBold,
+                    Sc.Muted,
+                    Modifier.padding(start = 4.dp, top = 10.dp, bottom = 6.dp),
+                )
+            }
+            items(pack.stickers, key = { "${pack.id}-${it.emoji}" }) { sticker ->
+                Box(
+                    Modifier.aspectRatio(1f)
+                        .clip(RoundedCornerShape(10.dp))
+                        .clickable { onPick(sticker.emoji) },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    ScText(sticker.emoji, 24f)
+                }
+            }
+        }
+    }
+}
+
+/** Emoji belgilar kichik — stiker to'ridan ko'ra ko'proq ustun sig'adi. */
+private const val EMOJI_GRID_COLUMNS = 8
 
 /** Panel balandligi — GIF paneli bilan bir xil, bo'lim almashganda "sakramasin". */
 private val PANEL_HEIGHT = 320.dp

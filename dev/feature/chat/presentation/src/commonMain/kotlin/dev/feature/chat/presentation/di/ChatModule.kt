@@ -3,6 +3,7 @@ package dev.feature.chat.presentation.di
 import dev.core.common.auth.TokenStore
 import dev.core.network.NetworkConfig
 import dev.core.network.createWebSocketClient
+import dev.core.network.refreshSession
 import dev.core.network.generated.api.ChatApi
 import dev.core.network.media.apiOrigin
 import dev.core.network.ws.SocketIoClient
@@ -57,15 +58,16 @@ fun chatModule() = module {
             endpoint = get<NetworkConfig>().baseUrl.substringBefore("/v1"),
             namespace = ChatSocket.NAMESPACE,
             tokenProvider = { refresh ->
-                // Token muddati o'tgan bo'lsa uni yangilashning eng ishonchli yo'li — arzon
-                // avtorizatsiyali REST so'rovi: Ktor `Auth` plagini 401 da o'zi refresh
-                // qiladi va yangi juftlikni `TokenStore` ga yozadi.
+                // Tokenni TO'G'RIDAN-TO'G'RI yangilaymiz (`auth/student/refresh`) — ilgari
+                // bu yerda `/v1/conversations` so'ralib, uning 401 i orqali yangilanardi.
+                // Soket qayta-qayta uzilganda o'sha so'rov ham qayta-qayta ketardi.
                 //
-                // ⚠️ Faqat SESSIYA BOR bo'lganda: tokenlarsiz bu so'rov yangilaydigan narsa
-                // yo'q va login ekranida 401 bo'lib qaytaveradi.
+                // ⚠️ Faqat SESSIYA BOR bo'lganda: refresh tokensiz yangilanadigan narsa yo'q.
                 val store = get<TokenStore>()
                 if (refresh && store.tokens() != null) {
-                    runCatching { get<ChatRemoteDataSource>().conversations(page = 1, size = 1) }
+                    runCatching {
+                        get<HttpClient>().refreshSession(get<NetworkConfig>(), store)
+                    }
                 }
                 store.tokens()?.accessToken
             },

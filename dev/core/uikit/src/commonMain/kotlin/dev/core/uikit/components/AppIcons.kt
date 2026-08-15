@@ -81,6 +81,14 @@ object AppIcons {
     /** To'plamda yo'q — arxiv uchun to'plam uslubida chizilgan. */
     val Bookmark: ImageVector @Composable get() = ScIcons.Archive
 
+    /** Sevimlilar — kontur / to'ldirilgan. */
+    val Heart: ImageVector @Composable get() = ScIcons.Heart
+    val HeartFilled: ImageVector @Composable get() = ScIcons.HeartFilled
+
+    /** Mavzu almashtirgichi. */
+    val Sun: ImageVector @Composable get() = ScIcons.Sun
+    val Moon: ImageVector @Composable get() = ScIcons.Moon
+
     // --- Auth / forma ikonalari -------------------------------------------
 
     val Mail: ImageVector @Composable get() = vectorResource(Res.drawable.ic_mail)

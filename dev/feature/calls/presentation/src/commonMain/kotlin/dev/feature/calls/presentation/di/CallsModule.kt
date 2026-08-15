@@ -3,6 +3,7 @@ package dev.feature.calls.presentation.di
 import dev.core.common.auth.TokenStore
 import dev.core.network.NetworkConfig
 import dev.core.network.createWebSocketClient
+import dev.core.network.refreshSession
 import dev.core.network.generated.api.CallsApi
 import dev.core.network.ws.SocketIoClient
 import dev.feature.calls.data.engine.CallEngineFactory
@@ -57,16 +58,20 @@ fun callsModule() = module {
             endpoint = get<NetworkConfig>().baseUrl.substringBefore("/v1"),
             namespace = CallsSocket.NAMESPACE,
             tokenProvider = { refresh ->
-                // Token muddati o'tgan bo'lsa uni yangilashning eng arzon yo'li —
-                // avtorizatsiyali REST so'rovi: Ktor `Auth` plagini 401 da o'zi refresh
-                // qiladi va yangi juftlikni `TokenStore` ga yozadi. `ice-servers` ataylab
-                // tanlangan: u eng yengil qo'ng'iroq endpointi.
+                // Tokenni TO'G'RIDAN-TO'G'RI yangilaymiz (`auth/student/refresh`).
                 //
-                // ⚠️ Faqat SESSIYA BOR bo'lganda: tokenlarsiz bu so'rov yangilaydigan narsa
-                // yo'q va login ekranida 401 bo'lib qaytaveradi.
+                // Ilgari bu yerda "arzon avtorizatsiyali REST so'rovi" — `ice-servers` —
+                // yuborilardi va Ktor `Auth` plagini uning 401 ida tokenni yangilardi.
+                // Server WS ni qabul qilmaganda soket qayta-qayta uziladi, ya'ni o'sha
+                // "arzon so'rov" davriy bo'lib qolardi: trafik jurnalida hech qanday
+                // qo'ng'iroq bo'lmasa ham `GET /v1/calls/ice-servers` takrorlanib turardi.
+                //
+                // ⚠️ Faqat SESSIYA BOR bo'lganda: refresh tokensiz yangilanadigan narsa yo'q.
                 val store = get<TokenStore>()
                 if (refresh && store.tokens() != null) {
-                    runCatching { get<CallsRemoteDataSource>().iceServers() }
+                    runCatching {
+                        get<HttpClient>().refreshSession(get<NetworkConfig>(), store)
+                    }
                 }
                 store.tokens()?.accessToken
             },

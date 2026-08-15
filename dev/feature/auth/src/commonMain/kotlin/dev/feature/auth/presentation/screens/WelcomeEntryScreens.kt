@@ -19,6 +19,8 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -55,11 +57,22 @@ import dev.feature.auth.presentation.screens.authStrings
 
 @Composable
 fun OnboardingScreen(
+    vm: AuthFlowViewModel,
     onNext: () -> Unit,
     onSkip: () -> Unit,
     palette: AppPalette = appPalette,
 ) {
-    AppScreenScaffold(topPadding = 52) {
+    val language by vm.language.collectAsStateWithLifecycle()
+    val themeMode by vm.themeMode.collectAsStateWithLifecycle()
+    AppScreenScaffold(topPadding = 20) {
+        // Ilovaning BIRINCHI ekrani — til shu yerdayoq tanlansin.
+        AuthTopControls(
+            language = language,
+            themeMode = themeMode,
+            onLanguage = vm::setLanguage,
+            onTheme = vm::setThemeMode,
+        )
+        Spacer(Modifier.height(10.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
             Text(
                 authStrings().skip,
@@ -214,7 +227,18 @@ fun WelcomeScreen(
     onGoogle: () -> Unit,
     palette: AppPalette = appPalette,
 ) {
-    AppScreenScaffold(scroll = true, topPadding = 60) {
+    val language by vm.language.collectAsStateWithLifecycle()
+    val themeMode by vm.themeMode.collectAsStateWithLifecycle()
+    AppScreenScaffold(scroll = true, topPadding = 18) {
+        // Til va mavzu — kirishdan OLDIN: Sozlamalar ekrani hisobga kirgandan keyin
+        // ochiladi, ya'ni bunsiz yangi foydalanuvchi tilni umuman tanlay olmasdi.
+        AuthTopControls(
+            language = language,
+            themeMode = themeMode,
+            onLanguage = vm::setLanguage,
+            onTheme = vm::setThemeMode,
+        )
+        Spacer(Modifier.height(18.dp))
         LogoTile()
         Spacer(Modifier.height(18.dp))
         ScreenTitle(authStrings().welcome, size = 25)
@@ -293,7 +317,8 @@ fun WelcomeScreen(
         OrDivider()
         Spacer(Modifier.height(14.dp))
         // Apple/Telegram tugmalari yo'q: backend hozircha faqat Google ID tokenini tekshiradi.
-        SocialRow(onGoogle)
+        // Yolg'iz logotip nima qilishini aytmaydi — shuning uchun matn bilan.
+        SocialRow(onGoogle, googleLabel = authStrings().continueWithGoogle)
 
         Spacer(Modifier.height(20.dp))
         FooterLink(authStrings().noAccount, authStrings().signUp, onSignUp)

@@ -391,7 +391,15 @@ fun ForgotPasswordScreen(
     palette: AppPalette = appPalette,
 ) {
     val s = authStrings()
-    AppScreenScaffold(scroll = true) {
+    AppScreenScaffold(
+        scroll = true,
+        // Tugma scroll maydonidan TASHQARIDA: raqamli klaviatura ochilganda u ekranning
+        // yarmini egallaydi va "Kodni yuborish" uning ostida qolib ketardi.
+        bottomBar = {
+            PrimaryButton(s.sendCode, onSend, enabled = state.forgotReady && !state.isLoading)
+            ErrorText(state.error)
+        },
+    ) {
         BackButton(onBack)
         Spacer(Modifier.height(40.dp))
         Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -431,16 +439,9 @@ fun ForgotPasswordScreen(
             textLetterSpacing = 0.5f,
         )
 
-        Spacer(Modifier.height(18.dp))
-        PrimaryButton(s.sendCode, onSend, enabled = state.forgotReady && !state.isLoading)
-
         state.info?.let {
             Spacer(Modifier.height(12.dp))
             Text(it, style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.5f.sp, fontWeight = FontWeight.SemiBold, color = palette.successDeep, lineHeight = 17.sp))
-        }
-        state.error?.let {
-            Spacer(Modifier.height(12.dp))
-            Text(it, style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.5f.sp, color = Color(0xFFDC2626), lineHeight = 17.sp))
         }
 
         Spacer(Modifier.height(20.dp))
@@ -472,7 +473,18 @@ fun NewPasswordScreen(
     palette: AppPalette = appPalette,
 ) {
     val s = authStrings()
-    AppScreenScaffold(scroll = true) {
+    AppScreenScaffold(
+        scroll = true,
+        // Ikkita parol maydoni + klaviatura — saqlash tugmasi mixlangan bo'lishi shart.
+        bottomBar = {
+            PrimaryButton(
+                s.savePassword, onSave,
+                enabled = state.newPasswordReady && !state.isLoading,
+                trailingIcon = AppIcons.Check,
+            )
+            ErrorText(state.error)
+        },
+    ) {
         BackButton(onBack)
         Spacer(Modifier.height(30.dp))
         Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -541,15 +553,6 @@ fun NewPasswordScreen(
 
         // Mos kelmagani darhol ko'rinadi — tugmani bosib ko'rishni kutmasdan.
         if (state.passwordMismatch) ErrorText(s.passwordsDontMatch)
-
-        Spacer(Modifier.height(18.dp))
-        PrimaryButton(
-            s.savePassword, onSave,
-            enabled = state.newPasswordReady && !state.isLoading,
-            trailingIcon = AppIcons.Check,
-        )
-
-        ErrorText(state.error)
 
         Spacer(Modifier.height(20.dp))
     }

@@ -12,6 +12,7 @@ import io.ktor.client.plugins.ServerResponseException
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpStatusCode
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
 
 /**
  * Barcha API so'rovlari uchun **yagona xavfsiz o'ram** (IYM-business naqshi).
@@ -44,7 +45,17 @@ private suspend fun <T> runSafely(
     block: suspend () -> T,
 ): Resource<T> {
     // Internet yo'q bo'lsa — so'rov qilmasdan aniq xato.
-    if (connectivity?.isOnline() == false) return failure(AppException.NoInternet())
+    //
+    // ⚠️ Lekin BIR MARTA qayta tekshiriladi. Ilova fondan qaytganda (yoki sovuq
+    // ishga tushganda) tizim faol tarmoqni bir necha yuz millisekundda tiklaydi va
+    // aynan shu oynaga ilovaning ilk so'rovlari tushardi: foydalanuvchi hech qanday
+    // sabab ko'rmay "Internet aloqasi yo'q" toastini olardi, keyingi so'rov esa
+    // muvaffaqiyatli ketardi. Qisqa kutish haqiqiy offline holatda ham sezilarli
+    // kechikish bermaydi (bir marta, 400ms).
+    if (connectivity?.isOnline() == false) {
+        delay(OFFLINE_RECHECK_MS)
+        if (!connectivity.isOnline()) return failure(AppException.NoInternet())
+    }
     return try {
         Resource.Success(block())
     } catch (e: CancellationException) {
@@ -61,6 +72,9 @@ private suspend fun <T> runSafely(
         failure(e.toAppException(connectivity?.isOnline() ?: true))
     }
 }
+
+/** Tarmoq holati "offline" deb ko'ringanda shuncha kutib bir marta qayta tekshiriladi. */
+private const val OFFLINE_RECHECK_MS = 400L
 
 /**
  * Xatoni [Resource.Error] ga aylantiradi VA [AppMessageBus] ga yuboradi.

@@ -82,6 +82,9 @@ private class AndroidDeviceGallery(private val context: Context) : DeviceGallery
     fun refreshAccess() {
         access = when {
             context.hasPermission(fullAccessPermissions()) -> GalleryAccess.GRANTED
+            // Android 14+ «faqat tanlanganlar»: to'liq ruxsat yo'q, lekin tanlangan
+            // rasmlar o'qiladi. Bu RAD ETISH EMAS — to'r ishlaydi, faqat qisqaroq.
+            context.hasPartialAccess() -> GalleryAccess.LIMITED
             asked -> GalleryAccess.DENIED
             else -> GalleryAccess.UNKNOWN
         }
@@ -95,11 +98,13 @@ private class AndroidDeviceGallery(private val context: Context) : DeviceGallery
             return
         }
         asked = true
-        launcher?.launch(fullAccessPermissions())
+        launcher?.launch(requestedPermissions())
     }
 
     override suspend fun page(offset: Int, limit: Int): List<GalleryItem> =
         withContext(Dispatchers.IO) {
+            // `LIMITED` da ham o'qiymiz: `MediaStore` faqat foydalanuvchi tanlagan
+            // rasmlarni qaytaradi, ya'ni so'rov xavfsiz va natija bo'sh emas.
             if (access == GalleryAccess.DENIED || access == GalleryAccess.UNKNOWN) {
                 return@withContext emptyList()
             }
@@ -152,6 +157,40 @@ private fun fullAccessPermissions(): Array<String> =
     } else {
         arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
     }
+
+/**
+ * Tizim oynasida SO'RALADIGAN ruxsatlar.
+ *
+ * Android 14 (API 34) dan boshlab ro'yxatga `READ_MEDIA_VISUAL_USER_SELECTED` qo'shiladi —
+ * aynan shu oynadagi **uchinchi** variantni ("Faqat tanlanganlarga ruxsat berish") paydo
+ * qiladi. Usiz foydalanuvchi "hammasi yoki hech nima" tanlovi oldida qolardi, Telegram esa
+ * uchta variantni ko'rsatadi va odam shuni kutadi.
+ */
+private fun requestedPermissions(): Array<String> = when {
+    Build.VERSION.SDK_INT >= UPSIDE_DOWN_CAKE -> arrayOf(
+        Manifest.permission.READ_MEDIA_IMAGES,
+        Manifest.permission.READ_MEDIA_VIDEO,
+        READ_MEDIA_VISUAL_USER_SELECTED,
+    )
+    else -> fullAccessPermissions()
+}
+
+/** Faqat tanlangan rasmlarga ruxsat berilganmi (Android 14+). */
+private fun Context.hasPartialAccess(): Boolean =
+    Build.VERSION.SDK_INT >= UPSIDE_DOWN_CAKE &&
+        ContextCompat.checkSelfPermission(this, READ_MEDIA_VISUAL_USER_SELECTED) ==
+        PackageManager.PERMISSION_GRANTED
+
+/**
+ * `Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED` — nomi bilan yozilgan, chunki
+ * konstanta faqat API 34 SDK'sida bor va u yerdan o'qish pastroq `compileSdk` da
+ * kompilyatsiyani buzardi. Qiymat platformada barqaror.
+ */
+private const val READ_MEDIA_VISUAL_USER_SELECTED =
+    "android.permission.READ_MEDIA_VISUAL_USER_SELECTED"
+
+/** Android 14 (API 34). `Build.VERSION_CODES` ga bog'lanmaslik uchun raqam bilan. */
+private const val UPSIDE_DOWN_CAKE = 34
 
 private fun Context.hasPermission(permissions: Array<String>): Boolean = permissions.all {
     ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED

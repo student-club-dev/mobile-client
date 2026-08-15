@@ -13,6 +13,7 @@ import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.api.createClientPlugin
 import io.ktor.client.plugins.auth.Auth
 import io.ktor.client.plugins.auth.authProvider
+import io.ktor.client.plugins.auth.AuthCircuitBreaker
 import io.ktor.client.plugins.auth.providers.BearerAuthProvider
 import io.ktor.client.plugins.auth.providers.BearerTokens
 import io.ktor.client.plugins.auth.providers.bearer
@@ -128,6 +129,45 @@ fun createHttpClient(
  */
 fun HttpClient.resetAuthTokenCache() {
     authProvider<BearerAuthProvider>()?.clearToken()
+}
+
+/**
+ * Sessiyani **to'g'ridan-to'g'ri** yangilaydi (`POST {baseUrl}{refreshPath}`) va yangi
+ * access tokenni qaytaradi; yangilab bo'lmasa `null` (sessiya tozalanadi).
+ *
+ * Nega alohida funksiya kerak: Socket.IO kanallari (chat, qo'ng'iroq) tokenni yangilash
+ * uchun "arzon avtorizatsiyali REST so'rovi" yuborardi — chatda `/v1/conversations`,
+ * qo'ng'iroqda `/v1/calls/ice-servers`. Ktor `Auth` plagini 401 da tokenni yangilagani
+ * uchun bu ISHLARDI, lekin narxi bor edi: server WS ni qabul qilmaganda soket har
+ * urinishda uziladi va shu "arzon so'rov" **davriy** ravishda ketaverardi. Trafik
+ * jurnalida bu `GET /v1/calls/ice-servers` ning bir necha daqiqada bir takrorlanishi
+ * bo'lib ko'rinardi — ya'ni hech qanday qo'ng'iroq bo'lmasa ham.
+ *
+ * Endi yangilash O'ZI so'raladi: bitta `refresh` so'rovi, hech qanday yon ta'sirsiz.
+ * Muvaffaqiyatsiz bo'lsa Ktor keshi ham tozalanadi — aks holda klient xotiradagi eski
+ * token bilan ishlashda davom etardi.
+ */
+suspend fun HttpClient.refreshSession(config: NetworkConfig, tokenStore: TokenStore): String? {
+    val current = tokenStore.tokens()?.refreshToken ?: return null
+    val renewed = runCatching {
+        post(config.baseUrl + config.refreshPath) {
+            // `markAsRefreshTokenRequest()` ning o'zi — `RefreshTokensParams` a'zosi, ya'ni
+            // faqat `refreshTokens { }` bloki ichida mavjud. U aynan shu bayroqni qo'yadi:
+            // busiz yangilash so'rovining 401 i `Auth` plaginini yana yangilashga chorlab,
+            // cheksiz siklga aylanardi.
+            attributes.put(AuthCircuitBreaker, Unit)
+            contentType(ContentType.Application.Json)
+            setBody(RefreshRequest(refreshToken = current))
+        }.body<TokensResponse>()
+    }.getOrNull()
+    if (renewed == null) {
+        tokenStore.clear()
+        resetAuthTokenCache()
+        return null
+    }
+    tokenStore.save(AuthTokens(renewed.accessToken, renewed.refreshToken))
+    resetAuthTokenCache()
+    return renewed.accessToken
 }
 
 /** Token yangilash so'rovi/javobi — generatsiya qilingan modelga bog'lanmaslik uchun local. */

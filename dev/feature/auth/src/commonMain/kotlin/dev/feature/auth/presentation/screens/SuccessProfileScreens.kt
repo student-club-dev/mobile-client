@@ -312,14 +312,24 @@ fun UniversityPickerScreen(
         } else {
             LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(picker.results, key = { it.id }) { uni ->
-                    UniversityRow(uni, state.universityId == uni.id, { vm.onUniversitySelected(uni) }, palette)
+                    // Qatorni bosishning O'ZI tanlash: ro'yxatdan bitta element tanlanadigan
+                    // joyda "Tanlash" tugmasi ortiqcha qadam — foydalanuvchi allaqachon
+                    // tanlovini bildirdi. Shuning uchun tanlangach ekran darhol yopiladi.
+                    UniversityRow(
+                        uni = uni,
+                        selected = state.universityId == uni.id,
+                        onClick = {
+                            vm.onUniversitySelected(uni)
+                            onSelectDone()
+                        },
+                        palette = palette,
+                    )
                 }
             }
         }
         picker.error?.let { ErrorText(it) }
 
         Spacer(Modifier.height(12.dp))
-        PrimaryButton(authStrings().select, onSelectDone, enabled = state.universityId != null)
     }
 }
 

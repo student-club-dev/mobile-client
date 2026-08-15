@@ -100,11 +100,17 @@ fun DiscountsScreen(
     vm: DiscountsViewModel = koinViewModel(),
     onBack: (() -> Unit)? = null,
     initialGroupKey: String? = null,
+    /**
+     * Bosh ekrandagi karta bosilganda — o'sha e'lonning tafsiloti darhol ochiladi
+     * (ekran ortida bo'lim feed'i turadi, ya'ni yopilgach foydalanuvchi ro'yxatda qoladi).
+     */
+    initialOfferId: String? = null,
 ) {
     val palette = appPalette
     // Faqat ekran ochilganda: keyin foydalanuvchi Filter'da bo'limni o'zgartirsa
     // (kalit o'zgarmagani uchun) qayta tiklanmaydi.
     LaunchedEffect(initialGroupKey) { vm.openGroup(initialGroupKey) }
+    LaunchedEffect(initialOfferId) { initialOfferId?.let(vm::openOffer) }
     val state by vm.state.collectAsStateWithLifecycle()
     val filterState by vm.filterState.collectAsStateWithLifecycle()
     val suggestions by vm.suggestions.collectAsStateWithLifecycle()

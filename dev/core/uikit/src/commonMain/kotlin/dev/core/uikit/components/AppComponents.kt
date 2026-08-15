@@ -3,6 +3,9 @@ package dev.core.uikit.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -79,7 +82,14 @@ fun AppScreenScaffold(
     bottomBar: (@Composable ColumnScope.() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    Box(modifier = modifier.fillMaxSize().background(palette.bgBrush)) {
+    // Maydon TASHQARISIGA bosilganda klaviatura yopiladi. Bunsiz raqamli klaviaturani
+    // (telefon, SMS kod) umuman yopib bo'lmasdi: unda "tayyor" tugmasi yo'q va u
+    // ekranning yarmini egallab, tugmalarni to'sib turardi.
+    val focusManager = LocalFocusManager.current
+    Box(
+        modifier = modifier.fillMaxSize().background(palette.bgBrush)
+            .pointerInput(Unit) { detectTapGestures(onTap = { focusManager.clearFocus() }) },
+    ) {
         // Yuqori-o'ng primary blob
         Box(
             Modifier
@@ -355,7 +365,7 @@ fun GlassTextField(
             if (value.isEmpty()) {
                 Text(
                     placeholder,
-                    style = TextStyle(fontFamily = AppFontFamily, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = palette.inkFaint),
+                    style = TextStyle(fontFamily = AppFontFamily, fontSize = 14.sp, fontWeight = FontWeight.Normal, color = palette.placeholder),
                 )
             }
             BasicTextField(
@@ -400,18 +410,38 @@ fun OrDivider(text: String = uiStrings().or, modifier: Modifier = Modifier, pale
  * Ijtimoiy kirish tugmalari. [onApple] / [onTelegram] `null` bo'lsa o'sha tugma **chizilmaydi** —
  * ishlamaydigan tugmani ko'rsatishdan ko'ra yo'q qilgan tuzuk. Hozir backend faqat Google'ni
  * qo'llab-quvvatlaydi (`POST /v1/auth/student/oauth/google`).
+ *
+ * [googleLabel] berilsa Google tugmasi **matn bilan** chiziladi: yakka logotip nima
+ * bo'lishini faqat taxmin qildiradi, "Continue with Google" esa aytadi.
  */
 @Composable
 fun SocialRow(
     onGoogle: () -> Unit,
     onApple: (() -> Unit)? = null,
     onTelegram: (() -> Unit)? = null,
+    googleLabel: String? = null,
     modifier: Modifier = Modifier,
     palette: AppPalette = appPalette,
 ) {
     Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(11.dp)) {
         SocialButton(Modifier.weight(1f), onGoogle, palette) {
-            androidx.compose.foundation.Image(AppIcons.Google, null, modifier = Modifier.size(21.dp))
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                androidx.compose.foundation.Image(AppIcons.Google, null, modifier = Modifier.size(21.dp))
+                if (googleLabel != null) {
+                    Text(
+                        googleLabel,
+                        style = TextStyle(
+                            fontFamily = AppFontFamily,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = palette.ink,
+                        ),
+                    )
+                }
+            }
         }
         if (onApple != null) {
             SocialButton(Modifier.weight(1f), onApple, palette) {

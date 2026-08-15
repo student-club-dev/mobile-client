@@ -167,7 +167,7 @@ fun AuthNavHost(vm: AuthFlowViewModel = koinViewModel()) {
                 vm.markOnboardingSeen()
                 nav.navigate(Route.WELCOME) { popUpTo(Route.ONBOARDING) { inclusive = true } }
             }
-            OnboardingScreen(onNext = afterOnboarding, onSkip = afterOnboarding)
+            OnboardingScreen(vm = vm, onNext = afterOnboarding, onSkip = afterOnboarding)
         }
 
         composable(Route.WELCOME) {

@@ -41,6 +41,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
@@ -325,6 +326,17 @@ fun StudentShell(onLoggedOut: () -> Unit) {
                                 popUpTo(StudentTab.HOME.route) { saveState = true }
                             }
                         },
+                        // Karta bosildi — o'sha bo'lim feed'i + darhol ochiladigan tafsilot.
+                        onOpenOffer = { offerId, groupKey ->
+                            val route = buildString {
+                                append(StudentTab.OFFERS.route)
+                                append("?group=").append(encodeArg(groupKey).orEmpty())
+                                append("&offer=").append(encodeArg(offerId).orEmpty())
+                            }
+                            nav.navigateSafe(route) {
+                                popUpTo(StudentTab.HOME.route) { saveState = true }
+                            }
+                        },
                         // "Fanlardan yordam" — o'sha ekran, Yordam tab'i ochilgan holda.
                         onOpenTasks = { openListingsKind(ListingKind.TASK) },
                         // shellListings() ekrani, darrov ijara tab'i ochilgan holda.
@@ -357,15 +369,21 @@ fun StudentShell(onLoggedOut: () -> Unit) {
                 composable(
                     // shellOffers() — bizneslardan keladigan e'lonlar, pastki paneldagi tab.
                     // `?group=` — Home'dagi bo'lim ("Ovqatlar") tugmasidan; bo'sh bo'lsa butun feed.
-                    route = "${StudentTab.OFFERS.route}?group={group}",
+                    // `?offer=` — Home'dagi kartaning O'ZI bosilgan holat: bo'lim feed'i
+                    // ochiladi va ustiga darhol o'sha e'lonning tafsiloti chiqadi.
+                    route = "${StudentTab.OFFERS.route}?group={group}&offer={offer}",
                     enterTransition = TabEnter, exitTransition = TabExit,
                     popEnterTransition = TabEnter, popExitTransition = TabExit,
                     arguments = listOf(
                         navArgument("group") { type = NavType.StringType; nullable = true; defaultValue = null },
+                        navArgument("offer") { type = NavType.StringType; nullable = true; defaultValue = null },
                     ),
                 ) { entry ->
                     // Tab — orqaga tugmasisiz (`onBack` berilmaydi).
-                    DiscountsScreen(initialGroupKey = entry.arguments?.getString("group"))
+                    DiscountsScreen(
+                        initialGroupKey = entry.arguments?.getString("group"),
+                        initialOfferId = entry.arguments?.getString("offer"),
+                    )
                 }
                 // Ijara / Xizmatlar / Ish e'lonlari — uchalasi bitta ekranda, tepadagi tab bilan.
                 // `kind` argumenti Home'dan konkret bo'limga o'tish uchun (masalan to'g'ridan-to'g'ri
@@ -537,6 +555,8 @@ private fun NavController.openNotificationTarget(
     when (target) {
         is NotificationTarget.Chat ->
             navigateSafe("$CHAT?conversationId=${encodeArg(target.conversationId)}", options)
+        // Suhbat id'si noma'lum — ro'yxatni ochamiz, yangi xabar uning tepasida turadi.
+        NotificationTarget.Conversations -> navigateSafe(CHAT, options)
         is NotificationTarget.Listing ->
             navigateSafe("$LISTING_DETAIL/${encodeArg(target.listingId)}", options)
         NotificationTarget.ConnectionRequests ->
@@ -556,15 +576,32 @@ private fun BottomBar(
     modifier: Modifier = Modifier,
 ) {
     val shape = remember { NotchedBarShape(BarCorner, FabCradleRadius, FabCenterY) }
-    Box(
-        modifier.fillMaxWidth()
-            .navigationBarsPadding()
-            .padding(start = 16.dp, end = 16.dp, bottom = 12.dp),
-    ) {
+    Box(modifier.fillMaxWidth()) {
+        // Panel ostidagi yumshoq o'tish. Bunsiz surilayotgan kontent panelning qirrasiga
+        // TIQ etib kelib to'xtardi va panel kontentga "yopishib" turgandek ko'rinardi.
+        // Gradient fon rangiga tushadi, ya'ni yorug'/to'q rejimda ham bir xil ishlaydi.
+        Box(
+            Modifier.align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .height(BarScrimHeight)
+                .background(
+                    Brush.verticalGradient(
+                        0f to Color.Transparent,
+                        0.55f to Sc.Bg.copy(alpha = 0.75f),
+                        1f to Sc.Bg,
+                    ),
+                ),
+        )
+        Box(
+            Modifier.align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(start = 16.dp, end = 16.dp, bottom = 12.dp),
+        ) {
         Row(
             Modifier.fillMaxWidth()
                 .height(BarHeight)
-                .scSoftShadow(14.dp, shape)
+                .scSoftShadow(18.dp, shape)
                 .clip(shape)
                 // Karta yuzasi — dark rejimda to'q variantga o'tadi.
                 .background(Sc.Card),
@@ -591,10 +628,14 @@ private fun BottomBar(
         ) {
             Icon(ScIcons.Plus, discountsStrings().postListing, tint = Color.White, modifier = Modifier.size(26.dp))
         }
+        }
     }
 }
 
 private val BarHeight = 64.dp
+
+/** Panel ostidagi o'tish gradientining balandligi (panel + FAB + navigatsiya paneli). */
+private val BarScrimHeight = 132.dp
 
 /** To'liq yumaloq chekka — balandlikning yarmi. */
 private val BarCorner = BarHeight / 2

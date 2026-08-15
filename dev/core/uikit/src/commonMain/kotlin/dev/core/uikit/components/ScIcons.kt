@@ -29,6 +29,10 @@ import dev.core.uikit.generated.resources.ic_filter
 import dev.core.uikit.generated.resources.ic_home
 import dev.core.uikit.generated.resources.ic_home_filled
 import dev.core.uikit.generated.resources.ic_home_filled_green
+import dev.core.uikit.generated.resources.ic_heart
+import dev.core.uikit.generated.resources.ic_heart_filled
+import dev.core.uikit.generated.resources.ic_moon
+import dev.core.uikit.generated.resources.ic_sun
 import dev.core.uikit.generated.resources.ic_laptop
 import dev.core.uikit.generated.resources.ic_map
 import dev.core.uikit.generated.resources.ic_messages
@@ -170,6 +174,18 @@ object ScIcons {
 
     /** Bo'sh quti — [ScEmptyState] ning zaxira ikonasi ("mavjud emas"). */
     val Empty: ImageVector @Composable get() = vectorResource(Res.drawable.ic_empty)
+
+    /** Sevimlilar — kontur. Arxiv qutisi o'rniga: "saqlash" universal belgisi yurak. */
+    val Heart: ImageVector @Composable get() = vectorResource(Res.drawable.ic_heart)
+
+    /** Sevimlilar — to'ldirilgan holat ([Heart] ning juftligi). */
+    val HeartFilled: ImageVector @Composable get() = vectorResource(Res.drawable.ic_heart_filled)
+
+    /** Yorug' mavzu — kirish ekranidagi mavzu almashtirgichi. */
+    val Sun: ImageVector @Composable get() = vectorResource(Res.drawable.ic_sun)
+
+    /** Qorong'i mavzu — [Sun] ning juftligi. */
+    val Moon: ImageVector @Composable get() = vectorResource(Res.drawable.ic_moon)
 
     // --- Ko'p rangli (ranglari XML da, [ScGlyph] bilan chiziladi) ----------
 
