@@ -118,6 +118,19 @@ private val CondenseDistance = 96.dp
  */
 private val CollapsedStoriesGap = 10.dp
 
+/**
+ * Story lentasi bilan BIRINCHI bo'lim ("🍽 Ovqatlanish") orasidagi masofa.
+ *
+ * Bo'limlar orasidagi [SectionGap] dan ataylab kichik: lenta bo'limlarning biri emas,
+ * ekranning boshi — u birinchi sarlavhadan uzoqlashsa, tepada egasiz bo'sh joy paydo
+ * bo'ladi. Lentaning O'ZI ham ichkarida bir oz chekinish beradi, shuning uchun ko'zga
+ * ko'rinadigan masofa bu qiymatdan sal kattaroq bo'ladi.
+ */
+private val StoriesToSections = 10.dp
+
+/** Bo'limlar orasidagi masofa — ular bir-biridan aniq ajralib turishi kerak. */
+private val SectionGap = 26.dp
+
 @Composable
 fun HomeScreen(
     onOpenProfile: () -> Unit = {},
@@ -216,13 +229,13 @@ fun HomeScreen(
                 onRefresh = vm::refresh,
                 modifier = Modifier.weight(1f),
             ) {
-                Column(
-                    // Story lentasi bilan sarlavha orasidagi bo'shliq: 22 → 12dp.
-                    // Lentaning O'ZI ham ichkarida bo'shliq beradi, ya'ni ikkalasi
-                    // qo'shilib kerakdan ortiq havo hosil qilardi.
-                    Modifier.fillMaxSize().verticalScroll(scroll).padding(top = 12.dp),
-                    verticalArrangement = Arrangement.spacedBy(26.dp),
-                ) {
+                // ⚠️ Ustun bir tekis `spacedBy` BILAN EMAS: story lentasi bilan birinchi
+                // bo'lim orasidagi masofa bo'limlar orasidagisidan KICHIK bo'lishi kerak.
+                // Ilgari ikkalasi ham 26dp edi va «Hikoyam» bilan «Ovqatlanish» orasida
+                // sarlavha adashib qoladigan darajada bo'sh joy qolardi. Endi lenta o'z
+                // bo'shlig'ini o'zi belgilaydi ([StoriesToSections]), bo'limlar esa ichki
+                // ustunda avvalgidek keng nafas oladi ([SectionGap]).
+                Column(Modifier.fillMaxSize().verticalScroll(scroll).padding(top = 12.dp)) {
                     // Story lentasi — eng tepada, bo'limlardan oldin (`handoff/07-STORIES.md` §2).
                     // O'z holatini o'zi boshqaradi: lenta bo'sh bo'lsa ham «Hikoyam» katakchasi
                     // qoladi, ya'ni bu yerda shart tekshirilmaydi.
@@ -234,42 +247,45 @@ fun HomeScreen(
                         // yerda chizamiz: story moduli chat moduliga bog'lanolmaydi.
                         onOpenProfile = { author -> profileStudent = author },
                     )
+                    Spacer(Modifier.height(StoriesToSections))
 
-                    // Birinchi yuklanish, keshda hech narsa yo'q — bo'limlar o'rniga skelet.
-                    if (state.loading) {
-                        HomeSkeleton()
+                    Column(verticalArrangement = Arrangement.spacedBy(SectionGap)) {
+                        // Birinchi yuklanish, keshda hech narsa yo'q — bo'limlar o'rniga skelet.
+                        if (state.loading) {
+                            HomeSkeleton()
+                        }
+                        // Bo'limlar TARTIBI qat'iy: Ovqatlanish → Kiyim-kechak → Fanlardan yordam →
+                        // Ijara kvartiralar. Birinchi ikkitasi katalogdan keladi (sarlavhalar
+                        // serverniki), keyingi ikkitasi — talaba e'lonlari. Qolgan turlar
+                        // ("Siz uchun", ish, xizmat) o'z ekranlarida.
+                        state.offerSections.forEach { section ->
+                            OfferSection(section, onOpenDiscounts, onOpenOffer)
+                        }
+                        TasksSection(state.tasks, onOpenTasks, onOpenListing)
+                        RentalsSection(state.rentals, onOpenRentals, onOpenListing)
+                        StudentsSection(
+                            title = s.myUniversityStudents,
+                            subtitle = s.myUniversityStudentsSubtitle,
+                            students = state.universityStudents,
+                            loading = state.studentsLoading,
+                            onSeeAll = onOpenStudentSearch,
+                            onConnect = vm::connect,
+                            onMessage = onOpenChatWith,
+                            onOpenStudent = { profileStudent = it },
+                        )
+                        StudentsSection(
+                            title = s.allStudents,
+                            subtitle = s.allStudentsSubtitle,
+                            students = state.allStudents,
+                            loading = state.studentsLoading,
+                            onSeeAll = onOpenStudentSearch,
+                            onConnect = vm::connect,
+                            onMessage = onOpenChatWith,
+                            onOpenStudent = { profileStudent = it },
+                        )
+                        // Pastki navigatsiya + FAB uchun joy.
+                        Spacer(Modifier.height(96.dp))
                     }
-                    // Bo'limlar TARTIBI qat'iy: Ovqatlanish → Kiyim-kechak → Fanlardan yordam →
-                    // Ijara kvartiralar. Birinchi ikkitasi katalogdan keladi (sarlavhalar
-                    // serverniki), keyingi ikkitasi — talaba e'lonlari. Qolgan turlar
-                    // ("Siz uchun", ish, xizmat) o'z ekranlarida.
-                    state.offerSections.forEach { section ->
-                        OfferSection(section, onOpenDiscounts, onOpenOffer)
-                    }
-                    TasksSection(state.tasks, onOpenTasks, onOpenListing)
-                    RentalsSection(state.rentals, onOpenRentals, onOpenListing)
-                    StudentsSection(
-                        title = s.myUniversityStudents,
-                        subtitle = s.myUniversityStudentsSubtitle,
-                        students = state.universityStudents,
-                        loading = state.studentsLoading,
-                        onSeeAll = onOpenStudentSearch,
-                        onConnect = vm::connect,
-                        onMessage = onOpenChatWith,
-                        onOpenStudent = { profileStudent = it },
-                    )
-                    StudentsSection(
-                        title = s.allStudents,
-                        subtitle = s.allStudentsSubtitle,
-                        students = state.allStudents,
-                        loading = state.studentsLoading,
-                        onSeeAll = onOpenStudentSearch,
-                        onConnect = vm::connect,
-                        onMessage = onOpenChatWith,
-                        onOpenStudent = { profileStudent = it },
-                    )
-                    // Pastki navigatsiya + FAB uchun joy.
-                    Spacer(Modifier.height(96.dp))
                 }
             }
         }
