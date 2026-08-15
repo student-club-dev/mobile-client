@@ -1,5 +1,6 @@
 package dev.feature.listings.presentation.browse
 
+import dev.core.uikit.components.ScBackButton
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -230,7 +231,7 @@ private fun BrowseHeader(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             if (onBack != null) {
-                ScCircleButton(ScIcons.ChevronLeft, onBack, contentDescription = lt("Orqaga"))
+                ScBackButton(onBack, contentDescription = lt("Orqaga"))
             }
             Column(Modifier.weight(1f)) {
                 ScHeaderTitle(lt("E'lonlar"), size = 26f)

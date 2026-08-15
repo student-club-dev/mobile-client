@@ -1,5 +1,19 @@
 package dev.feature.auth.presentation.main
 
+import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.runtime.derivedStateOf
+import dev.core.common.format.formatUzPhoneFull
+import dev.core.uikit.components.ScBackButton
+import dev.core.uikit.components.ScFavoriteButton
+import dev.core.uikit.components.ScHideBottomBar
+import dev.core.uikit.components.ScIcons
+import dev.core.uikit.components.ScNetworkImage
+import dev.core.uikit.map.MapPoint
+import dev.core.uikit.map.OfferMarker
+import dev.core.uikit.map.OffersMapOverlay
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -66,16 +80,15 @@ fun OfferDetailSheet(
     onToggleSaved: (String, Boolean) -> Unit,
     onClose: () -> Unit,
 ) {
+    // Tafsilot — to'liq ekranli qatlam: karkasning pastki paneli va «+» tugmasi uning
+    // ustida qolib, kontentni to'sardi (bug hisoboti #42 skrinshoti).
+    ScHideBottomBar()
     Column(Modifier.fillMaxSize().background(palette.bgBrush)) {
         Row(
             Modifier.fillMaxWidth().padding(horizontal = 16.dp).scTopInset().padding(bottom = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Box(
-                Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(palette.glass)
-                    .border(1.dp, palette.border, RoundedCornerShape(12.dp)).clickable(onClick = onClose),
-                contentAlignment = Alignment.Center,
-            ) { Icon(AppIcons.ArrowLeft, uiStrings().close, tint = palette.ink, modifier = Modifier.size(18.dp)) }
+            ScBackButton(onClose, contentDescription = uiStrings().close)
             Spacer(Modifier.size(12.dp))
             Text(
                 discountsStrings().listing,
@@ -84,10 +97,13 @@ fun OfferDetailSheet(
             )
             val d = state.detail
             if (d != null) {
-                Icon(
-                    AppIcons.Bookmark, discountsStrings().save,
-                    tint = if (saved) palette.primary else palette.inkFaint,
-                    modifier = Modifier.size(22.dp).clickable { onToggleSaved(d.id, saved) },
+                // Arxiv qutisi o'rniga yurak: ikonaning vazifasi ko'rinishidan
+                // tushunilishi kerak edi (bug hisoboti #35).
+                ScFavoriteButton(
+                    saved = saved,
+                    onToggle = { onToggleSaved(d.id, it) },
+                    idleTint = palette.inkFaint,
+                    contentDescription = discountsStrings().save,
                 )
             }
         }
@@ -124,11 +140,17 @@ private fun DetailBody(d: OfferDetail, palette: AppPalette) {
     var copied by remember(d.id) { mutableStateOf(false) }
     LaunchedEffect(copied) { if (copied) { delay(1500); copied = false } }
 
+    /** Xaritada ochilgan filial — `null` bo'lsa xarita yopiq. */
+    var mapBranch by remember(d.id) { mutableStateOf<OfferBranch?>(null) }
+
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState())
             .padding(horizontal = 16.dp).padding(bottom = 110.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        // Rasmlar — server `images` massivini yuboradi, ilgari u umuman o'qilmasdi.
+        if (d.images.isNotEmpty()) DetailImages(d.images, palette)
+
         // Sarlavha bloki
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Box(
@@ -159,25 +181,37 @@ private fun DetailBody(d: OfferDetail, palette: AppPalette) {
             InfoBanner(discountsStrings().offlineCache, palette)
         }
 
-        // Narx
-        Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        // Narx. Tekislash BAZA CHIZIG'I bo'yicha (`alignByBaseline`), pastki chekka
+        // bo'yicha emas: 22sp narx bilan 12sp «/ dona» ning pastki chekkalari mos kelsa
+        // ham harflar bir chiziqda turmasdi — kichik matn yuqoriga qalqib chiqardi
+        // (bug hisoboti #35).
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(
                 "${(if (d.isDiscount) d.finalPrice else d.originalPrice).formatAmount()} ${uiStrings().currency}",
                 style = TextStyle(fontFamily = AppFontFamily, fontSize = 22.sp, fontWeight = FontWeight.Black, color = if (d.isDiscount) accent else palette.ink),
+                modifier = Modifier.alignByBaseline(),
             )
             if (d.isDiscount && d.originalPrice > d.finalPrice) {
                 Text(
                     d.originalPrice.formatAmount(),
                     style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.sp, color = palette.inkFaint, textDecoration = TextDecoration.LineThrough),
+                    modifier = Modifier.alignByBaseline(),
                 )
-                Box(Modifier.clip(RoundedCornerShape(9.dp)).background(accent).padding(horizontal = 9.dp, vertical = 4.dp)) {
+                Box(
+                    Modifier.align(Alignment.CenterVertically).clip(RoundedCornerShape(9.dp))
+                        .background(accent).padding(horizontal = 9.dp, vertical = 4.dp),
+                ) {
                     Text(
                         d.discountBadge ?: "−${d.discountPercent}%",
                         style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.sp, fontWeight = FontWeight.Black, color = Color.White),
                     )
                 }
             }
-            Text("/ ${d.priceUnit}", style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.sp, color = palette.inkFaint))
+            Text(
+                "/ ${d.priceUnit}",
+                style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.sp, color = palette.inkFaint),
+                modifier = Modifier.alignByBaseline(),
+            )
         }
         if (d.isDiscount && d.savedAmount > 0) {
             Text(
@@ -241,19 +275,37 @@ private fun DetailBody(d: OfferDetail, palette: AppPalette) {
         }
 
         if (d.branches.isNotEmpty()) {
-            DetailSection(discountsStrings().branches(d.branches.size), palette) {
-                d.branches.forEach { BranchRow(it, palette) }
+            // Ro'yxat uzun bo'lishi mumkin (ba'zi tarmoqlarda 20+ filial) — birinchi
+            // uchtasi ko'rinadi, qolganlari «Yana ko'rsatish» bilan ochiladi.
+            var allBranches by remember(d.id) { mutableStateOf(false) }
+            val visible = if (allBranches) d.branches else d.branches.take(BRANCH_PREVIEW)
+            DetailSection(discountsStrings().branchesLabel(d.branches.size), palette) {
+                visible.forEach { branch ->
+                    // Filial bosilsa — xaritada ko'rsatiladi (manzil matni o'zi
+                    // "qayerda ekan?" degan savolga javob bermaydi).
+                    BranchRow(branch, palette, onClick = { mapBranch = branch }.takeIf { branch.hasLocation })
+                }
+                if (!allBranches && d.branches.size > BRANCH_PREVIEW) {
+                    Text(
+                        discountsStrings().showMore(d.branches.size - BRANCH_PREVIEW),
+                        style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.5f.sp, fontWeight = FontWeight.Bold, color = palette.primary),
+                        modifier = Modifier.clickable { allBranches = true }.padding(vertical = 4.dp),
+                    )
+                }
             }
         }
 
-        val validity = listOfNotNull(d.validFrom, d.validTo).joinToString(" — ")
+        // `2026-08-07` → `07.08.2026` (bug hisoboti #35: sana ISO ko'rinishida chiqardi).
+        val validity = listOfNotNull(formatIsoDate(d.validFrom), formatIsoDate(d.validTo))
+            .joinToString(" – ")
         DetailSection(discountsStrings().validUntil, palette) {
             Text(
                 validity.ifBlank { discountsStrings().notSpecified },
                 style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.sp, color = palette.inkMuted),
             )
             val contacts = listOfNotNull(
-                d.businessPhone?.let { "☎ $it" },
+                // Raqam ham formatlanadi: `+998941229005` o'qilmaydi (#35).
+                d.businessPhone?.let { "☎ ${formatUzPhoneFull(it)}" },
                 d.telegram?.let { discountsStrings().telegram(it) },
                 d.instagram?.let { discountsStrings().instagram(it) },
                 d.website,
@@ -262,16 +314,109 @@ private fun DetailBody(d: OfferDetail, palette: AppPalette) {
             if (d.viewsCount > 0) Caption(discountsStrings().viewsCount(d.viewsCount), palette)
         }
     }
+
+    // Filial xaritada — bitta marker, tafsilotning ustida to'liq ekran.
+    mapBranch?.let { branch ->
+        OffersMapOverlay(
+            markers = listOf(
+                OfferMarker(
+                    id = branch.id,
+                    lat = branch.lat,
+                    lng = branch.lng,
+                    label = branch.name,
+                    colorHex = BRANCH_MARKER_COLOR,
+                    highlight = true,
+                ),
+            ),
+            palette = palette,
+            onClose = { mapBranch = null },
+            center = MapPoint(branch.lat, branch.lng),
+        )
+    }
 }
 
+/**
+ * E'lon rasmlari — gorizontal karusel.
+ *
+ * Bitta rasm bo'lsa u butun kenglikni oladi; bir nechtasi bo'lsa surib ko'riladi va
+ * ostida nuqtalar turadi. Ilgari tafsilotda rasm UMUMAN chizilmasdi.
+ */
 @Composable
-private fun BranchRow(b: OfferBranch, palette: AppPalette) {
+private fun DetailImages(images: List<String>, palette: AppPalette) {
+    val listState = rememberLazyListState()
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        LazyRow(
+            state = listState,
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            flingBehavior = rememberSnapFlingBehavior(listState),
+        ) {
+            items(images, key = { it }) { url ->
+                ScNetworkImage(
+                    url = url,
+                    modifier = Modifier
+                        .fillParentMaxWidth(if (images.size > 1) 0.92f else 1f)
+                        .height(IMAGE_HEIGHT),
+                    shape = RoundedCornerShape(18.dp),
+                )
+            }
+        }
+        if (images.size > 1) {
+            val current by remember { derivedStateOf { listState.firstVisibleItemIndex } }
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(5.dp, Alignment.CenterHorizontally),
+            ) {
+                repeat(images.size) { index ->
+                    Box(
+                        Modifier.size(if (index == current) 7.dp else 5.dp)
+                            .clip(RoundedCornerShape(percent = 50))
+                            .background(if (index == current) palette.primary else palette.border),
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** `2026-08-07` (ISO) → `07.08.2026`. Format tanilmasa matn o'zgarishsiz qaytadi. */
+internal fun formatIsoDate(iso: String?): String? {
+    val value = iso?.trim()?.takeIf { it.isNotBlank() } ?: return null
+    val parts = value.take(10).split("-")
+    if (parts.size != 3 || parts[0].length != 4) return value
+    val (year, month, day) = parts
+    if (month.length != 2 || day.length != 2) return value
+    return "$day.$month.$year"
+}
+
+/** Tafsilotda darrov ko'rsatiladigan filiallar soni; qolgani «Yana ko'rsatish» ostida. */
+private const val BRANCH_PREVIEW = 3
+
+/** Filial markerining rangi — brend ko'ki (xarita ustidagi yagona nuqta). */
+private const val BRANCH_MARKER_COLOR = "#00AEEF"
+
+/** Karusel rasmining balandligi. */
+private val IMAGE_HEIGHT = 210.dp
+
+@Composable
+private fun BranchRow(b: OfferBranch, palette: AppPalette, onClick: (() -> Unit)? = null) {
     Column(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(13.dp)).background(palette.glass)
-            .border(1.dp, palette.border, RoundedCornerShape(13.dp)).padding(11.dp),
+            .border(1.dp, palette.border, RoundedCornerShape(13.dp))
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            .padding(11.dp),
         verticalArrangement = Arrangement.spacedBy(3.dp),
     ) {
-        Text(b.name, style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, color = palette.ink))
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(
+                b.name,
+                style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, color = palette.ink),
+                modifier = Modifier.weight(1f),
+            )
+            if (onClick != null) {
+                Icon(ScIcons.Map, discountsStrings().onMap, tint = palette.primary, modifier = Modifier.size(15.dp))
+            }
+        }
         val line = listOfNotNull(
             b.address.takeIf { it.isNotBlank() },
             b.tradeCenterName,

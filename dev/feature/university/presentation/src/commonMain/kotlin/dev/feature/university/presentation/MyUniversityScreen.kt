@@ -1,5 +1,6 @@
 package dev.feature.university.presentation
 
+import dev.core.uikit.components.ScBackButton
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -690,7 +691,7 @@ private fun StudentsOverlay(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(13.dp),
             ) {
-                ScCircleButton(ScIcons.ChevronLeft, onClose, contentDescription = uiStrings().back)
+                ScBackButton(onClose, contentDescription = uiStrings().back)
                 ScHeaderTitle(s.studentsTitle, modifier = Modifier.weight(1f))
             }
         }
@@ -864,13 +865,13 @@ private fun OffersMapSection(
     // Fon rangi — xarita sahifasi fon oqimida yig'ilgani uchun birinchi kadrlarda WebView
     // hali yo'q; fonsiz o'sha lahzada ostidagi ro'yxat ko'rinib qolardi.
     Box(Modifier.fillMaxSize().background(Sc.Bg)) {
-        OffersMap(markers, center, Sc.IsDark, rememberUserLocation(), 100, Modifier.fillMaxSize(), onMarkerTap = onMarkerTap)
+        OffersMap(markers, center, rememberUserLocation(), 100, Modifier.fillMaxSize(), onMarkerTap = onMarkerTap)
         Row(
             Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = Sc.ScreenPadding, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(11.dp),
         ) {
-            ScCircleButton(ScIcons.ChevronLeft, onClose, size = 46.dp, contentDescription = uiStrings().back)
+            ScBackButton(onClose, contentDescription = uiStrings().back)
             Box(
                 Modifier.clip(RoundedCornerShape(16.dp)).background(Sc.Card)
                     .padding(horizontal = 14.dp, vertical = 10.dp),

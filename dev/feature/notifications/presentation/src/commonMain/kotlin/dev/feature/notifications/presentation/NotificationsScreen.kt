@@ -1,5 +1,6 @@
 package dev.feature.notifications.presentation
 
+import dev.core.uikit.components.ScBackButton
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -78,7 +79,7 @@ fun NotificationsScreen(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(13.dp),
             ) {
-                ScCircleButton(ScIcons.ChevronLeft, onBack, contentDescription = uiStrings().back)
+                ScBackButton(onBack, contentDescription = uiStrings().back)
                 // Sarlavha qatorda YOLG'IZ: ilgari yonida "Hammasi o'qildi" chipi turardi va
                 // "Bildirishnomalar" uch nuqta bilan kesilib qolardi. Tugma endi pastda.
                 ScHeaderTitle(notificationsStrings().title)

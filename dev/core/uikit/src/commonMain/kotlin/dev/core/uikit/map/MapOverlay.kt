@@ -29,6 +29,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.core.uikit.components.AppFontFamily
 import dev.core.uikit.components.AppIcons
+import dev.core.uikit.components.ScBackButtonIconSize
+import dev.core.uikit.components.ScBackButtonSize
+import dev.core.uikit.components.ScHideBottomBar
 import dev.core.uikit.theme.AppPalette
 import dev.core.uikit.theme.Sc
 import dev.core.uikit.locale.uiStrings
@@ -96,11 +99,14 @@ fun OffersMapOverlay(
     // Fon RANGI kerak: xarita sahifasi fon oqimida yig'ilgani uchun ([rememberOffersMapHtml])
     // birinchi kadrlarda WebView hali yo'q — fonsiz o'sha lahzada ostidagi ro'yxat ko'rinib
     // qolardi, go'yo ekran yarim ochilgandek.
+    // Xaritada pastki navigatsiya paneli ko'rsatilmaydi: u xaritaning pastini kesib,
+    // MapLibre'ning zoom/joylashuv tugmalariga yopishib turardi. Xaritadan chiqish yo'li —
+    // yuqoridagi orqaga tugmasi.
+    ScHideBottomBar()
     Box(modifier.fillMaxSize().background(Sc.Bg)) {
         OffersMap(
             markers = markers,
             center = center,
-            dark = palette.dark,
             userLocation = userLocation,
             bottomInset = bottomInset,
             modifier = Modifier.fillMaxSize(),
@@ -119,10 +125,10 @@ fun OffersMapOverlay(
                 horizontalArrangement = Arrangement.spacedBy(9.dp),
             ) {
                 Box(
-                    Modifier.size(46.dp).clip(RoundedCornerShape(13.dp)).background(palette.glass)
-                        .border(1.dp, palette.border, RoundedCornerShape(13.dp)).clickable(onClick = onClose),
+                    Modifier.size(ScBackButtonSize).clip(RoundedCornerShape(12.dp)).background(palette.glass)
+                        .border(1.dp, palette.border, RoundedCornerShape(12.dp)).clickable(onClick = onClose),
                     contentAlignment = Alignment.Center,
-                ) { Icon(AppIcons.ArrowLeft, uiStrings().close, tint = palette.ink, modifier = Modifier.size(18.dp)) }
+                ) { Icon(AppIcons.ArrowLeft, uiStrings().close, tint = palette.ink, modifier = Modifier.size(ScBackButtonIconSize)) }
                 topBarExtras()
             }
 
@@ -139,7 +145,7 @@ fun OffersMapOverlay(
                     // Marker soni EMAS, e'lonlar soni: bitta marker ortida bir biznesning
                     // bir nechta e'loni turishi mumkin.
                     if (markers.isEmpty()) uiStrings().noListingsForFilters
-                    else "${markers.sumOf { it.count }} ta e'lon xaritada",
+                    else uiStrings().listingsOnMap(markers.sumOf { it.count }),
                     style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.5f.sp, fontWeight = FontWeight.Bold, color = Color.White),
                 )
             }

@@ -1,5 +1,6 @@
 package dev.feature.chat.presentation
 
+import dev.core.uikit.components.ScBackButton
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -325,7 +326,7 @@ private fun OpeningThread(onBack: (() -> Unit)?) {
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 if (onBack != null) {
-                    ScCircleButton(ScIcons.ChevronLeft, onBack, contentDescription = uiStrings().back)
+                    ScBackButton(onBack, contentDescription = uiStrings().back)
                 }
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     // Ism hali noma'lum (suhbat qatori kelmagan) — o'rniga skelet qatorlar.

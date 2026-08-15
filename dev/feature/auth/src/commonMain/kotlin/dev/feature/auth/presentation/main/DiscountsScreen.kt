@@ -1,5 +1,6 @@
 package dev.feature.auth.presentation.main
 
+import dev.core.uikit.components.ScBackButton
 import dev.core.uikit.components.scTopInset
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -25,11 +26,13 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.Text
@@ -57,12 +60,14 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import dev.core.domain.model.DiscountCategory
+import dev.core.domain.model.Region
 import dev.core.domain.model.DiscountOffer
 import dev.core.domain.model.DiscountTag
 import dev.core.uikit.components.AppFontFamily
 import dev.core.uikit.components.ScCircleButton
 import dev.core.uikit.components.ScEmptyState
 import dev.core.uikit.components.ScHeader
+import dev.core.uikit.components.ScHideBottomBar
 import dev.core.uikit.components.ScHeaderSubtitle
 import dev.core.uikit.components.ScHeaderTitle
 import dev.core.uikit.components.ScIcons
@@ -225,7 +230,7 @@ private fun CatalogContent(
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 if (onBack != null) {
-                    ScCircleButton(ScIcons.ChevronLeft, onBack, contentDescription = uiStrings().back)
+                    ScBackButton(onBack, contentDescription = uiStrings().back)
                 }
                 Column(Modifier.weight(1f)) {
                     ScHeaderTitle(discountsStrings().title, size = 21f)
@@ -445,7 +450,7 @@ private fun FeedContent(
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 if (onBack != null) {
-                    ScCircleButton(ScIcons.ChevronLeft, onBack, contentDescription = uiStrings().back)
+                    ScBackButton(onBack, contentDescription = uiStrings().back)
                 }
                 Column(Modifier.weight(1f)) {
                     // Chipdan tur tanlangan bo'lsa — sarlavha o'sha tur ("🥟 Somsa");
@@ -672,13 +677,16 @@ private fun MapOverlay(
             FilterButton(state.activeFilterCount, palette, onOpenFilter)
         },
         belowTopBar = {
-            // Kategoriya chiplari — bosilganda markerlar DARHOL filtrlanadi (ro'yxat ham).
-            MapCategoryChips(
-                categories = filterState.availableSubcategories,
-                counts = filterState.subcategoryCounts,
-                selected = state.subcategories.firstOrNull(),
+            // ⚠️ Chiplar **biznes turlari** (Milliy taomlar, Fast food…), bo'limlar
+            // (Osh/Plov, Burgerlar…) EMAS. Xaritada odam "qayerga borishim mumkin" deb
+            // qaraydi — bu do'kon TURI. Bo'lim esa menyu ichidagi taom nomi va u
+            // xaritadagi nuqtani tanlashda hech narsa bermaydi (bug hisoboti #30).
+            MapTypeChips(
+                types = filterState.categories,
+                counts = filterState.typeCounts,
+                selectedId = state.type?.id,
                 palette = palette,
-                onSelect = vm::selectSubcategory,
+                onSelect = vm::selectType,
             )
         },
     )
@@ -786,26 +794,27 @@ private fun DiscountOffer.businessKey(): String {
  * Tanlov DARHOL qo'llanadi: markerlar ham, ostidagi ro'yxat ham bir vaqtda filtrlanadi.
  */
 @Composable
-private fun MapCategoryChips(
-    categories: List<String>,
+private fun MapTypeChips(
+    types: List<DiscountCategory>,
     counts: Map<String, Int>,
-    selected: String?,
+    selectedId: String?,
     palette: AppPalette,
     onSelect: (String?) -> Unit,
 ) {
-    if (categories.isEmpty()) return
+    if (types.isEmpty()) return
     LazyRow(
         Modifier.fillMaxWidth().padding(top = 10.dp),
         contentPadding = PaddingValues(horizontal = 16.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         item {
-            MapChip(discountsStrings().all, selected == null, palette) { onSelect(null) }
+            MapChip(discountsStrings().all, selectedId == null, palette) { onSelect(null) }
         }
-        items(categories, key = { it }) { category ->
-            MapChip(category.withCount(counts[category]), category == selected, palette) {
+        items(types, key = { it.id }) { type ->
+            val label = "${type.emoji} ${type.name}".trim().withCount(counts[type.id])
+            MapChip(label, type.id == selectedId, palette) {
                 // Ikkinchi marta bosilsa — tanlov bekor bo'ladi.
-                onSelect(if (category == selected) null else category)
+                onSelect(if (type.id == selectedId) null else type.id)
             }
         }
     }
@@ -849,6 +858,10 @@ private fun FilterScreen(
     onClose: () -> Unit,
 ) {
     val d = fs.draft
+    // Filtr — to'liq ekranli qatlam va o'z orqaga tugmasi bor: karkasning pastki paneli
+    // va «+» tugmasi ustidan chizilib, «Qo'llash» ni bosib bo'lmas holga keltirardi
+    // (bug hisoboti #27). Panel yashiringach tugma ostidagi ulkan bo'shliq ham keraksiz.
+    ScHideBottomBar()
     Column(Modifier.fillMaxSize().background(palette.bgBrush)) {
         // Sarlavha
         Row(
@@ -943,9 +956,12 @@ private fun FilterScreen(
             Spacer(Modifier.height(16.dp))
         }
 
-        // Pastki panel — Qo'llash (jonli natija soni bilan).
-        // Pastki tab paneli (StudentShell BottomBar ~88.dp) ustidan ko'rinishi uchun bottom padding.
-        Box(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 96.dp)) {
+        // Pastki panel — Qo'llash (jonli natija soni bilan). Karkas paneli yashiringan
+        // ([ScHideBottomBar]), shuning uchun faqat tizim navigatsiyasi uchun chekinish.
+        Box(
+            Modifier.fillMaxWidth().navigationBarsPadding()
+                .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 16.dp),
+        ) {
             Box(
                 Modifier.fillMaxWidth().height(50.dp).clip(RoundedCornerShape(14.dp)).background(palette.primary).clickable(onClick = onApply),
                 contentAlignment = Alignment.Center,
@@ -957,17 +973,15 @@ private fun FilterScreen(
 }
 
 /**
- * discountsStrings().location — bosilganda viloyatlar ro'yxatini ochib beradigan select.
- * Ro'yxat shu yerda, filtrning ichida ochiladi (alohida oyna emas) — filtr o'zi to'liq
- * ekranli qoplama bo'lgani uchun ustiga yana bir oyna qo'yish shart emas.
+ * Viloyat tanlash — bosilganda pastdan **varaq** ochiladi ([RegionPickerSheet]).
  */
 @Composable
 private fun RegionSelect(vm: DiscountsViewModel, palette: AppPalette) {
     val picker by vm.regionPicker.collectAsStateWithLifecycle()
     val selected by vm.selectedRegion.collectAsStateWithLifecycle()
-    var expanded by remember { mutableStateOf(false) }
+    var sheetOpen by remember { mutableStateOf(false) }
 
-    LaunchedEffect(expanded) { if (expanded) vm.loadRegions() }
+    LaunchedEffect(sheetOpen) { if (sheetOpen) vm.loadRegions() }
 
     Column(Modifier.fillMaxWidth().padding(top = 14.dp)) {
         Text(
@@ -978,43 +992,81 @@ private fun RegionSelect(vm: DiscountsViewModel, palette: AppPalette) {
         Row(
             Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp))
                 .background(palette.glass)
-                .border(1.dp, if (expanded) palette.primary else palette.border, RoundedCornerShape(14.dp))
-                .clickable { expanded = !expanded }
+                .border(1.dp, palette.border, RoundedCornerShape(14.dp))
+                .clickable { sheetOpen = true }
                 .padding(horizontal = 13.dp, vertical = 13.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Icon(ScIcons.MapPin, null, tint = palette.primary, modifier = Modifier.size(17.dp))
             Text(
-                selected?.name ?: discountsStrings().allUzbekistan,
+                selected?.name ?: discountsStrings().allRegions,
                 style = TextStyle(fontFamily = AppFontFamily, fontSize = 13.5f.sp, fontWeight = FontWeight.Bold, color = palette.ink),
                 modifier = Modifier.weight(1f),
                 maxLines = 1,
             )
             Icon(AppIcons.ChevronDown, null, tint = palette.inkFaint, modifier = Modifier.size(17.dp))
         }
+    }
 
-        if (expanded) {
-            Spacer(Modifier.size(8.dp))
+    // ⚠️ Ro'yxat ekranning ICHIDA ochilmaydi, VARAQ bo'lib chiqadi.
+    //
+    // Ilgari 14 ta viloyat filtr ustunining o'rtasiga qo'shilardi: ostidagi butun filtr
+    // (biznes turi, saralash, Qo'llash tugmasi) ekrandan pastga surilib ketardi va
+    // foydalanuvchi qayerda turganini yo'qotardi (bug hisoboti #26). Varaq esa ochiladi,
+    // tanlanadi va yopiladi — filtr joyidan qimirlamaydi.
+    if (sheetOpen) {
+        RegionPickerSheet(
+            picker = picker,
+            selectedId = selected?.id,
+            palette = palette,
+            onSelect = { region ->
+                vm.selectRegion(region)
+                sheetOpen = false
+            },
+            onDismiss = { sheetOpen = false },
+        )
+    }
+}
+
+/** Viloyat tanlash varag'i — [RegionSelect] uchun. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun RegionPickerSheet(
+    picker: RegionPickerState,
+    selectedId: String?,
+    palette: AppPalette,
+    onSelect: (Region?) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = Sc.Card,
+        dragHandle = { BottomSheetDefaults.DragHandle() },
+    ) {
+        Column(
+            Modifier.fillMaxWidth()
+                .padding(start = 16.dp, end = 16.dp, bottom = 24.dp)
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Text(
+                discountsStrings().location,
+                style = TextStyle(fontFamily = AppFontFamily, fontSize = 17.sp, fontWeight = FontWeight.Black, color = palette.ink),
+                modifier = Modifier.padding(bottom = 8.dp),
+            )
             when {
-                // Viloyat qatorlari o'rniga o'shalarning skeleti.
-                picker.loading -> ScShimmerList(rows = 5, leading = false, spacing = 10.dp)
-
+                picker.loading -> ScShimmerList(rows = 6, leading = false, spacing = 10.dp)
                 picker.error != null -> Text(
                     picker.error.orEmpty(),
                     style = TextStyle(fontFamily = AppFontFamily, fontSize = 12.5f.sp, color = Color(0xFFDC2626)),
                 )
-
-                else -> Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    RegionOption(discountsStrings().allUzbekistan, selected == null, palette) {
-                        vm.selectRegion(null)
-                        expanded = false
+                else -> {
+                    RegionOption(discountsStrings().allRegions, selectedId == null, palette) {
+                        onSelect(null)
                     }
                     picker.regions.forEach { region ->
-                        RegionOption(region.name, region.id == selected?.id, palette) {
-                            vm.selectRegion(region)
-                            expanded = false
-                        }
+                        RegionOption(region.name, region.id == selectedId, palette) { onSelect(region) }
                     }
                 }
             }

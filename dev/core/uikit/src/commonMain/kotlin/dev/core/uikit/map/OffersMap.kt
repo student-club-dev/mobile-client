@@ -39,7 +39,7 @@ internal const val OFFERS_MAP_BRIDGE = "OffersMapBridge"
  * Barcha e'lonlarni xaritada narx markerlari bilan ko'rsatadi (suriladi/zoom).
  *
  * **MapLibre GL JS + OpenFreeMap** (vektor, GPU, bepul, API kalitsiz) — WebView ichida.
- * Yorug' mavzuda OpenFreeMap "positron", qorong'uda CARTO "dark-matter" (ikkalasi ham tekin).
+ * Uslub ilova mavzusiga ERGASHMAYDI, xarita doim yorug' ([mapStyleUrl] izohiga qarang).
  *
  * @param center xarita boshlang'ich markazi
  * @param onMarkerTap marker bosilganda uning e'lon id'si bilan chaqiriladi
@@ -48,7 +48,6 @@ internal const val OFFERS_MAP_BRIDGE = "OffersMapBridge"
 expect fun OffersMap(
     markers: List<OfferMarker>,
     center: MapPoint,
-    dark: Boolean,
     userLocation: MapPoint?,
     bottomInset: Int,          // pastki tugmalar (zoom/locate) uchun pastdan bo'shliq (px) — tab panel ostida qolmasin
     modifier: Modifier,
@@ -112,7 +111,6 @@ internal fun rememberMapLibreReady(): Boolean {
 internal fun rememberOffersMapHtml(
     markers: List<OfferMarker>,
     center: MapPoint,
-    dark: Boolean,
     userLocation: MapPoint?,
     bottomInset: Int,
 ): String? {
@@ -121,9 +119,9 @@ internal fun rememberOffersMapHtml(
     // Joylashuv ham boshlang'ich qiymatidan olinadi: u kelganda sahifa qayta qurilmaydi,
     // `setMe(...)` bilan faqat ko'k nuqta ko'chadi.
     val initialMe = remember { userLocation }
-    val html by produceState<String?>(null, dark, bottomInset) {
+    val html by produceState<String?>(null, bottomInset) {
         value = withContext(Dispatchers.Default) {
-            offersMapHtml(initialCenter, initialMarkers, dark, initialMe, bottomInset)
+            offersMapHtml(initialCenter, initialMarkers, initialMe, bottomInset)
         }
     }
     return html
@@ -143,15 +141,16 @@ internal fun markersJs(markers: List<OfferMarker>): String =
     }
 
 /** Xarita sahifasi — MapLibre GL JS + OpenFreeMap. */
-internal fun offersMapHtml(center: MapPoint, markers: List<OfferMarker>, dark: Boolean, userLocation: MapPoint?, bottomInset: Int): String {
-    val styleUrl = mapStyleUrl(dark)   // joy tanlash xaritasi bilan bir xil uslub
+internal fun offersMapHtml(center: MapPoint, markers: List<OfferMarker>, userLocation: MapPoint?, bottomInset: Int): String {
+    val styleUrl = mapStyleUrl()   // joy tanlash xaritasi bilan bir xil uslub
     // Chegirma yorliqlari va klaster nuqtasining rangi — ilovadagi "Success" yashili.
     val accentGreen = "#22C55E"
     // Marker rangi: oddiy e'lon — brend ko'ki, bir joyda bir nechtasi — yashil.
     val pinBlue = "#00AEEF"
-    val labelBg = if (dark) "#221E38" else "#ffffff"
-    val labelInk = if (dark) "#F2F0FF" else "#14102D"
-    val labelBorder = if (dark) "rgba(255,255,255,.16)" else "rgba(15,42,67,.10)"
+    // Yorliqlar ham yorug' xaritaga moslangan — mavzuga qarab o'zgarmaydi.
+    val labelBg = "#ffffff"
+    val labelInk = "#14102D"
+    val labelBorder = "rgba(15,42,67,.10)"
     val meJs = if (userLocation != null) "{lat:${userLocation.lat},lng:${userLocation.lng}}" else "null"
     return """
 <!DOCTYPE html>
@@ -162,7 +161,7 @@ internal fun offersMapHtml(center: MapPoint, markers: List<OfferMarker>, dark: B
   <style>${MapLibreAssets.css.orEmpty()}</style>
   <style>
     html, body, #map { margin: 0; padding: 0; height: 100%; width: 100%; }
-    #map { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: ${mapBackgroundColor(dark)}; }
+    #map { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: ${mapBackgroundColor()}; }
     /* Belgilar uchun CSS YO'Q — pin, yorliq, klaster va "mening joylashuvim" nuqtasi
        xaritaning O'Z canvas'i ichida, MapLibre qatlami sifatida chiziladi (pastdagi
        `ensureLayers`). Ilgari ular canvas USTIDAGI HTML elementlar edi: xarita GPU'da,

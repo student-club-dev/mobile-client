@@ -37,7 +37,14 @@ data class DiscountsStrings(
     val serverCount: (Int) -> String = { "$it listings on the server" },
     val apply: (Int) -> String = { "Apply · $it listings" },
     val location: String = "Location",
-    val allUzbekistan: String = "All of Uzbekistan",
+    /**
+     * Viloyat filtri o'chirilgan holat.
+     *
+     * "All of Uzbekistan" EMAS: ro'yxatdagi qolgan qatorlar viloyatlar, ya'ni bu qator ham
+     * ular bilan bir qatorda o'qilishi kerak — "barcha viloyatlar". Eski matn esa
+     * mamlakatni viloyat bilan bir ro'yxatga qo'yib, tanlovni chalkashtirardi (#26).
+     */
+    val allRegions: String = "All regions",
     val save: String = "Save",
     val shopsCount: (Int) -> String = { "$it shops" },
     val studentId: String = "Student ID",
@@ -59,6 +66,16 @@ data class DiscountsStrings(
     val description: String = "Description",
     val attributes: String = "Attributes",
     val branches: (Int) -> String = { "Branches ($it)" },
+    /**
+     * Filiallar sarlavhasi — bitta filial uchun BIRLIK shakl.
+     *
+     * "Branches (1)" mantiqsiz o'qilardi (bug hisoboti #35): bitta narsa ko'plikda
+     * atalgan va yonida yana uning soni turgan.
+     */
+    val branchesLabel: (Int) -> String = { if (it == 1) "Branch" else "Branches · $it" },
+    /** Qolgan filiallarni ochish. */
+    val showMore: (Int) -> String = { "Show $it more" },
+    val onMap: String = "On the map",
     val validUntil: String = "Valid until",
     val notSpecified: String = "Not specified",
     val telegram: (String) -> String = { "Telegram: $it" },
@@ -100,7 +117,7 @@ private val DiscountsRu = DiscountsStrings(
     serverCount = { "$it объявлений на сервере" },
     apply = { "Применить · $it объявл." },
     location = "Расположение",
-    allUzbekistan = "Весь Узбекистан",
+    allRegions = "Все регионы",
     save = "Сохранить",
     shopsCount = { "$it магазинов" },
     studentId = "Student ID",
@@ -121,6 +138,9 @@ private val DiscountsRu = DiscountsStrings(
     description = "Описание",
     attributes = "Характеристики",
     branches = { "Филиалы ($it)" },
+    branchesLabel = { if (it == 1) "Филиал" else "Филиалы · $it" },
+    showMore = { "Показать ещё $it" },
+    onMap = "На карте",
     validUntil = "Срок действия",
     notSpecified = "Не указан",
     telegram = { "Telegram: $it" },
@@ -160,7 +180,7 @@ private val DiscountsUz = DiscountsStrings(
     serverCount = { "Serverda $it ta e'lon" },
     apply = { "Qo'llash · $it ta e'lon" },
     location = "Joylashuv",
-    allUzbekistan = "Butun O‘zbekiston",
+    allRegions = "Barcha viloyatlar",
     save = "Saqlash",
     shopsCount = { "$it ta do'kon" },
     studentId = "Talaba ID",
@@ -181,6 +201,9 @@ private val DiscountsUz = DiscountsStrings(
     description = "Tavsif",
     attributes = "Xususiyatlar",
     branches = { "Filiallar ($it)" },
+    branchesLabel = { if (it == 1) "Filial" else "Filiallar · $it" },
+    showMore = { "Yana $it ta ko'rsatish" },
+    onMap = "Xaritada",
     validUntil = "Amal qilish muddati",
     notSpecified = "Ko'rsatilmagan",
     telegram = { "Telegram: $it" },

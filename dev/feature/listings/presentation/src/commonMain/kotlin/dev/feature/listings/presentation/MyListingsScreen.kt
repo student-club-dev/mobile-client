@@ -1,5 +1,6 @@
 package dev.feature.listings.presentation
 
+import dev.core.uikit.components.ScBackButton
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -82,10 +83,7 @@ fun MyListingsScreen(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 if (onBack != null) {
-                    ScCircleButton(
-                        ScIcons.ChevronLeft, onBack,
-                        background = Sc.Card, tint = Sc.Ink, contentDescription = lt("Orqaga"),
-                    )
+                    ScBackButton(onBack, contentDescription = lt("Orqaga"))
                 }
                 Column(Modifier.weight(1f)) {
                     // Sarlavha filtrga qarab — talaba shell'ida ("Mening e'lonlarim") chegirma

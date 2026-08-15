@@ -56,6 +56,7 @@ import androidx.navigation.navArgument
 import dev.core.common.push.PushRegistrar
 import dev.core.common.push.PushRoute
 import dev.core.uikit.components.ScIcons
+import dev.core.uikit.components.ScImmersive
 import dev.core.uikit.components.LocalScOverlayHost
 import dev.core.uikit.components.ScOverlayHost
 import dev.core.uikit.components.ScOverlayHostState
@@ -504,7 +505,9 @@ fun StudentShell(onLoggedOut: () -> Unit) {
             // ko'tarilgani uchun panel matn maydonining tagida osilib qolardi va joy egallardi.
             val keyboardOpen = WindowInsets.ime.getBottom(LocalDensity.current) > 0
             // Chat endi tab emas — panel u yerda o'z-o'zidan chizilmaydi (`current in tabRoutes`).
-            if (current in tabRoutes && !keyboardOpen) {
+            // `ScImmersive` — to'liq ekranli qatlam (xarita) ochiq: u ekranning har bir
+            // pikselini talab qiladi va panel uning tugmalariga yopishib turardi.
+            if (current in tabRoutes && !keyboardOpen && !ScImmersive.active) {
                 BottomBar(
                     current = current,
                     onSelect = selectTab,

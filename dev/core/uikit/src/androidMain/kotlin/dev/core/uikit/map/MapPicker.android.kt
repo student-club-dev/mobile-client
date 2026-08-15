@@ -16,7 +16,6 @@ import androidx.compose.ui.viewinterop.AndroidView
 @Composable
 actual fun MapPicker(
     initial: MapPoint?,
-    dark: Boolean,
     onCenterChanged: (MapPoint) -> Unit,
     modifier: Modifier,
     centerRequest: MapCenterRequest?,
@@ -32,7 +31,7 @@ actual fun MapPicker(
     // Sahifa fon oqimida yig'iladi — tayyor bo'lmaguncha WebView qurilmaydi. Boshlang'ich
     // markaz FAQAT bir marta olinadi: keyingi ko'chishlar `centerRequest` orqali JS bilan
     // bajariladi, sahifa qayta yuklanmaydi.
-    val html = rememberPickerMapHtml(initial, dark) ?: return
+    val html = rememberPickerMapHtml(initial) ?: return
 
     // Bu holatlar Compose snapshot'i EMAS — `update` ichida o'qish/yozish sikl keltirmaydi.
     val pageReady = remember { Holder(false) }

@@ -1,5 +1,6 @@
 package dev.feature.listings.presentation.detail
 
+import dev.core.uikit.components.ScBackButton
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -189,7 +190,7 @@ private fun GallerySection(listing: Listing, onBack: () -> Unit) {
         }
 
         Box(Modifier.align(Alignment.TopStart).scTopInset().padding(start = Sc.ScreenPadding)) {
-            ScCircleButton(ScIcons.ChevronLeft, onBack, contentDescription = lt("Orqaga"))
+            ScBackButton(onBack, contentDescription = lt("Orqaga"))
         }
     }
 }

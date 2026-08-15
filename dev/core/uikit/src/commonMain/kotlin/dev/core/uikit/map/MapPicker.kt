@@ -39,7 +39,6 @@ data class MapCenterRequest(val point: MapPoint, val id: Int)
 @Composable
 expect fun MapPicker(
     initial: MapPoint?,
-    dark: Boolean,
     onCenterChanged: (MapPoint) -> Unit,
     modifier: Modifier,
     centerRequest: MapCenterRequest?,
@@ -55,10 +54,10 @@ internal const val MAP_BRIDGE = "StudentClubMap"
  * [initial] faqat birinchi chaqiruvdan olinadi — keyingi ko'chishlar `centerRequest` orqali.
  */
 @Composable
-internal fun rememberPickerMapHtml(initial: MapPoint?, dark: Boolean): String? {
+internal fun rememberPickerMapHtml(initial: MapPoint?): String? {
     val initialCenter = remember { initial ?: DefaultMapCenter }
-    val html by produceState<String?>(null, dark) {
-        value = withContext(Dispatchers.Default) { pickerMapHtml(initialCenter, dark) }
+    val html by produceState<String?>(null) {
+        value = withContext(Dispatchers.Default) { pickerMapHtml(initialCenter) }
     }
     return html
 }
@@ -76,7 +75,7 @@ internal fun jsSetCenter(point: MapPoint): String = "setCenter(${point.lat}, ${p
  * Surish/zoom/inersiya MapLibre'ning o'zidan keladi, ya'ni e'lonlar xaritasi bilan bir xil
  * his beradi (ilgari bu qo'lda yozilgan va sezilarli farq qilardi).
  */
-internal fun pickerMapHtml(center: MapPoint, dark: Boolean): String = """
+internal fun pickerMapHtml(center: MapPoint): String = """
 <!DOCTYPE html>
 <html>
 <head>
@@ -86,7 +85,7 @@ internal fun pickerMapHtml(center: MapPoint, dark: Boolean): String = """
   <style>
     html, body, #map { margin: 0; padding: 0; height: 100%; width: 100%; overflow: hidden; }
     #map { position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-           background: ${mapBackgroundColor(dark)}; }
+           background: ${mapBackgroundColor()}; }
     /* Tanlash belgisi — Yandex'dagidek EKRAN MARKAZIDA qotib turadi. */
     #pin { position: fixed; left: 50%; top: 50%; width: 36px; height: 36px;
            margin-left: -18px; margin-top: -36px; pointer-events: none; z-index: 9; }
@@ -94,7 +93,7 @@ internal fun pickerMapHtml(center: MapPoint, dark: Boolean): String = """
     /* Belgi uchi turgan aniq nuqta. */
     #tip { position: fixed; left: 50%; top: 50%; width: 6px; height: 6px;
            margin-left: -3px; margin-top: -3px; border-radius: 50%;
-           background: ${if (dark) "rgba(255,255,255,.6)" else "rgba(20,16,45,.55)"};
+           background: rgba(20,16,45,.55);
            pointer-events: none; z-index: 9; }
     .hint { position: fixed; top: 10px; left: 50%; transform: translateX(-50%); z-index: 10;
             background: rgba(20,16,45,.85); color: #fff; padding: 7px 12px; border-radius: 10px;
@@ -119,7 +118,7 @@ internal fun pickerMapHtml(center: MapPoint, dark: Boolean): String = """
   <script>
     var map = new maplibregl.Map({
       container: 'map',
-      style: '${mapStyleUrl(dark)}',
+      style: '${mapStyleUrl()}',
       center: [${center.lng}, ${center.lat}],
       zoom: $MAP_PICKER_ZOOM,
       attributionControl: false

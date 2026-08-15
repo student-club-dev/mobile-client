@@ -1,5 +1,6 @@
 package dev.feature.chat.presentation.list
 
+import dev.core.uikit.components.ScBackButton
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
@@ -232,7 +233,7 @@ private fun Toolbar(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (onBack != null) {
-            ScCircleButton(ScIcons.ChevronLeft, onBack, contentDescription = uiStrings().back)
+            ScBackButton(onBack, contentDescription = uiStrings().back)
             Spacer(Modifier.width(BackGap))
         }
         Spacer(

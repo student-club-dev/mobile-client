@@ -26,7 +26,6 @@ internal class Holder<T>(var value: T)
 actual fun OffersMap(
     markers: List<OfferMarker>,
     center: MapPoint,
-    dark: Boolean,
     userLocation: MapPoint?,
     bottomInset: Int,
     modifier: Modifier,
@@ -40,7 +39,7 @@ actual fun OffersMap(
     // Sahifa (MapLibre matni bilan birga ~870 KB) fon oqimida yig'iladi — aks holda uni
     // qurish UI oqimini bir necha kadrga bloklardi. Boshlang'ich markaz/markerlar bir marta
     // olinadi; keyingi o'zgarishlar JS orqali (reload YO'Q).
-    val html = rememberOffersMapHtml(markers, center, dark, userLocation, bottomInset) ?: return
+    val html = rememberOffersMapHtml(markers, center, userLocation, bottomInset) ?: return
 
     val htmlHolder = remember { Holder("") }
     val lastMe = remember { Holder<MapPoint?>(null) }

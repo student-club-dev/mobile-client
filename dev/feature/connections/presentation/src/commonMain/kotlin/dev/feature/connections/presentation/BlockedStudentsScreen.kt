@@ -1,5 +1,6 @@
 package dev.feature.connections.presentation
 
+import dev.core.uikit.components.ScBackButton
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -95,7 +96,7 @@ fun BlockedStudentsScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(13.dp),
                 ) {
-                    ScCircleButton(ScIcons.ChevronLeft, onBack, contentDescription = uiStrings().back)
+                    ScBackButton(onBack, contentDescription = uiStrings().back)
                     ScHeaderTitle(s.blockedTitle, modifier = Modifier.weight(1f))
                 }
                 Spacer(Modifier.height(8.dp))

@@ -405,6 +405,9 @@ private fun ListingDetailDto.toDomain(
     validFrom = validFrom.take(10),
     validTo = validTo.take(10),
     imagesCount = imagesCount,
+    // Muqova (`imageUrl`) ro'yxatda bo'lmasa ham birinchi bo'lib qo'shiladi: karta va
+    // tafsilot bir xil rasm bilan ochilishi kerak.
+    images = (listOfNotNull(imageUrl?.takeIf { it.isNotBlank() }) + images).distinct(),
     viewsCount = viewsCount,
     saved = isFavorite,
     attributes = attributes.toOfferAttributes(attributeDefs),

@@ -1,5 +1,6 @@
 package dev.feature.listings.presentation
 
+import dev.core.uikit.components.ScBackButton
 import dev.core.uikit.components.scTopInset
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -139,7 +140,7 @@ private fun ListingKindPicker(
                 horizontalArrangement = Arrangement.spacedBy(14.dp),
             ) {
                 // Dizaynda orqaga hamisha aylana `‹` — X emas.
-                ScCircleButton(ScIcons.ChevronLeft, onClose, size = 44.dp, contentDescription = lt("Orqaga"))
+                ScBackButton(onClose, contentDescription = lt("Orqaga"))
                 ScHeaderTitle(lt("Yangi e'lon"))
             }
             Spacer(Modifier.height(12.dp))
@@ -402,7 +403,6 @@ private fun BranchMapScreen(state: PostListingUiState, palette: AppPalette, vm: 
         Box(Modifier.fillMaxWidth().weight(1f)) {
             MapPicker(
                 initial = userLocation,
-                dark = palette.dark,
                 onCenterChanged = { point -> pickedPoint = point },
                 modifier = Modifier.fillMaxSize(),
                 centerRequest = centerRequest,

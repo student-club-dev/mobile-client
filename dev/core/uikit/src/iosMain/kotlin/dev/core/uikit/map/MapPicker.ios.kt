@@ -22,7 +22,6 @@ import platform.darwin.NSObject
 @Composable
 actual fun MapPicker(
     initial: MapPoint?,
-    dark: Boolean,
     onCenterChanged: (MapPoint) -> Unit,
     modifier: Modifier,
     centerRequest: MapCenterRequest?,
@@ -34,7 +33,7 @@ actual fun MapPicker(
 
     // Sahifa fon oqimida yig'iladi. Boshlang'ich markaz bir marta olinadi; keyingi
     // ko'chishlar JS orqali (reload YO'Q).
-    val html = rememberPickerMapHtml(initial, dark) ?: return
+    val html = rememberPickerMapHtml(initial) ?: return
 
     // Handler WKWebView'dan uzoq yashashi kerak — aks holda JS xabari kelguncha
     // u yig'ib yuboriladi va callback hech qachon chaqirilmaydi.

@@ -1,5 +1,6 @@
 package dev.feature.connections.presentation
 
+import dev.core.uikit.components.ScBackButton
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -111,7 +112,7 @@ fun ConnectionsScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(13.dp),
                 ) {
-                    ScCircleButton(ScIcons.ChevronLeft, onBack, contentDescription = uiStrings().back)
+                    ScBackButton(onBack, contentDescription = uiStrings().back)
                     ScHeaderTitle(s.title, modifier = Modifier.weight(1f))
                 }
             }

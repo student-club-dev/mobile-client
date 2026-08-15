@@ -50,6 +50,8 @@ fun DiscountOffer.toOfflineDetail(saved: Boolean): OfferDetail = OfferDetail(
     title = title,
     emoji = emoji,
     bannerAccent = bannerAccent,
+    // Keshdagi kartada bitta muqova rasmi bor — offline tafsilot ham bo'sh chiqmasin.
+    images = listOfNotNull(imageUrl?.takeIf { it.isNotBlank() }),
     isDiscount = isDiscount,
     discountPercent = discountPercent,
     originalPrice = originalPrice,

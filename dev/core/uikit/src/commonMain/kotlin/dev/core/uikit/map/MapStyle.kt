@@ -11,12 +11,20 @@ package dev.core.uikit.map
  *
  * Ikkala uslub ham bepul va API kalit talab qilmaydi (ma'lumot — OpenStreetMap).
  */
-internal fun mapStyleUrl(dark: Boolean): String =
-    if (dark) "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
-    else "https://tiles.openfreemap.org/styles/liberty" // sariq yo'llar, POI — Yandex uslubi
+/**
+ * ⚠️ Xarita HAR DOIM yorug' — ilova mavzusi qorong'i bo'lganda ham.
+ *
+ * Ilgari qorong'i rejimda CARTO "dark-matter" uslubiga o'tilardi va natija yomon edi:
+ * ko'chalar deyarli ko'rinmas, yashil/ko'k markerlar qora fonda bir-biriga qo'shilib
+ * ketardi. Xarita — rasm emas, MA'LUMOT: unda mo'ljal (ko'cha, bino, suv) o'qilishi
+ * kerak. Yandex Maps, 2GIS va Google Maps ham mobil ilovada sukut bo'yicha aynan shu
+ * yo'ldan boradi — interfeys qorong'i bo'lsa ham xarita yorug' qoladi.
+ */
+internal fun mapStyleUrl(): String =
+    "https://tiles.openfreemap.org/styles/liberty" // sariq yo'llar, POI — Yandex uslubi
 
 /** Plitkalar kelguncha ko'rinadigan fon — xarita "oq ekran" bo'lib turmasin. */
-internal fun mapBackgroundColor(dark: Boolean): String = if (dark) "#12101F" else "#E8E6F2"
+internal fun mapBackgroundColor(): String = "#E8E6F2"
 
 /**
  * WebView'ning baza manzili. Sahifa plitka serveri bilan bir origin'da bo'lsa WebView

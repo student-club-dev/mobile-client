@@ -216,6 +216,43 @@ fun ScHeaderSubtitle(text: String, modifier: Modifier = Modifier) {
 }
 
 /**
+ * **Orqaga tugmasining yagona o'lchami** — ilovadagi HAMMA ekranda bir xil.
+ *
+ * Ilgari har ekran o'zicha berardi: 40, 42, 44, 46 dp va bir nechta "kvadrat" variant.
+ * Ekrandan ekranga o'tganda tugma sezilarli sakrardi, ba'zilari esa sarlavhadan kattaroq
+ * bo'lib ko'zga urilardi (bug hisoboti #28, #35). 38 dp — Material'ning 48 dp tegish
+ * maydonidan kichik emas (tugma atrofidagi bo'sh joy tegishga kiradi), lekin vizual
+ * jihatdan sarlavha bilan muvozanatda.
+ */
+val ScBackButtonSize = 38.dp
+
+/** [ScBackButtonSize] ichidagi belgi o'lchami. */
+val ScBackButtonIconSize = 17.dp
+
+/**
+ * Orqaga qaytish tugmasi — ilovadagi YAGONA ko'rinish.
+ *
+ * Ekranlar `ScCircleButton` ni o'z o'lchami bilan chaqirish o'rniga shuni ishlatadi,
+ * shunda o'lcham bitta joydan boshqariladi.
+ */
+@Composable
+fun ScBackButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    contentDescription: String? = null,
+    icon: ImageVector = ScIcons.ChevronLeft,
+) {
+    ScCircleButton(
+        icon = icon,
+        onClick = onClick,
+        modifier = modifier,
+        size = ScBackButtonSize,
+        iconSize = ScBackButtonIconSize,
+        contentDescription = contentDescription,
+    )
+}
+
+/**
  * Topbar'dagi aylana tugma. Orqaga qaytish uchun hamisha `‹` ([ScIcons.ChevronLeft])
  * ishlatiladi — X emas.
  *

@@ -34,6 +34,13 @@ data class OfferDetail(
     val validFrom: String? = null,
     val validTo: String? = null,
     val imagesCount: Int = 0,
+    /**
+     * E'lonning BARCHA rasmlari (`ListingDetailDto.images`).
+     *
+     * Ilgari faqat [imagesCount] o'qilardi va tafsilot oynasida bironta ham rasm
+     * chizilmasdi — server ularni yuborib turgan bo'lsa ham (bug hisoboti #42).
+     */
+    val images: List<String> = emptyList(),
     val viewsCount: Int = 0,
     val saved: Boolean = false,
     /** Ichki (`_regular`, `_gender`...) kalitlarsiz atributlar — "40 daqiqa", "PS5"... */
@@ -61,7 +68,10 @@ data class OfferBranch(
     val distanceMeters: Int? = null,
     val lat: Double = 0.0,
     val lng: Double = 0.0,
-)
+) {
+    /** Xaritada ko'rsatish uchun haqiqiy koordinata bormi (`0,0` — noma'lum). */
+    val hasLocation: Boolean get() = lat != 0.0 && lng != 0.0
+}
 
 /** Qidiruv qatoridagi takliflar turi (`POST /v1/discounts/suggest`). */
 enum class SuggestionKind { CATEGORY, TYPE, BUSINESS, LISTING }

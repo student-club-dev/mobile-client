@@ -1,5 +1,6 @@
 package dev.feature.settings.presentation
 
+import dev.core.uikit.components.ScBackButton
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -97,7 +98,7 @@ fun SettingsScreen(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(13.dp),
             ) {
-                ScCircleButton(ScIcons.ChevronLeft, onBack, contentDescription = s.back)
+                ScBackButton(onBack, contentDescription = s.back)
                 ScHeaderTitle(s.title, modifier = Modifier.weight(1f))
             }
         }
@@ -130,7 +131,7 @@ fun SettingsScreen(
             SettingRow(
                 ScIcons.MapPin, Sc.TintOrange, Sc.Orange,
                 s.region,
-                settings.region?.name ?: s.allUzbekistan,
+                settings.region?.name ?: s.allRegions,
             ) { regionSheet = true }
             Text(
                 s.regionHint,
@@ -223,7 +224,7 @@ private fun RegionPickerSheet(
             ScText(s.selectRegion, 18f, FontWeight.ExtraBold, Sc.Ink)
             Spacer(Modifier.height(4.dp))
 
-            RegionRow(s.allUzbekistan, selected == null) { onSelect(null) }
+            RegionRow(s.allRegions, selected == null) { onSelect(null) }
 
             when {
                 // Viloyat qatorlari kelguncha — o'sha qatorlarning skeleti.

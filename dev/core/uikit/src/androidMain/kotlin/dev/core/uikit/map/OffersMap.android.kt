@@ -20,7 +20,6 @@ internal class Holder<T>(var value: T)
 actual fun OffersMap(
     markers: List<OfferMarker>,
     center: MapPoint,
-    dark: Boolean,
     userLocation: MapPoint?,
     bottomInset: Int,
     modifier: Modifier,
@@ -37,7 +36,7 @@ actual fun OffersMap(
     // Boshlang'ich markaz/markerlar FAQAT bir marta olinadi. Keyingi o'zgarishlar (qidiruv,
     // filtr, joylashuv) sahifani qayta yuklamasdan JS orqali qo'llaniladi — aks holda har
     // bosilgan harfda MapLibre skripti va barcha plitkalar qaytadan tortilib xarita qotardi.
-    val html = rememberOffersMapHtml(markers, center, dark, userLocation, bottomInset) ?: return
+    val html = rememberOffersMapHtml(markers, center, userLocation, bottomInset) ?: return
 
     // Bu holatlar Compose snapshot'i EMAS — `update` ichida o'qish/yozish sikl keltirmaydi.
     val pageReady = remember { Holder(false) }
