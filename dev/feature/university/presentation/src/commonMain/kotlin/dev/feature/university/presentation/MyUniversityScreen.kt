@@ -68,6 +68,8 @@ import dev.core.uikit.components.ScShimmerList
 import dev.core.uikit.map.MapPoint
 import dev.core.uikit.map.OfferMarker
 import dev.core.uikit.map.OffersMap
+import dev.core.uikit.map.ScLocationLabel
+import dev.core.uikit.map.rememberShowOnMap
 import dev.core.uikit.map.rememberUserLocation
 import dev.core.uikit.theme.Sc
 import dev.core.domain.model.DiscountOffer
@@ -850,7 +852,14 @@ private fun OfferDetailSheet(shop: DiscountOffer, onClose: () -> Unit) {
                 ) { ScText(universityStrings().promoCode(it), 12.5f, FontWeight.ExtraBold, Sc.Brand) }
             }
             Spacer(Modifier.height(12.dp))
-            ScText("📍 ${shop.location ?: universityStrings().defaultLocationFull}", 12.5f, FontWeight.Medium, Sc.Muted)
+            // Manzil bosilsa — do'kon xaritada ochiladi.
+            ScLocationLabel(
+                text = shop.location ?: universityStrings().defaultLocationFull,
+                size = 12.5f,
+                color = Sc.Muted,
+                weight = FontWeight.Medium,
+                onShowOnMap = rememberShowOnMap(shop.merchant, shop.lat, shop.lng),
+            )
         }
     }
 }

@@ -60,6 +60,7 @@ import dev.core.uikit.components.ScImmersive
 import dev.core.uikit.components.LocalScOverlayHost
 import dev.core.uikit.components.ScOverlayHost
 import dev.core.uikit.components.ScOverlayHostState
+import dev.core.uikit.map.ScLocationViewerHost
 import org.koin.compose.koinInject
 import dev.core.uikit.components.scSoftShadow
 import dev.core.uikit.components.scBrandShadow
@@ -294,7 +295,14 @@ fun StudentShell(onLoggedOut: () -> Unit) {
      */
     var profileStudent by remember { mutableStateOf<StudentSummary?>(null) }
 
+    // Manzil xaritasi — butun karkas uchun BITTA. Har bir e'lonning "📍 …" qatori
+    // (bosh ekran, feed, e'lonlar, universitet, tafsilotlar) shu orqali o'z nuqtasini
+    // xaritada ochadi; ekranlar hech narsani uzatmaydi (`LocalScLocationViewer`).
+    //
+    // ⚠️ `LocalScOverlayHost` ICHIDA: xarita pastki navigatsiya panelidan ham yuqorida
+    // chizilishi kerak.
     CompositionLocalProvider(LocalScOverlayHost provides overlay) {
+      ScLocationViewerHost {
         Box(Modifier.fillMaxSize().background(Sc.Bg)) {
             NavHost(
                 navController = nav,
@@ -535,6 +543,7 @@ fun StudentShell(onLoggedOut: () -> Unit) {
                 },
             )
         }
+      }
     }
 }
 

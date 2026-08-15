@@ -33,6 +33,7 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -74,11 +75,14 @@ fun ScText(
     lineHeight: Float = 0f,
     letterSpacing: Float = 0f,
     maxLines: Int = Int.MAX_VALUE,
+    /** Tag chizig'i — bosiladigan matn uchun ([dev.core.uikit.map.ScLocationLabel]). */
+    decoration: TextDecoration? = null,
 ) {
     Text(
         text,
         modifier = modifier,
-        style = scStyle(size, weight, color, lineHeight, letterSpacing),
+        style = scStyle(size, weight, color, lineHeight, letterSpacing)
+            .copy(textDecoration = decoration),
         maxLines = maxLines,
         overflow = TextOverflow.Ellipsis,
     )

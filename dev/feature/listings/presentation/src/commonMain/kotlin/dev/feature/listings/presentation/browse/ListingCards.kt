@@ -29,6 +29,8 @@ import androidx.compose.ui.unit.sp
 import dev.core.uikit.components.AppFontFamily
 import dev.core.uikit.theme.AppPalette
 import dev.core.uikit.theme.Sc
+import dev.core.uikit.map.ScLocationLabel
+import dev.core.uikit.map.rememberShowOnMap
 import androidx.compose.ui.draw.shadow
 import dev.feature.listings.domain.model.ExperienceLevel
 import dev.feature.listings.domain.model.JobCatalog
@@ -117,7 +119,7 @@ private fun RentalCard(
                 FaintLine(if (extra > 0) "$shown · +$extra" else shown, palette)
             }
 
-            MetaLine(distanceLabel, branchLabel, palette)
+            MetaLine(listing, distanceLabel, branchLabel, palette)
         }
     }
 }
@@ -165,7 +167,7 @@ private fun ServiceCard(
 
             PriceLine(priceText(listing, listing.priceUnit.suffix), palette)
 
-            MetaLine(distanceLabel, branchLabel, palette)
+            MetaLine(listing, distanceLabel, branchLabel, palette)
         }
     }
 }
@@ -221,7 +223,7 @@ private fun TaskCard(
 
             PriceLine(priceText(listing, null), palette)
 
-            MetaLine(distanceLabel, branchLabel, palette)
+            MetaLine(listing, distanceLabel, branchLabel, palette)
         }
     }
 }
@@ -276,7 +278,7 @@ private fun JobCard(
                 FaintLine(details.benefits.take(2).joinToString(" · "), palette)
             }
 
-            MetaLine(distanceLabel, branchLabel, palette)
+            MetaLine(listing, distanceLabel, branchLabel, palette)
         }
     }
 }
@@ -325,7 +327,7 @@ private fun DiscountBrowseCard(
                 }
             }
 
-            MetaLine(distanceLabel, branchLabel, palette)
+            MetaLine(listing, distanceLabel, branchLabel, palette)
         }
 
         // Chegirmasiz oddiy e'londa badge() `null` — yorliq umuman chizilmaydi.
@@ -404,14 +406,30 @@ private fun FaintLine(text: String, palette: AppPalette) {
     )
 }
 
-/** "📍 640 m · Chilonzor 9-kvartal" — talabaning asosiy savoli: qayerda va qancha uzoq. */
+/**
+ * "📍 640 m · Chilonzor 9-kvartal" — talabaning asosiy savoli: qayerda va qancha uzoq.
+ *
+ * Qator **bosiladi**: e'lonning eng yaqin filiali xaritada ochiladi. Koordinatasi bo'lmagan
+ * e'londa (server manzilni geokodlamagan) oddiy yozuv bo'lib qoladi.
+ */
 @Composable
-private fun MetaLine(distanceLabel: String?, branchLabel: String?, palette: AppPalette) {
-    val meta = listOfNotNull(
-        distanceLabel?.let { "📍 $it" },
-        branchLabel?.takeIf { it.isNotBlank() },
-    ).joinToString(" · ")
-    if (meta.isNotBlank()) FaintLine(meta, palette)
+private fun MetaLine(
+    listing: Listing,
+    distanceLabel: String?,
+    branchLabel: String?,
+    palette: AppPalette,
+) {
+    val meta = listOfNotNull(distanceLabel, branchLabel?.takeIf { it.isNotBlank() })
+        .joinToString(" · ")
+    if (meta.isBlank()) return
+    val branch = listing.branches.firstOrNull { it.hasValidCoordinates }
+    ScLocationLabel(
+        text = meta,
+        size = 12.5f,
+        color = Sc.Muted,
+        weight = FontWeight.Medium,
+        onShowOnMap = rememberShowOnMap(listing.title, branch?.lat ?: 0.0, branch?.lng ?: 0.0),
+    )
 }
 
 @Composable

@@ -74,6 +74,8 @@ import dev.core.uikit.components.ScHeaderTitle
 import dev.core.uikit.components.ScIcons
 import dev.core.uikit.components.ScNotFoundTitle
 import dev.core.uikit.theme.Sc
+import dev.core.uikit.map.ScLocationLabel
+import dev.core.uikit.map.rememberShowOnMap
 import dev.core.uikit.components.AppIcons
 import dev.core.uikit.components.GlassTextField
 import dev.core.uikit.components.ScShimmerCard
@@ -1295,7 +1297,13 @@ private val BannerHeight = 150.dp
  * hech qachon bo'sh qolmaydi. Matn o'qilishi uchun pastdan qora gradient tushiriladi.
  */
 @Composable
-private fun OfferBanner(offer: DiscountOffer, accent: Color, saved: Boolean, onToggleSaved: () -> Unit) {
+private fun OfferBanner(
+    offer: DiscountOffer,
+    accent: Color,
+    saved: Boolean,
+    onShowOnMap: (() -> Unit)?,
+    onToggleSaved: () -> Unit,
+) {
     Box(Modifier.fillMaxWidth().height(BannerHeight).background(accent.copy(alpha = 0.16f))) {
         ScNetworkImage(url = offer.imageUrl, modifier = Modifier.fillMaxSize()) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -1370,10 +1378,12 @@ private fun OfferBanner(offer: DiscountOffer, accent: Color, saved: Boolean, onT
                 }
             }
             offer.location?.takeIf { it.isNotBlank() }?.let { location ->
-                Text(
-                    "📍 $location",
-                    style = TextStyle(fontFamily = AppFontFamily, fontSize = 11.sp, color = Color.White.copy(alpha = 0.78f)),
-                    maxLines = 1,
+                // Manzil bosilsa — o'sha nuqta xaritada. Koordinatasiz e'londa oddiy yozuv.
+                ScLocationLabel(
+                    text = location,
+                    size = 11f,
+                    color = Color.White.copy(alpha = if (offer.hasLocation) 0.92f else 0.78f),
+                    onShowOnMap = onShowOnMap,
                 )
             }
         }
@@ -1428,7 +1438,12 @@ private fun OfferCard(
             .border(1.dp, palette.border, RoundedCornerShape(18.dp)).clickable(onClick = onOpen),
     ) {
         // Narx, tur yorlig'i va manzil rasm USTIDA; rasm ostida nom va biznes qoladi.
-        OfferBanner(offer, accent, saved) { onToggleSaved(offer, saved) }
+        OfferBanner(
+            offer = offer,
+            accent = accent,
+            saved = saved,
+            onShowOnMap = rememberShowOnMap(offer.merchant, offer.lat, offer.lng),
+        ) { onToggleSaved(offer, saved) }
         Column(
             Modifier.padding(horizontal = 14.dp, vertical = 11.dp),
             verticalArrangement = Arrangement.spacedBy(2.dp),

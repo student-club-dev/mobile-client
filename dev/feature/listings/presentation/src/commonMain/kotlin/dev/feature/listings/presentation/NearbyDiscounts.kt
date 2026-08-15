@@ -1,5 +1,7 @@
 package dev.feature.listings.presentation
 
+import dev.core.uikit.map.rememberShowOnMap
+import dev.core.uikit.map.ScLocationLabel
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -158,17 +160,21 @@ private fun NearbyDiscountCard(
                 }
             }
 
-            // Eng yaqin filial va masofa — talabaning asosiy savoli: "qayerda va qancha uzoq?"
-            val meta = listOfNotNull(
-                distanceLabel?.let { "📍 $it" },
-                branchLabel,
-            ).joinToString(" · ")
+            // Eng yaqin filial va masofa — talabaning asosiy savoli: "qayerda va qancha
+            // uzoq?". Bosilsa o'sha filial xaritada ochiladi.
+            val meta = listOfNotNull(distanceLabel, branchLabel).joinToString(" · ")
             if (meta.isNotBlank()) {
-                Text(
-                    meta,
-                    style = TextStyle(fontFamily = AppFontFamily, fontSize = 10.5f.sp, color = palette.inkFaint),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
+                val branch = listing.branches.firstOrNull { it.hasValidCoordinates }
+                ScLocationLabel(
+                    text = meta,
+                    size = 10.5f,
+                    color = palette.inkFaint,
+                    weight = FontWeight.Medium,
+                    onShowOnMap = rememberShowOnMap(
+                        listing.title,
+                        branch?.lat ?: 0.0,
+                        branch?.lng ?: 0.0,
+                    ),
                 )
             }
         }

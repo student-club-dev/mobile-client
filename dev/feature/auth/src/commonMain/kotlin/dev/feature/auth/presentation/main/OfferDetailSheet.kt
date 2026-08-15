@@ -12,9 +12,7 @@ import dev.core.uikit.components.ScFavoriteButton
 import dev.core.uikit.components.ScHideBottomBar
 import dev.core.uikit.components.ScIcons
 import dev.core.uikit.components.ScNetworkImage
-import dev.core.uikit.map.MapPoint
-import dev.core.uikit.map.OfferMarker
-import dev.core.uikit.map.OffersMapOverlay
+import dev.core.uikit.map.rememberShowOnMap
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -141,8 +139,6 @@ private fun DetailBody(d: OfferDetail, palette: AppPalette) {
     var copied by remember(d.id) { mutableStateOf(false) }
     LaunchedEffect(copied) { if (copied) { delay(1500); copied = false } }
 
-    /** Xaritada ochilgan filial — `null` bo'lsa xarita yopiq. */
-    var mapBranch by remember(d.id) { mutableStateOf<OfferBranch?>(null) }
 
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState())
@@ -283,8 +279,13 @@ private fun DetailBody(d: OfferDetail, palette: AppPalette) {
             DetailSection(discountsStrings().branchesLabel(d.branches.size), palette) {
                 visible.forEach { branch ->
                     // Filial bosilsa — xaritada ko'rsatiladi (manzil matni o'zi
-                    // "qayerda ekan?" degan savolga javob bermaydi).
-                    BranchRow(branch, palette, onClick = { mapBranch = branch }.takeIf { branch.hasLocation })
+                    // "qayerda ekan?" degan savolga javob bermaydi). Xaritani karkasdagi
+                    // umumiy ko'ruvchi ochadi — ilovada bitta yo'l.
+                    BranchRow(
+                        b = branch,
+                        palette = palette,
+                        onClick = rememberShowOnMap(branch.name, branch.lat, branch.lng),
+                    )
                 }
                 if (!allBranches && d.branches.size > BRANCH_PREVIEW) {
                     Text(
@@ -316,24 +317,6 @@ private fun DetailBody(d: OfferDetail, palette: AppPalette) {
         }
     }
 
-    // Filial xaritada — bitta marker, tafsilotning ustida to'liq ekran.
-    mapBranch?.let { branch ->
-        OffersMapOverlay(
-            markers = listOf(
-                OfferMarker(
-                    id = branch.id,
-                    lat = branch.lat,
-                    lng = branch.lng,
-                    label = branch.name,
-                    colorHex = BRANCH_MARKER_COLOR,
-                    highlight = true,
-                ),
-            ),
-            palette = palette,
-            onClose = { mapBranch = null },
-            center = MapPoint(branch.lat, branch.lng),
-        )
-    }
 }
 
 /**

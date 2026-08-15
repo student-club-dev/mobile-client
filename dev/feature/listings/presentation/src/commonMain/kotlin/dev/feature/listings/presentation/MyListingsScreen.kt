@@ -45,6 +45,8 @@ import dev.core.uikit.components.scCard
 import dev.core.uikit.components.scStyle
 import dev.core.uikit.components.scTopInset
 import dev.core.uikit.theme.Sc
+import dev.core.uikit.map.ScLocationLabel
+import dev.core.uikit.map.rememberShowOnMap
 import dev.core.uikit.components.ScShimmerList
 import dev.core.uikit.components.ScPullRefresh
 import dev.feature.listings.domain.model.Listing
@@ -282,12 +284,15 @@ private fun MyListingCard(
             val first = listing.branches.firstOrNull()
             if (first != null) {
                 val extra = listing.branches.size - 1
-                // Bir nechta filial bo'lsa: "📍 Chilonzor filiali — ... +2 filial"
-                ScText(
-                    "📍 ${first.display()}" + if (extra > 0) " ${Lt.moreBranches(extra)}" else "",
-                    11f, FontWeight.Medium, Sc.MutedLight,
-                    Modifier.weight(1f),
-                    maxLines = 1,
+                // Bir nechta filial bo'lsa: "📍 Chilonzor filiali — ... +2 filial".
+                // Bosilsa — birinchi filial xaritada.
+                ScLocationLabel(
+                    text = first.display() + if (extra > 0) " ${Lt.moreBranches(extra)}" else "",
+                    size = 11f,
+                    color = Sc.MutedLight,
+                    weight = FontWeight.Medium,
+                    modifier = Modifier.weight(1f),
+                    onShowOnMap = rememberShowOnMap(listing.title, first.lat, first.lng),
                 )
             } else {
                 Spacer(Modifier.weight(1f))

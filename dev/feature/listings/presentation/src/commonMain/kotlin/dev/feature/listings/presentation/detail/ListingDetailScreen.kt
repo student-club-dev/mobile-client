@@ -1,5 +1,7 @@
 package dev.feature.listings.presentation.detail
 
+import androidx.compose.material3.Icon
+import androidx.compose.foundation.clickable
 import dev.core.uikit.components.ScBackButton
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -48,6 +50,7 @@ import dev.core.uikit.components.scCard
 import dev.core.uikit.components.scStyle
 import dev.core.uikit.components.scTopInset
 import dev.core.uikit.theme.Sc
+import dev.core.uikit.map.rememberShowOnMap
 import dev.core.uikit.components.ScShimmerLine
 import dev.core.uikit.components.ScShimmerBox
 import dev.feature.listings.domain.model.JobCatalog
@@ -394,8 +397,14 @@ private fun BranchesSection(listing: Listing) {
     if (listing.branches.isEmpty()) return
     DetailSection(lt("Manzil")) {
         listing.branches.forEachIndexed { index, branch ->
+            // Filial bosilsa — xaritada. Manzil matni o'zi "bu qayerda?" degan savolga
+            // javob bermaydi, ayniqsa notanish tumanda.
+            val showOnMap = rememberShowOnMap(listing.title, branch.lat, branch.lng)
             Row(
-                Modifier.fillMaxWidth(),
+                Modifier.fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .then(if (showOnMap == null) Modifier else Modifier.clickable(onClick = showOnMap))
+                    .padding(vertical = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
@@ -412,6 +421,9 @@ private fun BranchesSection(listing: Listing) {
                     branch.landmark?.takeIf { it.isNotBlank() }?.let {
                         ScText(it, 12f, FontWeight.Medium, Sc.InkSoft)
                     }
+                }
+                if (showOnMap != null) {
+                    Icon(ScIcons.Map, lt("Xaritada"), tint = Sc.Brand, modifier = Modifier.size(16.dp))
                 }
             }
         }

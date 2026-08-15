@@ -70,6 +70,8 @@ import dev.core.uikit.components.ScShimmerLine
 import dev.core.uikit.components.ScShimmerCard
 import dev.core.uikit.components.ScShimmerBox
 import dev.core.uikit.theme.Sc
+import dev.core.uikit.map.ScLocationLabel
+import dev.core.uikit.map.rememberShowOnMap
 import dev.feature.stories.presentation.StoriesCollapsed
 import dev.feature.stories.presentation.storiesCollapsedStackWidth
 import dev.feature.chat.presentation.rememberPeerProfileSections
@@ -662,7 +664,14 @@ private fun OfferCard(offer: DiscountOffer, onClick: () -> Unit) {
                 }
                 OfferPrice(offer)
                 offer.location?.takeIf { it.isNotBlank() }?.let { location ->
-                    ScText("📍 $location", 10.5f, FontWeight.SemiBold, Color.White.copy(alpha = 0.78f), maxLines = 1)
+                    // Manzil bosilsa xaritada ochiladi; koordinatasi yo'q e'londa
+                    // shunchaki yozuv bo'lib qoladi (bosilmaydi, tagi chizilmaydi).
+                    ScLocationLabel(
+                        text = location,
+                        size = 10.5f,
+                        color = Color.White.copy(alpha = if (offer.hasLocation) 0.92f else 0.78f),
+                        onShowOnMap = rememberShowOnMap(offer.merchant, offer.lat, offer.lng),
+                    )
                 }
             }
         }
@@ -885,9 +894,15 @@ private fun RentalsSection(rentals: List<Listing>, onSeeAll: () -> Unit, onOpen:
                     ScText(listing.title, 16f, FontWeight.ExtraBold, Sc.Ink, maxLines = 1)
                     Spacer(Modifier.height(8.dp))
                     ScText(listing.rentLabel(), 15f, FontWeight.ExtraBold, Sc.Success, maxLines = 1)
-                    listing.locationLabel()?.let { location ->
+                    val branch = listing.branches.firstOrNull()
+                    branch?.address?.takeIf { it.isNotBlank() }?.let { location ->
                         Spacer(Modifier.height(4.dp))
-                        ScText("📍 $location", 11.5f, FontWeight.SemiBold, Sc.MutedLight, maxLines = 1)
+                        ScLocationLabel(
+                            text = location,
+                            size = 11.5f,
+                            color = Sc.MutedLight,
+                            onShowOnMap = rememberShowOnMap(listing.title, branch.lat, branch.lng),
+                        )
                     }
                 }
             }
@@ -1023,13 +1038,6 @@ private fun StudentsSkeleton(title: String, subtitle: String) {
 // ---------------------------------------------------------------------------
 // Matn yordamchilari
 // ---------------------------------------------------------------------------
-
-/**
- * Kartadagi manzil — birinchi filial manzili. Manzil ko'rsatilmagan e'londa `null`
- * (qator umuman chizilmaydi).
- */
-private fun Listing.locationLabel(): String? =
-    branches.firstOrNull()?.address?.takeIf { it.isNotBlank() }
 
 /** "1 500 000 so'm / oy". */
 private fun Listing.rentLabel(): String {
