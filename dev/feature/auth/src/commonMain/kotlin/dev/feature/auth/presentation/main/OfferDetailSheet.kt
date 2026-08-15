@@ -5,6 +5,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.derivedStateOf
+import dev.core.common.format.formatIsoDate
 import dev.core.common.format.formatUzPhoneFull
 import dev.core.uikit.components.ScBackButton
 import dev.core.uikit.components.ScFavoriteButton
@@ -377,16 +378,6 @@ private fun DetailImages(images: List<String>, palette: AppPalette) {
             }
         }
     }
-}
-
-/** `2026-08-07` (ISO) → `07.08.2026`. Format tanilmasa matn o'zgarishsiz qaytadi. */
-internal fun formatIsoDate(iso: String?): String? {
-    val value = iso?.trim()?.takeIf { it.isNotBlank() } ?: return null
-    val parts = value.take(10).split("-")
-    if (parts.size != 3 || parts[0].length != 4) return value
-    val (year, month, day) = parts
-    if (month.length != 2 || day.length != 2) return value
-    return "$day.$month.$year"
 }
 
 /** Tafsilotda darrov ko'rsatiladigan filiallar soni; qolgani «Yana ko'rsatish» ostida. */

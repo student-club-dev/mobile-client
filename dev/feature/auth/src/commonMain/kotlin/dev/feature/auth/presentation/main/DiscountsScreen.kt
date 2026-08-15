@@ -619,10 +619,15 @@ private fun TypeChip(label: String, selected: Boolean, palette: AppPalette, onCl
 }
 
 @Composable
-private fun FilterButton(activeCount: Int, palette: AppPalette, onClick: () -> Unit) {
+private fun FilterButton(
+    activeCount: Int,
+    palette: AppPalette,
+    onClick: () -> Unit,
+    height: Dp = 46.dp,
+) {
     val active = activeCount > 0
     Row(
-        Modifier.height(46.dp).clip(RoundedCornerShape(13.dp))
+        Modifier.height(height).clip(RoundedCornerShape(13.dp))
             .background(if (active) palette.primary else palette.glass)
             .border(1.dp, if (active) palette.primary else palette.border, RoundedCornerShape(13.dp))
             .clickable(onClick = onClick)
@@ -691,9 +696,10 @@ private fun MapOverlay(
         onMarkerTap = { ids -> selectedIds = ids.split(",").filter { it.isNotBlank() } },
         topBarExtras = {
             Box(Modifier.weight(1f)) {
-                GlassTextField(state.query, vm::onQuery, discountsStrings().searchHint, leading = AppIcons.Search, height = 46)
+                // Xaritada boshqaruvlar pastroq balandlikda — orqaga tugmasi bilan bir xil.
+                GlassTextField(state.query, vm::onQuery, discountsStrings().searchHint, leading = AppIcons.Search, height = 38)
             }
-            FilterButton(state.activeFilterCount, palette, onOpenFilter)
+            FilterButton(state.activeFilterCount, palette, onOpenFilter, height = 38.dp)
         },
         belowTopBar = {
             // ⚠️ Chiplar **biznes turlari** (Milliy taomlar, Fast food…), bo'limlar
@@ -838,17 +844,19 @@ private fun MapTypeChips(
 /** Xarita ustidagi chip — fon xarita bo'lgani uchun to'liq qorong'i/oq (shaffof emas). */
 @Composable
 private fun MapChip(label: String, selected: Boolean, palette: AppPalette, onClick: () -> Unit) {
+    // Xarita ustidagi boshqaruvlar ATAYLAB ro'yxatdagilardan kichikroq: bu yerda asosiy
+    // kontent — xaritaning O'ZI, chiplar esa uni to'sib turmasligi kerak (#25).
     Box(
-        Modifier.clip(RoundedCornerShape(11.dp))
+        Modifier.clip(RoundedCornerShape(10.dp))
             .background(if (selected) palette.primary else palette.glassStrong)
-            .border(1.dp, if (selected) palette.primary else palette.border, RoundedCornerShape(11.dp))
+            .border(1.dp, if (selected) palette.primary else palette.border, RoundedCornerShape(10.dp))
             .clickable(onClick = onClick)
-            .padding(horizontal = 13.dp, vertical = 8.dp),
+            .padding(horizontal = 11.dp, vertical = 6.dp),
     ) {
         Text(
             label,
             style = TextStyle(
-                fontFamily = AppFontFamily, fontSize = 12.5f.sp, fontWeight = FontWeight.Bold,
+                fontFamily = AppFontFamily, fontSize = 11.5f.sp, fontWeight = FontWeight.Bold,
                 color = if (selected) Color.White else palette.ink,
             ),
             maxLines = 1,

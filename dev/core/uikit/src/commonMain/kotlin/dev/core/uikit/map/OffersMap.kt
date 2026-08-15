@@ -83,17 +83,32 @@ private object MapLibreAssets {
 internal fun rememberMapLibreReady(): Boolean {
     var ready by remember { mutableStateOf(MapLibreAssets.loaded) }
     LaunchedEffect(Unit) {
-        if (!MapLibreAssets.loaded) {
-            withContext(Dispatchers.Default) {
-                runCatching {
-                    MapLibreAssets.js = Res.readBytes("files/maplibre-gl.js").decodeToString()
-                    MapLibreAssets.css = Res.readBytes("files/maplibre-gl.css").decodeToString()
-                }
-            }
-        }
+        prepareMapAssets()
         ready = MapLibreAssets.loaded
     }
     return ready
+}
+
+/**
+ * MapLibre fayllarini oldindan xotiraga oladi — **ilova ishga tushganda**.
+ *
+ * Ilgari ular xarita birinchi marta ochilganda o'qilardi: 870 KB ni diskdan o'qib matnga
+ * aylantirish, so'ng shu matndan sahifa yig'ish — hammasi foydalanuvchi "Xaritada ko'rish"
+ * ni bosgandan KEYIN boshlanardi va ochilish sezilarli sekin edi (bug hisoboti #29).
+ * Endi bu ish ilova ochilishida, foydalanuvchi hali bosh ekranni ko'rib turgan paytda
+ * bajariladi; xarita ochilganda fayllar allaqachon tayyor.
+ *
+ * Qayta chaqirish xavfsiz: fayllar bir marta o'qiladi.
+ */
+@OptIn(ExperimentalResourceApi::class)
+suspend fun prepareMapAssets() {
+    if (MapLibreAssets.loaded) return
+    withContext(Dispatchers.Default) {
+        runCatching {
+            MapLibreAssets.js = Res.readBytes("files/maplibre-gl.js").decodeToString()
+            MapLibreAssets.css = Res.readBytes("files/maplibre-gl.css").decodeToString()
+        }
+    }
 }
 
 /**

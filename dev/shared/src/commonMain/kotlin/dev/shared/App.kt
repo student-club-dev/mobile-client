@@ -32,6 +32,7 @@ import dev.core.network.media.MediaUrl
 import dev.core.network.media.apiOrigin
 import dev.core.uikit.components.ScToastHost
 import dev.core.uikit.locale.LocalAppLanguage
+import dev.core.uikit.map.prepareMapAssets
 import dev.core.uikit.media.purgeLegacyGalleryMedia
 import dev.core.uikit.theme.AppTheme
 import dev.feature.settings.domain.model.ThemeMode
@@ -99,6 +100,9 @@ private fun AppScaffold(content: @Composable () -> Unit) {
         // marta o'chiriladi. Endi media ilovaning shaxsiy papkasida turadi va galereyada
         // umuman ko'rinmaydi (`StudentClubFolder`).
         runCatching { purgeLegacyGalleryMedia() }
+        // Xarita kutubxonasi (~870 KB) oldindan xotiraga olinadi — "Xaritada ko'rish"
+        // bosilganda u allaqachon tayyor bo'ladi (qarang [prepareMapAssets]).
+        runCatching { prepareMapAssets() }
     }
 
     // Foydalanuvchi tanlagan mavzu (Sozlamalar). SYSTEM bo'lsa qurilma rejimiga ergashadi.

@@ -115,3 +115,30 @@ fun Long.formatAmountShort(): String = when {
     this >= 1_000 -> "${this / 1_000}k"
     else -> "$this"
 }
+
+// ===========================================================================
+// SANA
+// ===========================================================================
+
+/**
+ * ISO sanani ko'rsatish qolipiga o'giradi: `2026-08-07` → `07.08.2026`.
+ *
+ * Backend sanalarni ISO'da beradi va ular ekranga o'sha holicha chiqib qolardi
+ * ("2026-08-07 — 2026-09-06"), holbuki mahalliy qolip — kun.oy.yil.
+ *
+ * Vaqtli qiymat ham qabul qilinadi (`2026-08-07T10:00:00Z`) — faqat sana qismi olinadi.
+ * Format tanilmasa kelgan matn O'ZGARISHSIZ qaytadi: noma'lum qolipni buzib ko'rsatishdan
+ * ko'ra shundayligicha ko'rsatgan xavfsizroq.
+ */
+fun formatIsoDate(iso: String?): String? {
+    val value = iso?.trim()?.takeIf { it.isNotBlank() } ?: return null
+    val parts = value.take(ISO_DATE_LENGTH).split("-")
+    if (parts.size != 3) return value
+    val (year, month, day) = parts
+    if (year.length != 4 || month.length != 2 || day.length != 2) return value
+    if (!(year + month + day).all { it.isDigit() }) return value
+    return "$day.$month.$year"
+}
+
+/** `YYYY-MM-DD` uzunligi. */
+private const val ISO_DATE_LENGTH = 10

@@ -118,4 +118,20 @@ class FormatsTest {
         assertEquals("2M", 2_000_000L.formatAmountShort())
         assertEquals("500", 500L.formatAmountShort())
     }
+
+    @Test
+    fun `ISO sana kun-oy-yil qolipiga o'giriladi`() {
+        assertEquals("07.08.2026", formatIsoDate("2026-08-07"))
+        // Vaqtli qiymatdan faqat sana olinadi.
+        assertEquals("06.09.2026", formatIsoDate("2026-09-06T10:30:00Z"))
+    }
+
+    @Test
+    fun `tanilmagan sana qolipi o'zgartirilmaydi`() {
+        assertEquals("kelishilgan", formatIsoDate("kelishilgan"))
+        assertEquals("07/08/2026", formatIsoDate("07/08/2026"))
+        assertEquals("2026-8-7", formatIsoDate("2026-8-7"))
+        assertNull(formatIsoDate(null))
+        assertNull(formatIsoDate("  "))
+    }
 }
